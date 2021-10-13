@@ -1,0 +1,5 @@
+{
+	"shell_cmd": "~/Documents/0xmin_stff/compilers/compile.sh $file",
+	"selector": "0xmin",
+	"file_patterns":["*.0xmin"],
+}

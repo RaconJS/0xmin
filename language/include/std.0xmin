@@ -1,0 +1,205 @@
+"log.table";
+#{
+	#let vars,main;//variables
+	#let io;//blocks
+	#let switch,increment,adder;//functions
+}
+//#var adder{};
+#{
+	vars{};main{};io{};adder{};
+}
+#var start{#var start->0xmin;};
+{
+	def start;
+}
+#set main{
+	#move->start.start;
+};
+#var red_filt  (){0x20000000;};
+#var white_filt(){0x3fffffff;};
+//#set io{...a};
+#set start{
+	move -0xff;
+	#{start->move;}
+	jump->return;//io.return;
+	def io;
+};
+#set vars{
+	null def var 0;
+	null def var 1;
+	null def var 2;
+	null def var 3;
+};
+#set io=>{
+	null def var input1;//read
+	null def var input2;//read
+	null def var output1;//write
+	null def var output2;
+};
+#var call(foo){
+	foo:(){//foo requirements
+		#{move->this};
+		...code;
+		move->return;
+	}
+	//foo{}//convert foo to block
+	#var returnTo,carryALU;
+	move->carryALU;set;
+	move->returnTo;get;
+	move->foo.return;set;
+	move->carryALU;get;
+	move->foo;
+	jump->foo;
+	#{//runs foo; (changes move pointer)
+		foo{};
+		//#def var a=>{...foo};//use a refference of foo's block.
+		move->foo.return;
+	}
+	null def carryALU;
+	#def returnTo;//move
+	jump foo.return->return;
+	#def return;
+};
+#set switch(array){//alu = n
+	//#{move->this;jump->this;}
+	#let consts{#var relAdr,negative;};#let vars{#var temp;};
+	move->consts.relAdr;red;//alu = move +n;
+	#let move_posative,move_negative;
+	move->move_posative;set;
+	move->consts.negative;nor;
+	move->vars.temp;set;
+	nor;get;//alu = move -n;
+	move->move_negative;set;
+	move->array;
+	switchPart:{
+		null def move_posative;
+		get;
+		null def move_negative;
+		set;
+	}
+	#var mv->0xmin;#mv->move;
+	jump->return;
+	def consts{
+		0x10 def relAdr;//0x10;
+		move -0 def negative;//move -0;
+	};
+	def vars{
+		null def temp;
+	};
+	#move->mv;
+};
+#set increment(){
+	//length=16
+	#let inc;
+	#let notIn,notOut,const_2;
+	#let notIn;
+	//#move->inc;
+	move->notIn def inc;
+	set;
+	nor def const_2;
+	set;
+	blue;
+	move->const_2;
+	blue;
+	red;
+	move->notOut;
+	set;
+	nor;
+	move->notIn;
+	red;
+	//move->inc;
+	{
+		jump->return;
+		null def notIn;
+		null def notOut;
+	}
+};
+#set adder{{
+	#var input1;
+	#let temp,temp0,temp1,carry;
+	#{{//to use:
+		//alu=input2
+		#def let input2;
+		move->this.input1;set;
+		move->input2;get;
+		move->this;jump->this;
+	}}
+	//alu=input2
+	#def let movePos;//#set movePos->carry;
+	move->carry;set;
+	#movePos->move;
+	mainLoop:{//while(carry&input1){
+		#var andVal,const_red,const_2;
+		andGate:{//alu=carry;
+			move->temp0;set;
+			nor def const_2;//let nor=2;
+			set;
+			move->input1;get;
+			nor;
+			move->temp0;//#def let movePos;#movePos->move;
+			if;null;
+			nor;
+			if;{#let then,endLoop;//if(carries){}else{alu=A or B;break;}
+				jump->then;//then
+				def endLoop{//else
+					move->carry;get;
+					move->input1;nor;
+					set;nor;//alu = carry|input1
+					jump->mainLoop.break;
+				}#move->temp0;
+				#def then;
+			}	
+		}
+		move->andVal;set;
+		xorGate:{
+			move->input1;get;
+			{
+				move->const_red;nor;
+				move->temp0;set;nor;
+			}//make sure it doesn't fail by removing 2^29;
+			move->carry;nor;//alu:1000 ; alu = ~(a|b);
+			move->andVal;nor;//1000 nor0001 -> alu:0110
+			//alu = ~(~(a|b)|("a&b"))= a|b & ~(a&b)
+		}
+		move->input1;set;
+		{
+			move->andVal;get;
+			move->const_2;red;
+			move->carry;set;
+		}
+		move->movePos;
+		jump->mainLoop;
+	}
+	#move->input1;
+	{jump->return;}
+	vars:{
+		#set const_red=>red_filt();
+		def const_red;
+		null def input1;
+		null def carry;
+		null def temp0;
+		null def andVal;
+	}
+	null def return;
+}};
+#set chunkLinker{
+}
+#var bridge{{#{
+	var current;
+	var int->0xmin 0;//number of bridges
+	#var parent=this;
+	var next(){
+		#var last,next,int->parent.int;
+		jump->return;//jump+2;
+		null def cmd;
+		#{
+			#set last=current;
+			#set last.next=this;
+			#set current=this;
+		}
+		#set int=>+1;//int++;
+	};
+	#set current;
+}}};
+//#set bridge.next();
+//debugger bridge.current;

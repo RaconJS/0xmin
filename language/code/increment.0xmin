@@ -1,0 +1,49 @@
+/*make file;*/
+null def var returnLbl;
+#let next;
+jump->next;//jump+5;
+#var incrementer,io;
+def io{
+	#var input1,output1,input2,output2;
+	null def input1;
+	null def input2;
+	null def output1;
+	null def output2;
+}
+{
+	#var red_filt   {0x20000000;};
+	#var white_filt {0x3fffffff;};
+	null def let incrementer_notIn;
+	null def let incrementer_notOut;
+	#incrementer{
+		//length=16
+		#let inc;
+		#let notIn,notOut,const_2;
+		#let notIn;
+		#move->inc;
+		move->notIn def inc;
+		set;
+		nor def const_2;
+		set;
+		blue;
+		move->const_2;
+		blue;
+		red;
+		move->notOut;
+		set;
+		nor;
+		move->notIn;
+		red;
+		move->inc;//
+	};
+	#set incrementer.notIn=>incrementer_notIn;
+	#set incrementer.notOut=>incrementer_notOut;
+	move->io.output1 def next;
+	set;
+	move->incrementer.inc;
+	jump->incrementer.inc;
+	def incrementer;
+	#move->incrementer.inc;
+	move->returnLbl;
+	jump->next;//0x1161;
+}

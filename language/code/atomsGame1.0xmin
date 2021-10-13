@@ -1,0 +1,125 @@
+//make file;
+{
+	#var red_filt   {0x20000000;};
+	#var white_filt {0x3fffffff;};
+	#var const_2{0x2;};
+	#var keyCodes{
+		#var isKeyDown(){0x1;};
+	}
+	#var incrementer(){
+		//length=14
+		#{
+			#let notIn,notOut,const_2;
+			#var vars{
+				null def notIn;
+				null def notOut;
+				2 def const_2;
+			};
+			#move->this;
+			#jump->this;
+		}
+		move->notIn;
+		set;
+		nor;//def const 2;
+		set;
+		blue;
+		move->const_2;
+		blue;
+		red;
+		move->notOut;
+		set;
+		nor;
+		move->notIn;
+		red;
+		move->return;
+	};
+	#var import{
+		#var random{null;};
+		#var io{
+			#var input1,output1,input2,output2;
+			null def input1;
+			null def input2;
+			null def output1;
+			null def output2;
+		};
+	};
+	#var startMain{
+		#var start;
+		//#move->this;#jump->this;
+		jump->start;
+		null;
+		def import.io;
+	};
+}
+{
+	def startMain;
+	def let board{
+		#let r{0x20000000;};
+		def r;def r;def r;def r;
+	};
+	def let lazar{
+		1 def let bitNum;//30 bits
+		1 def let filtNum;//3 bits
+		1 def let dir;//4 bits
+	};
+	def let waitForInput{
+		#{move->this;jump->this;}//alu = output;
+		#var userInput;
+		#{
+			#let io;
+			#set io=import.io;
+		}
+		#let temp0;
+		move->io.output1;
+		set;
+		move->keyCodes.isKeyDown;
+		get;
+		nor;
+		move->temp0;//temp0=!isKeyDown;
+		set;
+		move->io.input1;
+		get;
+		nor;
+		move->temp0;
+		nor;//alu=isKeyDown&io.input
+		if;
+		nor;//if(!(isKeyDown&io.input))
+		move->this;
+		if;
+		jump->this;
+		move->io.input1;
+		get;
+		move->return;//return io.input1;
+		null def return;
+	};
+	def let vars{
+		#set startMain.start=>return;
+		def keyCodes.isKeyDown;
+		//def red_filt;
+		//def white_filt;
+		null def let temp0, waitForInput.temp0;
+		null def let temp1;
+	};
+	def let mainLoop{//while true
+		#{move->this;jump->this;}
+		#let next;{//call waitForInput();
+			#let foo,returner;
+			#set foo=waitForInput;
+			move->returner;
+			get;
+			move->foo.return;
+			set;
+			move->foo;
+			jump->foo;//waitForInput()
+			{jump foo.return->next def returner;}
+			#{jump->returner;move->foo.return;}
+		}//alu = 6bit(input)<<1;
+		{
+			1 def let a;
+			move->vars.temp0 def next;
+			set;
+			move 0;
+		}
+		{move->return;}
+	}
+}

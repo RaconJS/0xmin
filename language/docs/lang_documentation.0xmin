@@ -1,0 +1,41 @@
+//based on javascript and C++ like syntax;
+//comment '//'
+/*
+multi
+line
+comment
+*/
+/**/
+//keywords:[
+	//label creation:#var,#let,def,
+	//0xmin pointers:move,jump,
+	//0xmin commmands: null,move,jump,nor,red,blue,get,set,if
+	//misc: 0xmin, 0bmin
+	//keyword labels: this,return,self,break
+//]
+blocks:{
+	{
+		
+	}
+	label:{}
+	#var label{}
+	#var label(){}
+}
+#0xmin;
+#{
+	#let labelVariable;
+	//'#' is similar to '#' in c++. 
+	//'#' = meta operator: allows for out-of-Line (aka meta) code.
+	//'out-of-Line code' is not included in the final machine-code.
+	//#can treat curtain expressions differently than there non-meta versions
+	//e.g.'#set' is not the same as 'set'.
+	#var variableLabel;
+	var null def variableMemory;//this version is not implemented yet
+}
+//'#let,#var' create or redefine a label
+#var label;//assign label to the function scope (named block scope)
+{//block scope
+	#let label1,label2;//assign label to the block scope
+}
+
+//def 

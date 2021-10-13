@@ -1,0 +1,166 @@
+#{
+	//how this language works
+	//0x00000001 to 0x2FFFFFFF
+	{
+		jump->name;
+		let name;
+		def name;
+		jump->name;
+		def name;
+	}
+	{
+		'->' 'A->B'="move A towards B";
+		'<-'  'X A<-B'="move X to A from B";
+		'#' means 'insert high level code' or 'sudo comment' normally for more clear code;also for compiler controll;
+		'move / jump' are used as commands or label variables (int30*)
+		'alu' =  the accumilator value
+		'#void' '#void lbl1,lbl2,lbl3...' for making scoped labels. forget labels.
+		'...' '...name' insert 'function';
+		'null' command does nothing normally null===30;
+		'#let move=lbl1,jump=move,alu=2' = "assuming move is at lbl1" for allow compiler to not use its predicted pointers.
+			'#let move,jump,alu,if,' means: 1.set pointers to this line, 2.alu=null;if=false;
+		'var,def,const':{
+			all define variables;
+			def:{
+				defines a general label;
+				'0x1101:def labelName;'
+				the label is normally known
+				e.g. {
+					0x1101:def labelName;
+				}
+			}
+			var:{
+				#new var labelName(condision)=123;//find a var with value that matches(condision) and set it to 123;
+				0x1101 var;//free label with inisial value
+				var;//free label with a free value
+				var marks a value as a "variable",
+				(#new var  ) looks for such markinings to use as a new variable;
+			}
+			const:{//by default all code is considered neither var or const.
+				#new const labelName(condision);//find a value that stays the same.
+				'const labelName;'
+				'0x1101 const;'
+				const marks a value as a "constant",
+				(#new const) looks for such markinings to use as a new constant;
+			}
+		}
+	}
+	{
+		get;
+		#let if=false;
+		if(true);
+		#let 
+	}
+	{
+
+		0x00d0; <== move +13; <== move->input_not: def increment; <==
+		0x2; <===== nor; <===========================================
+		0x6; <===== set; <===========================================
+		0x4; <===== blue; <==========================================
+		0x0020; <== move +2; <=== move->const_2; <===================
+		0x4; <===== blue; <==========================================
+		0x3; <===== red; <===========================================
+		0x1010; <== move -1; <=== move->temp1; <=====================
+		0x6; <===== set; <===========================================
+		0x2; <===== nor; <===========================================
+		0x1010; <== move -1; <=== move->input_not; <=================
+		0x3; <===== red; <===========================================
+		30; <====== var null; <== var:def increment_return; <========
+		30; <====== var null; <== var:def input_not; <===============
+		30; <====== var null; <== var:def temp1; <===================
+		0x2; <=================== 0x2: def const_2; <================
+	}
+}
+//increment (bad house keeping)
+#increment (in alu) => (out alu);
+#function(let jump,move=jump+0,alu=*input)
+var increment_return,increment;
+{
+	var input_not,const_2,temp1;
+	#{
+		input_not=new;
+		temp1=new;
+		const_2=x=>x&0b11==0b1;
+	}
+	let move=jump,jump=increment,alu=input;
+	move->input_not: def increment;
+	nor;
+	set;
+	blue;
+	move->const_2;
+	blue;
+	red;
+	move->temp1;
+	set;
+	nor;
+	move->input_not;
+	red;
+	def increment_return;
+	#def input_not;
+	#def temp1;
+}
+//call function increment
+{
+	var returnAddress,input;
+	#{
+		input=new;
+	}
+	move->returnAddress;get;move->increment_return;set;
+	move->input;get;
+	move->increment;
+	jump->increment;
+	var = jump(increment_return->jump+1): def returnAddress;
+	move->jump+0;//alu=alu++;
+}
+{//turing machine
+	var;
+	let move->jump:
+	if;null;//clear aluif
+
+	main_loop:{
+		#def_ lineNumber,bitNumber;
+		//bitNumber = ~(2^x);
+		let move->jump:
+		move->line0: def main_loop_start,lineNumber_moveto;
+		if;null;//clear aluif
+		nor;
+		move->main_loop_start:def lineNumber_return;
+		move->states_list;
+		if;
+			jump->var if_0_then;
+				move+0:def elseif_1_then,;//move to next state
+				get;
+				move-0;//return from next state
+			jump->var endif;
+				move+0:def if_0_then;//move to next state
+				get;
+				move-0;//return from next state
+		move->states_current:def endif;
+		set;//let alu=new_state;
+		//decode state
+		{
+			jump var next;
+				var=null:def varList[0],next_state;
+				var=null:def varList[1],~next_state;
+				var=null:def varList[2];
+				const=0x2 #var = (1<<(1<<0)):def bitJumps;
+				const=0x4 #var = (1<<(1<<1));
+				const=0x10 #var = (1<<(1<<2));
+				const=0x100 #var = (1<<(1<<3));
+				const=0x10000 #var = (1<<(1<<4));
+
+				const=0x1ff0 #var={-0xff}:def filters[0];
+			move->varList[0]:def next;
+			#let alu=*next_state;
+			set;
+			nor;
+			move+1;#varList[1];
+			set;
+			move->filters[0];
+			red;
+			nor;
+			move->varList[2];
+
+		}
+	}
+}

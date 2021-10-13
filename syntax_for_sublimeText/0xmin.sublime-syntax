@@ -1,0 +1,287 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/syntax.html
+name:
+  0xmin
+file_extensions:
+  - 0xmin #ec
+scope: source.example-c
+variables:
+  number: '((?<!\w)[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
+  labelName: '([\w\[\]]+)(?!\.)(?!\w)'
+  buildSettingWords: '\!?(make file|log.table|log.code)'
+  equalSigns: '<=>|<=|=>|=|<->|<-|->'
+  commands: 'nor|red|blue|get|set|if'
+contexts:
+  display_0xmin_1:
+    - include: mainScope
+    - match: ;
+      pop: true
+  display_0xmin:
+    - match: '[0x,0b]'
+      scope: variable.parameter #variable.function #constant.numeric.example-c
+    - match: min
+      scope: variable.parameter
+      pop: true
+      #push: display_0xmin_1
+  
+  baseMain:
+    - match: '"'
+      scope: punctuation.definition.string.begin.example-c
+      push: double_quoted_string_"
+    - match: "'"
+      scope: punctuation.definition.string.begin.example-c
+      push:  double_quoted_string_'
+    - match: "`"
+      scope: punctuation.definition.string.begin.example-c
+      push:  double_quoted_string_`
+
+    # Comments begin with a '//' and finish at the end of the line
+    - match:  '//'
+      scope: punctuation.definition.comment.example-c
+      push: line_comment
+
+    - match:  '/\*'
+      scope: punctuation.definition.comment.example-c
+      push: multiple_lines_comment
+  mainScope:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character
+    - include: baseMain
+
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+
+    #basic commands
+    - match: '(?=0[xb]min)'
+      push: display_0xmin
+      scope: variable.parameter
+
+    - match: '\b(def)\b'
+      scope: keyword.declaration
+      push: define_command
+
+    - match: '(#\s*set\b)'
+      scope: keyword.declaration #variable.function
+      push: set_statement
+
+    - match: '\b(nor|red|blue|get|set|if)\b' #'\b(if|else|for|while)\b'
+      scope: variable.function #keyword.control.example-c
+    
+    - match: '\b(move|jump|alu)\b'
+      scope: keyword.control #entity.name.type
+    - match: '\b(this|return|break)\b'
+      scope: variable.parameter
+
+    - match: '\b(let|var)\b'
+      scope: keyword.declaration
+      push: let_statement
+
+    - match: '\bdebugger(\s*.\s*((labels|type|code)[oO]f|log))?\b'
+      scope: keyword.control
+
+    - match: '\bimport\b'
+      scope: keyword.control
+      push: import_statement
+
+    - match: '\.\.\.'
+      scope: keyword.control
+      push: deRefference
+
+    - match: '\b(var|let|const|set|def)\b'
+      scope: variable.function
+
+    - match: '<->'
+      scope: variable.function
+    
+    - match: '->|<-'
+      scope: variable.function
+
+    # Numbers
+    - match: '\b(true|false)\b'
+      scope: constant.numeric.example-c
+
+    - match: '{{number}}' #'((\b0b[0-1]+)|(\s(\+0x|\-0x|0x)[0-9a-fA-F]+)|(\b0[xb])|((\b|[+-](?=[0-9]))[0-9]+))' #'\b(-)?[0-9.]+\b'
+      scope: constant.numeric.example-c
+
+    - match: '\b(null|NaN)\b'
+      scope: constant.numeric.example-c
+
+
+
+    - match: '<=>|<=|=>|='
+      scope: keyword.control
+      push: main_equalsSign
+
+    - match: '{{equalSigns}}'
+      push: main_equalsSign
+
+    - match: '(\+|\/|\-|\*|\~|\&|\||\^|\<\<)'
+      scope: keyword.control
+
+    - match: '\b(new|void)\b'
+      scope: keyword.control
+
+    - match: '#\s*(\([\s\S]*?\)\s*)?\{'
+      scope: variable.function
+      push: higher_code_brackets
+
+    - match: '#'
+      scope: variable.function
+      push: higher_code_singleLine
+    
+    - match: '\{'
+      push: mainScope
+    - match: '\}'
+      pop: true
+
+    #- match: '\['
+    #  push: indexBrackets
+    #- match: '\]'
+    #  pop: true
+    #end line ";"
+        
+
+  main: #build settings
+    #- meta_scope: keyword.declaration
+    - match: '"{{buildSettingWords}}";|\/\/{{buildSettingWords}};(\s|$)|\/\*{{buildSettingWords}};\*\/'
+      scope: keyword.declaration
+    - match: '(?=[^\s])'
+      pop: true
+      push: mainScope
+
+
+  double_quoted_string:
+    - match: '\\.'
+      scope: constant.character.escape.example-c
+  double_quoted_string_":
+    - meta_scope: string.quoted.double.example-c
+    - include: double_quoted_string
+    - match: '"'
+      scope: punctuation.definition.string.end.example-c
+      pop: true
+  double_quoted_string_':
+    - meta_scope: string.quoted.double.example-c
+    - include: double_quoted_string
+    - match: "'"
+      scope: punctuation.definition.string.end.example-c
+      pop: true
+  double_quoted_string_`:
+    - meta_scope: string.quoted.double.example-c
+    - include: double_quoted_string
+    - match: '`'
+      scope: punctuation.definition.string.end.example-c
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.example-c
+    - match: $
+      pop: true
+
+  multiple_lines_comment:
+    - meta_scope: comment.line.example-c
+    - match: '\*\/'
+      pop: true
+
+  higher_code:
+    - include: mainScope
+    - meta_scope: source
+  higher_code_brackets:
+    - match: '}'
+      scope: variable.function
+      pop: true
+    - include: higher_code
+  higher_code_singleLine:
+    - match: ';|}'
+      pop: true
+    - match: '{'
+      pop: true
+      push: mainScope
+    - include: higher_code
+  define_command:
+    - match: '{'
+      pop: true
+      push: mainScope
+    - match: '\b(let|var)\b'
+      scope: variable.function
+    - include: mainScope
+    - include: metacode_define_blocks
+    - meta_scope: source
+    - match: '{{labelName}}' # a.b.c.greenValue
+      scope: entity.name.type
+    - match: '(?=[;:])' #';|:'
+      pop: true
+    - match: '{{equalSigns}}'
+      push: main_equalsSign
+  set_statement:
+    - match: '{'
+      pop: true
+      push: mainScope
+    - include: mainScope
+    - include: metacode_define_blocks
+    - match: '{{labelName}}(?==|=>|->)' #block_scope 
+      scope: entity.name.type #variable.name
+    - match: '(?=[;:])' #';|:'
+      pop: true
+    #- include: define_command
+  let_statement:
+    - include: mainScope
+    - include: metacode_define_blocks
+    - match: '{{labelName}}' #block_scope 
+      scope: variable.name
+    - include: define_command
+  main_equalsSign:
+    - match: '(?=[,;{])'
+      pop: true
+    - include: mainScope
+    - match: '{{labelName}}'
+      pop: true
+  metacode_define_blocks:
+    - match: '{{labelName}}\s*(?=\([^\s{]*?\){)' #class_constructor
+      scope: entity.name.class
+      push: function_params
+    - match: '{{labelName}}\s*(?=\()' #class_constructor "foo();""
+      scope: variable.function
+    
+    - match: '{{labelName}}\s*(?=\{)' #class_constructor
+      scope: entity.name.function
+      pop: true
+  function:
+    - meta_content_scope: meta.function
+    - match: '[a-zA-Z0-9_]+'
+      scope: variable.function
+    - match: \(
+      scope: punctuation.section.group.begin
+      set: function_params
+  function_params:
+    - meta_scope: meta.function.params
+    - match: \)
+      scope: punctuation.section.group.end
+      pop: true
+    - match: '[a-zA-Z0-9_]+'
+      scope: variable.parameter
+
+  indexBrackets:
+    - include: mainScope
+
+  import_statement:
+    - match: '\b(this|lib|mainScope)\b' #|caller|parent
+      scope: variable.function #variable.parameter
+      pop: true
+      push: import_statement1
+    - match: ';'
+      pop: true
+    - include: mainScope
+  import_statement1:
+    - match: ';'
+      pop: true
+    - include: mainScope
+  deRefference:
+    - match: '{{labelName}}'
+      scope: entity.name.enum
+    - match: ';'
+      pop: true
+    - include: mainScope

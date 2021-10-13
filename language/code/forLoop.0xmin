@@ -1,0 +1,101 @@
+"make file";
+"log.code";
+"!log.table";
+//name, def, vars, code, params
+{
+	def var std{
+		#var std.TEST{move->0xmin;jump 0;};
+		import lib "std.0xmin";
+	}
+	//debugger std.TEST;
+	#let inc{
+		#{move->this;}
+		def std.increment();
+		move->return;
+		null def return;
+	}
+	#let if(condition,then,else,endIf){
+		//I can't figure out how to make syntax hylighting make exeptions for the 'if' in this context. here 'if' is a label(function)
+		#{
+			condition(){};
+			then{};
+			else{};
+			endIf;
+			#let then,else,mv->0xmin;
+			mv->move;
+		}
+		
+		if;
+		null;
+		...condition;
+		if;
+		jump->then;
+		def else;
+		jump->return;
+		def then;
+	};
+	//me: writes for loop. forLoop: works first time. me: *has gained the power of the gods*. also me: My genious is, it's almost teriffying.
+	#var for{{//for(let i=0;i<n;i++){print(i);}
+		#var n,i;
+		#let zero,const_2,const_4,temp,redV;
+		#set temp{#var t1,t2,t3;};
+		get_n:{jump+2;10 def n;move->n;get;}
+		move->zero;nor def const_2;
+		move->i;set;//i = (~n)&(~red);
+		#var endMain_move->0xmin;
+		#var startMain_move->0xmin;
+		#{startMain_move->move;}
+		main:{
+			overFlowTest:{
+				#{move->i;get;}
+				move->const_4;
+				if;null;red;
+			}
+			if;{#let mv,then,else;//if('i' has_not_overflowed)
+				#set then{};#set else{};
+				#set mv->0xmin;
+				jump->then;//then
+				jump->else;//else
+				def then{
+					move->i;get;
+					def std.call(inc);
+					move->i;set;
+				}
+				jump->else.return;
+				#{mv->move;}
+				def else{
+					#{endMain_move->move;}
+					jump->main.break;
+				}
+			}
+			move->i;get;nor;//alu=-i = (~i)+1;
+			move->std.io.output1;set;
+			move->startMain_move;jump->main;
+			def var vars{
+				null def i;
+				0x4 def const_4;
+				0x30000000 def zero,redV;//0xfffffff = max_num_white
+				def inc;
+			}
+		}#{move->endMain_move;}
+		move->std.io.output1;set;
+		{move->return;jump->return;}
+		null def return;
+	}};
+	#set std.main{
+		#(){
+			#set std.vars=>{
+				#def var in1;
+				4321;
+				#def var in2;
+				1234;
+			};
+			move->std.adder.input1;set;
+			move->std.vars.in2;get def var MAIN;
+			def std.call(std.adder);
+		}
+		def for;
+		move->std.io.output1;set;
+		jump 0;
+	}
+}

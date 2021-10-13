@@ -1,0 +1,32 @@
+/*make file;*/
+var switch(){
+	//alu = n
+	//#{move->this;jump->this;}
+	#let consts{var relAdr,negative;},vars{var temp;};
+	move->consts.relAdr;red;//alu = move +n;
+	#let move_posative,move_negative;
+	move->move_posative;set;
+	move->consts.negative;nor;
+	move->vars.temp;set;
+	nor;get;//alu = move -n;
+	move->move_negative;set;
+	#var array;
+	move->array;
+	switchPart:{
+		null def move_posative;
+		get;
+		null def move_negative;
+		set;
+	}
+
+	def return;
+	def consts{
+		0x10 def var relAdr;//0x10;
+		move -0 def var negative;//move -0;
+	};
+	def vars{
+		null def var temp;
+	};
+	def array;
+}
+def switch();

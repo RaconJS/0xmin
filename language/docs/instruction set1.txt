@@ -1,0 +1,8 @@
+0:move
+1:jump
+2:nor
+3:red
+4:blue
+5:get (read)
+6:set (write)
+7:if

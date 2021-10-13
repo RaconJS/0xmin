@@ -1,0 +1,32 @@
+#{
+	instructions{//the block is also a label
+		//create labels
+			#let myLabel;//create a label with unlabeled-block-scope 
+			#let myLabel;//over right the label with a new one.
+			#var myLabel//create a label with labeled-block-scope similar to "this.mylabel;"
+		//labels MUST be defined with "def" for them to be used.
+		move -1;//move the data pointer (the pointer is named "move")
+		jump -> myLabel;//move the jump pointer (i.e. "goto" is c++)
+		nor;//logical NOR
+		red;//variable_red_shift
+		blue;//variable_blue_shift(B)
+		set;//write
+		get;//read
+	}
+	1213;//can put numbers instead of keyword instructions
+	0x123 def instructions.myLabel;//def sets a label's address to the current line
+	#let labelName;//"#" the meta symbol. lines and blocks with "#" arn't included in the .filt file
+	1 def labelName,lbl2;
+	jump +2;//jump forward 2 lines
+	move -4;//move data_pointer back 4 lines
+	move->labelName;//move the data_pointer to labelName
+	jump->labelName;
+	{
+
+	}
+}
+
+aBlockLabel{//blocks can be labeled like this
+	def let a;//can also do this REMEMBER to put the "def" first. "let def label;" doesn't work.
+	move->a;
+};

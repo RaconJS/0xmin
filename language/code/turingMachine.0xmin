@@ -1,0 +1,108 @@
+0xmin;
+#{
+	{
+		#let funtion(){
+			code;
+			code1;
+		};
+		#let block = funtion();
+		new block, let void def label;
+	}
+}
+{
+	#{
+		let instructions,worldCenter,coords;
+		let instructions{
+			new [10]=null;
+		};
+	}
+	jump->let startProgram;{
+		new def ioBlock;
+		new def increment.varBlock;
+	}void def startProgram,
+	move -> let worldCenter;
+	move +0 var : def coordsCommand1;
+	get;
+	move -0 var : def coordsCommand2;
+	#let move=jump;//the line above
+	//move-> currentValue;set;
+	move -> const_0x10;
+	jump let lbl;
+	def varBlock{
+		0x10 : def const_0x10;
+		move : def const_move;
+		new[2] = null : def temp,temp[0];
+		temp[0] <- def temp[1];
+		0x1000 : def const_negativeJump;
+	};
+	red, void def lbl;//(value,0x10);
+
+	{//move -> instuction[world[this.coords]];
+		{
+			move -> const_move;
+			nor;
+			move -> let instructionPointer_command_to;
+			set;
+			nor;
+			set;
+		}{
+			move -> const_negativeJump;
+			nor;
+			move -> instructionPointer_command_from;
+			set;
+			nor;
+			set;
+		}
+	}
+	move -> instructions;
+	move +0 var,def instructionPointer_command_to;
+	get;
+	move -0 var,def instructionPointer_command_from;
+	#let if=true;
+	if;
+	jump+2;
+	0x3ffffffe;#{(2^30-1)-1}
+	move->(jump-1);
+	nor;
+	if;//if instruction == 0
+	jump->let then;
+	null : void def else;//== 1 notFinnished
+
+	null : void def then;//== 0 notFinnished
+}
+#let ioBlock{
+	#let input,output;
+	let inputs{
+		new[2] = null def input;
+	};
+	let outputs{
+		null def output;
+		null;
+	};
+};
+#let increment(arg1,arg2){
+	#let notIn,notOut,const_2;
+	#def jump,move,alu;
+	#let varBlock{
+		null def increment.notIn;
+		null def increment.notOut;
+		0x2 def increment.const_2;
+	};
+	{
+		move->notIn;
+		nor 
+		set;
+		blue;
+		move->const_2;
+		blue;red;
+		move->notOut;
+		set;nor;
+		move->notIn;
+		red;
+	}
+};
+{
+	move->input;get;
+	new increment();
+	move->output;set;
+}
