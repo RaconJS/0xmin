@@ -1,20 +1,29 @@
 # 0xmin
-worlds smallest 30bit computer in The Powder Toy.
+Worlds smallest 30bit computer in The Powder Toy.
 
 TPT = ThePowderToy
+
 comes with a compiler, emulator.cpp, the TPT computer itself
+
+old computer documentation
+https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
 
 ## to use
 `./compiler.sh filename.0xmin outputName.filt`
+
 or
+
 `./compiler.sh filename.0xmin outputName.lua`
+
 or
+
 `./compiler.sh filename.0xmin` to send it to The Powder Toy
 
 ## requirements:{
 the following are required for the full 0xmin experience.
 ### node.js v16
 For the `compiler.js`. It uses "`a??b`" and "`a?.b`".
+
 node.js v16 can be installed with the `installer.sh`
 ### ubuntu (strongly recommended)
 Otherwise you will have to:
