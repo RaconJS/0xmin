@@ -1,13 +1,14 @@
 %YAML 1.2
 ---
+#pls_fix_this_spaghetti_
 # See http://www.sublimetext.com/docs/syntax.html
 name:
   0xmin
 file_extensions:
   - 0xmin #ec
-scope: source.example-c
+scope: source.0xmin
 variables:
-  number: '((?<!\w)[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
+  number: '((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
   labelName: '([\w\[\]]+)(?!\.)(?!\w)'
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<=>|<=|=>|=|<->|<-|->'
@@ -26,15 +27,15 @@ contexts:
       #push: display_0xmin_1
   
   baseMain:
-    - match: '"'
-      scope: punctuation.definition.string.begin.example-c
-      push: double_quoted_string_"
-    - match: "'"
-      scope: punctuation.definition.string.begin.example-c
-      push:  double_quoted_string_'
-    - match: "`"
-      scope: punctuation.definition.string.begin.example-c
-      push:  double_quoted_string_`
+    - meta_scope: source.0xmin
+    #- match: ()["'`]
+    #  scope: punctuation.definition.string.begin.0xmin
+    - match: \"
+      push: double_quoted_"
+    - match: \'
+      push: double_quoted_'
+    - match: \`
+      push: double_quoted_`
 
     # Comments begin with a '//' and finish at the end of the line
     - match:  '//'
@@ -44,6 +45,8 @@ contexts:
     - match:  '/\*'
       scope: punctuation.definition.comment.example-c
       push: multiple_lines_comment
+    - match: '{{number}}'
+      scope: constant.numeric
   mainScope:
     # Strings begin and end with quotes, and use backslashes as an escape
     # character
@@ -56,8 +59,8 @@ contexts:
     # other.
 
     #basic commands
-    - match: '(?=0[xb]min)'
-      push: display_0xmin
+    - match: '\b0[xb]min\b' #'\b(?=0[xb]min)\b'
+      #push: display_0xmin
       scope: variable.parameter
 
     - match: '\b(def)\b'
@@ -71,9 +74,13 @@ contexts:
     - match: '\b(nor|red|blue|get|set|if)\b' #'\b(if|else|for|while)\b'
       scope: variable.function #keyword.control.example-c
     
+    - match: '(?<=^|[\n;{}])\s*\b(String)\b(?!\s*\.)' #'\b(if|else|for|while)\b'
+      scope: keyword.declaration #keyword.control
+      push: string_parse
+
     - match: '\b(move|jump|alu)\b'
       scope: keyword.control #entity.name.type
-    - match: '\b(this|return|break)\b'
+    - match: '\b(this|constructor|self|return|break)\b'
       scope: variable.parameter
 
     - match: '\b(let|var)\b'
@@ -122,13 +129,19 @@ contexts:
     - match: '(\+|\/|\-|\*|\~|\&|\||\^|\<\<)'
       scope: keyword.control
 
-    - match: '\b(new|void)\b'
+    - match: '\b(new|delete)\b'
       scope: keyword.control
 
-    - match: '#\s*(\([\s\S]*?\)\s*)?\{'
+    - match: '#(?![\s\S]*?;)(?=[^;]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
       scope: variable.function
       push: higher_code_brackets
 
+    - match: \bvoid\b(?!\s*\.)(?![\s\S]*?;)(?=[^;]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+      scope: keyword.control
+      push: mainScope_void
+
+    - match: \bvoid\b(?!\s*\.)
+      scope: keyword.control
     - match: '#'
       scope: variable.function
       push: higher_code_singleLine
@@ -137,45 +150,43 @@ contexts:
       push: mainScope
     - match: '\}'
       pop: true
-
     #- match: '\['
     #  push: indexBrackets
     #- match: '\]'
     #  pop: true
     #end line ";"
-        
+    - include: define_blocks    
 
   main: #build settings
     #- meta_scope: keyword.declaration
-    - match: '"{{buildSettingWords}}";|\/\/{{buildSettingWords}};(\s|$)|\/\*{{buildSettingWords}};\*\/'
+    - match: '^(?=[\s\S])'
+      scope: keyword.declaration
+      push: startFile
+  startFile:
+    - match: \#?(["'`]){{buildSettingWords}}\1|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
       scope: keyword.declaration
     - match: '(?=[^\s])'
-      pop: true
       push: mainScope
-
+      pop: true
 
   double_quoted_string:
-    - match: '\\.'
+    - match: \\(x([0-9]|[a-f]|[A-F]){2}|[\s\S])?
       scope: constant.character.escape.example-c
-  double_quoted_string_":
-    - meta_scope: string.quoted.double.example-c
+  double_quoted_":
+    - meta_scope: string
     - include: double_quoted_string
-    - match: '"'
-      scope: punctuation.definition.string.end.example-c
+    - match: \"
       pop: true
-  double_quoted_string_':
-    - meta_scope: string.quoted.double.example-c
+  double_quoted_':
+    - meta_scope: string
     - include: double_quoted_string
-    - match: "'"
-      scope: punctuation.definition.string.end.example-c
+    - match: \'
       pop: true
-  double_quoted_string_`:
-    - meta_scope: string.quoted.double.example-c
+  double_quoted_`:
+    - meta_scope: string
     - include: double_quoted_string
-    - match: '`'
-      scope: punctuation.definition.string.end.example-c
+    - match: \`
       pop: true
-
   line_comment:
     - meta_scope: comment.line.example-c
     - match: $
@@ -189,11 +200,34 @@ contexts:
   higher_code:
     - include: mainScope
     - meta_scope: source
+
   higher_code_brackets:
+    - match: '[()]'
+      scope: variable.function
+    - match: '{'
+      scope: variable.function
+      push: higher_code_brackets1
+    - include: mainScope
+  higher_code_brackets1:
     - match: '}'
       scope: variable.function
-      pop: true
+      pop: 2
     - include: higher_code
+  mainScope_void:
+    - match: '[()]'
+      scope: keyword.control
+    - match: '{'
+      scope: keyword.control
+      push: mainScope_void1
+    - match: \b(let|var|set|def)\b
+      scope: keyword.declaration
+    - include: mainScope
+  mainScope_void1:
+    - match: '}'
+      scope: keyword.control
+      pop: 2
+    - include: mainScope
+
   higher_code_singleLine:
     - match: ';|}'
       pop: true
@@ -211,7 +245,7 @@ contexts:
     - include: metacode_define_blocks
     - meta_scope: source
     - match: '{{labelName}}' # a.b.c.greenValue
-      scope: entity.name.type
+      scope: entity.name.type #label
     - match: '(?=[;:])' #';|:'
       pop: true
     - match: '{{equalSigns}}'
@@ -228,6 +262,8 @@ contexts:
       pop: true
     #- include: define_command
   let_statement:
+    - match: '{'
+      pop: true
     - include: mainScope
     - include: metacode_define_blocks
     - match: '{{labelName}}' #block_scope 
@@ -236,18 +272,33 @@ contexts:
   main_equalsSign:
     - match: '(?=[,;{])'
       pop: true
+    - include: metacode_define_blocks
     - include: mainScope
     - match: '{{labelName}}'
+      scope: variable
       pop: true
-  metacode_define_blocks:
+  define_blocks:
     - match: '{{labelName}}\s*(?=\([^\s{]*?\){)' #class_constructor
-      scope: entity.name.class
+      scope: entity.name.function #class
       push: function_params
-    - match: '{{labelName}}\s*(?=\()' #class_constructor "foo();""
+
+    - match: '{{labelName}}\s*(?=(=>)?\()' #class_constructor "foo();""
       scope: variable.function
     
     - match: '{{labelName}}\s*(?=\{)' #class_constructor
-      scope: entity.name.function
+      scope: entity.name.namespace #entity.name.function
+  metacode_define_blocks:
+    - match: '{{labelName}}\s*(?=\([^\s{]*?\){)' #class_constructor
+      scope: entity.name.function #class
+      push: function_params
+      pop: true
+
+    - match: '{{labelName}}\s*(?=(=>)?\()' #class_constructor "foo();""
+      scope: variable.function
+      pop: true
+
+    - match: '{{labelName}}\s*(?=\{)' #class_constructor
+      scope: entity.name.namespace #entity.name.function
       pop: true
   function:
     - meta_content_scope: meta.function
@@ -285,3 +336,9 @@ contexts:
     - match: ';'
       pop: true
     - include: mainScope
+  string_parse: # String move(10,3),"dasda",
+    - include: baseMain
+    - match: (move|col) #\s*(?=[,;])
+      scope: variable.parameter #variable.function #keyword.declaration
+    - match: ;
+      pop: true

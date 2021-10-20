@@ -1,0 +1,76 @@
+{
+	"scope": "source.0xmin",// - variable.other.php",
+	"completions":[
+		{
+			"trigger": "import",
+			"annotation": "import std",
+			"contents": "import lib \"std.0xmin\"",
+			"kind": "snippet",
+			"details": "imports the standard library"
+		},
+		{
+			"trigger":"debugger",
+			"contents":"debugger",
+			"kind":"keyword",
+		},
+			/*{
+				"contents":"debugger.labelsOf",
+				"trigger":"debugger.",
+				"kind":"Keyword",
+				"annotation":"labelsOf",
+			},
+			{
+				"contents":"debugger.log",
+				"trigger":"debugger.",
+				"kind":"Keyword",
+				"annotation":"log",
+			},
+			{
+				"contents":"debugger.codeOf",
+				"trigger":"debugger.",
+				"kind":"Keyword",
+				"annotation":"codeOf",
+			},
+			{
+				"contents":"debugger.typeof",
+				"trigger":"debugger.",
+				"kind":"Keyword",
+				"annotation":"typeof",
+			},*/
+		//----
+		{
+			"trigger":"import",
+			"contents":"import",
+			"kind":"keyword",
+		},{
+			"trigger":"var",
+			"contents":"var ${1:name}",
+			"kind":"variable",
+			"annotation": "object scope",
+			"details": "creates new variable"
+		},{
+			"trigger":"let",
+			"contents":"let ${1:name}",
+			"kind":"variable",
+			"annotation": "block scope",
+			"details": "creates new variable"
+		},{
+			"trigger":"set",
+			"contents":"set ${1:name} = ${2:name2}",
+			"kind":"variable",
+			"annotation": "set variable",
+			"details": "assigns values to existing variable"
+		},{
+			"trigger":"def ${1:name}",
+			"contents":"def",
+			"annotation": "define",
+			"annotation": "defines variables memory location (aka address)",
+		},
+
+		{
+			"trigger":"class",
+			"contents":"let ${1:className} {\n\t${2:...constructor}\n} : {\n\t${3:...static}\n}",
+			//"kind":"type",
+		}
+	]
+}
