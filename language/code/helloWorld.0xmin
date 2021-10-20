@@ -1,0 +1,159 @@
+#"!log.code"
+#"make file"
+#"log.table"
+#var std{
+	//import lib "std.0xmin";
+	#set main{
+		#move->0xmin 0;
+	};
+	#let switch,increment,adder,call,String;
+	#let red_filt  {0x20000000;};//'red_filt;'
+	#let white_filt{0x3fffffff;};
+	//#set io{...a};
+	#set start{
+		jump->main;//io.return;
+		jump 0;
+	};
+
+	#set io=>{
+		null def var input1;//move;get;
+		null def var input2;
+		null def var output1;//move;set;
+		null def var output2;
+	}:{
+		#var 
+	};
+	#set print(){move->io.output1;set;}
+	#set increment(){
+		//length=16
+		#let inc;
+		#let notIn,notOut,const_2;
+		#let notIn;
+		//#move->inc;
+		move->notIn def inc;
+		set;
+		nor def const_2;
+		set;
+		blue;
+		move->const_2;
+		blue;
+		red;
+		move->notOut;
+		set;
+		nor;
+		move->notIn;
+		red;
+		//move->inc;
+		{
+			jump->return;
+			null def notIn;
+			null def notOut;
+		}
+	};
+	#set switch(array){//alu = n
+		//#{move->this;jump->this;}
+		#let consts{#var relAdr,negative;};#let vars{#var temp;};
+
+		move->consts.relAdr;red;//alu = move +n;
+		#let move_posative,move_negative;
+		move->move_posative;set;
+		move->consts.negative;nor;
+		move->vars.temp;set;
+		nor;//alu = move -n;
+		move->move_negative;set;
+		move->array;
+		switchPart:{
+			null def move_posative;
+			get;
+			null def move_negative;
+			set;
+		}
+		#var mv->0xmin;#mv->move;
+		jump->return;
+		def consts{
+			0x10 def relAdr;//0x10;
+			move -0 def negative;//move -0;
+		};
+		def vars{
+			null def temp;
+		};
+		#move->mv;
+	};
+	#let String:{
+		#let print(string){//nonLocal string;
+				#let shift_1;//where shift_1&3==2;
+				#let next;
+				jump->next;
+				null def let i;
+				null def let val;
+				red_filt() def let const_0;
+				endStringTester() def let endStringTest;
+				move->const_0 def next;
+				get;
+				move->i;
+				set;//alu=i=0;
+				#let mv->0xmin;
+				#mv->move;
+			#def let loop;
+				#var loop.endMove->0xmin,loop.break;
+				switch(string);//alu= string[i];
+			#def let checker;
+				xor:{
+
+				}
+				{
+					if;null;
+					move->endStringTest;nor;
+					if;
+					jump+2;#loop.endMove->move;
+					jump->loop.break;
+					nor;
+				}
+			#def var checker.end;
+				move->terminal.o;set;//cout<<string[i];
+				move->i;get;
+				increment();//alu=i+1;
+				std.print();//move->io.output1;set;//print(i);
+				move->i;set;//i++;
+				move->mv;
+				jump->loop;
+			#def loop.break;
+				#move->loop.endMove;
+				move->0xmin 1;
+				jump->0xmin 1;//hault
+		}
+		#var Char{
+			#var print(){
+				move->terminal.output;set;
+			}
+		}
+		#let endStringTester{0x10000000;}
+		#let end{0x2fffffff;}
+		screen{
+
+		}
+	}
+}
+//debugger std;
+void{...std;}
+
+#set main=>{};
+#let terminal{
+	#var i,o;
+	#var init(io){
+		#set i=io.input2;
+		#set o=io.output2;
+	}
+	init(io);
+}
+jump->main;
+jump 0;
+def io;
+def terminal;
+#def let string;#set string;
+String (col(0xf,0),move(1,2),"hello world");
+def String.end;
+def main;
+def String.print(string);
+
+//red_filt() def var string.end;

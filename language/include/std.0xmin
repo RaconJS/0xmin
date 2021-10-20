@@ -1,28 +1,26 @@
-"log.table";
+"!log.table";
 #{
 	#let vars,main;//variables
 	#let io;//blocks
-	#let switch,increment,adder;//functions
+	#let switch,increment,adder,call;//functions
+	#let hault,print;//functions
 }
-//#var adder{};
-#{
+#{#var aa;
 	vars{};main{};io{};adder{};
 }
-#var start{#var start->0xmin;};
+#let start{#var start->0xmin;}
 {
 	def start;
 }
 #set main{
 	#move->start.start;
 };
-#var red_filt  (){0x20000000;};
-#var white_filt(){0x3fffffff;};
+#let red_filt  {0x20000000;};//'red_filt;'
+#let white_filt{0x3fffffff;};
 //#set io{...a};
 #set start{
-	move -0xff;
-	#{start->move;}
-	jump->return;//io.return;
-	def io;
+	jump->main;//io.return;
+	jump 0;
 };
 #set vars{
 	null def var 0;
@@ -31,16 +29,19 @@
 	null def var 3;
 };
 #set io=>{
-	null def var input1;//read
-	null def var input2;//read
-	null def var output1;//write
+	null def var input1;//move;get;
+	null def var input2;
+	null def var output1;//move;set;
 	null def var output2;
 };
-#var call(foo){
+#set print(){move->io.output1;set;}
+#set hault(){def print();move->0xmin 1;jump 0;}
+#set call(foo){
 	foo:(){//foo requirements
 		#{move->this};
 		...code;
 		move->return;
+		null def return;
 	}
 	//foo{}//convert foo to block
 	#var returnTo,carryALU;
@@ -56,64 +57,11 @@
 		move->foo.return;
 	}
 	null def carryALU;
-	#def returnTo;//move
-	jump foo.return->return;
-	#def return;
-};
-#set switch(array){//alu = n
-	//#{move->this;jump->this;}
-	#let consts{#var relAdr,negative;};#let vars{#var temp;};
-	move->consts.relAdr;red;//alu = move +n;
-	#let move_posative,move_negative;
-	move->move_posative;set;
-	move->consts.negative;nor;
-	move->vars.temp;set;
-	nor;get;//alu = move -n;
-	move->move_negative;set;
-	move->array;
-	switchPart:{
-		null def move_posative;
-		get;
-		null def move_negative;
-		set;
-	}
-	#var mv->0xmin;#mv->move;
-	jump->return;
-	def consts{
-		0x10 def relAdr;//0x10;
-		move -0 def negative;//move -0;
-	};
-	def vars{
-		null def temp;
-	};
-	#move->mv;
-};
-#set increment(){
-	//length=16
-	#let inc;
-	#let notIn,notOut,const_2;
-	#let notIn;
-	//#move->inc;
-	move->notIn def inc;
-	set;
-	nor def const_2;
-	set;
-	blue;
-	move->const_2;
-	blue;
-	red;
-	move->notOut;
-	set;
-	nor;
-	move->notIn;
-	red;
-	//move->inc;
-	{
-		jump->return;
-		null def notIn;
-		null def notOut;
-	}
-};
+	jump foo.return->return def returnTo;//move;
+	//#def return;
+}#set call{
+
+}
 #set adder{{
 	#var input1;
 	#let temp,temp0,temp1,carry;
@@ -125,7 +73,7 @@
 		move->this;jump->this;
 	}}
 	//alu=input2
-	#def let movePos;//#set movePos->carry;
+	#def let movePos->0xmin;//#set movePos->carry;
 	move->carry;set;
 	#movePos->move;
 	mainLoop:{//while(carry&input1){
@@ -171,7 +119,7 @@
 		jump->mainLoop;
 	}
 	#move->input1;
-	{jump->return;}
+	{move->return;jump->return;}
 	vars:{
 		#set const_red=>red_filt();
 		def const_red;
@@ -182,14 +130,69 @@
 	}
 	null def return;
 }};
+#set switch(array){//alu = n
+	//#{move->this;jump->this;}
+	#let consts{#var relAdr,negative;};#let vars{#var temp;};
+
+	move->consts.relAdr;red;//alu = move +n;
+	#let move_posative,move_negative;
+	move->move_posative;set;
+	move->consts.negative;nor;
+	move->vars.temp;set;
+	nor;//alu = move -n;
+	move->move_negative;set;
+	move->array;
+	switchPart:{
+		null def move_posative;
+		get;
+		null def move_negative;
+		set;
+	}
+	#var mv->0xmin;#mv->move;
+	jump->return;
+	def consts{
+		0x10 def relAdr;//0x10;
+		move -0 def negative;//move -0;
+	};
+	def vars{
+		null def temp;
+	};
+	#move->mv;
+};
+#set increment(){
+	//length=16
+	#let inc;
+	#let notIn,notOut,const_2;
+	#let notIn;
+	//#move->inc;
+	move->notIn def inc;
+	set;
+	nor def const_2;
+	set;
+	blue;
+	move->const_2;
+	blue;
+	red;
+	move->notOut;
+	set;
+	nor;
+	move->notIn;
+	red;
+	//move->inc;
+	{
+		jump->return;
+		null def notIn;
+		null def notOut;
+	}
+};
 #set chunkLinker{
 }
 #var bridge{{#{
 	var current;
 	var int->0xmin 0;//number of bridges
-	#var parent=this;
+	#var parent=bridge;
 	var next(){
-		#var last,next,int->parent.int;
+		#var last,next,int=parent.int;
 		jump->return;//jump+2;
 		null def cmd;
 		#{
@@ -197,9 +200,8 @@
 			#set last.next=this;
 			#set current=this;
 		}
-		#set int=>+1;//int++;
+		#set int+1;//int++;
+		//#var parent=parent;
 	};
 	#set current;
 }}};
-//#set bridge.next();
-//debugger bridge.current;

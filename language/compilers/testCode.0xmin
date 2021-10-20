@@ -1,32 +1,51 @@
-"log.code";
-"make file";
-"log.table";
+#"log.code"
+#"make file"
+#"!log.table"
 //name, def, vars, code, params
 //'#(){...} is for commenting out code. it creates a function that cannot be accessed and so cannot be run'
-#let a;
+
 {
-	#set a=>this;
-	debugger.log a "label.code.length";
+	import "../code/helloWorld.0xmin";
 }
-debugger.log a "label.code.length";//should return ["GLOBAL SCOPE"]
 #(){
 	#let std{
 		import lib "std.0xmin";
-		def start;
 	}
+	def std;
+	#set std.start{jump->main def return;}
 	#let array;
-	def let switch=std.switch(array);
+	0x000ff000;
+	def let switch{
+		#{move->this;jump->this;}
+		def std.switch(array);
+		move->return;
+		null def switch.return;
+	}
 	def array{
-		11;22;33;44;
+		111;222;333;444;
 	}
 	def let vars{
 		2 def 0;
 	}
 	def std.main{
-
+		#var input;
+		move->input;get;
+		{
+			def let caller=std.call(switch);
+			2 def input;
+			#def caller.return;
+		}
+		def std.print;
+		null;
+		null;
+		null;
+		null;
+		null;
+		null;
+		jump-6;
 	}
 }
-fibinacci_sequence:{
+#(){//fibinacci_sequence
 	import lib "std.0xmin";
 	#var inputs{234;};
 	#set start{
