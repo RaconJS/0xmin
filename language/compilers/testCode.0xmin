@@ -1,80 +1,79 @@
-#"log.code"
-#"make file"
-#"!log.table"
-//name, def, vars, code, params
-//'#(){...} is for commenting out code. it creates a function that cannot be accessed and so cannot be run'
-
-{
-	import "../code/helloWorld.0xmin";
-}
+#"log.code";
+#"!log.table";
+#"make file";
 #(){
-	#let std{
-		import lib "std.0xmin";
-	}
-	def std;
-	#set std.start{jump->main def return;}
-	#let array;
-	0x000ff000;
-	def let switch{
-		#{move->this;jump->this;}
-		def std.switch(array);
-		move->return;
-		null def switch.return;
-	}
-	def array{
-		111;222;333;444;
-	}
-	def let vars{
-		2 def 0;
-	}
-	def std.main{
-		#var input;
-		move->input;get;
-		{
-			def let caller=std.call(switch);
-			2 def input;
-			#def caller.return;
+	let object{
+		var array{11;22;object};
+		var property=4;
+		var method(b){
+			...code;
+			return;
 		}
-		def std.print;
-		null;
-		null;
-		null;
-		null;
-		null;
-		null;
-		jump-6;
+		var class()={
+			constructor;
+			this;
+			move->continue;
+			move->return;
+		}::{
+			var staticProperty;
+			var set prototype{
+				var instanceProperty;
+			}
+		}
+		var subObject{//subObject
+			var property2;
+		}
 	}
 }
-#(){//fibinacci_sequence
+{
 	import lib "std.0xmin";
-	#var inputs{234;};
-	#set start{
-		#let mv->0xmin;
-		#{mv->move;}
-		0x000ff000;
-		def adder;
-		def inputs;
-		#{move->mv;}
+	def io;
+	def main;
+	#let str=...String.move(2,2)...String.col(15,0)..."Hello World";
+	//#set str{String.move(2,2);String.col(15,0);}
+	printString(pos,str)={
+		var n->pos;//debugger n;
+		var n1->n;
+		var next(){
+			//debugger str[n1];
+			//debugger.log str[n1]"getCode(label).map(v=>v.croppedSource)";
+			move->5;
+			get;
+			move->terminal.output;
+			set;
+			jump+3;
+			def str[n1];
+			0x3fffffff
+			#n+1;
+			#set n1->n+(+n1)+1;
+		}
 	}
-	#set inputs{
-		1 def var n0;
-		1 def var n1;
+	#let a;
+	#let itter=printString(str=str,pos=a);
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	hault();
+	0x3ffff000;
+	#def a;
+}
+#(){//test
+	#let String;
+	#var std{
+		#let red_filt  {0x20000000;};//'red_filt;'
+		#set String{
+			#var print(string){//nonLocal string;
+				debugger.typeof red_filt;
+				red_filt() def let const_0;
+			}
+		}
 	}
-	def main{//fibinacci sequence
-		#var mv->0xmin;#mv->move;
-		move->inputs;
-		move->inputs.n0;get;move->adder.input1;set;
-		move->inputs.n1;get;
-		def call(adder);
-		#var temp;
-		move->temp;set;
-		move->inputs.n1;get;
-		move->inputs.n0;set;
-		move->temp;get;
-		move->inputs.n1;set;
-		move->io.output1;set;
-		move->mv;
-		jump->this;
-		null def temp;
-	}
+	//void{...std;}
+	def String.print(string);
+	//debugger std;
 }

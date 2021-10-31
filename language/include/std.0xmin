@@ -1,17 +1,14 @@
-"!log.table";
+"log.table";
+#set asd;
 #{
 	#let vars,main;//variables
 	#let io;//blocks
 	#let switch,increment,adder,call;//functions
 	#let hault,print;//functions
-}
-#{#var aa;
 	vars{};main{};io{};adder{};
 }
 #let start{#var start->0xmin;}
-{
-	def start;
-}
+def start;
 #set main{
 	#move->start.start;
 };
@@ -21,22 +18,17 @@
 #set start{
 	jump->main;//io.return;
 	jump 0;
+	def main;
 };
-#set vars{
-	null def var 0;
-	null def var 1;
-	null def var 2;
-	null def var 3;
-};
+#set let printInt()={move->io.output1;set;}
 #set io=>{
 	null def var input1;//move;get;
 	null def var input2;
 	null def var output1;//move;set;
 	null def var output2;
 };
-#set print(){move->io.output1;set;}
-#set hault(){def print();move->0xmin 1;jump 0;}
-#set call(foo){
+set let hault()={def printInt();move->0xmin 1;jump 0;}
+#set call(foo)={
 	foo:(){//foo requirements
 		#{move->this};
 		...code;
@@ -59,8 +51,6 @@
 	null def carryALU;
 	jump foo.return->return def returnTo;//move;
 	//#def return;
-}#set call{
-
 }
 #set adder{{
 	#var input1;
@@ -130,35 +120,100 @@
 	}
 	null def return;
 }};
-#set switch(array){//alu = n
-	//#{move->this;jump->this;}
-	#let consts{#var relAdr,negative;};#let vars{#var temp;};
-
-	move->consts.relAdr;red;//alu = move +n;
-	#let move_posative,move_negative;
-	move->move_posative;set;
-	move->consts.negative;nor;
-	move->vars.temp;set;
-	nor;//alu = move -n;
-	move->move_negative;set;
-	move->array;
-	switchPart:{
-		null def move_posative;
-		get;
-		null def move_negative;
-		set;
-	}
-	#var mv->0xmin;#mv->move;
-	jump->return;
-	def consts{
-		0x10 def relAdr;//0x10;
-		move -0 def negative;//move -0;
-	};
-	def vars{
-		null def temp;
-	};
-	#move->mv;
-};
+{//switch
+	#let do{get;};
+	#set switch(array,do)={//alu = n
+		//#{move->this;jump->this;}
+		#let consts{#var relAdr,negative;};#let vars{#var temp,val;};
+		move->vars.val;set;
+		move->consts.relAdr;red;//alu = move +n;
+		#let move_posative,move_negative;
+		move->move_posative;set;
+		move->consts.negative;nor;
+		move->vars.temp;set;
+		nor;//alu = move -n;
+		move->move_negative;set;
+		move->array;
+		move->vars.val;get;
+		switchPart:{
+			null def move_posative;
+			#let arrayIndex->move;
+			def do;
+			assert move->arrayIndex;
+			null def move_negative;
+			set;
+		}
+		#var mv->0xmin;#mv->move;
+		jump->return;
+		def consts{
+			0x10 def relAdr;//0x10;
+			move -0 def negative;//move -0;
+		};
+		def vars{
+			null def temp;
+			null def val;
+		};
+		#move->mv;
+	}::{{
+		let call1=call;
+		var call=call1;
+	}};
+	//unfinnished
+	#set var switch.block{{//alu = n
+		#{
+			#var array,setUp,do;//PointerBlocks
+			#{array{};setUp{};do{};}
+			#let self=this;
+			#var call(array,do,setUp)={{
+				#let arrayCmd,doCmd;
+				move->arrayCmd;get;move->self.array;set;
+				//if(do){
+					move->doCmd;get;move->self.array;set;
+				//}
+				move->self;
+				jump->return;
+				{
+					move->array def arrayCmd;
+					jump->do def doCmd;
+				}
+			}}::{
+				set var prototype.do={get;};
+				set var prototype.setUp={};//{#let mv->0xmin;move->val;get;}
+			}
+			#var do.return.move;
+		}
+		#{move->this;jump->this;}
+		#let consts{#var relAdr,negative;};
+		#let vars{#var temp;};
+		move->consts.relAdr;red;//alu = move +n;
+		#let move_posative,move_negative;
+		move->move_posative;set;
+		move->consts.negative;nor;
+		move->vars.temp;set;
+		nor;//alu = move -n;
+		move->move_negative;set;
+		move+0 def array;
+		switchPart:{
+			null def move_posative;
+			#let arrayIndex->move;
+			get def do;
+			assert move->arrayIndex;
+			null def move_negative;
+			set;
+		}
+		#var mv->0xmin;#mv->move;
+		jump->return;
+		def consts{
+			0x10 def relAdr;//0x10;
+			move -0 def negative;//move -0;
+		};
+		def vars{
+			null def temp;
+		};
+		#move->mv;
+		null def return;
+	}}
+}
 #set increment(){
 	//length=16
 	#let inc;
@@ -205,3 +260,86 @@
 	};
 	#set current;
 }}};
+#let terminal{
+	#let start->0xmin 3;
+	#var input->start;//io.input2
+	#var output->start 2;//io.output2
+	let String::{//extend string
+		#let end{0x2fffffff;}
+		#let print(string){//nonLocal string;
+				#let shift_1;//where shift_1&3==2;
+				#let next;
+				jump->next;
+				null def let i;
+				null def let val;
+				0x20000000 def let const_0;
+				0x10000000 def let endStringTest;
+				move->const_0 def next;
+				get;
+				move->i;
+				set;//alu=i=0;
+				#let mv->0xmin;
+				#mv->move;
+			#def let loop;
+				#var loop.endMove->0xmin,loop.break;
+				def switch(string);//alu= string[i];
+			#def let checker;
+				xor:{
+
+				}
+				{
+					if;null;
+					move->endStringTest;nor;
+					if;
+					jump+2;#loop.endMove->move;
+					jump->loop.break;
+					nor;
+				}
+			#def var checker.end;
+				move->terminal.output;set;//cout<<string[i];
+				move->i;get;
+				hault();
+				def increment();//alu=i+1;
+				hault();//move->io.output1;set;//print(i);
+				move->i;set;//i++;
+				move->mv;
+				jump->loop;
+			#def loop.break;
+				#move->loop.endMove;
+				move->0xmin 1;
+				jump->0xmin 1;//hault
+		}::{
+			#var print.block{
+				#var stringPointer;
+				...print(stringPointer);
+				jump->return;
+				null def stringPointer;
+			}
+			#var print.call(string){
+				#let foo=print.block;
+				move->returnTo;get;
+				move->foo.return;set;
+				move->string;get;
+				move->foo.stringPointer;set;
+				move->foo;
+				jump->foo;
+				#{//runs foo; (changes move pointer)
+					foo{}
+					//#def var a=>{...foo};//use a refference of foo's block.
+					move->foo.return;
+				}
+				null def carryALU;
+				jump foo.return->return def returnTo;//move;
+			}
+		}
+		#var Char{
+			#var print(){
+				move->terminal.output;set;
+			}
+		}
+		screen{
+
+		}
+	}
+}
+//def terminal.String.print.call(0xmin);

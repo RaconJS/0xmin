@@ -1,12 +1,12 @@
-#"!log.code"
-#"make file"
-#"log.table"
+#"log.code";
+#"make file";
+#"log.table";
 #var std{
 	//import lib "std.0xmin";
 	#set main{
 		#move->0xmin 0;
 	};
-	#let switch,increment,adder,call,String;
+	#let set switch,increment,adder,call,string;
 	#let red_filt  {0x20000000;};//'red_filt;'
 	#let white_filt{0x3fffffff;};
 	//#set io{...a};
@@ -20,9 +20,8 @@
 		null def var input2;
 		null def var output1;//move;set;
 		null def var output2;
-	}:{
-		#var 
-	};
+	}
+
 	#set print(){move->io.output1;set;}
 	#set increment(){
 		//length=16
@@ -79,7 +78,14 @@
 		};
 		#move->mv;
 	};
-	#let String:{
+	#set String::{
+		#let terminal{
+			#var input,output;
+			#{
+				#set input=io.input2;
+				#set output=io.output2;
+			}
+		};
 		#let print(string){//nonLocal string;
 				#let shift_1;//where shift_1&3==2;
 				#let next;
@@ -110,7 +116,7 @@
 					nor;
 				}
 			#def var checker.end;
-				move->terminal.o;set;//cout<<string[i];
+				move->terminal.output;set;//cout<<string[i];
 				move->i;get;
 				increment();//alu=i+1;
 				std.print();//move->io.output1;set;//print(i);
@@ -121,6 +127,10 @@
 				#move->loop.endMove;
 				move->0xmin 1;
 				jump->0xmin 1;//hault
+		}:{
+			#var print.call(){
+
+			}
 		}
 		#var Char{
 			#var print(){
@@ -151,9 +161,9 @@ jump 0;
 def io;
 def terminal;
 #def let string;#set string;
-String (col(0xf,0),move(1,2),"hello world");
+def String.col(0xf,0)...String.move(1,2)..."hello world";
 def String.end;
 def main;
 def String.print(string);
 
-//red_filt() def var string.end;
+//red_filt() def var string.end;*/
