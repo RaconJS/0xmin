@@ -1,9 +1,10 @@
 #"log.code";
-#"!log.table";
+#"log.table";
 #"make file";
 #(){
 	let object{
-		var array{11;22;object};
+		var Intarray{11;22;{33,44}};
+		var objarray2{def var a;def var b;};
 		var property=4;
 		var method(b){
 			...code;
@@ -25,18 +26,17 @@
 		}
 	}
 }
-{
-	import lib "std.0xmin";
-	def io;
+#(){
+	import lib "io.0xmin";
+	#let printInt(){move->io.output1;set;}
+	#let hault(){def printInt();move->0xmin 1;jump 0;}
 	def main;
-	#let str=...String.move(2,2)...String.col(15,0)..."Hello World";
+	#let str=...String.pos(2,2)...String.col(15,0)..."Hello World";
 	//#set str{String.move(2,2);String.col(15,0);}
 	printString(pos,str)={
-		var n->pos;//debugger n;
+		var n->pos;
 		var n1->n;
 		var next(){
-			//debugger str[n1];
-			//debugger.log str[n1]"getCode(label).map(v=>v.croppedSource)";
 			move->5;
 			get;
 			move->terminal.output;
@@ -52,6 +52,12 @@
 	#let itter=printString(str=str,pos=a);
 	def itter.next();
 	def itter.next();
+
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
+	def itter.next();
 	def itter.next();
 	def itter.next();
 	def itter.next();
@@ -62,18 +68,5 @@
 	0x3ffff000;
 	#def a;
 }
-#(){//test
-	#let String;
-	#var std{
-		#let red_filt  {0x20000000;};//'red_filt;'
-		#set String{
-			#var print(string){//nonLocal string;
-				debugger.typeof red_filt;
-				red_filt() def let const_0;
-			}
-		}
-	}
-	//void{...std;}
-	def String.print(string);
-	//debugger std;
-}
+#move+1;
+1;

@@ -1,12 +1,12 @@
 #"log.code";
 #"make file";
-#"log.table";
+#"!log.table";
 #var std{
 	//import lib "std.0xmin";
 	#set main{
 		#move->0xmin 0;
 	};
-	#let set switch,increment,adder,call,string;
+	#let set switch,adder,call,string;
 	#let red_filt  {0x20000000;};//'red_filt;'
 	#let white_filt{0x3fffffff;};
 	//#set io{...a};
@@ -15,15 +15,15 @@
 		jump 0;
 	};
 
-	#set io=>{
+	#let set io=>{
 		null def var input1;//move;get;
 		null def var input2;
 		null def var output1;//move;set;
 		null def var output2;
 	}
-
-	#set print(){move->io.output1;set;}
-	#set increment(){
+	#set var hault(){print();jump 0;}
+	#set var print(){move->io.output1;set;}
+	#set let increment(){
 		//length=16
 		#let inc;
 		#let notIn,notOut,const_2;
@@ -78,6 +78,38 @@
 		};
 		#move->mv;
 	};
+	#set switch1{//alu = n
+		//#{move->this;jump->this;}
+
+		#move->0;
+		def let set this.start;
+		#let consts{#var relAdr,negative;};#let vars{#var temp;};
+
+		move->consts.relAdr;red;//alu = move +n;
+		#let move_posative,move_negative;
+		move->move_posative;set;
+		move->consts.negative;nor;
+		move->vars.temp;set;
+		nor;//alu = move -n;
+		move->move_negative;set;
+		move->array;
+		switchPart:{
+			null def move_posative;
+			get;
+			null def move_negative;
+			set;
+		}
+		#var mv->0xmin;#mv->move;
+		jump->return;
+		def consts{
+			0x10 def relAdr;//0x10;
+			move -0 def negative;//move -0;
+		};
+		def vars{
+			null def temp;
+		};
+		#move->mv;
+	};
 	#set String::{
 		#let terminal{
 			#var input,output;
@@ -92,7 +124,7 @@
 				jump->next;
 				null def let i;
 				null def let val;
-				red_filt() def let const_0;
+				0x30000000 def let const_0;//red_filt() def let const_0;
 				endStringTester() def let endStringTest;
 				move->const_0 def next;
 				get;
@@ -125,8 +157,6 @@
 				jump->loop;
 			#def loop.break;
 				#move->loop.endMove;
-				move->0xmin 1;
-				jump->0xmin 1;//hault
 		}:{
 			#var print.call(){
 
@@ -145,7 +175,7 @@
 	}
 }
 //debugger std;
-void{...std;}
+void{var...std;}
 
 #set main=>{};
 #let terminal{
@@ -161,9 +191,9 @@ jump 0;
 def io;
 def terminal;
 #def let string;#set string;
-def String.col(0xf,0)...String.move(1,2)..."hello world";
+def String.col(0xf,0)...String.pos(1,2)..."hello world";
 def String.end;
 def main;
 def String.print(string);
-
+hault();
 //red_filt() def var string.end;*/
