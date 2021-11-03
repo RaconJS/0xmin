@@ -1,6 +1,1 @@
-def var start{
-	#var start->0xmin;
-	move -0xff;
-	#{start->move;}
-	jump->return;//io.return;
-};
+1;2;3;a{44;55;66;}
