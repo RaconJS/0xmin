@@ -1,32 +1,137 @@
+debugger 0xmin;
+//meta keywords list #
+#set;
+#let;
+#var;
+#def;
+//special meta statements
+if(){}
+else if(){}
+else{}
+delete;
+import;
+
+//assembly key words
+move;
+jump;
+nor;
+red;
+blue;
+get;
+set;
+if;
+
+//weak scopeing keywords/symbols
+$;
+#;
+void;
+//assignment
+=;
+=>;
+->;
+//maths operators
+( + - * / ** % );
+//bitewise operators
+( | & ^ ~ );
+//logical operators
+( ! || 	&& ^^ );
+//1 or 2 argument operators
+( + ); //(a+b) or cast to number 
+( ~ ); //(a nor b)
+
+//scopes
+//let scopes aka block scopes
+{} 
+//weak blocks
+${} #{} void{} if(1){}
+//labeled blocks (with break and continue)
+a:{} 
+//weak blocks
+$a:{} #a:{} void a:{}
+//var scopes. aka object scope (with this and return)
+a{}
+//function types
+(){} ()={} ()=>{}
+//extension scopes
+::{} ::#{} ::${} ::void{}
+
+
+//keyword property names
+//labels (memory pointer)
+//object
+this;
+return;
+//labeled block
+break;
+continue;
+//class instance
+constructor;
+//property used in classes
+prototype;
+
+//inbuilt global objects
+0xmin;
+Number;
+String;
+String.col;
+String.pos;
+String.confirm;
+true;
+false;
+if;
+else;
+debugger;
+//computer's:pointers and registers
+jump;
+move;
+alu;
+
+
 #{
 	instructions{//the block is also a label
 		//create labels
 			#let myLabel;//create a label with unlabeled-block-scope 
 			#let myLabel;//over right the label with a new one.
-			#var myLabel//create a label with labeled-block-scope similar to "this.mylabel;"
+			#var myLabel;//create a label with labeled-block-scope similar to "this.mylabel;"
 		//labels MUST be defined with "def" for them to be used.
-		move -1;//move the data pointer (the pointer is named "move")
-		jump -> myLabel;//move the jump pointer (i.e. "goto" is c++)
-		nor;//logical NOR
-		red;//variable_red_shift
-		blue;//variable_blue_shift(B)
-		set;//write
-		get;//read
+			move -1;//move the data pointer (the pointer is named "move")
+			jump -> myLabel;//move the jump pointer (i.e. "goto" is c++)
+			nor;//logical NOR
+			red;//variable_red_shift
+			blue;//variable_blue_shift(B)
+			set;//write from accumilator
+			get;//read to accumilator
+			if;//if(one of the previous ALU operations was successful i.e didn't = 0)reset the boolean register to false;else ignore the next line.
 	}
 	1213;//can put numbers instead of keyword instructions
+	0b10110;//30 bit number
+	0x3fffffff;
 	0x123 def instructions.myLabel;//def sets a label's address to the current line
-	#let labelName;//"#" the meta symbol. lines and blocks with "#" arn't included in the .filt file
-	1 def labelName,lbl2;
+	#let labelName,lbl2;//"#" the meta symbol. lines of code and blocks with "#" arn't included in the .filt file
+	1 def labelName,lbl2;//
 	jump +2;//jump forward 2 lines
 	move -4;//move data_pointer back 4 lines
 	move->labelName;//move the data_pointer to labelName
 	jump->labelName;
-	{
-
+}
+scope_types{
+	${} #{} void{} if(1){}//weak scopes
+	{} a:{}//let scopes aka block scopes
+	let a{}//var scopes. objects
+	a:{} $a:{} #a:{} void a:{}//
+	let a(){} let a()={} let a()=>{}//functions
+	a::{} a::#{} a::${} a::void{}//extension scope
+}
+function_calls{
+	let foo(){
+		;
 	}
+	foo();//normal call. uses the function's type.
+	foo=();//call as class.
+	foo=>();//call as arrow function.
 }
 
 aBlockLabel{//blocks can be labeled like this
-	def let a;//can also do this REMEMBER to put the "def" first. "let def label;" doesn't work.
+	123 def let a;//can also chains meta keywords like this.
 	move->a;
 };

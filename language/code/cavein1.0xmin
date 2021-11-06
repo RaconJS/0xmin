@@ -1,25 +1,18 @@
-//doesnt work :(
 #"make file";
 #"log.table";
 #"log.code";
 import lib "io.0xmin";
 #let printInt(){move->io.output1;set;}
 #let hault(){def printInt();move->0xmin 1;jump 0;}
-#let print(string){
-	#let i->string;
-	#var next(){
-		move->i;
-		get;
-		move->terminal.output;
-		set;
-		#i=i+1;
-		//#var next=this;
+#let printString{
+	#let call{
 	}
 }
-{
+#let switch{}
+void{
 	let Pos(self){
-		1 def var self.x;
-		1 def var self.x1;
+		1 def var self.x,x;
+		1 def var self.x1,x1;
 	}
 	//def let numberList=" 1 2 3 4 5 6 7 8 91011121314151617181920212223242526272829";
 	def let board{
@@ -34,68 +27,67 @@ import lib "io.0xmin";
 	}
 	2 def let const_2;
 	set main{
-		#{move->0xmin 0;}
-		move->player.lives;
-		get;
-		move->const_2;
-		if;null;
-		blue;
-		if;#let mv->0xmin;#{mv->move;}#let endMain;
-		jump+2;
-		jump->endMain;
-		move->player.lives;set;
-		{move->0xmin 0;jump->this;}
-		#def endMain;
-		move->mv;
-		hault();
-		#(){//hault
+		#let startMv;
+		$move->0xmin 0;
+		$startMv->move;
+		#let endMain,endMain.mv->0xmin;
+		handle_player_lives:{
+			move->player.lives;get;
+			move->const_2;
+			if;null;
+			blue;//if(lives--)do game over;
+			if;$endMain.mv->move;
+			jump+2;
+			jump->endMain;
+			move->player.lives;set;
+		}
+		handle_playerMoveMent:{
+			#let nextPos=Pos();
+			#let confirm;
+			#let inputTemp;
+			move->terminal.input;get;move->inputTemp;set;
+			move->confirm;get;move->terminal.output;set;
+			move->inputTemp;get;
+			vars:{
+				jump->break;
+				0b1000 def let const_shift4;
+				null def let arrowKey;
+			}
+			{
+				#let xorVars;
+				def let xor{
+					111111111111111111111111111111;
+				}
+				def nextPos;
+				null def inputTemp;
+				String.confirm def confirm;
+			}
+		}
+		{move->startMv;jump->this;}
+		$def endMain;
+		move->endMain.mv;
+		{//hault
 			#let endLine="\n";
-			#let curserPos=String.move(2,2);
-			#let gameOver=String.move(2,2)...
+			#let curserPos=String.pos(2,2);
+			#let gameOver=String.pos(2,2)...
 				String.col(1,15)...
 				"GAME OVER"...
 				String.col(1,15)...
-				String.move(2,3)...
-				"~~~~~~~~~"...
-				
+				String.pos(2,3)...
+				"~~~~~~~~~"...	
 				String.col(0,16)...
 				"\n\n"
 			;//length: 25
-			move->endLine;get;
-			move->terminal.output;
-			//clear screen
-			//set;set;set;set;set;set;set;set;
-			//set;set;set;set;set;set;set;set;//set *16
-			move->curserPos;get;move->terminal.output;set;
-			#let itter=print(gameOver);{
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
-				def itter.next();
+			clear_screen:{
+				move->endLine;get;
+				move->terminal.output;
+				set;set;set;set;set;set;set;set;
+				set;set;set;set;set;set;set;set;//set *16
 			}
+			move->curserPos;get;move->terminal.output;set;
+			def printString.call(gameOver);
 			move->0xmin 1;
-			jump->0;
+			jump->0xmin 1;
 			def endLine;
 			def curserPos;
 			def gameOver;
