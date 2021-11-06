@@ -26,47 +26,52 @@
 		}
 	}
 }
-#(){
-	import lib "io.0xmin";
-	#let printInt(){move->io.output1;set;}
-	#let hault(){def printInt();move->0xmin 1;jump 0;}
-	def main;
-	#let str=...String.pos(2,2)...String.col(15,0)..."Hello World";
-	//#set str{String.move(2,2);String.col(15,0);}
-	printString(pos,str)={
-		var n->pos;
-		var n1->n;
-		var next(){
-			move->5;
-			get;
-			move->terminal.output;
-			set;
-			jump+3;
-			def str[n1];
-			0x3fffffff
-			#n+1;
-			#set n1->n+(+n1)+1;
-		}
+#let set xorNotIf(){
+	#def let x;
+	def var input{null};
+	null def let y;
+	null def let temp;
+	#def var start,start.mv->0xmin;
+	$move->x;
+	$start.mv->move;
+	move->y;set;
+	move->x;nor;//alu=x~y;//if(x>y)
+	move->temp;set;
+	move->x;nor;set;
+	move->temp;get;
+	move->y;nor;
+	move->x;nor;//length = 14
+	#def return;
+	#var return.mv->0xmin;
+	$return.mv->move;
+	#{//does:
+		let a=0b0101,b=0b0011;
+		let c1->a~b;
+		let c2->a~c1;
+		let c3->b~c1;
+		let ans->c2~c3&0b1111;
+		debugger ans;
 	}
-	#let a;
-	#let itter=printString(str=str,pos=a);
-	def itter.next();
-	def itter.next();
-
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	def itter.next();
-	hault();
-	0x3ffff000;
-	#def a;
 }
-#move+1;
-1;
+#let io{
+	#import lib "io.0xmin";
+}...let io;#delete io;
+#let xorInst=xorNotIf();
+#set xorInst.input=>{
+	0x1234;
+}
+#let next;
+jump->next;
+move->xorInst.start;
+def xorInst;
+jump 0 def var xorInst.returner;
+#def next;
+#let val,returner;
+move->returner;get;move->xorInst.return;set;
+move->val;get;move->xorInst.start.mv;
+jump->xorInst.start;
+$move->xorInst.return.mv;
+jump xorInst.return->2 def returner;
+0x1224#def val;#delete val,returner;
+move->0xmin 4;
+jump 0;

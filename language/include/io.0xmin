@@ -13,6 +13,6 @@ def let io{
 	null def var output2;
 };
 #set main{
-	#{move->0xmin 0;}
+	${move->0xmin 0;}
 }
 #def main;

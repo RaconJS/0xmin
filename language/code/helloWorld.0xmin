@@ -1,10 +1,10 @@
 #"log.code";
 #"make file";
-#"!log.table";
+#"log.table";
 #var std{
 	//import lib "std.0xmin";
 	#set main{
-		#move->0xmin 0;
+		$move->0xmin 0;
 	};
 	#let set switch,adder,call,string;
 	#let red_filt  {0x20000000;};//'red_filt;'
@@ -14,7 +14,7 @@
 		jump->main;//io.return;
 		jump 0;
 	};
-
+	
 	#let set io=>{
 		null def var input1;//move;get;
 		null def var input2;
@@ -28,7 +28,7 @@
 		#let inc;
 		#let notIn,notOut,const_2;
 		#let notIn;
-		//#move->inc;
+		//$move->inc;
 		move->notIn def inc;
 		set;
 		nor def const_2;
@@ -67,7 +67,7 @@
 			null def move_negative;
 			set;
 		}
-		#var mv->0xmin;#mv->move;
+		#var mv->0xmin;$mv->move;
 		jump->return;
 		def consts{
 			0x10 def relAdr;//0x10;
@@ -76,12 +76,12 @@
 		def vars{
 			null def temp;
 		};
-		#move->mv;
+		$move->mv;
 	};
 	#set switch1{//alu = n
 		//#{move->this;jump->this;}
 
-		#move->0;
+		$move->0;
 		def let set this.start;
 		#let consts{#var relAdr,negative;};#let vars{#var temp;};
 
@@ -99,7 +99,7 @@
 			null def move_negative;
 			set;
 		}
-		#var mv->0xmin;#mv->move;
+		#var mv->0xmin;$mv->move;
 		jump->return;
 		def consts{
 			0x10 def relAdr;//0x10;
@@ -108,7 +108,7 @@
 		def vars{
 			null def temp;
 		};
-		#move->mv;
+		$move->mv;
 	};
 	#set String::{
 		#let terminal{
@@ -131,7 +131,7 @@
 				move->i;
 				set;//alu=i=0;
 				#let mv->0xmin;
-				#mv->move;
+				$mv->move;
 			#def let loop;
 				#var loop.endMove->0xmin,loop.break;
 				switch(string);//alu= string[i];
@@ -143,7 +143,7 @@
 					if;null;
 					move->endStringTest;nor;
 					if;
-					jump+2;#loop.endMove->move;
+					jump+2;$loop.endMove->move;
 					jump->loop.break;
 					nor;
 				}
@@ -156,7 +156,7 @@
 				move->mv;
 				jump->loop;
 			#def loop.break;
-				#move->loop.endMove;
+				$move->loop.endMove;
 		}:{
 			#var print.call(){
 
@@ -195,5 +195,5 @@ def String.col(0xf,0)...String.pos(1,2)..."hello world";
 def String.end;
 def main;
 def String.print(string);
-hault();
+move->0xmin 1;jump->0xmin 1;
 //red_filt() def var string.end;*/
