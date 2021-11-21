@@ -2,6 +2,11 @@
 	"scope": "source.0xmin",// - variable.other.php",
 	"completions":[
 		{
+			"trigger":"\"make file\";",//can only appear at start of file
+			"contents":"#\"make file\";\n#\"log.table\";\n#\"log.code\";",
+			"details":"file settings. must appear at top of file.",
+		},
+		{
 			"trigger": "import",
 			"annotation": "import std",
 			"contents": "import lib \"std.0xmin\"",
@@ -40,7 +45,7 @@
 		//----
 		{
 			"trigger":"import",
-			"contents":"import",
+			"contents":"import this \"${1:file}.0xmin\";${2}",
 			"kind":"keyword",
 		},{
 			"trigger":"var",
@@ -69,8 +74,22 @@
 
 		{
 			"trigger":"class",
-			"contents":"let ${1:className} {\n\t${2:...constructor}\n} : {\n\t${3:...static}\n}",
+			"contents":"let ${1:className}() = {\n\t${2:...constructor;}\n} :: {\n\tvar set prototype {\n\t\t${3:...prototype;}\n\t}\n\tvar set supertype {\n\t\t${4:...supertype;}\n\t}\n\t${5:...static;}\n}",
 			//"kind":"type",
-		}
+		},
+		{
+			"trigger":"String",
+			"contents":"String(\"${1}\")${2}",
+			"kind":"type",
+		},
+		{
+			"trigger":"0bblack",
+			"contents":"0b000000000000000000000000000000",
+			"kind":"constant",
+		},{
+			"trigger":"0bwhite",
+			"contents":"0b111111111111111111111111111111",
+			"kind":"constant",
+		},
 	]
 }
