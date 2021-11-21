@@ -1,16 +1,23 @@
 debugger 0xmin;
-//meta keywords list #
+//meta keywords list declarators and definers #
+#def;
 #set;
 #let;
 #var;
-#def;
 //special meta statements
 if(){}
 else if(){}
 else{}
 delete;
 import;
-
+static;
+debugger;
+//weak scopeing keywords/symbols
+$;
+#;
+void;
+// not implemented special statements
+void;
 //assembly key words
 move;
 jump;
@@ -21,14 +28,12 @@ get;
 set;
 if;
 
-//weak scopeing keywords/symbols
-$;
-#;
-void;
 //assignment
 =;
 =>;
+<=>;
 ->;
+<->;
 //maths operators
 ( + - * / ** % );
 //bitewise operators
@@ -43,7 +48,7 @@ void;
 //let scopes aka block scopes
 {} 
 //weak blocks
-${} #{} void{} if(1){}
+${} #{} void{} if(){}
 //labeled blocks (with break and continue)
 a:{} 
 //weak blocks
@@ -73,19 +78,24 @@ prototype;
 0xmin;
 Number;
 String;
-String.col;
-String.pos;
-String.confirm;
 true;
 false;
 if;
 else;
 debugger;
+//const properties
+String.col;
+String.pos;
+String.confirm;
+
 //computer's:pointers and registers
 jump;
 move;
 alu;
 
+// not implemented features
+use; //e.g. use(x,y,0xmin){can only use }
+0xmin.Object;
 
 #{
 	instructions{//the block is also a label

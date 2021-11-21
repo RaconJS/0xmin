@@ -9,9 +9,9 @@ file_extensions:
 scope: source.0xmin
 variables:
   number: '((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
-  labelName: '([\w\[\]]+)(?!\.)(?!\w)'
+  labelName: '([\w]+)(?!\.)(?!\w)'
   buildSettingWords: '\!?(make file|log.table|log.code)'
-  equalSigns: '<=>|<=|=>|=|<->|<-|->'
+  equalSigns: '<[=-]>?|[=-]>|=' #{}=|={}
   commands: 'nor|red|blue|get|set|if'
 contexts:
   display_0xmin_1:
@@ -71,21 +71,28 @@ contexts:
       scope: keyword.declaration #variable.function
       push: set_statement
 
+    - match: '\b(let|var)\b|\bset\b(?=[\s\S]*?{)'
+      scope: keyword.declaration
+      push: let_statement
+
+    - match: \b(else\s+)?if\b(?!\s*\.)(?=\([^;]*?\){) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+      scope: keyword.control
+      push: if_statement
+    - match: \belse\b(?!\s*\.)\s*(?={) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+      scope: keyword.control
     - match: '\b(nor|red|blue|get|set|if)\b' #'\b(if|else|for|while)\b'
-      scope: variable.function #keyword.control.example-c
+      scope: support.constant #keyword.control.example-c
     
-    - match: '(?<=^|[\n;{}])\s*\b(String)\b(?!\s*\.)' #'\b(if|else|for|while)\b'
-      scope: keyword.declaration #keyword.control
+    - match: '\b(String|Number)\b' #'\b(if|else|for|while)\b'
+      scope: support.constant #keyword.declaration #keyword.control
       push: string_parse
 
     - match: '\b(move|jump|alu)\b'
       scope: keyword.control #entity.name.type
-    - match: '\b(this|constructor|self|return|break)\b'
-      scope: variable.parameter
-
-    - match: '\b(let|var)\b'
-      scope: keyword.declaration
-      push: let_statement
+    - match: '\b(this|constructor|continue|return|break)\b'
+      scope: variable.language
+    - match: \b(prototype|supertype)\b
+      scope: support.constant
 
     - match: '\bdebugger(\s*.\s*((labels|type|code)[oO]f|log))?\b'
       scope: keyword.control
@@ -93,58 +100,64 @@ contexts:
     - match: '\bimport\b'
       scope: keyword.control
       push: import_statement
-
+    - match: '(?<=[@$#;{}]|^)\s*\bstatic\b' #
+      scope: keyword.control
+    - match: '((?<=[@$#])\s*|\s*)\bassert\b' #'(?<=^|[;{}])\s*\bassert\b'
+      scope: keyword.control
     - match: '\.\.\.'
       scope: keyword.control
       push: deRefference
 
     - match: '\b(var|let|const|set|def)\b'
-      scope: variable.function
+      scope: support.constant
 
     - match: '<->'
-      scope: variable.function
+      scope: support.constant
     
     - match: '->|<-'
-      scope: variable.function
+      scope: support.constant
 
     # Numbers
-    - match: '\b(true|false)\b'
+    - match: '\b(true|false|NaN|undefined)\b'
       scope: constant.numeric.example-c
 
     - match: '{{number}}' #'((\b0b[0-1]+)|(\s(\+0x|\-0x|0x)[0-9a-fA-F]+)|(\b0[xb])|((\b|[+-](?=[0-9]))[0-9]+))' #'\b(-)?[0-9.]+\b'
       scope: constant.numeric.example-c
 
-    - match: '\b(null|NaN)\b'
+    - match: '\b(null)\b'
       scope: constant.numeric.example-c
 
 
 
-    - match: '<=>|<=|=>|='
+    - match: '{{equalSigns}}'
       scope: keyword.control
       push: main_equalsSign
 
-    - match: '{{equalSigns}}'
-      push: main_equalsSign
-
-    - match: '(\+|\/|\-|\*|\~|\&|\||\^|\<\<)'
+    - match: '([+\-*/~&|^!]|<<|>>|>>>|&&|\|\||\^\^|%)|(!=|==|===)'
       scope: keyword.control
 
     - match: '\b(new|delete)\b'
       scope: keyword.control
 
-    - match: '#(?![\s\S]*?;)(?=[^;]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: variable.function
+    - match: '\#(?=[^;]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+      scope: support.constant.weakScope
       push: higher_code_brackets
+    - match: '\$(?=[^;]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+      scope: entity.name.weakScope
+      push: hiddenCodeScope_brackets
 
-    - match: \bvoid\b(?!\s*\.)(?![\s\S]*?;)(?=[^;]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+
+    - match: \bvoid\b(?!\s*\.)(?=[^;]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
       scope: keyword.control
       push: mainScope_void
 
     - match: \bvoid\b(?!\s*\.)
       scope: keyword.control
-    - match: '#'
-      scope: variable.function
-      push: higher_code_singleLine
+    - match: '[#]'
+      scope: support.constant
+      #push: higher_code_singleLine
+    - match: '[$]'
+      scope: entity.name.keyword #support.constant
     
     - match: '\{'
       push: mainScope
@@ -155,6 +168,7 @@ contexts:
     #- match: '\]'
     #  pop: true
     #end line ";"
+    
     - include: define_blocks    
 
   main: #build settings
@@ -163,7 +177,7 @@ contexts:
       scope: keyword.declaration
       push: startFile
   startFile:
-    - match: \#?(["'`]){{buildSettingWords}}\1|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
+    - match: \#?(["'`]){{buildSettingWords}}\1;?|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
       scope: keyword.declaration
     - match: '(?=[^\s])'
       push: mainScope
@@ -207,10 +221,22 @@ contexts:
     - match: '{'
       scope: variable.function
       push: higher_code_brackets1
-    - include: mainScope
+    - include: base_statement
   higher_code_brackets1:
     - match: '}'
       scope: variable.function
+      pop: 2
+    - include: higher_code
+  hiddenCodeScope_brackets:
+    - match: '[()]'
+      scope: entity.name
+    - match: '{'
+      scope: entity.name
+      push: hiddenCodeScope_brackets1
+    - include: base_statement
+  hiddenCodeScope_brackets1:
+    - match: '}'
+      scope: entity.name
       pop: 2
     - include: higher_code
   mainScope_void:
@@ -235,73 +261,66 @@ contexts:
       pop: true
       push: mainScope
     - include: higher_code
-  define_command:
+  base_statement:
     - match: '{'
       pop: true
       push: mainScope
     - match: '\b(let|var)\b'
-      scope: variable.function
+      scope: keyword.declaration
+      push: let_statement
+      pop: true
+    - match: '\b(def)\b'
+      scope: keyword.declaration
+      push: define_command
+    - match: '\b(set)\b'
+      scope: keyword.declaration
+      push: set_statement
+      pop: true
     - include: mainScope
-    - include: metacode_define_blocks
-    - meta_scope: source
-    - match: '{{labelName}}' # a.b.c.greenValue
-      scope: entity.name.type #label
+    - include: define_blocks
     - match: '(?=[;:])' #';|:'
       pop: true
+    - match: '\s*(?<=\))\s*(=>|=)\s*(?={)' # '=>' or '=' in '() => {}'
+      scope: 'support.constant.0xmin.operator'
     - match: '{{equalSigns}}'
       push: main_equalsSign
+  define_command:
+    - include: base_statement
+    - match: ";"
+      pop: true
+    - match: '{{labelName}}' # a.b.c.greenValue
+      scope: entity.name.type #label
   set_statement:
-    - match: '{'
-      pop: true
-      push: mainScope
-    - include: mainScope
-    - include: metacode_define_blocks
-    - match: '{{labelName}}(?==|=>|->)' #block_scope 
-      scope: entity.name.type #variable.name
-    - match: '(?=[;:])' #';|:'
-      pop: true
-    #- include: define_command
+    - include: base_statement
   let_statement:
-    - match: '{'
-      pop: true
-    - include: mainScope
-    - include: metacode_define_blocks
+    - include: base_statement
     - match: '{{labelName}}' #block_scope 
       scope: variable.name
-    - include: define_command
   main_equalsSign:
+    - match: '{{number}}'
+      scope: constant.numeric
     - match: '(?=[,;{])'
       pop: true
-    - include: metacode_define_blocks
+    - include: define_blocks
     - include: mainScope
     - match: '{{labelName}}'
       scope: variable
       pop: true
   define_blocks:
-    - match: '{{labelName}}\s*(?=\([^\s{]*?\){)' #class_constructor
+    - match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
+      scope: entity.name.function #class
+
+    - match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
       scope: entity.name.function #class
       push: function_params
 
-    - match: '{{labelName}}\s*(?=(=>)?\()' #class_constructor "foo();""
+    - match: '{{labelName}}\s*(?=(=>?)?\s*\()' #funciton call "foo();""
       scope: variable.function
     
-    - match: '{{labelName}}\s*(?=\{)' #class_constructor
-      scope: entity.name.namespace #entity.name.function
-  metacode_define_blocks:
-    - match: '{{labelName}}\s*(?=\([^\s{]*?\){)' #class_constructor
-      scope: entity.name.function #class
-      push: function_params
-      pop: true
-
-    - match: '{{labelName}}\s*(?=(=>)?\()' #class_constructor "foo();""
-      scope: variable.function
-      pop: true
-
-    - match: '{{labelName}}\s*(?=\{)' #class_constructor
-      scope: entity.name.namespace #entity.name.function
-      pop: true
+    - match: '{{labelName}}\s*(?=((=>?|::|)\s*)?{)' #'{{labelName}}\s*(?=\{)' #block
+      scope: entity.name.namespace #entity.name.function'
   function:
-    - meta_content_scope: meta.function
+    - meta_scope: meta.function
     - match: '[a-zA-Z0-9_]+'
       scope: variable.function
     - match: \(
@@ -312,14 +331,20 @@ contexts:
     - match: \)
       scope: punctuation.section.group.end
       pop: true
+      push: function_typeSign
     - match: '[a-zA-Z0-9_]+'
       scope: variable.parameter
-
+    - match: '{{equalSigns}}'
+      scope: keyword.control
+  function_typeSign:
+    - match: '\s*(=>|=|)\s*'
+      scope: 'support.constant.0xmin.operator'
+      pop: true
   indexBrackets:
     - include: mainScope
 
   import_statement:
-    - match: '\b(this|lib|mainScope)\b' #|caller|parent
+    - match: '\b(this|lib|main)\b' #|caller|parent
       scope: variable.function #variable.parameter
       pop: true
       push: import_statement1
@@ -331,14 +356,36 @@ contexts:
       pop: true
     - include: mainScope
   deRefference:
+    - include: base_statement
     - match: '{{labelName}}'
       scope: entity.name.enum
     - match: ';'
       pop: true
-    - include: mainScope
-  string_parse: # String move(10,3),"dasda",
+    - match: '}'
+      pop: 2
+  string_parse:
+    - include: baseMain
+    - match: \(
+      pop: true
+      push: string_parse1
+    - match: '[^\s]'
+      pop: true
+  string_parse1: # String move(10,3),"dasda",
     - include: baseMain
     - match: (move|col) #\s*(?=[,;])
       scope: variable.parameter #variable.function #keyword.declaration
-    - match: ;
+    - match: \(
+      push: string_parse1
+    - match: '[);]'
       pop: true
+  if_statement:
+    - match: '(?={)'
+      pop: true
+    - include: baseMain
+    
+    - match: '{{equalSigns}}'
+      scope: keyword.control
+      push: main_equalsSign
+
+    - match: '([+\-*/~&|^!]|<<|>>|>>>|&&|\|\||\^\^|%)|(!=|==|===)'
+      scope: keyword.control

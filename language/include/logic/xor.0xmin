@@ -1,0 +1,148 @@
+#let xor;aa:{
+	#let endBlock;
+	#let call(x,y,out){debugger;
+		#let foo=self;
+		if(x){
+			if(x!=alu){move->x;get;}
+			move->foo.x;set;
+		}
+		if(y){
+			if(y!=alu){move->y;get;}
+			move->foo.y;set;
+		}
+		#let ret;
+		#let returner{jump foo.return->ret;};
+		//assume alu = input2;
+		move->returner;get;move->endBlock;set;
+		$assert move->endBlock;
+		jump->foo.start;
+		$move->endBlock;
+		def returner;
+		#def ret;
+		if(out){
+			move->out;set;
+		}
+	};
+	#let self=this;
+	let block{
+		#{
+			#var start,x,y;
+			#var input{null;null};
+			#def start;
+			#let startMove->0xmin;
+			#let defaultRed()={{
+				//hault();
+				#static var red=Number(0x20000000)->0;
+				#let mv->0xmin;
+				$mv->move;
+				if;
+				jump->return;
+				move->constructor.red;
+				get;
+				move->mv;
+			}}
+		}
+		$move->endBlock;
+		void{def input;}
+		null def x;
+		null def y;
+		null def let temp;
+
+		#def start;
+		move->y;get;if;
+		move->x;nor;//alu=x~y;//if(x|y!=white)
+		def defaultRed();
+		move->temp;set;
+		move->x;nor;
+		def defaultRed();
+		set;//if y&(~x)
+		move->temp;get;if;
+		move->y;nor;//if x&(~y)
+		def defaultRed();
+		move->x;nor;
+		def defaultRed();
+		if;null;
+		move->temp;set;nor;
+		//length = 14
+		#set endBlock->temp;
+		null def return;
+		def defaultRed.red;
+		2 def const_2;
+		#var return.mv->0xmin;
+		$return.mv->move;
+		//#var endMove->0xmin;
+		//$endMove->move;
+		if(0){#{//does:
+			//#let f(a){#debugger.log Number(a)"((label.relAddress|0b1000000)&0b1111111).toString(2).substr(1)";}
+			let a=0b0111;
+			let b=0b0101;
+			let c1->a~b;f(c1);
+			let c2->c1~a;f(c2);//~(~(a|b)|a)= b&~a
+			let c3->c1~b;f(c3);
+			let ans->c2~c3;
+
+			set ans->ans&0b111111; f(ans);
+		}}
+	};
+	#set xor{};
+	#set xor{static{
+		let a=block;
+		let xor.block=a;
+		let a=call;
+		let xor.call=a;
+	}}
+	if(0){#let set xorNotIf=(){//old version smartly uses try/catch ifs.
+		#def let x;
+		def var input{null;NaN;};
+		null def let y;
+		null def let temp;
+		#def var start,start.mv->0xmin;
+		$move->x;
+		$start.mv->move;
+		move->y;set;
+		if;null;
+		move->x;nor;//alu=x~y;//if(x|y!=white)
+		#let returnMove;
+		if;:{//if y~x then ans = x&y; 
+			#let break.move->0xmin;
+			$break.move->move;
+			jump->break;
+		#def let else;//if !(y~x)
+			move->y;nor;set;//y=~y
+			if;:{//y!=white
+				jump->break;
+			#def let else;//y==white
+				//ans=x;
+				move->x;get;
+				//move->returnMove; redundant as returnMove==move==x;
+				jump->return;
+			}
+			//y!=white x!=white
+			move->x;get;nor;//alu = ~x
+			move->y;nor;//alu = x&y;alu = ~(x^y)
+			move->returnMove;
+			jump->return;
+			//if;
+			//$move->break.move;
+		}
+		move->temp;set;
+		move->x;nor;
+		if;:{
+			#let break.move->0xmin;
+			$break.move->move;
+			jump->break;
+			//else
+			move->temp;nor;//alu = ~temp
+		}
+		set;//if y&(~x)
+		move->temp;get;
+		move->y;nor;//if x&(~y)
+		move->x;nor;
+		#{#set returnMove->x;}
+		//length = 14
+		null def return;
+		#var return.mv->0xmin;
+		$return.mv->move;
+	}}
+	def xor.block;
+}

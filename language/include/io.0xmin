@@ -6,13 +6,13 @@ def let start{
 #let terminal{#let input,output;}
 def let io{
 	null def var input1;//move;get;
-	#def terminal.input;
+		#def terminal.input;
 	null def var input2;
 	null def var output1;//move;set;
-	#def terminal.output;
+		#def terminal.output;
 	null def var output2;
 };
 #set main{
-	${move->0xmin 0;}
+	$move->0xmin;
 }
 #def main;

@@ -2,7 +2,7 @@
 //BODGED
 //UNFINISHED
 //issue with 'foo=>();' where foo.parent changes when it shouldn't
-//TODO: make # (-> and =>) weak assignments and allow <=> and <->.
+//TODO: remove the endBracket i.e. `code:["}"]` system.
 const errorMsg="\x1b[31m"+" 0xmin-ERROR ::"+"\x1b[0m ";
 function errorLog(...args){console.log(...args);};
 function loga(...args){console.log(...args);};
@@ -47,7 +47,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			scopes:{main:{}},
 			labels:[],
 		};
-		let Path=require("path");
 		strictMode=false;
 		fileList={
 			[fileName]:inputFile,
@@ -68,8 +67,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				buildSettings.allowScripts=val;
 			},
 		};
-		let getRegex=i=>new RegExp('^\\s*#?(\\s*([\"\'\`])\\s*'+i+'\\s*\\2\\s*(;\\s*)?|\\/\\/\\s*'+i+"\\b|"+"\\/\\*"+i+";?\\*\\/"+")");//'^\\s*("'+i+'";|\\/\\/'+i+';|\\/\\*'+i+';\\*\\/)\\s*');
-		/^\s*#?(\s*(["'`])\s*i\s*\2\s*(;\s*)?|\/\/\s*i\b|\/\*i;?\*\/)/
+		let getRegex=i=>new RegExp('^\\s*#?(\\s*([\"\'\`])\\s*'+i+'\\s*\\2\\s*(;\\s*)?|^\\s*\\/\\/\\s*'+i+"\\b|"+"^\\s*\\/\\*"+i+";?\\*\\/"+")");//'^\\s*("'+i+'";|\\/\\/'+i+';|\\/\\*'+i+';\\*\\/)\\s*');
+		/^\s*#?(\s*(["'`])\s*i\s*\2\s*(;\s*)?|^\s*\/\/\s*i\b|^\s*\/\*i;?\*\/)/;
 		for(let i=0,found=true;i<10&&found;i++){
 			found=false;
 			for(let i in texts){//to make a file.filt, the file.0xmin should start with ' #"make file";'
@@ -113,14 +112,15 @@ const oxminCompiler=async function(inputFile,fileName){
 				for(let j=0;j<parts.length*2;j++){//handle strings in comments
 					let match;
 					let endComment=
-						parts[i].match(/\/\/(?![^\n]*?\n)/)?/(?<=\n)/
-						:parts[i].match(/\/\*(?![\s\S]*?\*\/)/)?/(?<=\*\/)/
+						parts[i].match(/\/\/(?![^\n]*?\n)/) ?/(?<=\n)/
+						:parts[i].match(/\/\*(?![\s\S]*?(\*\/))/) ?/(?<=\*\/)/
 					:undefined;
 					//if ("/*comment) or ("// comment)
 					if(endComment){//if unended comments
-						for(let end=false;i+1<parts.length&&!end;){
-							parts[i]=parts[i]+parts[i+1];
+						let len=parts.length;
+						for(let end=false,i1=0;i1<len&&parts.length>i+1&&!end;i1++){
 							if(match=parts[i+1].match(endComment))end=true;
+							parts[i]=parts[i]+parts[i+1];
 							parts.splice(i+1,1);
 						}
 						if(match){
@@ -129,8 +129,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 			}//parts[0]!=string
-			let commentRexExp= /(\/\*[\s\S]*?\*\/)|(\/\/[^\n]*)/;
-			let commentRexExpG=/(\/\*[\s\S]*?\*\/)|(\/\/[^\n]*)/g;
+			let commentRexExp= /(\/\*[\s\S]*?(\*\/|$))|(\/\/[^\n]*)/;
+			let commentRexExpG=/(\/\*[\s\S]*?(\*\/|$))|(\/\/[^\n]*)/g;
 			let newlinesString=len=>new Array(len).fill("\n").join("");
 			for(let i=0;i<parts.length;i+=2){//remove comments
 				for(let j of parts[i].matchAll(commentRexExpG)){
@@ -150,7 +150,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			for(let i=0;i<parts.length;i++){
 				if(i%2==0){
 					//let part=parts[i].split(/(?<={}=|={}|[{};])/);
-					p1.push(...parts[i].split(/(?<=[{};])/));
+					let section=parts[i].split(/(?<=[{};])/);
+					for(let i=0;i<section.length;i++){
+						let match=section[i].match(/^[\S]+\s*}/);
+						if(match){//allow for 'code}' insead of 'code;'
+							section.splice(i,1,...section[i].split(/(?=})/));// ['code}'] -> ['code','}']
+						}
+					}
+					p1.push(...section);
 				}
 				else {
 					let n=i>>1;//same as (i/2)|0
@@ -161,7 +168,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			parts=p1;
 			return parts;
-		}
+		};
 	}
 	//generate scopes
 		const bracketRegex=/{([^{}]|)*}/;
@@ -178,7 +185,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				static state=new this();
 			};
-			const Str=class Str{
+			const Str=class Str{//primitive string
 				constructor({str,start,length}={}){
 					this.str=str;
 					this.start=start;
@@ -186,18 +193,30 @@ const oxminCompiler=async function(inputFile,fileName){
 					this[0]=str;//allow for use in words[words.i]
 				}toString(){return this.str;}
 				get string(){
-					const sandbox = {outStr:"NONE"};
-					vm.createContext(sandbox);
+					let outStr;
+					//const sandbox = {outStr:"NONE"};
+					//vm.createContext(sandbox);
 					const code = "outStr="+this.str+";";
-					try{vm.runInContext(code, sandbox);}catch(error){
-						throw Error(errorMsg+throwErrorLine(codeObj)+", Could not run the string as javascript. threw:{{'"+error+"'}}"+throwErrorFile(codeObj))
+					try{
+						outStr=JSON.parse(this.str);
+						//vm.runInContext(code, sandbox);outStr=sandbox.outStr;
+					}catch(error){
+						throw Error(throwError(codeObj,", Could not parse the string using JSON. threw:{{'"+error+"'}}"))
 					}
-					return sandbox.outStr;
+					return outStr;//sandbox.outStr;
 					//JSON.parse(this.str);
 					//json couldnt handle stuff like:'\1'
 				}
+				toLabel(codeObj){return new StringObj({},codeObj,this);}
 				valueof(){return this.string;}
-			}
+			};const Int=class Int extends Number{//primitive number
+				constructor(value){
+					super(value);
+					this.value=value;
+				}valueOf(){return this.value;}
+				toLabel(codeObj){return new NumberObj({},codeObj,this);}
+			};
+			const throwError=(codeObj,str,msg=errorMsg)=>msg+throwErrorLine(codeObj)+str+throwErrorFile(codeObj);
 			const throwErrorLine=(fileLineNumber)=>typeof fileLineNumber=="number"//number or codeObj
 				?"line "+fileLineNumber+": '"+inputFile.replaceAll("\t", "").split("\n")[fileLineNumber-1]+"'"
 				:"line "+fileLineNumber.sourceLineNumber+": '"+fileLineNumber.croppedSource+"'";
@@ -207,7 +226,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				??(typeof fileName=="string"?fileName:fileName.fileName);
 				return name==mainFileName?"": "file:"+name+"";
 			}
-			const lister=obj=>{let a=[];for(let i in obj){a.push(i)}return a;};
+			const lister=obj=>{let a=[];for(let i in obj){if(a.hasOwnProperty(i))a.push(i);}return a;};
 			class Scope{// extends String{
 				constructor(dataObj={},isPartOfScope=false){
 					//super(dataObj.toStringString);
@@ -217,6 +236,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					this.isVarBlock=false;
 					this.codeBlock=new String("{UNDEFINED CODE BLOCK}");
 					this.codeBlock.code=[];//code is set to the current codeObj and then that codeObj can be later read by getCode();
+					this.sourceCodeObj=Scope.currentCodeObj;
 					if(!isPartOfScope&&0){//sytem not finnished
 						let parent=this;
 						dataObj.labels??={};
@@ -233,12 +253,35 @@ const oxminCompiler=async function(inputFile,fileName){
 							set labels(val){parent.labels=val;},
 						},true);
 					}
+					//stop it defaulting to the Object class
+					//this.labels["constructor"]=undefined;
 					Object.assign(this,dataObj);
+					if(!(this.labels["constructor"] instanceof Scope))this.labels["constructor"]=undefined;
 				}
+				//
+					parent=null;
+					labels={};
+					parameters=[];
+					scopes={
+						var:null,
+						let:null,
+						parent:null,
+					};
+					toStringString="";
+					//toString(){return this.toStringString;}
+					code=[];
+					//codeStr="";
+					relAddress=0;//relative to lineNumber
+					arrayLabels=[];
+					proto;//__prototype__ default properties
+					super;//__supertype__ ontop of normal properties
+				//----
 				intoVoidBlock(){
 					this.labels.jump=new Pointer({address:0,name:"jump"});
 					this.labels.move=new Pointer({address:0,name:"move"});
 					this.labels.alu=new Register({address:0,name:"alu",label:undefined});
+					this.labels.alu=new Register({address:0,name:"alu",label:undefined});
+					Object.assign(this,);
 					return this;
 				}
 				intoLabeledLetBlock(codeObj){//"label:{"
@@ -346,6 +389,30 @@ const oxminCompiler=async function(inputFile,fileName){
 					let line=(this.address??this.lineNumber)+(parent&&parent!=this?parent.getLine():0);
 					this.islogged_getLine=0;
 					return line;
+				}dotFindLabel(name){//'this.name'
+					if(this[findLabel.key])return;
+					let property=undefined;
+					this[findLabel.key]??=0;
+					this[findLabel.key]++;
+					let scope;
+					scope=this.super;
+					if(scope){
+						for(let i=scope.arrayLabels.length;i>=0;i--){//supertypes' are done in reverse
+							property??=scope.arrayLabels[i].label?.dotFindLabel?.(name);
+						}property??=scope.dotFindLabel(name);
+					}
+					if(this.labels.hasOwnProperty(name)&&(this.labels[name]||this.labels[name]===null)){
+						property??=this.labels[name];
+					}
+					scope=this.proto;
+					if(scope){
+						for(let i=0;i<scope.arrayLabels.length;i++){//supertypes' are done in reverse
+							property??=scope.arrayLabels[i].label?.dotFindLabel?.(name);
+						}property??=scope.dotFindLabel(name);
+					}
+					this[findLabel.key]=0;
+					delete this[findLabel.key];
+					return property;
 				}
 				findLabel(name){
 					return findLabel(this,name);
@@ -357,49 +424,49 @@ const oxminCompiler=async function(inputFile,fileName){
 				}findPointerParent(name){//needs upgrading to allow for custom pointers
 					return findLabelParent(objectsScope,name)??findLabelParent(this,name);
 				}
-				parent=null;
-				labels={};
-				parameters=[];
-				scopes={
-					var:null,
-					let:null,
-					parent:null,
-				};
-				toStringString="";
-				//toString(){return this.toStringString;}
-				code=[];
-				//codeStr="";
-				relAddress=0;//relative to lineNumber
-				arrayLabels=[];
-				static searchAddressSymbol=Symbol("isUsed");
-				static searchScopeSymbol=Symbol("isUsed");
+				getInternalsAsScope(){//gotton with 'label..'
+					let codeLen=Math.max(0,this.code.length-1);
+					let internalScope=new Scope({
+						name:"[internals]",
+						labels:{
+							"prototype":this.proto,
+							"supertype":this.super,
+							"length":new NumberObj({parent:this,name:"[length]"+codeLen},"NA",codeLen),//length-1 to remove '}'
+							"parameters":new Scope({name:"[parameters]",code:this.parameters,arrayLabels:this.parameters}),
+						},
+						proto:objectsScope,//0xmin
+					});
+					return internalScope;
+				}
+				toLabel(codeObj){
+					return this;
+				}
 				set address(v){this.relAddress=0;this.relAddress=v-this.address;}
 				get address(){//only used in the non-meta pass
-					let codeObj=Scope.currentCodeObj;
+					let codeObj=Scope.currentCodeObj??this.sourceCodeObj;
 					if(this[Scope.searchAddressSymbol]){
 						errorLog("Error: pottencial recursion.",Error());
-						throw new Error(errorMsg//error 
-							+throwErrorLine(codeObj)//+"line "+this.sourceLineNumber+": '"+inputFile.replaceAll("\t", "").split("\n")[this.sourceLineNumber-1]+"'"
-							+" , label:'"+this.name+"' references itself in deffinition. Can be caused by e.g.'#set A->B;#set B->A;'. Try adding: '1234 def "+this.name+";'"
-							+throwErrorFile(codeObj)
-						);
+						throw new Error(throwError(
+							" , label:'"+this.name+"' references itself in deffinition. Can be caused by e.g.'#set A->B;#set B->A;'. Try adding: '1234 def "+this.name+";'"
+						));
 					}
 					this[Scope.searchAddressSymbol]=true;
 					if(!this.codeObj){
+						if(0)if(this.wasDeclared===false)throw Error(throwError(codeObj,
+							+" , label:'"+this.name+"'$ is probably not declared. Try adding: '1234 def "+this.name+";' "
+						));
 						//errorLog(this);
 						errorLog("Error: this.codeObj is undefined");
-						throw new Error(errorMsg//error 
-							+throwErrorLine(codeObj)
-							+" , label:'"+this.name+"' is probably not defined. Try adding: '1234 def "+this.name+";' "
-							+throwErrorFile(codeObj)
-						);
+						throw new Error(throwError(codeObj,
+							" , label:'"+this.name+"' is probably not defined. Try adding: '1234 def "+this.name+";' "
+						));
 					}
 					let address=((this.codeObj instanceof Scope?this.codeObj.address:this.codeObj.lineNumber)??this.codeObj.address)+this.relAddress??0;
 					delete this[Scope.searchAddressSymbol];
 					return address;
 				}
 				getDataSummery(){
-					let labels=[];for(let i in this.labels)labels.push(i);
+					let labels=[];for(let i in this.labels)if(this.labels.hasOwnProperty(i)&&this.labels[i]!==undefined)labels.push(i);
 					let code=(this.code).map(v=>v.croppedSource);
 					let type=(this.isFunction=="="?"class":this.isFunction?"function":this.isBlock?"block":this.wasDeclared!==false?"label": "undefined");
 					let address;try{address=this.codeObj?.address;}catch(error){address=undefined;}
@@ -420,6 +487,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(data.vars.length==0){delete data.vars;}
 					return data;
 				}
+				static searchAddressSymbol=Symbol("isUsed");
+				static searchScopeSymbol=Symbol("isUsed");
 			};
 			class EndBlock extends Scope{//for labels "block.return" and "block.break"
 				constructor(dataObj){
@@ -461,7 +530,19 @@ const oxminCompiler=async function(inputFile,fileName){
 				isMeta;//false->blocks code collecter
 				phaseLevel=3;//3 = all 3 phases.; 2 == "#" 1== "$"; 0 == no phaes e.g. function
 			}
-			class EndBracket extends CodeObj{
+			Scope.Function=class extends Scope{
+				name;
+				parameters=[];
+				isFunction=true;
+				isBlock=true;
+				code=[new EndBracket()];
+				defaultFunction=({label,scope,codeObj})=>{};
+				constructor(dataObj){
+					super({});
+					Object.assign(this,dataObj)
+				}
+			};
+			class EndBracket extends CodeObj{//TODO remove this
 				constructor(scope){//{string,codeObj={},scope,partI,isMeta,parts}
 					super({},"}",scope);
 				}
@@ -495,7 +576,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							phaseLevel:3,
 							sourceLineNumber:codeObj.sourceLineNumber,
 							//toValueValue:value,
-						},value+";",this),new CodeObj({},"}",this)],
+						},value+";",this),new EndBracket(this)],
 						relAddress:value,
 						parent:scope,
 						...dataObj,
@@ -522,7 +603,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								command:{type:"string",strMode:"char"},
 								char:v,
 							},v,this)),
-							new CodeObj({},"}",this),
+							new EndBracket(this),
 						],
 						isBlock:true,
 						parent:scope,
@@ -569,24 +650,19 @@ const oxminCompiler=async function(inputFile,fileName){
 				static maxSize=1000;
 				static phases=CallStackObj.phases=["#","$","@"];
 				static phase=this.phases[0];
+				static current(){return callStack[callStack.length-1]}
 				constructor(obj={sourceLineNumber,scope,fileName,parent,codeObj}){
 					Object.assign(this,obj);
 					this.parent??=callStack[callStack.length-1];
-					if(callStack.length>this.constructor.maxSize)throw Error(errorMsg+
-						throwErrorLine(this.codeObj??this.sourceLineNumber)
-						+" Maximum call stack size ("+this.constructor.maxSize+") exceeded. avaid things like:'foo(){foo();} def foo();'"
-						+throwErrorFile(this.codeObj??this.fileName)
+					if(callStack.length>this.constructor.maxSize)throw Error(throwError(this.codeObj??this," Maximum call stack size ("+this.constructor.maxSize+") exceeded. avaid things like:'foo(){foo();} def foo();'")
 					);
 					let finds=0;
 					if(this.codeObj.callLineObj)for(let i=callStack.length-1;i>=0;i--){//prevent infinite loops
 						if(callStack[i].codeObj.callLineObj&&callStack[i].codeObj.callLineObj==this.codeObj.callLineObj||callStack[i].codeObj==this.codeObj){
 							finds++;
 						}
-						if(finds==2){
-							throw Error(errorMsg+
-								throwErrorLine(this.codeObj??this.sourceLineNumber)
-								+", "+this.constructor.phase+" infinite loop detected. "
-								+throwErrorFile(this.codeObj??this.fileName)
+						if(finds>=2){
+							throw Error(throwError(this.codeObj??this,", "+this.constructor.phase+" infinite loop detected. ")
 							);
 						}
 					}
@@ -598,7 +674,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return this.fileName==fileName||this.parent?.inFile(fileName);
 				}
 				toString(){
-					return this.sourceLineNumber+":"+this.scope.name+":"+this.fileName;
+					return this.scope.name+":"+this.codeObj.sourceLineNumber+":"+this.fileName;
 				}
 			};
 			let findLabel=function(scope,name){
@@ -624,7 +700,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if((!scope)||(scope[findLabel.key]??0)>0)return;
 				scope[findLabel.key]??=0;
 				scope[findLabel.key]++;
-				let label=scope.labels[name]?scope:(undefined
+				let label=scope.labels.hasOwnProperty(name)&&(scope.labels[name]||scope.labels[name]===null)?scope:(undefined
 					??findLabelParent(scope.scopes.code,name)
 					??findLabelParent(scope.scopes.let,name)
 					??findLabelParent(scope.scopes.var,name)
@@ -633,11 +709,13 @@ const oxminCompiler=async function(inputFile,fileName){
 				);
 
 				// let label=scope.labels[name]?scope:(undefined//local scope. '#{lbl{};debugger lbl;}'
+				//  ??findLabelParent(scope.scopes.code,name)//for physical scopes to reference the code scope.
 				// 	??findLabelParent(scope.scopes.let,name)//block scope. '{lbl{};debugger lbl;}'
 				// 	??findLabelParent(scope.scopes.var,name)//object scope. '#let{#var lbl;debugger lbl;}}'
 				// 	??findLabelParent(scope.parent,name)//the scope outside local. '#let lbl;{debugger lbl;}'
 				// 	??findLabelParent(scope.scopes.parent,name)//object scope. C++ doesn't have this type. use scope from '{b{#var lbl;}} b{debugger }'
 				// }
+				scope[findLabel.key]=0;
 				delete scope[findLabel.key];
 				return label;
 			};
@@ -661,6 +739,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		//----
 		//parsing funcitons
 			//labels
+				const equalsRegexWord=/^<[-=]>?|[-=]>|=$/;
 				const evalParamaters=async function({index,lineStr0,words,scope,block,label,codeObj,makeVars=true,wasDeclared}){
 					let lineStr=lineStr0.substring(index);
 					let functionType=lineStr.match(/(?<=^\s*)(=>|=)?(?=\s*\()/);//"foo=>();" or "foo();"
@@ -672,7 +751,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					let index1=0;
 					if(functionType&&!wasDeclared)throw Error(
-						errorMsg+throwErrorLine(codeObj)+" function: '"+label.name+"' was not declared. "+throwErrorFile(codeObj)
+						throwError(codeObj," function: '"+label.name+"' was not declared. ")
 					);
 					if(functionType){//&&label.isFunction){//label?.parameters
 						let foo=label;
@@ -696,61 +775,111 @@ const oxminCompiler=async function(inputFile,fileName){
 						label.scopes.let=label;
 						//label.scopes.parent=foo.scopes.parent;//closure: use foo's parent's variables
 						label.parent=foo.parent;
-						if(typeof foo.isFunction!="boolean"&& !functionType[0]){//'foo=(){};foo();' default to original's type
-							functionType[0]=[foo.isFunction];
-						}
-						if(functionType[0]=="=>"){//'#set lbl = foo=>();'
-							//'lbl.this==undefined' and the 'this' in 'foo(){this;}' == the 'this' of the block that called it.
-							//'foo(){this;};' ==> 'obj{this;obj.foo()}'
-							delete label.labels["this"];//note:label.labels.this==label.parent;
-							delete label.labels["return"];
-							label.scopes.parent=scope;
-						}else if(functionType[0]=="="){//'#set lbl = foo=();' class
-							//like: 'new class();'
-							label.labels["constructor"]=foo;
-							label.scopes.parent=scope;
-							label.proto=foo;
-						}else{//'#set lbl=foo();' like 'new'.
-							label.scopes.parent=foo.scopes.parent;
-							label.labels["this"]=block;//'obj.foo().this' == 'obj;'
+						function_types:{
+							if(typeof foo.isFunction!="boolean"&& !functionType[0]){//'foo=(){};foo();' default to original's type
+								functionType[0]=[foo.isFunction];
+							}
+							if(functionType[0]=="=>"){//'#set lbl = foo=>();' arrow function
+								//'lbl.this==undefined' and the 'this' in 'foo(){this;}' == the 'this' of the block that called it.
+								//'foo(){this;};' ==> 'obj{this;obj.foo()}'
+								delete label.labels["this"];//note:label.labels.this==label.parent;
+								delete label.labels["return"];
+								//label.scopes.parent=scope;
+								label.parent=foo.parent;
+							}else if(functionType[0]=="->"){//'#set lbl = foo->();'
+								//'lbl.this==undefined' and the 'this' in 'foo(){this;}' == the 'this' of the block that called it.
+								//'foo(){this;};' ==> 'obj{this;obj.foo()}'
+								delete label.labels["this"];//note:label.labels.this==label.parent;
+								delete label.labels["return"];
+								//label.scopes.parent=scope;
+								label.parent=foo.parent;
+							}else if(functionType[0]=="="){//'#set lbl = foo=();' class
+								//like: 'new class();'
+								label.labels["constructor"]=foo;
+								label.scopes.parent=scope;
+								label.proto=foo;
+								label.super=foo;
+							}else{//'#set lbl=foo();' like 'new'.
+								label.scopes.parent=foo.scopes.parent;
+								label.labels["this"]=block;//'obj.foo().this' == 'obj;'
+							}
 						}
 						label.isInstance=true;
 						let i=0;
 						for(words.i=0;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
 							//if(words[words.i].index<index)continue;
 							let word=words[words.i][0];
-							if(word[0]=="("){brackets++;openedBrackets=true;}
+							if(word[0]=="("){brackets++;openedBrackets=true;
+								if(brackets>1){
+									let {label}=await evalBrackets({lineStr,scope,codeObj,words});words.i--;
+									if(label)parameters.push(label);
+								}
+							}
 							else if(word[0]==")")brackets--;
 							else if(word.match(/^(;|,)/)){}
 							else if(openedBrackets){
-								let argument;
-								//index=word.index;
-								({label:argument,refLevel}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
-								let argument1=new Scope({
-									name:word,
-									parent:scope,
-								});
-								argument1.scopes.parent=label;
-								let oldI=words.i;
-								if(refLevel==0&&(await parseSetStatement({scope,label:argument1,words,codeObj,tryTest:true})).didParse){
-									words.i=oldI;
-									//foo(a,c){};var b;foo(a=b,c=b);
-									let label;
-									({label}=await parseSetStatement({scope,label:argument1,words,codeObj}));
-									parametersObj[word]=label;
-								}else words.i=oldI;
-								if(argument instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
-									let num=+argument;
-									let name=word;//foo.parameters[parameters.length];
-									argument=new NumberObj({
+								if(0){//old working version
+									let argument,didParse;
+									//index=word.index;
+									({label:argument,refLevel,didParse}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
+									let argument1=new Scope({
+										name:word,
 										parent:scope,
-									},codeObj,num,name);
-									argument.scopes.parent=argument;
-									argument.relAddress=num;
+									});
+									argument1.scopes.parent=label;
+									if(argument instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
+										let num=+argument;
+										let name=word;//foo.parameters[parameters.length];
+										argument=new NumberObj({
+											parent:scope,
+										},codeObj,num,name);
+										argument.scopes.parent=argument;
+										argument.relAddress=num;
+									}
+									let oldI=words.i;
+									if(refLevel==0&&(await parseSetStatement({scope,label:argument1,words,codeObj,tryTest:true})).didParse){
+										words.i=oldI;
+										//foo(a,c){};var b;foo(a=b,c=b);
+										let label;
+										({label}=await parseSetStatement({scope,label:argument1,words,codeObj}));//parseSetStatement
+										parametersObj[word]=label;
+									}else words.i=oldI;
+									if(argument)parameters.push(argument);
+									else throw Error(throwError(codeObj,"label '"+word+"' was not declared"));
+									words.i--;
 								}
-								if(argument)parameters.push(argument);
-								else throw Error(errorMsg+throwErrorLine(codeObj)+"label '"+word+"' was not declared"+throwErrorFile(codeObj));
-								words.i--;
+								if(1){
+									let label,didParse;
+									//index=word.index;
+									({label,refLevel,didParse}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
+									let oldI=words.i;
+									let argument1=new Scope({
+										name:word,
+										parent:scope,
+									});
+									argument1.scopes.parent=label;
+									if(label instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
+										let num=+label;
+										let name=word;//foo.parameters[parameters.length];
+										label=new NumberObj({
+											parent:scope,
+										},codeObj,num,name);
+										label.scopes.parent=label;
+										label.relAddress=num;
+									}
+									let setName=refLevel==0&&(words[words.i]?.[0]??"").match(equalsRegexWord);
+									if(setName){
+										label=argument1;
+									}
+									({label}=await evalBrackets({scope,label,words,codeObj}));//parseSetStatement
+									if(setName){
+										//foo(a,c){};var b;foo(a=b,c=b);
+										parametersObj[word]=label;
+									}
+									else if(label)parameters.push(label);
+									else throw Error(throwError(codeObj,"label '"+word+"' was not declared"));
+									words.i--;
+								}
 								continue;
 							}
 							//index+=word.length;
@@ -764,6 +893,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						for(let i in parametersObj){
 							if(parametersObj[i])label.labels[i]=parametersObj[i];
 						}
+						for(let i of foo.parameters){
+							label.labels[i]??=null;//'let x;a(x){debugger x;};a();' returns undefined
+						}
 						let code=getCode(foo);
 						if(code.popped!=undefined)code.push(code.popped);//dont loose end brackets or code
 						if(code[0]?.sourceLineNumber==undefined){
@@ -773,7 +905,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						//handle_special_objects
 						let argsObj={scope:label,codeScope:label,parts:code,fileName,codeObj};
 						if(foo.isDebugger){//'debugger(label).code;'
-							if(!foo.onCall)throw Error(errorMsg+throwErrorLine(codeObj)+"'"+foo.name+"' cannot be called with '()'."+throwErrorFile(codeObj))
+							if(!foo.onCall)throw Error(throwError(codeObj,"'"+foo.name+"' cannot be called with '()'."))
 							label=foo.onCall?.({codeObj,label,scope,parameters});
 						}
 						else{
@@ -787,22 +919,26 @@ const oxminCompiler=async function(inputFile,fileName){
 					index=index+index1;
 					return {index,lineStr,label};
 				};
-				const assignError=(name,codeObj)=>errorMsg+throwErrorLine(codeObj)+" label:'"+name+"' was not declared. Try adding '#let "+name+";' before this line "+throwErrorFile(codeObj);
-				const evalLabel=async function({index=0,lineStr,scope,codeObj,makeVars,words=[],evalFoo=true}){
+				const assignError=(name,codeObj)=>throwError(codeObj," label:'"+name+"' was not declared. Try adding '#let "+name+";' before this line ");
+				const getLabelFromCodeObj=function(codeObj){
+					return codeObj.label??codeObj.labelForArray;
+				}
+				const evalLabel=async function({index=0,lineStr,scope,codeObj,makeVars,words=[],startLabel,block,evalFoo=true}){
 					const useStrict=true;
 					if(makeVars==undefined)makeVars=-1;
 					//returns (existing label) or (a new label with "isDefined = false").
 					let lineStr0=lineStr;
 					lineStr=lineStr0.substring(index);
 					//index=next index
-					let label,lblName=undefined,hasDef,block,name;
+					let label,lblName=undefined,hasDef,name;
 					let lastWasName=false;
 					let wasDeclared=true,isDeclared=true,refLevel=0,arrayCodeObj;
 					{
-						let words=[...lineStr.matchAll(/[,;]|[\w_]+|\.\.\.|\.|(<?[\-=]>?\s*)?\(|\[|[\S]/g)];
+						let words=[...lineStr.matchAll(/[,;]|[\w_]+|\.+|(<?[\-=]>?\s*)?\(|\[|[\S]/g)];
 						let i=0;
 						let thisIsName=false;
 						let isFirstLabel=true;
+						let isInternal=false;
 						for(i=0;i<words.length;i++){
 							let word=words[i][0];
 							if(word.match(/\w+/)){
@@ -818,12 +954,21 @@ const oxminCompiler=async function(inputFile,fileName){
 									block=label;
 								}
 								let labelPrototype=block.proto?.labels?.["prototype"];
+								let labelSupertype=block.super?.labels?.["supertype"];
 								if(dotType){//label){
 									tempLabel=block.labels[word];
 									tempLabel??=labelPrototype?.labels?.[word];
 								}
 								else{
-									tempLabel=findLabel(block,word)??findLabel(labelPrototype,word);
+									if(0)if(labelPrototype)for(let i=0;!tempLabel&&i<labelPrototype.arrayLabels.length;i++){
+										tempLabel=getLabelFromCodeObj(labelSupertype.arrayLabels[i])?.findLabel(word);
+									}//dotFindLabel;
+									tempLabel=labelSupertype?.dotFindLabel?.(word);
+									tempLabel??=findLabel(block,word);
+									tempLabel??=labelPrototype?.dotFindLabel?.(word);
+									if(0)if(labelPrototype)for(let i=0;!tempLabel&&i<labelPrototype.arrayLabels.length;i++){
+										tempLabel=getLabelFromCodeObj(labelPrototype.arrayLabels[i])?.findLabel(word);
+									}
 								}
 								label=tempLabel;
 								name=word;
@@ -849,9 +994,13 @@ const oxminCompiler=async function(inputFile,fileName){
 								//if(label){
 								//	block.labels[word]=label;
 								//}
-								lblName=words[i];
+								lblName=word;
 								isFirstLabel=false;
-							}else if(word=="."){
+							}else if(word=="."||word==".."){
+								if(i==0){//'#(...).lbl'
+									thisIsName=false;
+									label=startLabel;
+								}
 								if(!isDeclared){
 									if(makeVars){
 										isDeclared=true;
@@ -861,9 +1010,12 @@ const oxminCompiler=async function(inputFile,fileName){
 										throw Error(assignError(label.name,codeObj));
 									}
 								}
-								if(!label)throw new Error(errorMsg+throwErrorLine(codeObj)+'label:"'+words[i-1]?.[0]+'" is undefined'+'"'+lineStr+'". Try adding "#let '+words[i-1]?.[0]+';" before this line'+throwErrorFile(codeObj));
+								if(!label)throw new Error(throwError(codeObj,'label:"'+words[i-1]?.[0]+'" is undefined'+'"'+lineStr+'". Try adding "#let '+words[i-1]?.[0]+';" before this line'));
 								thisIsName=false;
 								refLevel++;
+								if(word==".."){//a..b get 'b' from the internal object
+									label=label.getInternalsAsScope();
+								}
 							}else if(word=="["){
 								let indexArg;
 								words.i=i+1;
@@ -874,31 +1026,44 @@ const oxminCompiler=async function(inputFile,fileName){
 								}
 								if(!isNaN(indexArg)){
 									if(!block){//'[4];'
-										block=scope;
+										block=scope.scopes.code??scope;//'block{}'=> 'block'
 									}else{//'lbl[4];'
 										block=label;
 									}
 									arrayCodeObj=block.arrayLabels[indexArg];
 									if(arrayCodeObj==undefined&&makeVars>=0){
 										arrayCodeObj=new CodeObj({isNonMeta:false},";",block);
+										wasDeclared=false;
 										if(makeVars){//add item to array
 											arrayCodeObj=block.arrayLabels[indexArg]
 										}
 									}
+									arrayCodeObj.index=indexArg;
 									if(arrayCodeObj){
-										label=arrayCodeObj.label??arrayCodeObj.labelForArray;
+										label=getLabelFromCodeObj(arrayCodeObj);//arrayCodeObj.label??arrayCodeObj.labelForArray;
 										if(!label){
-											let value=arrayCodeObj.command?.number??"null";
-											label=new NumberObj({
-												//index:indexArg,
-												//codeObj:arrayCodeObj,
-												relAddress:+value||0,
-												parent:scope,
-												codeObj:arrayCodeObj,
-											},arrayCodeObj,value,"["+indexArg+"]");
-											label.code[0]=arrayCodeObj;
-											label.codeObj=arrayCodeObj;
-											//arrayCodeObj.label??=label
+											if(typeof arrayCodeObj=="string"||arrayCodeObj instanceof Str){
+												label=new StringObj({
+													//index:indexArg,
+													//codeObj:arrayCodeObj,
+													parent:block,
+													codeObj:arrayCodeObj,
+													name:""+arrayCodeObj,
+												},arrayCodeObj,arrayCodeObj+"","["+indexArg+"]");
+											}
+											else{
+												let value=arrayCodeObj.command?.number??NaN;
+												label=new NumberObj({
+													//index:indexArg,
+													//codeObj:arrayCodeObj,
+													relAddress:+value,
+													parent:block,
+													codeObj:arrayCodeObj,
+												},arrayCodeObj,value,"["+indexArg+"]");
+												label.code[0]=arrayCodeObj;
+												label.codeObj=arrayCodeObj;
+												//arrayCodeObj.label??=label
+											}
 										}
 									}
 									else{label=undefined;}
@@ -926,7 +1091,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							lastWasName=thisIsName;
 						}
-						if(makeVars&&block)block.labels[name]=label;
+						if(makeVars&&block&&!isDeclared)block.labels[lblName]=label;
 						i--;
 						if(words.length>0&&i>=0){
 							if(1){
@@ -983,6 +1148,11 @@ const oxminCompiler=async function(inputFile,fileName){
 							}else if(this.type=="string"){
 								this.label=new StringObj({parent:this.scope},codeObj,this.string.string,this.name);
 								this.number=0;
+								this.type="label";
+							}else if(this.type==undefined){
+								this.number=NaN;
+								this.label=labelUndefined;
+								this.type="label";
 							}
 						}else{
 							//this.label.relAddress+=this.number||0;
@@ -1014,9 +1184,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				const evalBrackets=async function insidersEvalBrackets(context,{brackets=0,argsList=[],i=0}={}){//words[i-1] == "("
 					i++;
-					let pointerOperators=["->", "<-", "=>", "<=", "=", "==", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
-					let operatorRegex= /^[><!]=?|(\<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$/;
-					let operatorRegex1=/^[><!]=?|(\<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$|^[+-](?=[0-9]?)/;
+					let pointerOperators=["->", "<->", "<=>", "<-", "=>", "<=", "=", "==", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
+					let operatorRegex= /^[><!]=?|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$/;
+					let operatorRegex1=/^[><!]=?|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$|^[+-](?=[0-9]?)/;
 					let words,scope,codeObj,label,name,block;
 					({words,scope,codeObj,label}=context);
 					brackets??=0;argsList??=[];
@@ -1027,7 +1197,33 @@ const oxminCompiler=async function(inputFile,fileName){
 					brackets++;
 					//words.i++;
 					var lineStr=words.map(v=>v[0]).join(" ");//lineStr isfor testing only
-					if(0)loga(words.map(v=>v[0]),"||",words.i);
+					if(0)loga(words.str,"||",words.i);
+					let processLabelCase=async(word,lastLabel)=>{
+						({label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({...context,lastLabel,pointerOperators,makeVars:0}));
+						if(label&&!label instanceof Number){
+							let lastVal=args[args.length-1];
+							if(lastVal&&lastVal.type=="label"&&lastVal.label instanceof Scope)return 1;//"a+b label" -> stops
+						}
+						if(label instanceof Scope){
+							args.push(new BracketValue({scope,label,name,block,refLevel,type:"label",arrayCodeObj,bool:wasDeclared&&label.bool!==false,wasDeclared}));
+							return;
+						}else if(label instanceof Number){
+							let match;if(match=word.match(/[+\-]/)){args.push(match[0]);}else{args.push("+");}
+							args.push(new BracketValue({
+								scope,
+								type:"number",
+								number:+label,
+								refLevel:0,
+								//label:new NumberObj({parent:scope},codeObj,+label),
+								bool:Boolean(+label),
+							}));
+							return;
+						}else if(word.match(/[);{}]/)){
+						}else if(words.i<words.length){
+							args.push(word);words.i++;return;
+						}
+						let l=args.length;
+					}
 					for(;i<words.length*3&&(words.i<words.length||args.length>=2)&&brackets>0;i++){
 						let word=words[words.i]?.[0]??"";
 						let found=true;
@@ -1036,8 +1232,17 @@ const oxminCompiler=async function(inputFile,fileName){
 							words.i++;//'('
 							args.push(await evalBrackets({...context,label:undefined},{brackets,argsList,i}));
 							words.i++;//')'
+							if((words[words.i]?.[0]||"").match(/\.{1,2}/)){//'().lbl'
+								let oldArg=args.pop();
+								args.push(oldArg);
+								if(oldArg.type!="label"){
+									await parseLabelOrNumber({codeObj,scope,words});
+								}
+								else if(await processLabelCase(word,oldArg.label))break;
+							}
 							continue;
 						}
+						if(word.match(/[#]/)){words.i++;continue;}
 						if(args.length>=2&&!(args[args.length-2] instanceof BracketValue)&&(args[args.length-1] instanceof BracketValue)){
 							let equalsOperator=false;
 							if(typeof args[args.length-3]=="string")
@@ -1140,10 +1345,14 @@ const oxminCompiler=async function(inputFile,fileName){
 										case"="://sets value
 											ans=arg1;
 											if(arg0.type=="label"){
-												arg1.toLabel(codeObj);
+												ans=arg1.toLabel(codeObj);
 												if(arg0.wasDeclared){
-													arg0.block.labels[arg0.name]=arg1.label;
-												}ans.label.relAddress+=(arg1.number|0)-(arg0.number|0);
+													if(arg0.arrayCodeObj){
+														arg0.block.arrayLabels[arrayCodeObj.index]=arg1.label;
+													}
+													else arg0.block.labels[arg0.name]=arg1.label;
+												}
+												ans.label.relAddress+=(arg1.number|0)-(arg0.number|0);
 												ans.number=0;
 											}
 											break;
@@ -1175,6 +1384,7 @@ const oxminCompiler=async function(inputFile,fileName){
 												//arg1.isBlock=true;
 												if(arg1.label?.isBlock){
 													arg0.label.code=arg1.label.code;
+													arg0.label.arrayLabels=arg1.label.arrayLabels;
 													arg0.label.isBlock=true;
 												}
 											}
@@ -1184,7 +1394,7 @@ const oxminCompiler=async function(inputFile,fileName){
 											if(arg0.type=="string"){//concat strings
 												arg1.toStringVal();
 												arg0.string.str+="+"+arg1.string.str;
-												arg0.string.str=JSON.stringify(arg0.string.string);//
+												arg0.string.str=JSON.stringify(arg0.string.string);
 												ans=arg0;
 											}else if(arg0.type=="label"){
 												if(!(arg1.type=="label"))arg1.toLabel(codeObj);
@@ -1194,34 +1404,35 @@ const oxminCompiler=async function(inputFile,fileName){
 											}//else ans=arg0;
 											break;
 										default:
-										case"<->":{//new command. strong set address
+										case"<->":{//new command. weak set address
 											let oldAddress=(arg0.number||0)+(arg0.label.relAddress||0);
 											ans=arg0;
 											if(arg0.type=="label"){
 												let subAddress=0;
 												if(arg1.label){
-													arg0.label.codeObj=arg1.label;
+													arg0.label.codeObj=arg1.label.codeObj;
 												}
-												arg0.label.relAddress=(arg1.number|0)-(arg0.number|0);
+												arg0.label.relAddress=(arg1.number|0)+(arg1.label?.relAddress|0);
 												ans.number=0;
 											}
 											else{
-												if(arg1.type=="label"){
+												if(arg1.type=="label"){//[number,operator,label]
 													arg0.toLabel();
-													arg0.label.codeObj=arg1.label;
-													arg0.label.relAddress=(arg1.number||0);
+													arg0.label.codeObj=arg1.label.codeObj;
+													arg0.label.relAddress=(arg1.number|0)+(arg1.label.relAddress|0);
 													ans.number=0;
 												}
-												else{
+												else{//[number,operator,number]
 													ans.number=arg1.number;
 												}
 											}
 											break;
-										}case"<=>"://strong set code
+										}case"<=>"://weak set code
 											if(arg0.type=="label"){
 												//arg1.isBlock=true;
 												if(arg1.label?.isBlock){
-													arg0.label.code=arg1.label.code;
+													arg0.label.code=[...arg1.label.code];
+													arg0.label.arrayLabels=[...arg1.label.arrayLabels];
 													arg0.label.isBlock=true;
 												}
 											}
@@ -1297,7 +1508,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							else{found=false;}
 							if(found){words.i++;continue;}
-							let label,wasDeclared,didParse,block,arrayCodeObj,name;
+							let label,wasDeclared,didParse,block,refLevel,arrayCodeObj,name;
 							let match;
 							if(words[words.i]instanceof Str){
 								args.push(new BracketValue({scope,type:"string",string:words[words.i],refLevel:0}).toStringVal());
@@ -1307,38 +1518,15 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(match=word.match(operatorRegex)){
 								args.push(word);words.i++;continue;
 							}
-							({label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({...context,pointerOperators,makeVars:0}));
-							if(label&&!label instanceof Number){
-								let lastVal=args[args.length-1];
-								if(lastVal&&lastVal.type=="label"&&lastVal.label instanceof Scope)break;//"a+b label" -> stops
-							}
-							if(label instanceof Scope){
-								args.push(new BracketValue({scope,label,name,block,refLevel,type:"label",arrayCodeObj,bool:wasDeclared&&label.bool!==false,wasDeclared}));
-								continue;
-							}else if(label instanceof Number){
-								let match;if(match=word.match(/[+\-]/)){args.push(match[0]);}else{args.push("+");}
-								args.push(new BracketValue({
-									scope,
-									type:"number",
-									number:+label,
-									refLevel:0,
-									//label:new NumberObj({parent:scope},codeObj,+label),
-									bool:Boolean(+label),
-								}));
-								continue;
-							}else if(word.match(/[);{}]/)){
-							}else if(words.i<words.length){
-								args.push(word);words.i++;continue;
-							}
-							let l=args.length;
+							if(await processLabelCase(word))break;
 						}
 					}
 					brackets--;
 					let ans=args[args.length-1];
 					if(!(ans instanceof BracketValue)){
-						const isStrict=true;
+						const isStrict=false;
 						if(!isStrict)ans=new BracketValue({scope,bool:false});
-						else throw Error(errorMsg+throwErrorLine(codeObj)+", ERROR: ans ="+ans+", args: ["+args.map(v=>v.type??v)+"]"+throwErrorFile(codeObj));
+						else throw Error(throwError(codeObj,", ERROR: ans ="+ans+", args: ["+args.map(v=>v.type??v)+"]"));
 					}
 					if(brackets==0){//convert back into label to be stored
 						if(!ans)ans=new BracketValue({scope,type:"label",bool:false,wasDeclared:false});
@@ -1361,282 +1549,309 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				let labelFalse=new NumberObj({bool:true,parent:"temp"},{sourceLineNumber:"NA"},1,"{true}");
 				let labelTrue=new NumberObj({bool:false,parent:"temp"},{sourceLineNumber:"NA"},0,"{false}");
+				let labelUndefined=new Scope({name:"{undefined}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
 			//---
-			const getWordsLength=words=>[...words].splice(0,words.i).map(v=>v[0]).join(" ").length;
-			const parseLabelOrNumber=async({words,scope,codeObj,pointerOperators=[],lineStr=undefined,makeVars=undefined,evalFoo=true})=>{//self contained
-				//evalFoo == false => is for testing statements and so doesnt run functions
-				lineStr=words.map(v=>v[0]).join(" ");//[0]?.input;
-				let word=words[words.i]?.[0];
-				let val=strToNumber(word);
-				if(!words[words.i]){}
-				else if(!isNaN(val)||word=="NaN"){//jump +4
-					let arg=new Number(val);
-					arg.word=words[words.i][0];
-					arg.type="number";
-					words.i++;
-					return {index:getWordsLength(words),label:arg,didParse:true};
-				}else if(words[words.i] instanceof Str){
-					let arg=new StringObj({parent:scope},codeObj,words[words.i].string);
-					words.i++;
-					return {index:getWordsLength(words),label:arg,didParse:true};
-				}else if(word.match(/["'`]/)){
-					let string=new Str({str:words[words.i][0]}).string;
-					return {label:new StringObj({parent:scope},codeObj,string),didParse:true};
-				}
-				else if(!pointerOperators.includes(words[words.i]?.[0])){//jump A->B;
-					let index,label,wasDeclared,name,refLevel;
-					index=getWordsLength(words);
-					({index,label,block,name,wasDeclared,refLevel,arrayCodeObj}=await evalLabel({index,lineStr,scope,makeVars,words,codeObj,evalFoo}));
-					for(;words.i<words.length;words.i++){//adjust words.i
-						if(!(getWordsLength(words)<index))break;
+			//other stuff that works
+				const getWordsLength=words=>[...words].splice(0,words.i).map(v=>v[0]).join(" ").length;
+				const parseLabelOrNumber=async({words,scope,codeObj,label,pointerOperators=[],lineStr=undefined,makeVars=undefined,evalFoo=true})=>{//self contained
+					//evalFoo == false => is for testing statements and so doesnt run functions
+					//label == start label e.g. '(...).name'
+					let startLabel=label;label=undefined;
+					lineStr=words.map(v=>v[0]).join(" ");//[0]?.input;
+					let word=words[words.i]?.[0];
+					let val=strToNumber(word);
+					if(!words[words.i]){}
+					else if(!isNaN(val)||word=="NaN"){//jump +4
+						let arg=new Number(val);
+						arg.word=words[words.i][0];
+						arg.type="number";
+						words.i++;
+						return {index:getWordsLength(words),label:arg,didParse:true};
+					}else if(words[words.i] instanceof Str){
+						let arg=words[words.i];//new StringObj({parent:scope},codeObj,words[words.i].string);
+						words.i++;
+						return {index:getWordsLength(words),label:arg,didParse:true};
+					}else if(word.match(/["'`]/)){
+						let string=new Str({str:words[words.i][0]}).string;
+						return {label:new StringObj({parent:scope},codeObj,string),didParse:true};
 					}
-					words.i=Math.min(words.i,words.length);
-					if(label){
-						//for(;words.i<words.length&&words[words.i].index<index;words.i++){}
-						//words.i++;
-						return {label,index,block,name,wasDeclared,refLevel,arrayCodeObj,didParse:true};
-					}
-					return {index,block,name,wasDeclared:false};
-				}
-				return{index:words[words.i]?.index,didParse:false};
-			};
-			//set statement is OBSILETE. replace with eval brackets.
-			const parseSetStatement=async function({label,label2=null,words,block,codeObj,scope,tryTest=false,evalFoo=true}){ //... 'label => label'
-				if(tryTest)evalFoo=false;
-				let lineStr=words[0]?.input;
-				let oldLabel=label;
-				let didParse=false;
-				block??=scope;
-				let match=words[words.i];//let match=lineStr.substring(index).match(/^(?<=\s*)(=>|<=|=|->|<-)/);//"#var lblA => lblB; can do #set a=>b; as well"
-				let oldI=words.i;
-				parsingBlock:{if(match)if(["=>", "<=", "=", "->", "<-"].includes(match[0])){//.match(/^(=)$/)){
-					words.i++;
-					let finalValue;//a label
-					evalBrackets_version2:{//TO_DO:{add maths evaluating e.g. "#var a=1+2*4/b;"}
-						if(label2){
-							finalValue=label2;
+					else if(!pointerOperators.includes(words[words.i]?.[0])){//jump A->B;
+						let index,label,wasDeclared,name,refLevel;
+						index=getWordsLength(words);
+						({index,label,block,name,wasDeclared,refLevel,arrayCodeObj}=await evalLabel({index,startLabel,lineStr,scope,makeVars,words,codeObj,evalFoo}));
+						for(;words.i<words.length;words.i++){//adjust words.i
+							if(!(getWordsLength(words)<index))break;
 						}
-						else{
-							let arg,num,block;
-							finalValue={};
-							//index=Math.max(index,words[words.i]?.index??words[words.i-1]?.index+words[words.i-1][0].length);
-							finalValue.block=block;
-							finalValue.number=undefined;
-							let doneLabel=false;
-							for(let i=0;i<2;i++){// /set {{label}}={{label}} ({{label}}||{{number}})?; "# a = b +2;""a = +2;"
-								//let currentBlock=block;
-								({label:arg,block}=await parseLabelOrNumber({words,scope,codeObj,makeVars:i==0?false:undefined}));
-								if(!doneLabel&&arg instanceof Scope){
-									doneLabel=true;
-									finalValue.type="label";
-									finalValue.label=arg;
-									finalValue.block=block;
-									//block=currentBlock;
-								}
-								else if(!isNaN(+arg)){
-									doneLabel=true;
-									finalValue.number=arg;
-								}
-							}
-							/*let oldI=words.i;
-							let num;
-							({label:num,block}=await parseLabelOrNumber({words,lineStr,scope,codeObj}));
-							if(arg instanceof Scope){
-								finalValue.type="label";
-								finalValue.label=arg;
-								finalValue.number=arg;
-							}
-							else if(!isNaN(+arg)){
-								finalValue.type;
-								finalValue.number=arg;
-							}*/
+						words.i=Math.min(words.i,words.length);
+						if(label){
+							//for(;words.i<words.length&&words[words.i].index<index;words.i++){}
+							//words.i++;
+							return {label,index,block,name,wasDeclared,refLevel,arrayCodeObj,didParse:true};
 						}
+						return {index,block,name,wasDeclared:false};
 					}
-					//label.scopes.parent.labels[label.name];
-					//label.scopes.parent=finalValue.label.scopes.parent;
-					//"set labelA=labelB;"
-					if(finalValue.number!=undefined||finalValue.label){// if("address" in (finalValue.label??{})){
-						didParse=!(finalValue.label instanceof Pointer||label instanceof Pointer);
-						if(tryTest)break parsingBlock;
-						//if(finalValue.label instanceof Pointer||(label instanceof Pointer))
-						if(finalValue.label)switch(match[0]){//"#set a -> b ;"
-							case"="://strong equals | like "parameter=argument"
-								//can get wrong name errors
-								block.labels[label.name]=finalValue.label;//??label.scopes.parent
-								label=finalValue.label;
-								//"A=B;" -> "scope.labels.A.name=B"
-								if(0){//BODGED, not sure if "=" works in every case.
-									label.codeObj=finalValue.label;
-									if(label.isBlock=finalValue.label.isBlock){
-										//label.isNonMeta=false;
-										label.code=finalValue.label.code;
-										if(label.isFunction=finalValue.label.isFunction){
-											label.parameters=finalValue.label.parameters;
-										}
+					return{index:words[words.i]?.index,didParse:false};
+				};
+				//set statement is OBSILETE. replace with eval brackets.
+				const parseSetStatement=async function({label,label2=null,words,block,codeObj,scope,tryTest=false,evalFoo=true}){ //... 'label => label'
+					if(tryTest)evalFoo=false;
+					let lineStr=words[0]?.input;
+					let oldLabel=label;
+					let didParse=false;
+					block??=scope;
+					let match=words[words.i];//let match=lineStr.substring(index).match(/^(?<=\s*)(=>|<=|=|->|<-)/);//"#var lblA => lblB; can do #set a=>b; as well"
+					let oldI=words.i;
+					parsingBlock:{if(match)if(["=>", "<=", "=", "->", "<-"].includes(match[0])){//.match(/^(=)$/)){
+						words.i++;
+						let finalValue;//a label
+						evalBrackets_version2:{//TO_DO:{add maths evaluating e.g. "#var a=1+2*4/b;"}
+							if(label2){
+								finalValue=label2;
+							}
+							else{
+								let arg,num,block;
+								finalValue={};
+								//index=Math.max(index,words[words.i]?.index??words[words.i-1]?.index+words[words.i-1][0].length);
+								finalValue.block=block;
+								finalValue.number=undefined;
+								let doneLabel=false;
+								for(let i=0;i<2;i++){// /set {{label}}={{label}} ({{label}}||{{number}})?; "# a = b +2;""a = +2;"
+									//let currentBlock=block;
+									({label:arg,block}=await parseLabelOrNumber({words,scope,codeObj,makeVars:i==0?false:undefined}));
+									if(!doneLabel&&arg instanceof Scope){
+										doneLabel=true;
+										finalValue.type="label";
+										finalValue.label=arg;
+										finalValue.block=block;
+										//block=currentBlock;
+									}
+									else if(!isNaN(+arg)){
+										doneLabel=true;
+										finalValue.number=arg;
 									}
 								}
-							break; 
-							case"=>"://weak equals | set block references | &a.block = &b.block;
-								//label.scopes.let=undefined;
-								//label.scopes.var=undefined;
-								//label.scopes.parent=finalValue.label;
-								if(finalValue.label.isBlock){//same as #set a()=>{def b;};
-									label.isBlock=true;
-									label.code=finalValue.label.code;//[...finalValue.label.code];
-								};
-								if(0){
-									label.code=finalValue.label.code;
-									label.isBlock=finalValue.label.isBlock;
-									label.parameters=finalValue.label.parameters;
-									label.isFunction=finalValue.label.isFunction;
+								/*let oldI=words.i;
+								let num;
+								({label:num,block}=await parseLabelOrNumber({words,lineStr,scope,codeObj}));
+								if(arg instanceof Scope){
+									finalValue.type="label";
+									finalValue.label=arg;
+									finalValue.number=arg;
 								}
-							break;
-							case"<=":
-								if(1)if(label.value.isBlock){
-									finalValue.isBlock=true;
-									finalValue.code=[...label.value.code];//same as #set a=>{...b;}
-								};
-								if(0){
-									label.code=[...finalValue.label.code];
-									label.isBlock=finalValue.label.isBlock;
-									label.parameters=[...finalValue.label.parameters];
-									label.isFunction=finalValue.label.isFunction;
-								}
-								errorLog("WARNING: use of experimental features. the use of the operator:'<' is not fully desided yet");
-							break;
-							case"->"://set def's refferences | &a.address = &b.address;
-								label.codeObj=finalValue.label;
-							break;
-							case"<-":{
-								finalValue.label.codeObj=label.codeObj;//undesided on what it should do
-								errorLog("WARNING: use of experimental features. the use of the operator:'<-' is not fully desided yet");
-							}break;default:
-							errorLog([match[0]]);
-							throw Error("logic error in .js: expected assignment symbol, got:'"+match[0]+"' check\n\tswitch(match[0])\n\tand\n\t['=','=>','->',etc...].includes(match[0])\nthis is not a 0xmin error.\n");
-						}
-						if(finalValue.number!=undefined){//#a=b+3;
-							if(["=", "=>","->"].includes(match[0])){
-								label.relAddress=finalValue.number;//not sure on this mechanic
-							}
-							else if(0){
-								if(finalValue.label)label.relAddress=finalValue.number;//'#set a->b+3'not sure on this mechanic
-								else label.relAddress+=finalValue.number;
-							}else{
-								throw Error("unfinished part of compiler");
+								else if(!isNaN(+arg)){
+									finalValue.type;
+									finalValue.number=arg;
+								}*/
 							}
 						}
-					}//label.address=finalValue.label.address;
-					else {
-						//errorLog(finalValue);
-						//throw new Error(errorMsg+throwErrorLine(codeObj)+' unhandled expression: "'+codeObj.croppedSource +'"'+throwErrorFile(codeObj));
-						break parsingBlock;
-					}
+						//label.scopes.parent.labels[label.name];
+						//label.scopes.parent=finalValue.label.scopes.parent;
+						//"set labelA=labelB;"
+						if(finalValue.number!=undefined||finalValue.label){// if("address" in (finalValue.label??{})){
+							didParse=!(finalValue.label instanceof Pointer||label instanceof Pointer);
+							if(tryTest)break parsingBlock;
+							//if(finalValue.label instanceof Pointer||(label instanceof Pointer))
+							if(finalValue.label)switch(match[0]){//"#set a -> b ;"
+								case"="://strong equals | like "parameter=argument"
+									//can get wrong name errors
+									block.labels[label.name]=finalValue.label;//??label.scopes.parent
+									label=finalValue.label;
+									//"A=B;" -> "scope.labels.A.name=B"
+									if(0){//BODGED, not sure if "=" works in every case.
+										label.codeObj=finalValue.label;
+										if(label.isBlock=finalValue.label.isBlock){
+											//label.isNonMeta=false;
+											label.code=finalValue.label.code;
+											if(label.isFunction=finalValue.label.isFunction){
+												label.parameters=finalValue.label.parameters;
+											}
+										}
+									}
+								break; 
+								case"=>"://weak equals | set block references | &a.block = &b.block;
+									//label.scopes.let=undefined;
+									//label.scopes.var=undefined;
+									//label.scopes.parent=finalValue.label;
+									if(finalValue.label.isBlock){//same as #set a()=>{def b;};
+										label.isBlock=true;
+										label.code=finalValue.label.code;//[...finalValue.label.code];
+									};
+									if(0){
+										label.code=finalValue.label.code;
+										label.isBlock=finalValue.label.isBlock;
+										label.parameters=finalValue.label.parameters;
+										label.isFunction=finalValue.label.isFunction;
+									}
+								break;
+								case"<=":
+									if(1)if(label.value.isBlock){
+										finalValue.isBlock=true;
+										finalValue.code=[...label.value.code];//same as #set a=>{...b;}
+									};
+									if(0){
+										label.code=[...finalValue.label.code];
+										label.isBlock=finalValue.label.isBlock;
+										label.parameters=[...finalValue.label.parameters];
+										label.isFunction=finalValue.label.isFunction;
+									}
+									errorLog("WARNING: use of experimental features. the use of the operator:'<' is not fully desided yet");
+								break;
+								case"->"://set def's refferences | &a.address = &b.address;
+									label.codeObj=finalValue.label;
+								break;
+								case"<-":{
+									finalValue.label.codeObj=label.codeObj;//undesided on what it should do
+									errorLog("WARNING: use of experimental features. the use of the operator:'<-' is not fully desided yet");
+								}break;default:
+								errorLog([match[0]]);
+								throw Error("logic error in .js: expected assignment symbol, got:'"+match[0]+"' check\n\tswitch(match[0])\n\tand\n\t['=','=>','->',etc...].includes(match[0])\nthis is not a 0xmin error.\n");
+							}
+							if(finalValue.number!=undefined){//#a=b+3;
+								if(["=", "=>","->"].includes(match[0])){
+									label.relAddress=finalValue.number;//not sure on this mechanic
+								}
+								else if(0){
+									if(finalValue.label)label.relAddress=finalValue.number;//'#set a->b+3'not sure on this mechanic
+									else label.relAddress+=finalValue.number;
+								}else{
+									throw Error("unfinished part of compiler");
+								}
+							}
+						}//label.address=finalValue.label.address;
+						else {
+							//errorLog(finalValue);
+							//throw new Error(throwError(codeObj,' unhandled expression: "'+codeObj.croppedSource +'"'));
+							break parsingBlock;
+						}
+						return{label,didParse};
+					}}
+					words.i=oldI;
 					return{label,didParse};
-				}}
-				words.i=oldI;
-				return{label,didParse};
-			};parseSetStatement.test=({words})=>["=>", "<=", "=", "->", "<-"].includes(words[words.i][0]);
-			const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,hasDef=false,varType1=undefined,makeVars=true}){
-				let label,block,name,refLevel,wasDeclared;{//#var label
-					({label,block,name,refLevel,wasDeclared}=await parseLabelOrNumber({
-						scope,//varType=="var"?scope.getVar():varType=="let"?scope.getLet():scope
-						codeObj,words,
-						makeVars:false,//["var","let"].includes(varType),
-					}));
-				};
-				if(!isNaN(label)){
-					label=new Scope({parent:scope,name:label});
-					label.scopes.parent=scope;
-					block??=scope;
-				}
-				if(label){
-					//label.codeObj=codeObj;label.address=0;
-					if(varType1=="..."){//concat lbl.code and lbl.labels. runs code
-						//var... a , let... b;
-						codeObj.isMeta=true;
-						codeObj.isNonMeta=false;
-						codeObj.phaseLevel=1;
-						//isMeta=true;
-						label.parent=scope;
-						let code=[...label.code];code.pop();//remove "}"
-						code=getCode(label);if(code.popped)code.push(code.popped);
-						//'let ...obj;' imports code. I might change this mechanic.
-						//'var ...obj;' imports variables.
-						//'...obj;' imports both.
-						if(varType!="let")Object.assign(scope.getLet().labels,label.labels);
-						commentLastStatemets(codeObj.codeScope);
-						if(varType!="var")await parseFunction({
-							scope,
-							codeScope:codeObj.codeScope,
-							parts:code,
-							fileName,
-							callStack,
-							functionLine:code[0]?.sourceLineNumber,
-							codeObj,
-						});
-						label=undefined;
-						varType=false;
+				};parseSetStatement.test=({words})=>["=>", "<=", "=", "->", "<-"].includes(words[words.i][0]);
+				const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,hasDef=false,varType1=undefined,makeVars=true,doBrackets=true}){
+					let label,block,name,refLevel,wasDeclared;{//#var label
+						({label,block,name,refLevel,wasDeclared}=await parseLabelOrNumber({
+							scope,//varType=="var"?scope.getVar():varType=="let"?scope.getLet():scope
+							codeObj,words,
+							makeVars:false,//["var","let"].includes(varType),
+						}));
+					};
+					let createdNewLabel;
+					if(!isNaN(label)){
+						label=new Scope({parent:scope,name:label});
+						label.scopes.parent=scope;
+						block??=scope;
 					}
-					else{
-						if(varType1!="..."&&(varType||(!strictMode&&0))){
-							//({label}=await letvarPhrase(words,varType));
-							let block1=block;
-							let newLabel=new Label({name});
-							newLabel.parent=scope;
-							if(varType=="let"){
-								if(refLevel==0)block1=scope.getLet();//'let a;'  --> JS:'let a=new Label();'
-								//else if(wasDeclared)newLabel=label;//'let a.b;'--> JS:'a.b??=new Label();' optionally creates b;
-							}
-							else if(varType=="var"){
-								if(refLevel==0)block1=scope.getVar();
-								//else if(wasDeclared)newLabel=label;
-							}
-							else {block1=scope;}
-							let found=findLabel(scope,label.name);
-							if(!found||found&&!(varType1=="set")){//'set var a;' ==> js'this.a??={};' 'var a' ==> js'this.a={};'
-								newLabel.scopes.parent=block1;
-								newLabel.sourceLineNumber=codeObj.sourceLineNumber;
-								block1.labels[name]=newLabel;
-								label=newLabel;
-								block=block1;
-								wasDeclared=true;
-							}
-						}
-						{
-							//let ret=await parseSetStatement({words,scope,codeObj,label,block,name});
-							let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
-							({label}=ret);//,block,name,refLevel,wasDeclared
-							//refLevel??=0;
-						}
-					}
-				}{
 					let didParse;
-					//({label,didParse}=await parseSetStatement({words,codeObj,scope,label,block,name}));
-					if(!didParse){//doesnt use an '='
-						let arg1;
-						({label:arg1}=await parseLabelOrNumber({scope,codeObj,words,makeVars:false}));
-						if(!isNaN(arg1)){//#set label+2;
-							label.relAddress+=arg1;
+					if(label){
+						//label.codeObj=codeObj;label.address=0;
+						if(varType1=="..."){//concat lbl.code and lbl.labels. runs code
+							//var... a , let... b;
+							codeObj.isMeta=true;
+							codeObj.isNonMeta=false;
+							codeObj.phaseLevel=1;
+							//isMeta=true;
+							label.parent=scope;
+							let code=[...label.code];code.pop();//remove "}"
+							code=getCode(label);if(code.popped)code.push(code.popped);
+							//'let ...obj;' imports code. I might change this mechanic.
+							//'var ...obj;' imports variables.
+							//'...obj;' imports both.
+							if(varType!="let")Object.assign(scope.getLet().labels,label.labels);
+							if(!codeObj.isDeleted)commentLastStatemets(codeObj.codeScope);
+							if(varType!="var")await parseFunction({
+								scope,
+								codeScope:codeObj.codeScope,
+								parts:code,
+								fileName,
+								callStack,
+								functionLine:code[0]?.sourceLineNumber,
+								codeObj,
+							});
+							label=undefined;
+							varType=false;
+						}
+						else{
+							if(varType1!="..."&&(varType||(!strictMode&&0))){
+								//({label}=await letvarPhrase(words,varType));
+								let block1=block;
+								let newLabel=new Label({name});
+								newLabel.parent=scope;
+								if(varType=="let"){
+									if(refLevel==0)block1=scope.getLet();//'let a;'  --> JS:'let a=new Label();'
+									//else if(wasDeclared)newLabel=label;//'let a.b;'--> JS:'a.b??=new Label();' optionally creates b;
+								}
+								else if(varType=="var"){
+									if(refLevel==0)block1=scope.getVar();
+									//else if(wasDeclared)newLabel=label;
+								}
+								else {block1=scope;}
+								let found=findLabel(block1,name);
+								if(!found||(found&&!(varType1=="set"))){//'set var a;' ==> js'this.a??={};' 'var a' ==> js'this.a={};'
+									newLabel.scopes.parent=block1;
+									//newLabel.labels["constructor"]??=block1;
+									newLabel.sourceLineNumber=codeObj.sourceLineNumber;
+									//block1.labels[name]=newLabel;
+									label=newLabel;
+									block=block1;
+									wasDeclared=true;
+									createdNewLabel=true;
+								}else createdNewLabel=false;
+								//create declares a new label.
+								if(0)if(!(words[words.i]?.[0]??"a").match(/\w+/)&&doBrackets){
+									let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
+									({label}=ret);//,block,name,refLevel,wasDeclared
+								}if(createdNewLabel){//'set var a;' ==> js'this.a??={};' 'var a' ==> js'this.a={};'
+									block.labels[name]=label;
+								}
+							}
+							if(!(words[words.i]?.[0]??"").match(/^\w+/)){// 'label+2' ignors 'label let'
+								//let ret=await parseSetStatement({words,scope,codeObj,label,block,name});
+								let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
+								({label}=ret);//,block,name,refLevel,wasDeclared
+								//refLevel??=0;
+								didParse=true;
+							}
+						}
+					}{
+						//({label,didParse}=await parseSetStatement({words,codeObj,scope,label,block,name}));
+						if(!didParse){//doesnt use an '=' OBSILETE replaced by
+							let arg1;
+							let oldI=words.i;
+							({label:arg1}=await parseLabelOrNumber({scope,codeObj,words,tryTest:true,makeVars:false}));
+							if(!isNaN(arg1)){//#set label+2;
+								label.relAddress+=arg1;
+							}
+							else{
+								words.i=oldI;
+							}
+						}
+						if(label)if(hasDef){
+							label.codeObj=codeObj;//does 'def block;' not 'block;'
 						}
 					}
-					if(label)if(hasDef){
-						label.codeObj=codeObj;//does 'def block;' not 'block;'
-					}
+					return{label,block,name,refLevel,wasDeclared,createdNewLabel};
+				};
+				const commentLastStatemets=function(scope,num=1,endComment=true){//semi-comment out the "...block;" --> "#(){...block}" 
+					let str;
+					//scope.codeBlock.code.pop();
+					scope.code.push(
+						new CodeObj({},"#CONTAINER:(){",scope),
+						...scope.code.splice(scope.code.length-num,num)
+					)
+					let endingCodeObj=new CodeObj({},";}",scope);
+					if(endComment)scope.code.push(endingCodeObj);
+					else return endingCodeObj;
 				}
-				return{label,block,name,refLevel,wasDeclared};
-			};
-			const commentLastStatemets=function(scope,num=1,endComment=true){//semi-comment out the "...block;" --> "#(){...block}" 
-				let str;
-				//scope.codeBlock.code.pop();
-				scope.code.push(
-					new CodeObj({},"#CONTAINER:(){",scope),
-					...scope.code.splice(scope.code.length-num,num)
-				)
-				let endingCodeObj=new CodeObj({},";}",scope);
-				if(endComment)scope.code.push(endingCodeObj);
-				else return endingCodeObj;
+			//----
+			function parsePhaseNumber({words,codeObj,scope}){
+				let word=words[words.i]?.[0]??"";
+				let symbol=word.match(/(?<=^\s*(::)?)([#\$]|\bvoid\b)/)?.[0]??"";//
+				let phaseLevel=(symbol=="#"?1:symbol=="$"||symbol=="void"?2:codeScope.phaseLevel??3);
 			}
+			//a function of code spaghetti
 			async function line_evalVariable({lastLabel,scope,words,lineStr,sourceLineNumber,isMeta,codeObj}){
+
 				let phaseLevel;
 				//'def var void a #{'
 				let allWords=words;
@@ -1654,7 +1869,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					let lineStr0=lineStr;
 				//----
 				lineStr=words.map(v=>v[0]).join(" ");
-				//fund block type
+				//find block type
 					if(words[words.i]?.[0]=="#"){
 						isMeta=true;
 						phaseLevel=1;
@@ -1686,7 +1901,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 					}//'{' note:'#{' doesn't have block scope
 					else{
-						throw Error(errorMsg+throwErrorLine(codeObj)+"invalid block definition. This might be a compiler bug."+throwErrorFile(codeObj))
+						throw Error(throwError(codeObj,"invalid block definition. This might be a compiler bug."))
 					}
 				//----
 				let codeScope=new Scope({parent:scope});
@@ -1719,7 +1934,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					for(;i<words.length;i++){
 						let thisIsName=false;
 						let word=words[i][0];
-						if(!lbl&&word.match(/\b(let|var|set|def|void)\b/)){// /(def)?(let|var|set)/
+						if(!lbl&&word.match(/\b(let|var|set|def|void|static)\b/)){// /(def)?(let|var|set)/
 							if(word=="def"){
 								hasDef=true;
 								isVarScope=true;
@@ -1735,7 +1950,11 @@ const oxminCompiler=async function(inputFile,fileName){
 						}else {//newer parser
 							//words.i=i;
 							words.i=i;let name;
-							({label:lbl,block:lblBlock,name,refLevel,wasDeclared}=await parseMakeVariable({words,scope,codeObj,varType,varType1,isVoid,hasDef}));
+							let asd=lbl;
+							({label:lbl,block:lblBlock,name,refLevel,wasDeclared,createdNewLabel}=await parseMakeVariable({words,scope,codeObj,varType,varType1,isVoid,hasDef,doBrackets:false}));
+							if(varType1=="set"&&varType&&!createdNewLabel){//'#let a;#let set a{};' == '#let a;#set a{};' dont create new label_block
+								varType=false;
+							}
 							i=words.i;
 							lblName=name;
 							break;
@@ -1770,12 +1989,14 @@ const oxminCompiler=async function(inputFile,fileName){
 								}
 								if(i<words.length&&!isLabeledBlock)lblBlock.labels[word]=lbl;//can do a.a.a.a.a.a{}
 							}else if(word=="."){
-								if(!lbl)throw new Error(errorMsg+'label:"'+words[i-1][0]+'" is undefined'+'"'+lineStr+'"');
+								if(!lbl)throw new Error(throwError(codeObj,+'label:"'+words[i-1][0]+'" is undefined'));
 							}
 							lastWasName=thisIsName;
 						}
 					}
-				}isNew=Boolean(varType)||!wasDeclared;
+				}
+				//spaghetti starts here. SPAGHETTI
+				isNew=Boolean(varType)||!wasDeclared;
 				words.i=i;
 				command=varType||varType1;
 				if(words.length>0)index=words[i-1]?.index+words[i-1]?.length;
@@ -1823,7 +2044,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(hasDef)lbl.codeObj=codeScope.codeObj=codeObj;
 						break;
 						default:
-						if(equalsSign!=undefined)throw Error(errorMsg+throwErrorLine(codeObj)+"symbol:'"+equalsSign+"' isn't a supported type of assignment"+throwErrorFile(codeObj));
+						if(equalsSign!=undefined)throw Error(throwError(codeObj,"symbol:'"+equalsSign+"' isn't a supported type of assignment"));
 					}
 					if(command=="set"){
 						//default assignment is: "add block code onto the existing label code"
@@ -1874,8 +2095,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				if(isJoiningBLock){//':{' in 'foo(){...} : {...}' or 'foo(){} : var{}'
 					if(!lastLabel){
-						throw Error(errorMsg+throwErrorLine(codeObj)+", expected a block before this one (e.g.'{}::{}'). Try using 'var foo(){}"+codeObj.croppedSource
-							+"' instead of this line. "+throwErrorFile(codeObj)
+						throw Error(throwError(codeObj,", expected a block before this one (e.g.'{}::{}'). Try using 'var foo(){}"+codeObj.croppedSource
+							+"' instead of this line. ")
 						);
 					}
 					lbl??=lastLabel;
@@ -1895,12 +2116,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					codeScope.scopes.var=codeScope.parent.getVar();
 					//codeScope.scopes.let=codeScope;
 				}
-				if(codeScope.hasLetScope){//remove existing end line
-					//if(codeScope.labels["return"]?.isDefaultLabel)codeScope.labels["return"].codeObj=undefined;
-					//if(codeScope.labels["break"]?.isDefaultLabel)codeScope.labels["break"].codeObj=undefined;
-					if((codeScope.code[codeScope.code.length-1]+"").match(/\s*}/)){
-						codeScope.code.pop().isDeleted=true;
-					}
+				//TODO remove this
+				if(EndBracket!=undefined)if((codeScope.code[codeScope.code.length-1]+"").match(/\s*}/)){
+					codeScope.code.pop().isDeleted=true;
 				}
 				codeScope.sourceLineNumber??=sourceLineNumber;
 				Object.assign(codeScope,{isBlock,hasLetScope,isVarScope,isJoiningBLock});
@@ -1911,8 +2129,16 @@ const oxminCompiler=async function(inputFile,fileName){
 				}else{
 					delete codeScope.phaseLevel;
 				}
-				if(isFunction!==true)codeScope.isFunction=isFunction;//set function type 'foo=(){' or 'foo=>(){'
-				else codeScope.isFunction||=isFunction;
+				if(isFunction!==true&&isFunction){
+					codeScope.isFunction=isFunction;//set function type 'foo=(){' or 'foo=>(){'
+					let constructorLabel=new Scope({});//adds inheritence object
+					constructorLabel.scopes.parent=codeScope;
+					codeScope.labels["prototype"]??=constructorLabel;
+					
+					constructorLabel=new Scope({});//allows for un overwritable objects object
+					constructorLabel.scopes.parent=codeScope;
+					codeScope.labels["supertype"]??=constructorLabel;//TODO change this mechanic
+				}else codeScope.isFunction??=isFunction;
 				if(lblName=="else"&&refLevel==0){//'else if(){'
 					if(scope.ifStatementValue?.bool===false){//if(bool==valse) then it doesn't run the if's block code
 						codeScope.isFunction=false;
@@ -1931,8 +2157,12 @@ const oxminCompiler=async function(inputFile,fileName){
 							//words1.i=0;
 							words.i++;//["if","(",words[words.i]]
 							//if(words1[0]?.[0]=="(")words1.i++;
-							//codeScope=new Scope({parent:scope,name:"if block"});
-							codeScope.name="if block";
+							{
+								codeScope=new Scope({parent:scope,name:"if block"});
+								codeScope.scopes.parent=block;
+								codeScope.name="if block";
+								scope=codeScope;
+							}
 							hasDef=true;
 							let lastI=words.i;
 							let value;
@@ -1962,7 +2192,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								let match=word.match(/[\w]+/);
 								if(match){
 									codeScope.parameters.push(match[0]);
-									codeScope.labels[match[0]]=new Label({
+									if(0)codeScope.labels[match[0]]=new Label({
 										name:match[0],
 										scopes:{parent:codeScope},
 										parent:scope,
@@ -1990,293 +2220,354 @@ const oxminCompiler=async function(inputFile,fileName){
 					codeObj.labelForArray1=newScope;
 					if(isNew)codeScope.parent=scope;
 					scope=newScope;//new Scope({parent:scope});{scope.scopes.parent=codeScope;scope.labels=codeScope.labels}//
-					codeScope.sourceLineNumber=sourceLineNumber;
+					codeScope.sourceCodeObj=codeObj;
 				}
 				return {scope,codeScope,lineStr,lbl,codeObj};
 				//===========================================================================================
 			};
 		//----
-		//inbuilts
+		let scope;//inbuilts
 			const vm = require('vm');
-			let debuggingTool={
-				warnColour:(str)=>"\x1b[33m"+str+"\x1b[0m",
-				async parse({words,codeObj,scope,parts,isMeta}){//("{debugger}"")={labelof,};
-					let phase=CallStackObj.phase;["#","$",""];
-					let i=words.i;
-					for(words.i=0;words.i<words.length;words.i++){//skip the '#' words.
-						if(!words[words.i][0].match(/^[#$@£]$/))break;
-					}
-					let cmd;
-					({label:cmd}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false}));
-					if(cmd?.isDebugger){
-						let error=this.warnColour((isMeta?"#":"")+cmd.name+"::");
-						let label;
-						if(words[words.i]){
-							({label,wasDeclared}=await parseLabelOrNumber({error,words,scope,codeObj,makeVars:false}));
-							if(!wasDeclared)label=new Scope({name:(label?.name??words[i][0])+"?",wasDeclared:false});
+			//objects and classes
+				const debuggingTool={
+					warnColour:(str)=>"\x1b[33m"+str+"\x1b[0m",
+					async parse({words,codeObj,scope,codeScope,parts,isMeta}){//("{debugger}"")={labelof,};
+						let phase=CallStackObj.phase;["#","$",""];
+						let i=words.i;
+						if(0)for(words.i=0;words.i<words.length;words.i++){//skip the '#' words. OBSILETE as this is done by the words are created
+							if(!words[words.i][0].match(/^[#$@£]$/))break;
 						}
-						else{
-							label=scope.scopes.code??scope;
-						}
-						await cmd.do?.({words,codeObj,scope,label,error,parts});
-						return{didParse:true};
-					}else{
-						words.i=i;
-						return{didParse:false}
-					}//words.i=i;
-				},
-				debuggerObj:new Label({
-					isDebugger:true,
-					name:"{DEBUGGER}",
-					labels:{},
-					isDebugger:true,
-					async onCall({codeObj,scope,label,parameters}){//'debugger();'
-						if(!parameters[0])throw Error(error+throwErrorLine(codeObj)+"missing 1 argument. Try 'debugger(labelName);'."+throwErrorFile(codeObj));
-						let dataLabel= new Scope({
-							name:"",
-							labels:{}
-						});
-						let data=label.getDataSummery();
-						for(let i in data){
-							dataLabel.labels[i]=new Scope({name:data[i],getDataSummery(){return label[i]}});
-						}
-						await this.do({words,scope,codeObj,label,error:errorMsg+throwErrorLine()})
-						return label;
-					},
-					async do({words,scope,codeObj,label,error}){
-						if(label instanceof Scope||label instanceof Pointer){
-							let data=label.getDataSummery();
-							//delete data.name;
-							console.warn(error,data);
+						let cmd;
+						({label:cmd}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false}));
+						if(cmd?.isDebugger){
+							let error=this.warnColour((isMeta?"#":"")+cmd.name+"::"+codeObj.sourceLineNumber+"::");
+							let label;
+							if(words[words.i]){
+								({label,wasDeclared}=await parseLabelOrNumber({error,words,scope,codeObj,makeVars:false}));
+								if(!wasDeclared&&(label instanceof Scope||label==undefined))label=new Scope({name:(label?.name??words[i][0])+"?",wasDeclared:false});
+							}
+							else{
+								label=scope.scopes.code??scope;
+							}
+							await cmd.do?.({words,codeObj,scope,codeScope,label,error,parts});
+							return{didParse:true};
 						}else{
-							throw Error(error+":ERROR: "+"label: '"+words[words.i]+"' was not declared"+throwErrorFile(codeObj));
+							words.i=i;
+							return{didParse:false}
+						}//words.i=i;
+					},
+					debuggerObj:new Label({
+						isDebugger:true,
+						name:"{DEBUGGER}",
+						labels:{},
+						isDebugger:true,
+						async onCall({codeObj,scope,label,parameters,error}){//'let =debugger();'
+							if(!parameters[0])throw Error(error+throwErrorLine(codeObj)+"missing 1 argument. Try 'debugger(labelName);'."+throwErrorFile(codeObj));
+							let dataLabel= new Scope({
+								name:"",
+								labels:{}
+							});
+							let data=label.getDataSummery();
+							for(let i in data){
+								dataLabel.labels[i]=new Scope({name:data[i],getDataSummery(){return label[i]}});
+							}
+							await this.do({words,scope,codeObj,label,error:errorMsg+throwErrorLine()})
+							return label;
+						},
+						async do({words,scope,codeObj,label,error}){
+							if(label instanceof Scope||label instanceof Pointer){
+								let data=label.getDataSummery();
+								//delete data.name;
+								console.log(error,data);
+							}else{
+								throw Error(throwError(codeObj,":ERROR: "+"label: '"+words[words.i]+"' was not declared",error));
+							}
+							codeObj.isNonMeta=false;
 						}
-						codeObj.isNonMeta=false;
+					}),
+					init(){
+						let label;
+						label=new Label({
+							name:"{labelsOf}",
+							isDebugger:true,
+							async do({words,scope,codeObj,label,error}){
+								if(label instanceof Scope){
+									let list=[];for(let i in label.labels)list.push(i);
+									console.warn(error+"'"+label.name+"':",list);
+								}else{
+									throw Error(throwError(codeObj,":ERROR: "+"label:"+words[words.i]+"was not declared",error));
+								}
+								codeObj.isNonMeta=false;
+							}
+						});
+						this.debuggerObj.labels["labelsOf"]=label;
+						this.debuggerObj.labels["labelsof"]=label;
+
+						label=new Label({
+							name:"{typeOf}",
+							isDebugger:true,
+							async do({words,scope,codeObj,label,error}){
+								//errorMsg+"line"+codeObj.sourceLineNumber+
+								if(1||label instanceof Scope){
+									//let list=[];for(let i in label.labels)list.push(i);
+									console.warn(error+"'"+label.name+"':",
+										(label.isFunction?"function":label.isBlock?"block":label.wasDeclared!==false?"label": "undefined"),
+										"| defined:",!!label.codeObj
+									);
+								}else{
+									throw Error(throwError(codeObj,"label:"+words[words.i]+"was not declared",error));
+								}
+								codeObj.isNonMeta=false;
+							}
+						});
+						this.debuggerObj.labels["typeOf"]=label;
+						this.debuggerObj.labels["typeof"]=label;
+
+						label=new Label({
+							name:"{codeOf}",
+							isDebugger:true,
+							async do({words,scope,codeObj,label,error}){
+								if(label instanceof Scope){
+									let list=getCode(label).map(v=>v.croppedSource);
+									console.warn(error+"'"+label.name+"':",list);
+								}else{
+									throw Error(throwError(codeObj,":ERROR: "+"label:"+words[words.i]+"was not declared",error));
+								}
+								codeObj.isNonMeta=false;
+							}
+						});
+						this.debuggerObj.labels["codeOf"]=label;
+						this.debuggerObj.labels["codeof"]=label;
+						vm;
+						label=new Label({
+							name:"{log}",
+							isDebugger:true,
+							async do({words,scope,codeScope,codeObj,label,error,parts}){//runs custom code'debugger.log"2+4,scope``"' --> "{log}:6 Scope{...}"
+								let str=label instanceof Str?label:words[words.i++];
+								if(0&&!str){//!(str instanceof Str)){
+									throw Error(error+"line:"+(codeObj.sourceLineNumber+1)+"isnt a string. try adding \"scope.labels\"");
+								}
+								const sandbox = {log:"no log;",callStack,lister,words,scope,codeScope,label,codeObj,parts,Scope,Label,getCode};
+								vm.createContext(sandbox);
+								const code = "log = ["+(""+str).match(/(?<=^.)[\s\S]*(?=.$)/)?.[0]+"\n]";//removes start and end ' " 's
+								try{vm.runInContext(code, sandbox);}catch(error){throw Error(throwError(codeObj,", Could not run the javascript. threw:{{'"+error+"'}}"))}
+								console.warn(error,...sandbox.log)
+								codeObj.isNonMeta=false;
+							}
+						});
+						this.debuggerObj.labels["log"]=label;
+						return this;
+					},
+				}.init();
+				class customFunction extends Scope{//UNFINNISHED
+					constructor(name,parameters,codeObjNames){
+						this.name="{"+name+"}";
+						this.parameters=parameters;
+						this.codeObjNames="String.col";
 					}
-				}),
-				init(){
-					let label;
-					label=new Label({
-						name:"{labelsOf}",
-						isDebugger:true,
-						async do({words,scope,codeObj,label,error}){
-							if(label instanceof Scope){
-								let list=[];for(let i in label.labels)list.push(i);
-								console.warn(error+"'"+label.name+"':",list);
-							}else{
-								throw Error(error+":ERROR: "+"label:"+words[words.i]+"was not declared"+throwErrorFile(codeObj.fileName));
-							}
-							codeObj.isNonMeta=false;
-						}
-					});
-					this.debuggerObj.labels["labelsOf"]=label;
-					this.debuggerObj.labels["labelsof"]=label;
-
-					label=new Label({
-						name:"{typeOf}",
-						isDebugger:true,
-						async do({words,scope,codeObj,label,error}){
-							//errorMsg+"line"+codeObj.sourceLineNumber+
-							if(1||label instanceof Scope){
-								//let list=[];for(let i in label.labels)list.push(i);
-								console.warn(error+"'"+label.name+"':",
-									(label.isFunction?"function":label.isBlock?"block":label.wasDeclared!==false?"label": "undefined"),
-									"| defined:",!!label.codeObj
-								);
-							}else{
-								throw Error(error+"label:"+words[words.i]+"was not declared");
-							}
-							codeObj.isNonMeta=false;
-						}
-					});
-					this.debuggerObj.labels["typeOf"]=label;
-					this.debuggerObj.labels["typeof"]=label;
-
-					label=new Label({
-						name:"{codeOf}",
-						isDebugger:true,
-						async do({words,scope,codeObj,label,error}){
-							if(label instanceof Scope){
-								let list=getCode(label).map(v=>v.croppedSource);
-								console.warn(error+"'"+label.name+"':",list);
-							}else{
-								throw Error(error+":ERROR: "+"label:"+words[words.i]+"was not declared"+throwErrorFile(codeObj.fileName));
-							}
-							codeObj.isNonMeta=false;
-						}
-					});
-					this.debuggerObj.labels["codeOf"]=label;
-					this.debuggerObj.labels["codeof"]=label;
-					vm;
-					label=new Label({
-						name:"{log}",
-						isDebugger:true,
-						async do({words,scope,codeObj,label,error,parts}){//runs custom code'debugger.log"2+4,scope``"' --> "{log}:6 Scope{...}"
-							let str=parts[parts.i+1]+"";
-							if(0&&!str){//!(str instanceof Str)){
-								throw Error(error+"line:"+(codeObj.sourceLineNumber+1)+"isnt a string. try adding \"scope.labels\"");
-							}
-							const sandbox = {log:"no log;",callStack,lister,words,scope,label,codeObj,parts,Scope,Label,getCode};
-							vm.createContext(sandbox);
-							const code = "log = ["+(""+str).match(/(?<=^.)[\s\S]*(?=.$)/)?.[0]+"\n]";//removes start and end ' " 's
-							try{vm.runInContext(code, sandbox);}catch(error){throw Error(errorMsg+throwErrorLine(codeObj)+", Could not run the javascript. threw:{{'"+error+"'}}"+throwErrorFile(codeObj))}
-							console.warn(error,...sandbox.log)
-							codeObj.isNonMeta=false;
-						}
-					});
-					this.debuggerObj.labels["log"]=label;
-					return this;
-				},
-			}.init();
-			let names=["col","pos","confirm"],i=0;
-			class customFunction extends Scope{//UNFINNISHED
-				constructor(name,parameters,codeObjNames){
-					this.name="{"+name+"}";
-					this.parameters=parameters;
-					this.codeObjNames="String.col";
+					isFunction=true;
+					isBlock=true;
+					code=[new EndBracket()];
+					defaultFunction({label,scope,codeObj}){
+						let args=[
+							label.labels[this.parameters[0]].relAddress,
+							label.labels[this.parameters[1]].relAddress,
+						];
+						label.code=[new CodeObj({
+							parent:scope,
+							sourceLineNumber:codeObj.sourceLineNumber,
+							fileName:codeObj.fileName,
+							callLineObj:codeObj.callLineObj,
+							args,
+							isMeta:false,
+							isNonMeta:true,
+							command:{0:"col",type:"string",strMode:"col",}
+						},"{String.col("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new EndBracket(scope)];
+						label.strMode="col";
+					}
 				}
-				isFunction=true;
-				isBlock=true;
-				code=["}"];
-				defaultFunction({label,scope,codeObj}){
-					let args=[
-						label.labels[this.parameters[0]].relAddress,
-						label.labels[this.parameters[1]].relAddress,
-					];
-					label.code=[new CodeObj({
-						parent:scope,
-						sourceLineNumber:codeObj.sourceLineNumber,
-						fileName:codeObj.fileName,
-						callLineObj:codeObj.callLineObj,
-						args,
-						isMeta:false,
-						isNonMeta:true,
-						command:{0:"col",type:"string",strMode:"col",}
-					},"{String.col("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new CodeObj({},"}",scope)];
-					label.strMode="col";
-				}
-			}
-			let stringObject=new Label({
-				name:"{String}",defaultFunction:evalString,
-				isFunction:true,
-				isBlock:true,
-				code:[],
-				parameters:["string"],//text colouring
-				defaultFunction({label,scope,codeObj}){
-					if(label.labels["string"]){
-						label.code=label.labels["string"].code;
-					}
-					return{label};
-				},
-				labels:{
-					"col":new Label({
-						name:"{col}",
-						isFunction:true,
-						isBlock:true,
-						code:["}"],
-						parameters:["color","bgcolor"],//text colouring
-						defaultFunction({label,scope,codeObj}){
-							let args=[
-								label.labels["color"]?.relAddress??15,
-								label.labels["bgcolor"]?.relAddress??0,
-							];
-							label.code=[new CodeObj({
-								parent:scope,
-								sourceLineNumber:codeObj.sourceLineNumber,
-								fileName:codeObj.fileName,
-								callLineObj:codeObj.callLineObj,
-								args,
-								isMeta:false,
-								isNonMeta:true,
-								command:{0:"col",type:"string",strMode:"col",}
-							},"{String.col("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new CodeObj({},"}",scope)];
-							label.strMode="col";
+				const instructionObject=new Scope.Function({
+					name:"{Instruction}",
+					parameters:["number"],//text colouring
+					defaultFunction({label,scope,codeObj}){
+						let arg=label.labels["number"];
+						let value=NaN;
+						if(arg){
+							if(arg instanceof Scope)arg=arg.relAddress;
+							else arg=+arg;
+							label=new NumberObj({parent:scope},codeObj,arg,label.name);//label.labels["number"]?.code;
+							value=label.relAddress;
 						}
-					}),
-					"pos":new Label({
-						name:"{move}",
-						isFunction:true,
-						isBlock:true,
-						code:["}"],
-						parameters:["x","y"],//text colouring
-						defaultFunction({label,scope,codeObj}){
-							let args=[
-								label.labels["x"]?.relAddress??0,
-								label.labels["y"]?.relAddress??0,
-							]
-							label.code=[new CodeObj({
-								parent:scope,
-								sourceLineNumber:codeObj.sourceLineNumber,
-								fileName:codeObj.fileName,
-								callLineObj:codeObj.callLineObj,
-								args,
-								isMeta:false,
-								isNonMeta:true,
-								command:{0:"pos",type:"string",strMode:"pos",}
-							},"{String.pos("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new CodeObj({},"}",scope)];
-							label.strMode="pos";
-						}
-					}),
-					"confirm":new Label({
-						name:"{confirm}",
-						isFunction:true,
-						isBlock:true,
-						code:["}"],
-						parameters:["output"],//text colouring
-						defaultFunction({label,scope,codeObj}){
-							let args=[
-								label.labels["output"]?.relAddress??0,
-							]
-							label.code=[new CodeObj({
-								parent:scope,
-								sourceLineNumber:codeObj.sourceLineNumber,
-								fileName:codeObj.fileName,
-								callLineObj:codeObj.callLineObj,
-								args,
-								isMeta:false,
-								isNonMeta:true,
-								command:{0:"pos",type:"string",strMode:"pos",}
-							},"{String.pos("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new CodeObj({},"}",scope)];
-						}
-					}),
-				},
-			});
-			let numberObject=new Label({
-				name:"{Number}",defaultFunction:evalString,
-				isFunction:true,
-				isBlock:true,
-				code:[],
-				parameters:["number"],//text colouring
-				defaultFunction({label,scope,codeObj}){
-					let arg=label.labels["number"];
-					if(arg){
-						if(arg instanceof Scope)arg=arg.relAddress;
-						else arg=+arg;
-						label=new NumberObj({parent:scope},codeObj,arg,label.name);//label.labels["number"]?.code;
-					}
-					return{label};
+						label.name="(int)"+value;//+"<{Number}> "
+						return{label};
 
-				},
-			});
-			let parts=getPartsFromFile(inputFile);
-			let scope=new Scope({name:["{GLOBALSCOPE}"]});{
+					},
+				})
+				const stringObject=new Scope.Function({
+					name:"{String}",
+					parameters:["string"],//text colouring
+					defaultFunction({label,scope,codeObj}){//line 970
+						let args=[label.labels["string"]];
+						if(args[0]){let str=args[0];
+							label.code=[...str.code];//UNFINNISHED
+							label.code.pop();//remove '''}
+							label.arrayLabels=[...str.arrayLabels];
+						}
+						return{label};
+					},
+					labels:{
+						"col":new Scope.Function({
+							name:"{col}",
+							parameters:["color","bgcolor"],//text colouring
+							defaultFunction({label,scope,codeObj}){
+								let args=[
+									label.labels["color"]?.relAddress??15,
+									label.labels["bgcolor"]?.relAddress??0,
+								];
+								label.code=[new CodeObj({
+									parent:scope,
+									sourceLineNumber:codeObj.sourceLineNumber,
+									fileName:codeObj.fileName,
+									callLineObj:codeObj.callLineObj,
+									args,
+									isMeta:false,
+									isNonMeta:true,
+									command:{0:"col",type:"string",strMode:"col",}
+								},"{String.col("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new EndBracket(scope)];
+								label.strMode="col";
+							}
+						}),
+						"pos":new Scope.Function({
+							name:"{move}",
+							parameters:["x","y"],//text colouring
+							defaultFunction({label,scope,codeObj}){
+								let args=[
+									label.labels["x"]?.relAddress??0,
+									label.labels["y"]?.relAddress??0,
+								]
+								label.code=[new CodeObj({
+									parent:scope,
+									sourceLineNumber:codeObj.sourceLineNumber,
+									fileName:codeObj.fileName,
+									callLineObj:codeObj.callLineObj,
+									args,
+									isMeta:false,
+									isNonMeta:true,
+									command:{0:"pos",type:"string",strMode:"pos",}
+								},"{String.pos("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new EndBracket(scope)];
+								label.strMode="pos";
+							}
+						}),
+						"confirm":new Scope.Function({
+							name:"{confirm}",
+							parameters:["output"],//text colouring
+							defaultFunction({label,scope,codeObj}){
+								let args=[
+									label.labels["output"]?.relAddress??0,
+								]
+								label.code=[new CodeObj({
+									parent:scope,
+									sourceLineNumber:codeObj.sourceLineNumber,
+									fileName:codeObj.fileName,
+									callLineObj:codeObj.callLineObj,
+									args,
+									isMeta:false,
+									isNonMeta:true,
+									command:{0:"pos",type:"string",strMode:"pos",}
+								},"{String.pos("+args+")}"+(""&&" | "+codeObj.croppedSource),scope)];//,new EndBracket(scope)];
+							}
+						}),
+					},
+				});
+				const numberObject=new Scope.Function({
+					name:"{Number}",
+					parameters:["number"],//text colouring
+					defaultFunction({label,scope,codeObj}){
+						let arg=label.labels["number"];
+						let value=NaN;
+						if(arg){
+							if(arg instanceof Scope)arg=arg.relAddress;
+							else arg=+arg;
+							label=new NumberObj({parent:scope},codeObj,arg,label.name);//label.labels["number"]?.code;
+							value=label.relAddress;
+						}
+						label.name="(int)"+value;//+"<{Number}> "
+						return{label};
+
+					},
+				});
+				let carry;
+				const objectScopeObject=new Scope.Function({
+					name:"{Object}",
+					parameters:[],
+					defaultFunction({label,codeObj,scope}){
+						;
+					},
+					labels:{
+						"getData":carry=new Scope.Function({
+							name:"{dataOf}",
+							parameters:["obj"],
+							defaultFunction({label,codeObj,scope}){Object.getOwnPropertyDescriptor
+								let dataObj=label.labels["obj"];
+								let data=dataObj.getDataSummery();
+								let dataLabel=new Scope({
+									name:dataObj.name+"::data",//name::data
+								});
+								for(let i in data){
+									let val=data[i];
+									if(val instanceof Array){
+										dataLabel.labels[i]=new Label({
+											name:i,
+											sourceLineNumber:codeObj.sourceLineNumber,
+											code:val.map(v=>new Str({str:v})),
+										});
+										dataLabel.labels[i].scopes.parent=label;
+									}
+									else if(typeof val=="string"){
+										dataLabel.labels[i]=new StringObj({},codeObj,val,i);
+									}
+									else if(typeof val=="number"){
+										dataLabel.labels[i]=new NumberObj({},codeObj,val,i);
+									}
+								}
+							}
+						}),
+						"getOwnPropertyDescriptor":carry,
+					}
+				});
+			//----
+			//label types:
+				//using `var name,label=name;`
+				//'name' == normal label
+				//'{name}' == inbuilt object. e.g. '0xmin' or 'String'
+				//'<name>' == `debugger label();` == instanceOf function.
+				//'name{}' == `label{debugger;}` == physical scope of label.
+				//':name:' == `label::{debugger;}` == extension block.
+				//'name::data' == `debugger Object.getData(label);`
+				//'(type)name' == `debugger Number=(label);` == label instance of datatype like in C++
+				//'[name]' == other compiler generated label e.g. `debuggerlabel..;`
+			//----
+			scope=new Scope({name:["{GLOBALSCOPE}"]}).intoVarBlock();{
 				scope.isBlock=true;
 				scope.codeObj=new String("{GLOBAL_SCOPE's CUSTOM CODEOBJ}");
 				scope.codeObj.lineNumber=0;
-				let objectsScope=scope.objectsScope=scope.scopes.parent=scope.labels["0xmin"]=new Label({
+				let objectsScope=scope.objectsScope=scope.scopes.parent=
+				scope.labels["0xmin"]=new Label({
 					name:"{0xmin}",
 					codeObj:scope,
 					labels:{
 						["debugger"]:debuggingTool.debuggerObj,
 						["String"]:stringObject,//String block constructor
-						["Number"]:numberObject,//not used yet TODO
-						["Object"]:new Label({name:"{Object}"}),//not used yet TODO
+						["Number"]:numberObject,
+						["Object"]:objectScopeObject,//not used fully yet. not tested TODO
+						["Array"]:new Label({name:"{Array}"}),//not used yet. TODO
 						["true"]:labelTrue,
 						["false"]:labelFalse,
-						["if"]:new Label({name:"{if}",defaultFunction(){}}),
-						["else"]:new Label({name:"{else}",defaultFunction(){}}),
+						["undefined"]:labelUndefined,
+						["if"]:new Scope.Function({name:"{if}",defaultFunction(){}}),
+						["else"]:new Scope.Function({name:"{else}",defaultFunction(){}}),
 					},
-				}).intoVarBlock().intoVoidBlock();
+				}).intoVoidBlock();
 
 				labelFalse.parent=objectsScope;
 				labelTrue.parent=objectsScope;
@@ -2289,6 +2580,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(parentScope)scope.scopes.parent=parentScope;//parentScope;
 					scope.parent=scope1;//parentScope;
 					for(let i in scope.labels){
+						if(!scope.labels[i])continue;
 						if(!scope.labels[i][found]){
 							labelSpider(scope.labels[i],scope);
 						}
@@ -2307,8 +2599,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			let functionLevel=0;
 			let metaLevel=0;
 			let processes=0;
-			const wordsRegex=/[#${}()]|::?|(\.\.\.)|\.|([_\w]+\s*\.\s*)*[_\w]+|,|\[|[><\!]=?|(-?->|<--?|<==?|=?=>|=?=?=)|[+-]?([0-9]+|0b[0-1]+|0x[0-9a-fA-F]+)|(\+\+?(?![0-9])|--?|\*\*?|\/)|(&&?|\|\|?|!|\^\^?|~|[£%@?¬])/g;
+			const wordsRegex=/[#${}()]|::?|\.+|([_\w]+\s*\.\s*)*[_\w]+|,|\[|(<[-=]>|-?->|<--?|<==?|=?=>|=?=?=)|[><\!]=?|[+-]?([0-9]+|0b[0-1]+|0x[0-9a-fA-F]+)|(\+\+?(?![0-9])|--?|\*\*?|\/)|(&&?|\|\|?|!|\^\^?|~|[£%@?¬])/g;
 		const parseFunction=async function({scope,parts,codeScope,fileName,functionLine=1,codeObj}){
+			fileName=fileName+"";//convert to string;
 			codeScope??=scope;
 			//codeScope??=new Scope({})
 			//dont run ("foo(){...code;}") function on block creation.
@@ -2353,8 +2646,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			parts.skipParts=0;
 			let endCommenting=false;
 			for(;i<parts.length&&i<bail&&processes<bail;[i++,parseReps++,processes++]){
+				if(callStack.length<startCallLen)throw Error("impossible compiler error. bug found.")
 				if(parts[i]==undefined){
-					console.log(arguments)
+					console.log(arguments);
 					throw Error(parts+"?'part' is undefined. impossible compiler error. ?")
 				}
 				if(parts[i] instanceof Scope&&parts[i].isInstance){//for functions "foo();" DELETE
@@ -2365,16 +2659,18 @@ const oxminCompiler=async function(inputFile,fileName){
 				let oldSourceLineNumber=sourceLineNumber;
 				let lineStr=(parts[i]+"");//.replaceAll(/^\s+/g,"").replaceAll(/\s+/g," ");
 				mainForLoop:{
-					let isRunningCode=functionLevel==0||scope.isStatic;//scope is the physical scope not the codeScope
+					let isRunningCode=functionLevel==0;//scope is the physical scope not the codeScope
 					let partI=parts.i=i;
 					let symbol=lineStr.match(/(?<=^\s*(::)?)([#\$]|\bvoid\b)/)?.[0]??"";//
-					let phaseLevel=(symbol=="#"?1:symbol=="$"||symbol=="void"?2:codeScope.phaseLevel??3);
+					let phaseLevel=(symbol=="#"?1:symbol=="$"?2:symbol=="void"?3:codeScope.phaseLevel??3);
 					let isMeta=phaseLevel<3;//["#","$","void"].includes(symbol);
 					let isNonMeta=phaseLevel>1;//["","$","void"].includes(symbol)
 					sourceLineNumber=parts[i].sourceLineNumber??oldSourceLineNumber+[...lineStr.matchAll("\n")].length;
 					scope.code??=[];
 					let codeObj=new CodeObj({},parts[i],scope);
-					if(parts[i] instanceof Str)codeObj=new Str(parts[i]);
+					if(parts[i] instanceof Str){
+						codeObj=new Str(parts[i]);
+					}
 					{
 						codeObj.parent=scope;
 						codeObj.codeScope=codeScope;
@@ -2395,6 +2691,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						}else{}
 					}
 					if(parts.skipParts>0){
+						codeObj.phaseLevel=0;
+						codeObj.isNonMeta=false;
+						codeObj.isMeta=false;
 						if(parts.skipParts==1&&endCommenting){
 							codeScope.code.push(endCommenting.codeObj);
 							for(let func of endCommenting.do){//runs code after its been commented out
@@ -2414,23 +2713,22 @@ const oxminCompiler=async function(inputFile,fileName){
 					let words=[];
 					let words1=[];
 					words.i=0;
-					words.str=words.map(v=>v[0]).join(" ");
+					codeObj.words=words;
+					words.str="";
 					ifBlock:{//allows for 'code;' and 'code}'
 						let newLastLabel=undefined;
-						varType="meta";let lastMatch;
+						varType="meta";let lastMatch,isBlock=false;//break up line into words.
 						for(let i=partI;i<parts.length;[i++,parts.skipParts++]){// 'code "str" more code;' joins str's with normal words.
-							if((parts[i]+"").match(/{$/)){
-								if(lineStr instanceof Str){
-									words1.push(parts[i]);
-									continue;
-								}
-								else words1.push(...lineStr.matchAll(wordsRegex));
-								break ifBlock;
-							};
 							lineStr=parts[i]??"";
 							if(lineStr instanceof Str){
 								words.push(parts[i]);
 								continue;
+							}
+							else if((parts[i]+"").match(/{$/)){
+								words.push(...lineStr.matchAll(wordsRegex));
+								isBlock=true;
+								words.str=words.map(v=>v[0]).join(" ");
+								break ifBlock;
 							}
 							else words.push(...lineStr.matchAll(wordsRegex));//better one: /([_\w,\[]+\s*\.\s*)*[_\w,\[]+|\[|(->|<-)|[+-]?(0[xb])?[0-9a-fA-F]/g)];//
 							if(lastMatch=parts[i].match(/[;}]$/)){
@@ -2444,36 +2742,40 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(words[i]?.[0].match(/[#$]/)){i++;words.i++;}
 							//if(words[i]instanceof Str)i++;'"str"'
 							//else break specialStringTester;
-							if(!words[i]||words[i][0]==";"&&i==words.length-1)//';'
+							if(!isBlock&&(!words[i]||words[i][0]==";"&&i==words.length-1))//';'
 							break mainForLoop;
 						}
 						let argsObj={words,scope,lineStr};
 						let index=0;
+						let addToNonMeta=false;
+						if(words[words.i]?.[0]=="static"&&functionLevel<=1){
+							//'(){ static let a; }' and '{static let a;}' is like '::{let a;}'
+							//static statements only runs in function scope and does not add code
+							codeScope.code.pop().isDeleted=true;//remove this codeObj
+							isRunningCode=true;
+							words.i++;
+						}
+						else if(!isRunningCode)break ifBlock;
+						if(isBlock){break ifBlock;}
 						if(words.length==0){
 							lastLabel=undefined;
 							break ifBlock;
 						}
-						let addToNonMeta=false;
-						if(words[words.i]?.[0]=="static"){
-							//'(){ static let a; }' is like '::{let a;}'
-							//static statements only runs in function scope and doesn't add code
-							codeScope.pop();
-						}
-						else if(!isRunningCode)break ifBlock;
 						special_statements:{
 							if(words[words.i]?.[0]=="import"){
 								isMeta=true;
 								addToNonMeta=false;
 								codeObj.isNonMeta=false;
+								codeObj.phaseLevel=1;
 								words.i++;
 								let args=[];
-								let throwStarter=errorMsg+throwErrorLine(codeObj)+". Incorrect import syntax. ";
+								let throwStarter=". Incorrect import syntax. ";
 								let folderRegex=/[\s\S]*?(\/(?=[^\/]*$))/;
 								const modes={
-									main:new String(mainFileName.match(folderRegex)?.[0]??""),
-									self:new String(    fileName.match(folderRegex)?.[0]??""),//file address relative to this file
-									library:new String(jsFolderDir+"/../include/"),//a lib
-									compiler:new String(""),
+									main:new String( mainFileName.match(folderRegex)?.[0]??""),
+									self:new String(     fileName.match(folderRegex)?.[0]??""),//file address relative to this file
+									library:new String(jsFolderDir+"/../include/"),
+									compiler:new String(""),//from the main file
 								}
 								let addressMode=modes.self;
 								if(words[words.i]){
@@ -2492,7 +2794,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								for(let i=partI+1;i<parts.length;[i++,n++]){
 									let match;
 									if(parts[i] instanceof Str){
-										newfileNames.push([addressMode+JSON.parse(parts[i]),parts[i]]);//Path.join(...addressMode,...(""+JSON.parse(parts[i])).split("/"));
+										newfileNames.push([addressMode+JSON.parse(parts[i]),parts[i]]);
 										n++;
 										i++;
 									}
@@ -2504,31 +2806,32 @@ const oxminCompiler=async function(inputFile,fileName){
 											break;
 										}
 										else{//"sa dasf gd ;"
-											throw new Error(throwStarter+"Not allowed extra statements in a import statement"+throwErrorFile(codeObj));
+											throw new Error(throwError(codeObj,throwStarter+"Not allowed extra statements in a import statement"));
 										}
 									}
 									else if(parts[i].match(/^\s*,?\s*$/)){//'import "A.0xmin" "B.0xmin", "C.0xmmin";'
 										;
 									}else{
-										throw new Error(throwStarter+""+throwErrorFile(codeObj));
+										throw new Error(throwError(codeObj,throwStarter+""));
 									}
 								}
-								async function oxminImport({newfileName,scope,fileName,callStack}){
-									if(fileList[newfileName]!=undefined){
-										throw new Error(errorMsg+"file already imported:"+newfileName[1]+throwErrorFile(fileName))
+								async function oxminImport({newfileName,scope,codeObj,fileName,callStack}){
+									if(callStack[callStack.length-1].inFile(newfileName[0])||fileList[newfileName[0]]!=undefined){
+										throw new Error(throwError(codeObj,"file already imported:"+newfileName[1]));
 									}
 									let file=fileList[newfileName[0]]=await oxminCompiler.fileLoader(newfileName[0]);
 									await parseFunction({scope,codeScope:codeObj.codeScope,parts:getPartsFromFile(file),fileName:newfileName[1],callStack,codeObj});
-									callStack.pop();//pops the file's scope. 
+									//callStack.pop();//pops the file's scope. 
 								};
 								endCommenting={
 									codeObj:commentLastStatemets(codeScope,n,false),//returns codeObj
 									do:[]
 								}
 								for(let newfileName of newfileNames){
-									endCommenting.do.push(async()=>await oxminImport({newfileName,scope,fileName,callStack}));
+									endCommenting.do.push(async()=>await oxminImport({newfileName,codeObj,scope,fileName,callStack}));
 								}
-							}else if(words[words.i]?.[0]=="assert"){//'assert move->label "my error message";'
+							}
+							else if(words[words.i]?.[0]=="assert"){//'assert move->label "my error message";'
 								// or '#assert set blockA{}=blockB{};'
 								//'assert' throws error if the code after it changes something e.g. if("move->label" != "move+0"){throw;}
 								codeObj.type=["","#","$",""][phaseLevel]+"assert";
@@ -2537,6 +2840,8 @@ const oxminCompiler=async function(inputFile,fileName){
 								words.i++;
 							}
 							else if(words[words.i]?.[0]=="delete"){//&&isMeta){//#delete label1 label2;
+								codeObj.phaseLevel=1;
+								codeObj.isNonMeta=false;
 								addToNonMeta=false;
 								words.i++;
 								let hasComma=true;
@@ -2574,10 +2879,10 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 							}
-							else if(isMeta&&words[words.i]?.[0]=="debugger"){
+							else if((isMeta||1)&&(words[words.i]?.[0]??"").match(/^debugger\b/)){//"debugger"
 								addToNonMeta=false;
 								//words.i=oldI;
-								codeObj.debug=await debuggingTool.parse({scope,words,codeObj,parts,phaseLevel,isMeta:true});//a function that runs in the non-meta phase
+								codeObj.debug=await debuggingTool.parse({scope,codeScope,words,codeObj,parts,phaseLevel,isMeta:true});//a function that runs in the non-meta phase
 							}
 							if(words[words.i]?.[0]){
 								addToNonMeta=true;//isMeta'#' is parsed similar to non-meta code
@@ -2644,7 +2949,7 @@ const oxminCompiler=async function(inputFile,fileName){
 										command.number=+label;
 										label=undefined;
 									}
-									else if(label){//test for 'lbl->pointer' or 'lbl=label'
+									if(label instanceof Scope || label instanceof Str){//test for 'lbl->pointer' or 'lbl=label'
 
 										if(isMeta&&isDebugger||label.isDebugger){
 											addToNonMeta=false;
@@ -2654,6 +2959,9 @@ const oxminCompiler=async function(inputFile,fileName){
 											// Used for: 'block;' --> 'def block;' exept doesnt set pointers (they do similar things)
 											words.i=oldI;
 											if(!usedBracketParse)label=(await parseLabelOrNumber({words,scope,codeObj,makeVars:false})).label;
+											if(label instanceof Str){// '"string";' == 'String("string")'
+												label=new StringObj({parent:codeScope},codeObj,label.string);
+											}
 											useBlock=label;
 											command.pointer=label;
 											codeObj.isNonMeta=true;
@@ -2783,7 +3091,7 @@ const oxminCompiler=async function(inputFile,fileName){
 											}
 											if(label){
 												if(label?.isBlock){
-													label.parent=scope;
+													//label.parent=scope;
 													let newScope=label;
 													newScope.isMeta=false;
 													if(hasDef)codeObj.label=label;// also works. adds code to 'foreachCode()'
@@ -2833,34 +3141,47 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					words.push(...words1);
 					if(lineStr[lineStr.length-1]=="{"){
+						let isFunction=words.str.match(/\)\s*(<?[=-]>?)?\s*{/);
 						let isBlock=true;
 						let ret;
-						if(isRunningCode)ret=await line_evalVariable({lastLabel,words,sourceLineNumber,scope,lineStr,isMeta,isNonMeta,isBlock,codeObj});
+						if(isRunningCode){
+							ret=await line_evalVariable({lastLabel,words,sourceLineNumber,scope,lineStr,isMeta,isNonMeta,isBlock,codeObj});
+							isFunction=ret.codeScope.isFunction;
+						}
 						else {
-							let newScope=new Scope({name:["FUNCTION PLACEHOLDER SCOPE"]});
+							let newScope=new Scope({
+								name:["FUNCTION PLACEHOLDER SCOPE"+Math.random()],
+							});
 							newScope.codeBlock=codeObj;
 							ret={scope,lineStr,codeScope};//dont process blocks in functions
 						}
+
 						scope=ret.scope;
 						codeScope=ret.codeScope;//codeScope&&=scope;
 						lineStr=ret.lineStr;
 						let lbl=ret.lbl;
-						if(codeScope.isFunction)functionLevel++;//ignore code in "foo(){...code;}" untill called "foo();"
 						//codeObj=ret.codeObj;
-						callStack.push(new CallStackObj({scope,codeScope,sourceLineNumber,fileName,codeObj}));
+						if(codeScope.isFunction){
+							//functionLevel++;//ignore code in "foo(){...code;}" untill called "foo();"
+						}
+						if(isFunction){
+							functionLevel++;
+						}
+						callStack.push(new CallStackObj({isFunction,scope,codeScope,sourceLineNumber,fileName,codeObj}));
 					}
 					if(lineStr.match(/}\s*;?/)){
 						if(words.str.match(/^\s*}\s*;?\s*$/))codeObj.isNonMeta=false;
 						if(isRunningCode){
 							setReturns(scope,codeScope);
 						}
-						if(codeScope.isFunction){functionLevel--;}
+						//if(codeScope.isFunction)
+						if(callStack[callStack.length-1].isFunction){functionLevel--;}
 						lastLabel=scope;
 						callStack.pop();
 						scope=callStack[callStack.length-1]?.scope//.parent;
 						codeScope=callStack[callStack.length-1]?.codeScope//.parent;
 						if(!scope){
-							throw new Error(errorMsg+throwErrorLine(codeObj)+" unballanced brackets. Try removeing '}'s "+throwErrorFile(codeObj));
+							throw new Error(throwError(codeObj," "+callStack.length+" unballanced brackets. Try removeing '}'s "));
 						}
 						if(parts[i+1]+""==";"){i++;}//'};' == '}' which counts as 1 line
 					}
@@ -2870,8 +3191,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				throw Error(errorMsg+"bailed. Possibly a compiler bug.");
 			}
 			//functions take the form [...code,"}"]; so poping is done already
-			if(callStack.length>startCallLen&&parts.length==0){
-				callStack.pop();//TODO: remove "}" codeObjs everywhere. 
+			//callStack.pop();//TODO: remove "}" codeObjs everywhere.
+			if(callStack.length>startCallLen){//BODGED
+				//if(parts.length==0){
+					callStack.pop();
+				//}
 			}return {scope};
 		};
 	//assign codeObj.lineNumber's and nonMeta pass
@@ -2884,7 +3208,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			{
 				const foreachCode=function*spider(scope){//scope or codeObj
 					for(let i of scope.code??scope.label?.code){//codeObj
-						if(i.phaseLevel<=1)continue;//if isMeta metaLevel++;//continue;
+						if(i.phaseLevel<=1)properMetaLevel++;//if isMeta metaLevel++;//continue;
 						if(i.isVoid)voidLevel++;
 						if(i.phaseLevel<=2)metaLevel++;//if isNonMeta
 						yield [i,scope,metaLevel,voidLevel];
@@ -2896,11 +3220,13 @@ const oxminCompiler=async function(inputFile,fileName){
 						else if(i.code){//REMOVE: codeObj.code is only for reading function: "parts"
 							//yield*spider(i);
 						}
+						if(i.phaseLevel<=1)properMetaLevel--;
 						if(i.isVoid)voidLevel--;
-						if(i.phaseLevel<3)metaLevel--;//metaLevel++;//continue;
+						if(i.phaseLevel<=2)metaLevel--;
 					}
 				};
 				let metaLevel=0;
+				let properMetaLevel=0;
 				let voidLevel=0;
 				let lineNum=[0];
 				for(let [i,s] of foreachCode(scope)){//codeObj,scope
@@ -2913,17 +3239,16 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(i.labels?.jump){
 						i.labels.jump.address=i.lineNumber;
 					}
-					if(i.isNonMeta&&!i.label&&metaLevel==0){//!i.code&&!(i instanceof String&&i.label?.code)){
+					if(i.isNonMeta&&i.phaseLevel>=3&&!i.label&&metaLevel==0&&properMetaLevel==0){//!i.code&&!(i instanceof String&&i.label?.code)){
 						lineNum[voidLevel]++;
 					}
-					if(i.isNonMeta){
+					if(i.isNonMeta&&i.phaseLevel>=2){
 						//if(metaLevel!=0)i.isMeta=true;
 						nonMetaCode.push({codeObj:i,isMeta:metaLevel});
 					}
 				}
 			}
 			//non-meta pass
-			let hasWarned=false;
 			commandRefference={
 				command:{
 					"move":0,
@@ -2959,20 +3284,30 @@ const oxminCompiler=async function(inputFile,fileName){
 						jump:codeObj.parent.findPointer("jump")?.address,
 						move:codeObj.parent.findPointer("move")?.address,
 					});
+					codeObj.semiValue=undefined;//compiled to 0bmin
 					let dif;
 					if(codeObj.command?.type=="string"){
 						let command=commandRefference.string[codeObj.command.strMode]??codeObj.command.number;
 						switch(codeObj.command.strMode){
 							case"char":
 							codeObj.toValueValue=command+codeObj.char.charCodeAt(0);
+							codeObj.semiValue="'"+codeObj.char+"';";
 							break;
 							case"confirm"://confirm that input has been recieved.
-							codeObj.toValueValue=command|(+codeObj.args[0]??codeObj.args[0]?.relAddress)
+							codeObj.toValueValue=command|(+codeObj.args[0]??codeObj.args[0]?.relAddress);
+							codeObj.semiValue="String.confirm("
+								+"0x"+(((1<<30)-1)&(codeObj.args[0]??codeObj.args[0]?.relAddress)).toString(16);
+								+");";
 							break;
 							default:
 							codeObj.toValueValue=command//+codeObj.command.number
 								+0x01*(0xf&(+codeObj.args[0]??codeObj.args[0]?.relAddress))
 								+0x10*(0xff&(+codeObj.args[1]??codeObj.args[1]?.relAddress))
+							;
+							codeObj.semiValue="String."
+								+codeObj.command.strMode+"("
+								+"0x"+(0xf&(+codeObj.args[0]??codeObj.args[0]?.relAddress)).toString(16)+","
+								+"0x"+(0xff&(+codeObj.args[1]??codeObj.args[1]?.relAddress)).toString(16)+");"
 							;
 						}
 					}
@@ -2989,7 +3324,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							codeObj.jumpOpand.value=dif;
 							if(Math.abs(dif)>0xff){
-								throw Error(errorMsg+throwErrorLine(codeObj)+"val:'"+dif+"'. abs("+dif+") > 0xff. Try adding '"+codeObj.command[0]+"+-"[+(dif<0)]+"'"+"0xff;"+throwErrorFile(codeObj));//"cannot move more than 256"
+								throw Error(throwError(codeObj,"val:'"+dif+"'. abs("+dif+") > 0xff. Try adding '"+codeObj.command[0]+"+-"[+(dif<0)]+"'"+"0xff;"));//"cannot move more than 256"
 							}
 						};
 						if((codeObj+"").match(/\s*set/)&&codeObj.args){//set label=>jump; NOT USED
@@ -3025,10 +3360,17 @@ const oxminCompiler=async function(inputFile,fileName){
 
 						}
 						let number=codeObj.command.number;
-						if(typeof num=="string"){
+						if(typeof number=="string"){
 							number=commandRefference[num];
 						}
 						codeObj.toValueValue=number + (!isNegative?0:0x1000) + (0xff&Math.abs(+codeObj.jumpOpand.value)+2*handleOxminQuerk)*0x10;
+						codeObj.semiValue= ""
+							+codeObj.command.number+" "
+							+((!!codeObj.jumpOpand.value)?
+								"+-"[+isNegative]
+								+(0xff&Math.abs(+codeObj.jumpOpand.value)):""
+							)
+						;
 					}
 					if(!isMeta&&!isJumping){
 						findLabel(codeObj.parent,"jump").address++;
@@ -3038,16 +3380,15 @@ const oxminCompiler=async function(inputFile,fileName){
 			return new Scope({code:nonMetaCode});
 		}
 	//find (!isMeta) binary code
+		let hasWarned=false;
 		const compileCodeCollector=function(scope){
 			const codeCollector=function*(scope){//ignore "codeObj.isMeta"
 				for(let i of scope.code){//codeObj
 					if(i.isMeta||i.isVoid)continue;
 					if(i.toValueValue!=undefined){let codeObj=i;
 						if(isNaN(codeObj.toValueValue)){
-							callStack[0]=new CallStackObj({fileName:codeObj.fileName,codeObj})
-							if(hasWarned++<2)console.warn(//throw new Error(
-								(errorMsg+"line "+codeObj.sourceLineNumber+":'")+codeObj.match(/[^\n\t].*/)[0]+"': value is NaN "+throwErrorFile(codeObj.fileName)
-							);
+							callStack[0]=new CallStackObj({fileName:codeObj.fileName,codeObj});
+							if(hasWarned++<2)console.warn(throwError(codeObj,"': value is NaN "));
 						}
 						yield i;//lineNumber??-1;//
 					}
@@ -3056,20 +3397,36 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			}
 			let code=[...codeCollector(scope)];
-			let newScope=new Scope({parent:scope})
-			newScope.code=code.map(v=>new NumberObj({
-				parent:newScope,
-				scope:newScope,
-				toValueValue:v.toValueValue
-			},v,v.toValueValue));
-			return {scope:newScope}
+			let newScope=new Scope({
+				parent:scope,
+				labels:{
+					"source":({code,name:"source"}),
+					"input":scope,
+				},
+			});
+			let codeFilts=code.map(v=>{
+				let num=(((1<<30)-1)&v.toValueValue).toString(16);
+				num="0x"+"0".repeat(8-num.length)+num;
+				return new CodeObj({
+					lineNumber:v.lineNumber,
+					toValueValue:v.toValueValue,
+					command:{number:v.toValueValue},
+					sourceLineNumber:v.sourceLineNumber,
+					computerState:v.computerState,
+					fileName:v.fileName,
+					croppedSource:v.croppedSource,//unsure about this line
+				},num+" #30bit;",newScope);//the string doesnt matter as long as it doesnt do anything when run.
+			});//code converted to list of numbers
+			newScope.code=codeFilts;
+			return {scope:newScope,code,}
 		}
 	//----
 	//run prog
+		let parts=getPartsFromFile(inputFile);
 		CallStackObj.phase=CallStackObj.phases[0]="#";
 		({scope}=await parseFunction({scope,parts,fileName,callStack,codeScope:scope,codeObj:scope.codeObj}));
 		if(globalScope!=scope){
-			throw new Error(errorMsg+"scope:'"+scope.name+"' unballanced brackets. File does not end in global scope. Try adding more '}'s to the end of the file.")
+			throw new Error(errorMsg+", scope:'"+scope.name+"' unballanced brackets. File does not end in global scope. Try adding "+(callStack.length-1)+" more '}'s to the end of the file.")
 		}
 		parsed.scope=scope;
 
@@ -3077,7 +3434,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		compileNonMeta(scope);
 		
 		CallStackObj.phase=CallStackObj.phases[2]="";//"code collection phase"
-		parsed.codeList=[...compileCodeCollector(scope).scope.code];
+		parsed.codeList=[...compileCodeCollector(scope).code];
 
 		parsed.outputFile=parsed.codeList.map(v=>v?.toValueValue);
 		if(buildSettings.drawTable)console.table(parsed.codeList.map(v=>{

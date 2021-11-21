@@ -1,3 +1,4 @@
+//OUTOFDATE
 /*make file;*/ 
 #def let global;
 #let global.return;
@@ -140,13 +141,13 @@ def var a{
 				};
 				#move=>switch;
 				def switch{
-					#{#jump=>edges;}
+					#{#jump<->edges;}
 					null;//the condition
 					jump->edge0;
 					jump->edge1;
 					jump->edge2;
 					jump->edge3;
-					#{{#def let next;#jump=>next;}}
+					#{{#def let next;#jump<->next;}}
 				}
 				def edge0{
 
