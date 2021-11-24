@@ -1,13 +1,18 @@
-#"log.code";
-#"log.table";
-#"!make file";
-#import lib "io.0xmin";
-#import lib "logic/xor.0xmin";
-def let a{0b100000000000000000000000000000;}
-def let b{0b011111111111111111111111111011;}
-null def let temp;
+#"make file";
+//#import this "../code/version_2_code/prints.0xmin";
+//#import lib "io.0xmin";
+let int(number)={
+	#let self=this;
+	def number;
+	#set constructor.vars{
+		def self;
+	}
+}::{
+	def let vars{}
+}
+let a= int(String.pos(0,0)...String.col(0,15)...">_");
 def main;
-xor(a,b);
-//move->temp;set;nor;
-move->io.output1;set;
-move->0xmin 1;jump 0;
+/*move->a;get;move->terminal.output;set;
+move->a 1;get;move->terminal.output;set;
+move->a 2;get;move->terminal.output;set;
+move->a 3;get;move->terminal.output;set;jump 0;*/
