@@ -1,0 +1,113 @@
+#"log.code";
+#"!log.table";
+#"make file";
+#import lib "io.0xmin";
+#import lib "logic/xor.0xmin";
+#import lib "logic/and.0xmin";
+#import lib "logic/or.0xmin";
+#import lib "logic/not.0xmin";
+let int(number)={
+	#let self=this;
+	#set vars{
+		#def self;
+		def number;
+	}
+}::{
+	def let vars{}
+}
+let showInt(){move->io.output1;set;}
+let printNumber(number)={
+	static let block,block.start;
+	if(number&&(number!=alu)){
+		move->number;get;
+	}
+	move->constructor.block.a;set;
+	#let returner{jump constructor.block.return->1};
+	move->returner;get;
+	move->constructor.block.return;set;
+	jump->constructor.block.start;
+	def returner;
+	//runs foo;
+	$move->constructor.block.return;
+	//$assert alu&constructor.block.char0=constructor.block.char00;
+}::{
+	set block{
+		#var set start;
+		let vars{}
+		let int(number)={
+			#let self=this;
+			#set vars{
+				def self;
+			}
+		}
+		let constChar=int=("0");
+		let a=int=(0);
+		let b=int=(0);
+		let c=int=(0);
+		let white=int=(0x2fffffff);
+		let red  =int=(0x20000000);
+		let const_2=int(2);
+		null def let temp;
+		$move->return;
+		#def set start;
+		move->constChar;get;move->b;set;
+		move->terminal.output;set;showInt();
+		whileLoop:{//c = a+b;
+
+			#def let startLoop,startLoop.move;
+			$startLoop.move->move;
+			#let break.move->0xmin;
+			xor(a,b,c);
+			and(a,b);
+			if;null;
+			move->const_2;red;//if = x!=0;
+			move->b;set;
+			if:{//if(a&b)
+				#let then,else,start->0xmin 0;
+				$start->move;
+				if;jump->then;
+				#def else;{
+					$break.move->move;
+					jump->break;
+				}
+				$move->start;
+				#def then;{
+					move->c;get;move->a;set;
+					move->startLoop.move;
+					jump->startLoop;
+				}
+			}
+			$move->break.move;
+		}
+		move->c;get;
+		move->terminal.output;set;
+		move->io.output1;set;
+		move->return;
+		null def return;
+		def vars;
+	}
+	def block;
+}
+let setInt(a,b){
+	if(a&&(a!=alu)){move->a;get;}
+	if(b&&(b!=alu)){move->b;set;}
+}
+def main;
+setInt(int=(String.col(0,15)),terminal.output);
+setInt(int=(String.pos(0,0)),terminal.output);
+setInt(int=(String("E")),terminal.output);jump-1;
+def printNumber(int(2));
+def printNumber(int(7));
+//let string=int=(".con\n.con the company you can trust.");
+//setInt(string,terminal.output);
+move->0xmin 1;//jump 0;
+/*
+((a~b)~(a&b));
+
+a~b!=1;
+
+(a~b)~(a&b)!=1;
+
+(a&b)!=1;
+
+(a&~b)|(~a&b);;
