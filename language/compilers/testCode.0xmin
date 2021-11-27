@@ -1,6 +1,6 @@
 #"make file";
 //#import this "../code/version_2_code/prints.0xmin";
-//#import lib "io.0xmin";
+#import lib "io.0xmin";
 let int(number)={
 	#let self=this;
 	def number;
@@ -10,9 +10,4 @@ let int(number)={
 }::{
 	def let vars{}
 }
-let a= int(String.pos(0,0)...String.col(0,15)...">_");
-def main;
-/*move->a;get;move->terminal.output;set;
-move->a 1;get;move->terminal.output;set;
-move->a 2;get;move->terminal.output;set;
-move->a 3;get;move->terminal.output;set;jump 0;*/
+let a= int(String.col(15,0)...String.pos(0,0)...">");

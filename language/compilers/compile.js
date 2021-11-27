@@ -194,14 +194,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				}toString(){return this.str;}
 				get string(){
 					let outStr;
-					//const sandbox = {outStr:"NONE"};
-					//vm.createContext(sandbox);
+					const sandbox = {outStr:"NONE"};
+					vm.createContext(sandbox);
 					const code = "outStr="+this.str+";";
 					try{
-						outStr=JSON.parse(this.str);
-						//vm.runInContext(code, sandbox);outStr=sandbox.outStr;
+						//outStr=JSON.parse(this.str);
+						vm.runInContext(code, sandbox);outStr=sandbox.outStr;
 					}catch(error){
-						throw Error(errorMsg+"\'"+this.str+"\'"+", Could not parse the string using JSON. threw:{{'"+error+"'}}");
+						throw Error(errorMsg+"\'"+this.str+"\'"+", Could not parse the string using Virtual Machine. threw:{{'"+error+"'}}");
 					}
 					return outStr;//sandbox.outStr;
 					//JSON.parse(this.str);
@@ -776,14 +776,10 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(functionType&&!wasDeclared)throw Error(
 						throwError(codeObj," function: '"+label.name+"' was not declared. ")
 					);
-					let wordsIn=words;
-					let indexIn=index;
 					if(functionType){//&&label.isFunction){//label?.parameters
 						let foo=label;
 						let words=[...lineStr.matchAll(/,|;|\(|\)|<?[\-=]>?|[^()<>\-=,\s]+/g)].map(v=>v); //|(?<=\()|(?=\)|;)/);
 						stringstoStr(words,codeObj);
-						//let words=wordsIn.filter((v,i)=>i>=wordsIn.i);
-						loga(words.map(v=>v[0]),[wordsIn.str]);
 						let brackets=0,openedBrackets=false;
 						let word;
 						let index=0;
@@ -896,7 +892,7 @@ const oxminCompiler=async function(inputFile,fileName){
 										label.relAddress=num;
 									}if(label instanceof Str){
 										//toLabel from Str
-										label=label.toLabel({codeObj,scope});loga("code:",label.getDataSummery().code)
+										label=label.toLabel({codeObj,scope});loga(label.getDataSummery().code)
 									}
 									let setName=refLevel==0&&(words[words.i]?.[0]??"").match(equalsRegexWord);
 									if(setName){
@@ -1104,7 +1100,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(!block)break;//'(' for non-function bracket scope
 								let index=words[i].index;
 								let i1=i;
-								words.i=i;
 								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
 								for(;i<words.length;i++){//adjust words.i
 									if(!words[i+1]||words[i+1]?.index>=index)break;
@@ -2660,6 +2655,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			const callStack=[];//[new CallStackObj({scope})];
 			let metaLevel=0;
 			let processes=0;
+			//string,comment regex
+			/(["'`])(?:\1|[\s\S]*?[^\\]\1)|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)/
 			const wordsRegex=/[#${}()]|::?|\.+|([_\w]+\s*\.\s*)*[_\w]+|,|\[|(<[-=]>|-?->|<--?|<==?|=?=>|=?=?=)|[><\!]=?|[+-]?([0-9]+|0b[0-1]+|0x[0-9a-fA-F]+)|(\+\+?(?![0-9])|--?|\*\*?|\/)|(&&?|\|\|?|!|\^\^?|~|[£%@?¬])/g;
 		const parseFunction=async function({scope,parts,codeScope,fileName,functionLine=1,codeObj}){
 			fileName=fileName+"";//convert to string;
