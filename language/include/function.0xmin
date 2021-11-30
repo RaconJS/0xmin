@@ -1,0 +1,66 @@
+//UNFINISHED
+//for(repeats)
+let function(block)={
+	#set var call(x,y,out){//caller
+		let self=this;
+		def let getInputs{
+			let parent=self;
+			if(x){
+				if(x!=alu){move->x;get;}
+				move->block.x;set;
+			}
+			if(y){
+				if(y!=alu){move->y;get;}
+				move->block.y;set;
+			}
+		}
+		#let ret;
+		#let returner{jump blocksReturn->ret;};
+		//assume alu = input2;
+		move->returner;get;move->block.return;set;
+		//$assert move->endBlock;
+		jump->block.start;
+		$move->block.return;
+		def returner;
+		#def ret;
+		def let sendOutputs{
+			if(out){
+				if(out!=alu){move->out;set;}
+			}
+		}
+	}
+	#set var block{
+		#let vars{
+
+			null def let block.x;
+			null def let block.y;
+		};
+		#let start
+		#let start->return,return.move;
+		$move->return;
+	}
+	#var len=0;
+	static#var prototype.addInput(){
+		#let index = +len;
+		#set len = len+1;
+		#set call.getInputs{
+			if(x[index]){
+				if(x!=alu){move->x;get;}
+				move->block.x[+index+2];set;
+			}
+		}
+		#set vars{
+			def this;
+		}
+	}
+	#var self.block=block;
+	def block;
+	def let blocksReturn;
+	def block.vars;
+};
+{
+	#let foo=function();
+	#set asd=foo.call;
+	#set foo.block{}
+	def foo;
+}

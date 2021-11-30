@@ -1,13 +1,5 @@
-#"make file";
-//#import this "../code/version_2_code/prints.0xmin";
-#import lib "io.0xmin";
-let int(number)={
-	#let self=this;
-	def number;
-	#set constructor.vars{
-		def self;
-	}
-}::{
-	def let vars{}
+//#import this "../code/version_2_code/prints.0xmin";null;
+#{
+	let a(){debugger.typeof this;}
+	a=>();
 }
-let a= int(String.col(15,0)...String.pos(0,0)...">");

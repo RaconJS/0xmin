@@ -1,10 +1,11 @@
 #let xor;aa:{
 	#let endBlock;
-	#let call(x,y,out){debugger;
+	#let isblock;
+	#let call(x,y,out){
 		#let foo=self;
 		if(x){
 			if(x!=alu){move->x;get;}
-			move->foo.x;set;
+			move ->foo.x;set;
 		}
 		if(y){
 			if(y!=alu){move->y;get;}
@@ -13,8 +14,8 @@
 		#let ret;
 		#let returner{jump foo.return->ret;};
 		//assume alu = input2;
-		move->returner;get;move->endBlock;set;
-		$assert move->endBlock;
+		move->returner;get;move->foo.return;set;
+		//$assert move->endBlock;
 		jump->foo.start;
 		$move->endBlock;
 		def returner;
@@ -23,8 +24,9 @@
 			move->out;set;
 		}
 	};
-	#let self=this;
-	let block{
+	#let block;
+	#let self=block;
+	set block{
 		#{
 			#var start,x,y;
 			#var input{null;null};
@@ -42,7 +44,7 @@
 				move->mv;
 			}}
 		}
-		$move->endBlock;
+		$move->return;
 		void{def input;}
 		null def x;
 		null def y;
@@ -84,14 +86,14 @@
 			set ans->ans&0b111111; f(ans);
 		}}
 	};
-	#set xor{};
-	#set xor{static{
-		let a=block;
-		let xor.block=a;
-		let a=call;
-		let xor.call=a;
+	//#set xor{};
+	#xor=call;
+	xor::{#{
+		let xor.block=block;
+		let xor.call=call;
+		let xor.asd;
 	}}
-	if(0){#let set xorNotIf=(){//old version smartly uses try/catch ifs.
+	/*if(0){#let set xorNotIf=(){//old version smartly uses try/catch ifs.
 		#def let x;
 		def var input{null;NaN;};
 		null def let y;
@@ -143,6 +145,6 @@
 		null def return;
 		#var return.mv->0xmin;
 		$return.mv->move;
-	}}
-	def xor.block;
-}
+	}}*/
+	def block;
+}def xor();

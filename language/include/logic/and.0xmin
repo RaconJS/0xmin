@@ -1,0 +1,73 @@
+//UNFINISHED
+#let and(x,y,out){};{
+	#set and(x,y,out){
+		if(x){
+			if(x!=alu){move->x;get;}
+			move->block.x;set;
+		}
+		if(y){
+			if(y!=alu){move->y;get;}
+			move->block.y;set;
+		}
+		#let ret;
+		#let returner{jump block.return->ret;};
+		//assume alu = input2;
+		move->returner;get;move->block.return;set;
+		//$assert move->endBlock;
+		jump->block.start;
+		$move->block.return.move;
+		def returner;
+		#def ret;
+		if(out){
+			move->out;set;
+		}
+	};
+	def let block{
+		#var x,y,start;
+		#let notX,notY,temp;
+		#let return.move;
+		$move->return;
+		#def block.start;
+
+		doY:{
+			move->y;get;if;//if(true)
+			move->notY;set;nor;
+			#let then,then.move->0xmin;
+			$then.move->move;
+			if;jump->then;//else y=white. ans == x
+				move->x;get;
+				move->return.move;
+				jump->return;
+			#def then;$move->then.move;
+			#delete then;
+			set;
+		}
+		doX:{
+			move->x;get;if;//if(true)
+			move->notX;set;nor;
+			#let then,then.move->0xmin;
+			$then.move->move;
+			if;jump->then;//else x=white. ans == y
+				move->y;get;
+				move->return.move;
+				jump->return;
+			#def then;$move->then.move;
+			#delete then;
+			set;
+		}
+		move->notY;nor;
+		if;jump->return;
+		move->zeroFilt;get;
+		move->return.move;
+		#return.move->notY;
+		
+		null #def return;
+		null #def x;
+		null #def y;
+		null #def notX;
+		null #def notY;
+		0x20000000 #def zeroFilt;
+		#delete notX,notY;
+	}
+	#and.block=block;
+}
