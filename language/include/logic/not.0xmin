@@ -1,0 +1,17 @@
+#set not(x,out){//if= !!(~alu);alu = ~alu||red;
+	#let temp,return.move;
+	#let useArg=#(x==alu)||(x==move);
+	if(+useArg){
+		move->x;get;
+	}
+	move->temp;nor;
+	move->zeroFilt;
+	if;jump+2;get;
+	move->temp;
+	jump->return;
+	if(out){
+		move->out;set;
+	}
+	null #def temp;
+	0x20000000#def zeroFilt;
+};
