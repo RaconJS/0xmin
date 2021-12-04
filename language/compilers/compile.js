@@ -3,6 +3,8 @@
 //UNFINISHED
 //NEEDSTESTING
 //TODO: remove the endBracket i.e. `code:["}"]` system.
+//TODO: add a parseKeywords();
+//TODO: allow for custom keywords
 const errorMsg="\x1b[31m"+" 0xmin-ERROR ::"+"\x1b[0m ";
 function errorLog(...args){console.log(...args);};
 function loga(...args){console.log(...args);};
@@ -301,7 +303,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				??(typeof fileName=="string"?fileName:fileName.fileName);
 				return name==mainFileName?"": "file:"+name+"";
 			}
-			const lister=obj=>{let a=[];for(let i in obj){if(a.hasOwnProperty(i))a.push(i);}return a;};
+			const lister=obj=>{let a=[];for(let i in obj){if(1||a.hasOwnProperty(i))a.push(i);}return a;};
 			class Scope{// extends String{
 				static scopeNumber=0;
 				constructor(dataObj={},isPartOfScope=false){
@@ -502,7 +504,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return findLabelParent(objectsScope,name)??findLabelParent(this,name);
 				}
 				getInternalsAsScope(){//gotton with 'label..'
-					let codeLen=Math.max(0,this.code.length-1);
+					let codeLen=()=>Math.max(0,this.arrayLabels.length);
 					let self=this;
 					let internalScope=new Scope({
 						name:"[internals]",
@@ -510,9 +512,21 @@ const oxminCompiler=async function(inputFile,fileName){
 							"prototype":this.proto,
 							"supertype":this.super,
 							"parameters":new Scope({name:"[parameters]",code:this.parameters,arrayLabels:this.parameters}),
-							
-							"length":new NumberObj({parent:this,name:"[length]"+codeLen},"NA",codeLen),//length-1 to remove '}'
-							"array":new Scope({code:this.arrayLabels,arrayLabels:this.arrayLabels}),
+							"call":new Scope.Function({name:"[call]",//foo..call(obj,...args);
+								parameters:["this"],//this is set to first argument
+								defaultFunction({label,scope,codeObj}){
+									label.labels["parent"]=self;
+									label.code=[...self.code];
+								},
+								parent:self.parent,
+							}),
+							"length":new NumberObj({parent:this,name:"[length]"+codeLen(),
+								isFunction:true,
+								defaultFunction({label,scope,codeObj}){
+									label=new NumberObj({parent:this},codeObj,codeLen());
+									return {label};
+								},},"NA",codeLen()),//length-1 to remove '}'
+							"array":new Scope({code:this.arrayLabels,arrayLabels:this.arrayLabels,}),
 							"splice":new Scope.Function({name:"[splice]",
 								parameters:["index","delete","array"],
 								defaultFunction({label,scope,codeObj}){
@@ -523,7 +537,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 
 									//NEEDSTESTING and BODGED splicing in this way might cause errors
-									let codePart=self.code.splice(args[0],args[1],getCode(argsArray));
+									//let codePart=self.code.splice(args[0],args[1],getCode(argsArray));
 									let arrayPart=self.arrayLabels.splice(args[0],args[1],getCode(argsArray));
 									for(let i in label.labels){
 										delete label.labels[i];
@@ -533,6 +547,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									label.code=codePart;
 								},
 							}),
+							"code":new Scope({code:this.code,arrayLabels:this.code,parent:self}),
 							"compile":new Scope.Function({name:"[compile]",//UNFINISHED
 								parameters:["phase"],
 								defaultFunction({label,scope,codeObj}){
@@ -871,9 +886,14 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					words.str=words.map(v=>v[0]).join(" ");
 				}
-				const evalParamaters=async function({index,lineStr0,words,scope,block,label,codeObj,makeVars=true,wasDeclared}){
-					let lineStr=lineStr0.substring(index);
-					let functionType=lineStr.match(/(?<=^\s*)(=>|=)?(?=\s*\()/);//"foo=>();" or "foo();"
+				const evalParamaters=async function({index,lineStr0,words,scope,label,codeObj,makeVars=true,wasDeclared,args,block,isFunctionCall,dontRun}){
+					let lineStr
+					if(index==undefined){//called by 'words' system
+						//BODGED doesnt change 'words.i' or 'index' after parsing
+						lineStr=[...words].splice(words.i,words.length-words.i).map(v=>v[0]).join(" ");
+					}
+					else lineStr=lineStr0.substring(index);
+					let functionType=lineStr.match(/(?<=^\s*)(=>|=)?(?=\s*\()|\)?(?=\s*{)/);//"foo=>();" or "foo();"
 					this_:{
 						//'foo=();' == JS:'new foo();' foo().this== foo()
 						//foo().this == this
@@ -891,8 +911,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						let brackets=0,openedBrackets=false;
 						let word;
 						let index=0;
-						let parameters=[];
-						let parametersObj={...foo.parametersObj??{}};
+						let parameters=args??[];
+						let parametersObj={...foo.parametersObj??{},...args,...block?.labels};
+						if(block)parametersObj["block"]=block;
 						label=new Scope({
 							//...foo,
 							name:"<"+foo.name+">",//instance name
@@ -907,6 +928,11 @@ const oxminCompiler=async function(inputFile,fileName){
 						label.scopes.let=label;
 						//label.scopes.parent=foo.scopes.parent;//closure: use foo's parent's variables
 						label.parent=foo.parent;
+						if(foo.isFunctionCall){//'let foo(){block();} foo(){"weak scope"}'
+							label.scopes.let=undefined;
+							label.scopes.var=undefined;
+							label.parent=scope;
+						}
 						function_types:{
 							if(typeof foo.isFunction!="boolean"&& !functionType[0]){//'foo=(){};foo();' default to original's type
 								functionType[0]=[foo.isFunction];
@@ -1031,6 +1057,19 @@ const oxminCompiler=async function(inputFile,fileName){
 						for(let i of foo.parameters){
 							label.labels[i]??=null;//'let x;a(x){debugger x;};a();' returns undefined
 						}
+						{
+							let lbl;
+							label.labels["arguments"]=lbl=new Scope({
+								name:"arguments",
+								isDefaultLabel:true,
+								sourceLineNumber:codeObj.sourceLineNumber,
+								parent:label,
+								labels:{...parametersObj},
+								arrayLabels:parameters.map(v=>new CodeObj({label:v},";",label)),
+							});
+							lbl.code=[...lbl.arrayLabels,new EndBracket(lbl)];
+							lbl.scopes.parent=label;
+						}
 						let code=getCode(foo);
 						if(code.popped!=undefined)code.push(code.popped);//dont loose end brackets or code
 						if(code[0]?.sourceLineNumber==undefined){
@@ -1039,16 +1078,18 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 						//handle_special_objects
 						let argsObj={scope:label,codeScope:label,parts:code,fileName,codeObj};
-						if(foo.isDebugger){//'debugger(label).code;'
-							if(!foo.onCall)throw Error(throwError(codeObj,"'"+foo.name+"' cannot be called with '()'."))
-							label=foo.onCall?.({codeObj,label,scope,parameters});
-						}
-						else{
-							if(typeof foo.defaultFunction=="function"){
-								({label}=foo.defaultFunction?.({scope,label,codeObj,words})??{label});
+						if(!dontRun){
+							if(foo.isDebugger){//'debugger(label).code;'
+								if(!foo.onCall)throw Error(throwError(codeObj,"'"+foo.name+"' cannot be called with '()'."))
+								label=foo.onCall?.({codeObj,label,scope,parameters});
 							}
-							await parseFunction(argsObj);//functionLine:callStack,code[0]?.sourceLineNumber??foo.sourceLineNumber,
-						}
+							else{
+								if(typeof foo.defaultFunction=="function"){
+									({label}=await foo.defaultFunction?.({scope,label,codeObj,words})??{label});
+								}
+								await parseFunction(argsObj);//functionLine:callStack,code[0]?.sourceLineNumber??foo.sourceLineNumber,
+							}
+						}else{}
 						index1=index??0;
 					};
 					index=index+index1;
@@ -1089,7 +1130,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									block=findLabelParent(block,word)??scope;
 								}
 								else{
-									block=label;
+									block=label??scope;
 								}
 								let labelPrototype=block.proto?.labels?.["prototype"];
 								let labelSupertype=block.super?.labels?.["supertype"];
@@ -1135,7 +1176,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								isFirstLabel=false;
 							}else if(word=="."||word==".."){
 								if(i==0){//'#(...).lbl'
-									label=startLabel;
+									label=startLabel??scope;
 								}
 								if(!isDeclared){
 									if(makeVars){
@@ -1167,7 +1208,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								}
 								block=label;
 								words.i=i+1;
-								let isArray=false;//=word=="[";
+								let isArray=false;//only for 'a[4]' instead of 'a.(4)';
 								let indexArg;{
 									let value=await evalBrackets({scope,codeObj,words});
 									words.i++;//words[words.i] == ")" or "]";
@@ -1201,7 +1242,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									if(arrayCodeObj){
 										label=getLabelFromCodeObj(arrayCodeObj);//arrayCodeObj.label??arrayCodeObj.labelForArray;
 										if(!label){
-											let name="["+indexArg+"]";
+											let indexName="["+indexArg+"]";
 											if(typeof arrayCodeObj=="string"||arrayCodeObj instanceof Str){
 												label=new StringObj({
 													//index:indexArg,
@@ -1224,6 +1265,12 @@ const oxminCompiler=async function(inputFile,fileName){
 												label.codeObj=arrayCodeObj;
 												//arrayCodeObj.label??=label
 											}
+											if(0){//removed code because the code already existed
+												let code=getCode(label);
+												code=[arrayCodeObj,code.popped];
+												label.code=code;
+											}
+											name=label.name
 										}
 									}
 									else{label=undefined;}
@@ -1272,7 +1319,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(!block)break;//'(' for non-function bracket scope
 								let index=words[i].index;
 								let i1=i;
-								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
+								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,codeObj,makeVars,wasDeclared}));
 								for(;i<words.length;i++){//adjust words.i
 									if(!words[i+1]||words[i+1]?.index>=index)break;
 								}
@@ -1374,7 +1421,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				const evalBrackets=async function insidersEvalBrackets(context,{brackets=0,argsList=[],i=0}={}){//words[i-1] == "("
 					i++;
-					let pointerOperators=["->", "<->", "<=>", "<-", "=>", "<=", "=", "==", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
+					let pointerOperators=["->", "<->", "<=>", "<-", "=>", "<=", "=", "==","===", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
 					let operatorRegex= /^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$/;
 					let operatorRegex1=/^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|@)$|^[+-](?=[0-9]?)/;
 					let words,scope,codeObj,label,name,block;
@@ -1389,7 +1436,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					var lineStr=words.map(v=>v[0]).join(" ");//lineStr isfor testing only
 					if(0)loga(words.str,"||",words.i);
 					let processLabelCases=async(word,lastLabel)=>{
-						({label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({...context,lastLabel,pointerOperators,makeVars:0}));
+						let {label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({
+							codeObj:context.codeObj,scope:context.scope,words:context.words,
+						lastLabel,pointerOperators,makeVars:0});
 						if(label&&!label instanceof Number){
 							let lastVal=args[args.length-1];
 							if(lastVal&&lastVal.type=="label"&&lastVal.label instanceof Scope)return 1;//"a+b label" -> stops
@@ -1398,7 +1447,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							args.push(new BracketValue({scope,label,name,block,refLevel,type:"label",arrayCodeObj,bool:wasDeclared&&label.bool!==false,wasDeclared}));
 							return;
 						}else if(label instanceof Number){
-							let match;if(match=word.match(/[+\-]/)){args.push(match[0]);}else{args.push("+");}
+							let match;if(match=word.match(/[+\-]/)&&!(words[words.i+1]?.[0]??"").match(/\.\.?/)){args.push(match[0]);}else{args.push("+");}
 							args.push(new BracketValue({
 								scope,
 								type:"number",
@@ -1420,35 +1469,19 @@ const oxminCompiler=async function(inputFile,fileName){
 						let word=words[words.i]?.[0]??"";
 						let found=true;
 						// 'A operater B' or 'operator A'
-						if(word.match(/^[(\[]$/)){
-							words.i++;//'('
-							let arg;
-							args.push(arg=await insidersEvalBrackets({...context,label:undefined},{brackets,argsList,i}));
-							words.i++;//')'
-							if(words[words.i]?.[0].match(/[\.(]|\.\./)){//e.g.'(label).lbl' or '(label)()'
-								arg.toLabel(codeObj);
-								let oldI=words.i;
-								let ret=await parseLabelOrNumber({codeObj,words,scope,label:arg.label});
-								if(ret.didParse){
-									if(ret.label instanceof Scope){
-										arg.label=ret.label;
-									}else{
-										words.i=oldI;
-									}
-								}
-							}
-						}
-						if(word.match(/[#]/)){words.i++;continue;}
+						if(word.match(/[#$@]/)){words.i++;continue;}
 						if(word.match(/^(\.|\.\.)$/)){//'"asd".a' => convert to label and get property
+							//done before the opperator:'+-*/' part so 
 							//can do '1'
 							let arg=args[args.length-1];
-							arg.toLabel();
+							arg.toLabel(codeObj);
 							let word=words[++words.i]?.[0];
 							if(word&&!word.match(/[#]/)){
 								let label,didParse;
 								({label,didParse}=parseLabelOrNumber({codeObj,scope,words,startLabel:arg.label}));
 								if(didParse)arg.label=label;
 							}
+							continue;
 						}
 						if(args.length>=2&&!(args[args.length-2] instanceof BracketValue)&&(args[args.length-1] instanceof BracketValue)){
 							let equalsOperator=false;
@@ -1472,8 +1505,9 @@ const oxminCompiler=async function(inputFile,fileName){
 										;
 									}
 								}
-								else if(operator.match(/^([!=><]=|[><])$/)){//'a == b'
-									ans=new BracketValue({scope}).toBool();
+								else if(operator.match(/^([!=><]=|===|[><])$/)){//'a == b'
+									ans=new BracketValue({scope});
+									ans.toBool();
 									let operators={
 										equals(a,b){
 											if(a.type=="string"||b.type=="string"){//number == number
@@ -1505,14 +1539,21 @@ const oxminCompiler=async function(inputFile,fileName){
 										default:
 										ans.bool=false;
 									}
-									ans.toBool();
+									//ans.toBool();
+									if(ans.bool){
+										let bool=ans.bool;
+										ans=arg1;
+										ans.bool=bool;
+										ans.number=0;
+										ans.type="bool";
+									}
 								}
 								else if(operator.match(/^([+\-*/]|%|[&|\^~]|\*\*)$/)){
 
 									ans=arg0;//new BracketValue({scope,label:arg0,block,type:"number"});
 									let ints=[
-										(arg0.type=="label"?(arg0.label?.relAddress??0):0)+(arg0.number??0),
-										(arg1.type=="label"?(arg1.label?.relAddress??0):0)+(arg1.number??0)
+										(arg0.type=="label"?(arg0.label?.relAddress??0):0)+((arg0.number??0)||arg0.bool),
+										(arg1.type=="label"?(arg1.label?.relAddress??0):0)+((arg1.number??0)||arg1.bool)
 									];
 									switch(operator){
 										case"+":ints[2]=ints[0]+ints[1];break;
@@ -1644,7 +1685,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 									ans.name=arg0.name;
 								}}else if(!operator.match(/[,;]/)&&!ans){
-									console.warn("error from operator:",[operator,codeObj]);
+									console.warn("error from operator:",operator,args.map(v=>v.type??v));
 									throw Error("compiler bug found")
 									args.splice(args.length-3,3,undefined);
 									continue;
@@ -1665,8 +1706,11 @@ const oxminCompiler=async function(inputFile,fileName){
 								else if(operator.match(/[\-+~]/)){
 									ans=arg0;//new BracketValue({scope,label:arg0.label,block:arg0.block,type:"number"});
 									let ints=[
-										(arg0.label?.relAddress??0)+(arg0.number||0),
+										(arg0.label?.relAddress??0)+(arg0.number||arg0.bool||0),
 									];
+									if(ans.type=="bool"){
+										ans.toNumber();
+									}
 									switch(operator){
 										case"~":ints[1]=~ints[0];break;
 										case"+":
@@ -1705,6 +1749,25 @@ const oxminCompiler=async function(inputFile,fileName){
 									continue;
 								}
 							}
+						}
+						if(word.match(/^[(\[]$/)){
+							words.i++;//'('
+							let arg;
+							args.push(arg=await insidersEvalBrackets({...context,label:undefined},{brackets,argsList,i}));
+							words.i++;//')'
+							if(words[words.i]?.[0].match(/[\.(]|\.\./)){//e.g.'(label).lbl' or '(label)()'
+								arg.toLabel(codeObj);
+								let oldI=words.i;
+								let ret=await parseLabelOrNumber({codeObj,words,scope,label:arg.label});
+								if(ret.didParse){
+									if(ret.label instanceof Scope){
+										arg.label=ret.label;
+									}else{
+										words.i=oldI;
+									}
+								}
+							}
+							continue;
 						}
 						//if end brackets /[^,;)]+/
 						if((brackets==1&&word==",")||word==";"||word.match(/^[)\]]$/)||args.length==1&&words.i>=words.length){
@@ -1945,16 +2008,15 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{label,didParse};
 				};parseSetStatement.test=({words})=>["=>", "<=", "=", "->", "<-"].includes(words[words.i][0]);
 				const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,hasDef=false,varType1=undefined,makeVars=true,doBrackets=true}){
-					let label,block,name,lblName,refLevel,wasDeclared;{//#var label
-						({label,block,name,lblName,refLevel,wasDeclared}=await parseLabelOrNumber({
+					//'#var label'
+						let {label,block,name,lblName,refLevel,wasDeclared}=await parseLabelOrNumber({
 							scope,//varType=="var"?scope.getVar():varType=="let"?scope.getLet():scope
 							codeObj,words,
 							makeVars:false,//["var","let"].includes(varType),
-						}));
+						});
 						if(label instanceof Str){
 							label=new StringObj({parent:scope},codeObj,label.string);
 						}
-					};
 					let createdNewLabel;
 					if(!isNaN(label)){
 						label=new Scope({parent:scope,name:label});
@@ -1972,7 +2034,8 @@ const oxminCompiler=async function(inputFile,fileName){
 							//isMeta=true;
 							label.parent=scope;
 							let code=[...label.code];code.pop();//remove "}"
-							code=getCode(label);if(code.popped)code.push(code.popped);
+							code=getCode(label);
+							if(code.popped)code.push(code.popped);
 							//'let ...obj;' imports code. I might change this mechanic.
 							//'var ...obj;' imports variables.
 							//'...obj;' imports both.
@@ -2055,6 +2118,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{label,block,name,refLevel,wasDeclared,createdNewLabel};
 				};
 				const commentLastStatemets=function(scope,num=1,endComment=true){//semi-comment out the "...block;" --> "#(){...block}" 
+					//scope.code.splice(scope.code.length-num,num);
 					let str;
 					//scope.codeBlock.code.pop();
 					scope.code.push(
@@ -2073,7 +2137,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			//a function of code spaghetti
 			async function line_evalVariable({lastLabel,scope,functionScope,words,lineStr,sourceLineNumber,isMeta,codeObj}){
-
 				let phaseLevel;
 				//'def var void a #{'
 				let allWords=words;
@@ -2088,6 +2151,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					let isStatic=false;
 					let isVarScope;
 					let isJoiningBLock;//'{}:{}'
+					let isFunctionCall;
 					let lineStr0=lineStr;
 				//----
 				lineStr=words.map(v=>v[0]).join(" ");
@@ -2104,22 +2168,24 @@ const oxminCompiler=async function(inputFile,fileName){
 						equalsSign=match[0];//'=>' or '<=' ('a = b.ref' or 'a = b.val')
 						command="set";
 					}
-					if(lineStr.match(/\([\w\W]*\)\s*(=>|=)?\s*{/)){// '(){' or '()={'
+					if(lineStr.match(/\([\s\S]*\)\s*(=>|=)?\s*{/)){// '(){' or '()={'
 						// =, ,=> for class/method/arrow function
 						isFunction=lineStr.match(/(=>|=)?(?=\s*{)/)?.[0]||true;
 					}
-					if(match=lineStr.match(/(\([\w\W]*\)\s)?(=>|=)?\s*{/)) {// any block. matches: up to '::#a:()=>{}'
+					if(match=lineStr.match(/(\([\s\S]*\)\s)?(=>|=)?\s*{/)) {// any block. matches: up to '::#a:()=>{}'
 						//from '{}' to '#a:()={}' . /#? label? :? (...args)? {}/
 						isBlock=true;
-						isWeakScope=hasLetScope=!(lineStr.match(/(([#$]|void|static)\s*)+{/));//'#{' 'lbl:#{' '::' doesnt have let scope
+						isWeakScope=!(hasLetScope=!(lineStr.match(/(([#$]|void|static)\s*)+{/)));//'#{' 'lbl:#{' '::' doesnt have let scope
 						//encludes 'var a #(){'
-						if(lineStr.match(/:[^:]/)){//"name:{"
-							isLabeledBlock=true;//a:{} or a:{}
-							hasDef=true
-						}
 						if(lineStr.match(/::/)){//up to 'var a::{'
 							// can also do '{}::{}' or '{}::a{}'
 							isJoiningBLock=true;//extension block. For editing objects without adding code to them. Used for making classes.
+						}else if(lineStr.match(/:[^:]/)){//"name:{"
+							isLabeledBlock=true;//a:{} or a:{}
+							hasDef=true
+						}
+						else {//'foo{'
+							isFunctionCall=true;
 						}
 					}//'{' note:'#{' doesn't have block scope
 					else{
@@ -2220,6 +2286,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 				//spaghetti starts here. SPAGHETTI
+				isFunctionCall&&=!varType1&&!varType&&lblName!=undefined&&!equalsSign;
+				hasLetScope&&=!isFunctionCall;
 				isNew=Boolean(varType)||!wasDeclared;
 				words.i=i;
 				command=varType||varType1;
@@ -2239,10 +2307,11 @@ const oxminCompiler=async function(inputFile,fileName){
 					lastLabel=lbl;
 				}//isJoiningBLock&&=!lbl||command;// ':{' or 'var a:{' . ':' becomes chaining operator
 				isLabeledBlock&&=!isJoiningBLock;
-				if(lbl&&!isLabeledBlock){//"a{};" | "var a{};"
+				if(lbl&&!isLabeledBlock&&!isFunctionCall){//"var a = {};" or "let a {};"
+					//assigns the codeScope to the found/new label
 					if(command=="var"||command=="let"){
 						codeScope.scopes.parent=lblBlock;//only var blocks can use the scope where it was defined.
-					}else if(!(equalsSign=="=")){
+					}else if(equalsSign!="="){
 						codeScope=lbl;//use existing label e.g. "def a{};" or "set a{};" or "a{};"
 					}
 					switch(equalsSign){//'set a={...};' or 'b=(){...};'
@@ -2304,8 +2373,11 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeScope.name=lblName;//"lbl:{"
 						codeScope.intoLabeledLetBlock(codeObj);
 					}
-					if(!isFunction&&!command){//'{' or 'a:{' or ':{'
+					if(!command){//'{' or 'a:{' or ':{'
 						codeObj.label=codeScope;// note:if 'def a{' then it will still define it
+					}else{
+						if(varType=="var")scope.getVar().labels[lblName]=codeScope;
+						if(varType=="let")scope.getLet().labels[lblName]=codeScope;
 					}
 				}
 				let newScope=new Scope();{//set up newScope
@@ -2316,8 +2388,104 @@ const oxminCompiler=async function(inputFile,fileName){
 					newScope.parent=scope;//reversed so findLabel looks in codeScope before scope
 				}
 				if(isNew){
+					//done before 'isFunctionCall' 
 					if(hasLetScope)codeScope.scopes.let=codeScope;
 					else codeScope.scopes.let=undefined;
+				}
+				if(lbl==elseObject&&refLevel==0){//'else if(){'
+					if(scope.ifStatementValue?.bool===false){//if(bool==valse) then it doesn't run the if's block code
+						codeScope.isFunction=false;
+						if(words[words.i]=="if"){//'else if(){'
+							lbl=ifObject;words.i++;
+						}
+					}else{
+						codeScope.isFunction=true;
+					}
+				}
+				if(isFunctionCall){
+					//&&lbl?.defaultFunction){
+					if(lbl?.defaultFunction&&lbl==ifObject){
+						if(lbl==ifObject&&refLevel==0){//'if(condition){'
+							let index=words[i-1].index+words[i-1].length;//not sure why but it matches 'f(1==2){' in 'if(1==2){' without the "+1" but.
+							//let words1=[...lineStr.substring(index).matchAll(wordsRegex)];
+							//words1.i=0;
+							words.i++;//[if,"(",words[words.i]]
+							//if(words1[0]?.[0]=="(")words1.i++;
+							{
+								codeScope=new Scope({parent:scope,name:"if block"});
+								codeScope.name="if block";
+								newScope=codeScope;
+								codeScope.scopes.parent=scope;//lbl;
+								if(!hasLetScope){
+									codeScope.scopes.let=undefined;
+									codeScope.scopes.var=undefined;
+								}
+							}
+							hasDef=true;
+							let lastI=words.i;
+							let value;
+							if(words[words.i]?.[0]==")")//'if(){' => 'if(false){'
+								value=new BracketValue({bool:false});
+							else value=await evalBrackets({codeObj,scope,words});
+							codeScope.scopes.let=undefined;
+							scope.ifStatementValue=value;
+							if(value.bool===false){//if(bool==valse) then it doesn't run the if's block code
+								codeScope.isFunction=true;
+							}else{
+								codeScope.isFunction=false;
+							}
+						}
+					}else if(lbl){//'foo(){}' or 'foo{}' calls function with block as argument
+						{
+							let {label,didParse}=await evalParamaters({
+								isFunctionCall:(isFunction?"()":"")+"{",
+								label:lbl,
+								dontRun:true,
+								lineStr0:lineStr,words,codeObj,scope,wasDeclared,
+							});
+							label.parent=scope;
+							newScope=label;
+						}
+						codeScope=newScope;
+						codeScope.isFunctionCall=true;
+						codeScope.parentFunction=lbl;
+						codeScope.isFunction=true;
+
+						codeScope.scopes.parent=scope;//lbl;
+						{
+							codeScope.scopes.let=undefined;
+							codeScope.scopes.var=undefined;
+						}
+					}
+				}
+				else if(isFunction){//BODGED: not sure about what happens when concatnaiting functions
+					
+					lineStr=[...words].splice(maxI,words.length-maxI).map(v=>v[0]).join(" ");
+					{
+						let words=lineStr.match(/(?<=\()[\s\S]+?$/)[0].split(/,|\)|\(/);
+						codeScope.parameters=[];//list of parameter names
+						let brackets=1;
+						words.i=0;
+						for(;words.i<words.length&&brackets>0;words.i++){
+							let word=words[words.i];
+							if(word=="(")brackets++;
+							else if(word==")")brackets--;
+							else if(brackets==1){
+								let match=word.match(/[\w]+/);
+								if(match){
+									codeScope.parameters.push(match[0]);
+									if(0)codeScope.labels[match[0]]=new Label({
+										name:match[0],
+										scopes:{parent:codeScope},
+										parent:scope,
+										codeObj:codeObj,
+										sourceLineNumber:sourceLineNumber
+									})
+								}
+							}
+							index+=word.length;
+						}
+					}
 				}
 				if(isJoiningBLock){//':{' in 'foo(){...} : {...}' or 'foo(){} : var{}'
 					if(!lastLabel){
@@ -2365,85 +2533,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					constructorLabel.scopes.parent=codeScope;
 					codeScope.labels["supertype"]??=constructorLabel;//TODO change this mechanic
 				}else codeScope.isFunction??=isFunction;
-				if(lblName=="else"&&refLevel==0){//'else if(){'
-					if(scope.ifStatementValue?.bool===false){//if(bool==valse) then it doesn't run the if's block code
-						codeScope.isFunction=false;
-						if(words[words.i]=="if"){//'else if(){'
-							lblName="if";words.i++;
-						}
-					}else{
-						codeScope.isFunction=true;
-					}
-				}
-				if(isFunction){//BODGED: not sure about what happens when concatnaiting functions
-					if(!command){//&&lbl?.defaultFunction){
-						if(lblName=="if"&&refLevel==0){//'if(condition){'
-							let index=words[i-1].index+words[i-1].length;//not sure why but it matches 'f(1==2){' in 'if(1==2){' without the "+1" but.
-							//let words1=[...lineStr.substring(index).matchAll(wordsRegex)];
-							//words1.i=0;
-							words.i++;//["if","(",words[words.i]]
-							//if(words1[0]?.[0]=="(")words1.i++;
-							{
-								codeScope=new Scope({parent:scope,name:"if block"});
-								codeScope.scopes.parent=scope;//lbl;
-								codeScope.name="if block";
-								newScope=codeScope;
-								if(!hasLetScope){
-									codeScope.scopes.let=undefined;
-									codeScope.scopes.var=undefined;
-								}
-							}
-							hasDef=true;
-							let lastI=words.i;
-							let value;
-							if(words[words.i]?.[0]==")")//'if(){' => 'if(false){'
-								value=new BracketValue({bool:false});
-							else value=await evalBrackets({codeObj,scope,words});
-							codeScope.scopes.let=undefined;
-							scope.ifStatementValue=value;
-							if(value.bool===false){//if(bool==valse) then it doesn't run the if's block code
-								codeScope.isFunction=true;
-							}else{
-								codeScope.isFunction=false;
-							}
-						}else if(lbl){
-							throw Error(throwError(codeObj,
-								"Block type \"#foo(){}\" (aka calling a function with a block as an argumnet) is not supported yet."
-								+" This, along with custom keywords, has not yet been added to the compiler"
-							));
-							if(lbl.defaultFunction){//'name(){}' => for custom stuff like 'for(i=0,i<10,i++){}'
-								lbl.defaultFunction({codeObj,words,newScope,codeScope,scope});//UNFINISHED
-							}
-							if(0)await evalParamaters({codeObj,words,scope});//not working YET
-						}
-					}
-					lineStr=[...words].splice(maxI,words.length-maxI).map(v=>v[0]).join(" ");
-					{
-						let words=lineStr.match(/(?<=\()[\s\S]+?$/)[0].split(/,|\)|\(/);
-						codeScope.parameters=[];//list of parameter names
-						let brackets=1;
-						words.i=0;
-						for(;words.i<words.length&&brackets>0;words.i++){
-							let word=words[words.i];
-							if(word=="(")brackets++;
-							else if(word==")")brackets--;
-							else if(brackets==1){
-								let match=word.match(/[\w]+/);
-								if(match){
-									codeScope.parameters.push(match[0]);
-									if(0)codeScope.labels[match[0]]=new Label({
-										name:match[0],
-										scopes:{parent:codeScope},
-										parent:scope,
-										codeObj:codeObj,
-										sourceLineNumber:sourceLineNumber
-									})
-								}
-							}
-							index+=word.length;
-						}
-					}
-				}
 				if(hasDef){//"def var block{...code};""
 					codeScope.codeObj=codeObj;
 					codeObj.label=codeScope;
@@ -2472,22 +2561,17 @@ const oxminCompiler=async function(inputFile,fileName){
 					warnColour:(str)=>"\x1b[33m"+str+"\x1b[0m",
 					async parse({words,codeObj,scope,codeScope,parts,isMeta}){//("{debugger}"")={labelof,};
 						let phase=CallStackObj.phase;["#","$",""];
-						let i=words.i;
 						if(0)for(words.i=0;words.i<words.length;words.i++){//skip the '#' words. OBSILETE as this is done by the words are created
 							if(!words[words.i][0].match(/^[#$@£]$/))break;
 						}
 						let cmd;
 						({label:cmd}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false}));
+						let i=words.i;//e.g. words: [debugger.typeof, i=label, ;]
 						if(cmd?.isDebugger){
 							let error=this.warnColour((isMeta?"#":"")+cmd.name+"::"+codeObj.sourceLineNumber+"::");
-							let label;
-							if(words[words.i]){
-								({label,wasDeclared}=await parseLabelOrNumber({error,words,scope,codeObj,makeVars:false}));
-								if(!wasDeclared&&(label instanceof Scope||label==undefined))label=new Scope({name:(label?.name??words[i][0])+"?",wasDeclared:false});
-							}
-							else{
-								label=scope.scopes.code??scope;
-							}
+							let {label,wasDeclared,name,didParse}=await parseLabelOrNumber({error,words,scope,codeObj,makeVars:false});
+							if(didParse&&!wasDeclared&&(label instanceof Scope||label==undefined))label=new Scope({name:name+"?",wasDeclared:false});
+							else label??=scope.scopes.code??scope;
 							await cmd.do?.({words,codeObj,scope,codeScope,label,error,parts});
 							return{didParse:true};
 						}else{
@@ -2736,11 +2820,40 @@ const oxminCompiler=async function(inputFile,fileName){
 					},
 				});
 				let carry;
+				const repeatLoop=new Scope.Function({
+					name:"{repeat}",
+					parameters:["break"],//text colouring
+					async defaultFunction({label,scope,codeObj}){
+						let bailArg=label.labels["break"]??=new NumberObj({parent:scope},codeObj,0,"[repeat.i]"+"0");
+						let block=label.labels["block"];
+						let maxRepeats=bailArg.relAddress;
+						bailArg.relAddress??=0;
+						let oldBreak=findLabel(label,"break");
+						label.labels["break"]=bailArg??=new Scope();
+						Object.assign(bailArg,{
+							name:"break",
+							labels:{...(oldBreak?.isDefaultLabel?oldLabel.labels:{})},
+							[label.name]:label,
+							isDefaultLabel:true,
+							relAddress:maxRepeats-1,
+						});
+						for(let i=maxRepeats-1;i>=0;i--){
+							let code=getCode(block);
+							code.push(code.popped);
+							//code=code.map(v=>v.words.str)
+							//bailArg.relAddress=i;
+							await parseFunction({scope:label,parts:code,codeScope:label,codeObj});
+							if((bailArg.relAddress??0)==0)break;
+							bailArg.relAddress=i;
+						}
+						return{label};
+					},
+				});
 				const objectScopeObject=new Scope.Function({
 					name:"{Object}",
 					parameters:[],
 					defaultFunction({label,codeObj,scope}){
-						;
+						throw Error(throwError(codeObj,"Object() doesnt do anything yet. This might be removed"))
 					},
 					labels:{
 						"getData":carry=new Scope.Function({
@@ -2776,7 +2889,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				});
 				labelNull.arrayLabels=[new CodeObj({command:{number:0}},labelNull,"null;")];
 				labelNull.code=[...labelNull.arrayLabels,new EndBracket(labelNull)];
-
+				const ifObject=new Scope.Function({name:"{if}",defaultFunction(){}});
+				const elseObject=new Scope.Function({name:"{else}",defaultFunction(){}});
 			//----
 			//label types:
 				//using `var name,label=name;`
@@ -2808,8 +2922,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						["false"]:labelFalse,
 						["null"]:labelNull,
 						["undefined"]:labelNull,
-						["if"]:new Scope.Function({name:"{if}",defaultFunction(){}}),
-						["else"]:new Scope.Function({name:"{else}",defaultFunction(){}}),
+						["if"]:ifObject,
+						["else"]:elseObject,
+						["repeat"]:repeatLoop,
 					},
 				}).intoVoidBlock();
 
@@ -2843,7 +2958,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			let metaLevel=0;
 			let processes=0;
 			//string,comment regex
-			/(["'`])(?:\1|[\s\S]*?[^\\]\1)|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)/
+			/(["'`])(?:\1|[\s\S]*?[^\\]\1)|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)/;
+			/[+-]?(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)/;
 			const wordsRegex=/[#${}()]|::?|\.+|([_\w]+\s*\.\s*)*[_\w]+|,|[\[\]]|(<[-=]>|-?->|<--?|<==?|=?=>|=?=?=)|[><\!]=?|[+-]?([0-9]+|0b[0-1]+|0x[0-9a-fA-F]+)|(\+\+?(?![0-9])|--?|\*\*?|\/)|(&&?|\|\|?|!|\^\^?|~|[£%@?¬])|[^\s]/g;
 		const parseFunction=async function({scope,parts,codeScope,fileName,functionLine=1,codeObj}){
 			fileName=fileName+"";//convert to string;
@@ -2866,7 +2982,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let self = ["continue", "this"][i];
 						if(codeScope.labels[name]?.isDefaultLabel&&codeScope.labels[name].hasDefaultCodObj){
 							if(codeObj)codeScope.labels[name].codeObj=codeObj;
-							else if(codeScope.labels[self].isDefaultLabel){
+							else if(codeScope.labels[self]?.isDefaultLabel){
 								codeScope.labels[name].codeObj=codeScope.labels[self];
 								//codeScope.code[codeScope.code.length-1];
 							}
@@ -2896,7 +3012,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			for(;i<parts.length&&i<bail&&processes<bail;[i++,parseReps++,processes++]){
 				if(callStack.length<startCallLen)throw Error("impossible compiler error. bug found.")
 				if(parts[i]==undefined){
-					console.log(arguments);
+					console.log([arguments]);
 					throw Error(parts+"?'part' is undefined. impossible compiler error. ?")
 				}
 				if(parts[i] instanceof Scope&&parts[i].isInstance){//for functions "foo();" DELETE
@@ -2932,6 +3048,16 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeObj.fileName=parts[i].fileName??fileName;
 						codeObj.callLineObj=(parts[partI] instanceof String)?(parts[partI].callLineObj??parts[partI]):codeObj;
 						codeObj.isCodeObj=true;
+						if(parts[i].recursionAllowed!=undefined){//handle 'repeat 10 foo()'
+							codeObj.recursionAllowed=parts[i].recursionAllowed-1;
+							codeObj.maxRecursion=parts[i].maxRecursion;
+							if(codeObj.recursionAllowed<=0){
+								const isStrict=false;
+								if(isStrict)throw Error(throwError(codeObj,"recursion limit of '"+codeObj.maxRecursion+"' reached. Try using a higher repeat or make sure the recursion stops"));
+								codeObj.recursionAllowed=undefined;
+							}
+							break mainForLoop;
+						}
 						if(parts[i].parent&&scopeLevel==0){//allow for function scopes concats to use different scopes
 							//NEEDSTESTING
 							//'let a;{let b;a(){b}}{let c;a(){c}}'
@@ -2965,14 +3091,16 @@ const oxminCompiler=async function(inputFile,fileName){
 						setReturns(scope,codeScope);
 					}
 					let words=[];
-					let words1=[];
+					let newLastLabel,isBlock;
 					words.i=0;
-					codeObj.words=words;
 					words.str="";
-					//parses the normal assembly part.
-					ifBlock:{//allows for 'code;' and 'code}'
-						let newLastLabel=undefined;
-						varType="meta";let lastMatch,isBlock=false;//break up line into words.
+					//parse words
+					if(parts[partI].words){
+						words=parts[partI].words;words.i=0;
+						isBlock=parts[partI].isBlock;
+					}
+					else{
+						varType="meta";isBlock=false;//break up line into words.
 						for(let i=partI;i<parts.length;[i++,parts.skipParts++]){// 'code "str" more code;' joins str's with normal words.
 							lineStr=parts[i]??"";
 							if(lineStr instanceof Str){
@@ -2991,6 +3119,11 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 						}
 						words.str=words.map(v=>v[0]).join(" ");
+					}
+					codeObj.words=words;
+					codeObj.isBlock=isBlock;
+					//parses the normal assembly part.
+					ifBlock:{//allows for 'code;' and 'code}'
 						specialStringTester:{//' #"make file"; ' -> ignore
 							let i=0;
 							if(words[i]?.[0].match(/[#$]/)){i++;words.i++;}
@@ -3025,7 +3158,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								codeObj.phaseLevel=1;
 								words.i++;
 								let args=[];
-								let throwStarter=". Incorrect import syntax. ";
+								let throwStarter="Incorrect import syntax. ";
 								let folderRegex=/[\s\S]*?(\/(?=[^\/]*$))/;
 								const modes={
 									main:new String( mainFileName.match(folderRegex)?.[0]??""),
@@ -3049,21 +3182,21 @@ const oxminCompiler=async function(inputFile,fileName){
 								let n=1;
 								for(let i=partI+1;i<parts.length;[i++,n++]){
 									let match;
-									if(parts[i] instanceof Str){
-										newfileNames.push([addressMode+JSON.parse(parts[i]),parts[i]]);
+									let part=parts[i];
+
+									if(part instanceof Str){
+										newfileNames.push([addressMode+part.string,part.string]);
 										n++;
 										i++;
+										part=parts[i];
 									}
-									if(match=parts[i].match(/^\s*,\s*$/)){
-										continue;
-									}
-									else if(match=parts[i].match(/^\s*;\s*$/)){//"import 'file' ;"
+									if(match=part.match(/^\s*[;}]\s*$/)){//"import 'file' ;"
 										break;
 									}
-									else if(parts[i].match(/^\s*,?\s*$/)){//'import "A.0xmin" "B.0xmin", "C.0xmmin";'
-										;
+									else if(part.match(/^\s*,?\s*$/)){//'import "A.0xmin" "B.0xmin", "C.0xmmin";'
+										continue;
 									}else{
-										throw new Error(throwError(codeObj,throwStarter+""));
+										throw new Error(throwError(codeObj,". '"+part+"' "+throwStarter+""));
 									}
 								}
 								async function oxminImport({newfileName,scope,codeObj,fileName,callStack}){
@@ -3073,13 +3206,13 @@ const oxminCompiler=async function(inputFile,fileName){
 									let file=fileList[newfileName[0]]=await oxminCompiler.fileLoader(newfileName[0]);
 									await parseFunction({scope,codeScope:codeObj.codeScope,parts:getPartsFromFile(file),fileName:newfileName[1],callStack,codeObj});
 									//callStack.pop();//pops the file's scope. 
-								};
-								endCommenting={
-									codeObj:commentLastStatemets(codeScope,n,false),//returns codeObj
+								};loga(codeScope.getDataSummery().code)
+								endCommenting={//open files after import args are parsed into code objects.
+									codeObj:commentLastStatemets(codeScope,1,false),//returns codeObj
 									do:[]
-								}
+								};
 								for(let newfileName of newfileNames){
-									endCommenting.do.push(async()=>await oxminImport({newfileName,codeObj,scope,fileName,callStack}));
+									endCommenting.do.push(async()=>0);//await oxminImport({newfileName,codeObj,scope,fileName,callStack}));
 								}
 							}
 							else if(words[words.i]?.[0]=="assert"){//'assert move->label "my error message";'
@@ -3126,9 +3259,14 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(!foundLabel){//'#delete;' clear scope
 									for(let i in defaultDeleteScope.labels){//clear the scope
 										let label=defaultDeleteScope.labels[i];
-										if(!label.isBuiltIn)delete defaultDeleteScope.labels[i];
+										if(label){
+											if(!label.isBuiltIn)delete defaultDeleteScope.labels[i];
+										}
 									}
 								}
+							}
+							else if(words[words.i]?.[0]=="repeat"){//sets recursion limit, allows for 
+
 							}
 							else if((isMeta||1)&&(words[words.i]?.[0]??"").match(/^debugger\b/)){//"debugger"
 								addToNonMeta=false;
@@ -3144,6 +3282,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 						if(addToNonMeta)addToNonMetaBlock:{
 							let failedAssert=false;
+							if(1)failedAssert=true;//TEMP remove this when assert is added
 							let addToNonMeta=true;//true => do the "jump->lbl+2;" parse
 							codeObj.isNonMeta=isNonMeta;
 							//words.i=0;
@@ -3177,12 +3316,14 @@ const oxminCompiler=async function(inputFile,fileName){
 									let ret={};
 									if(shouldStop()){words.i++;}
 									else{
-										ret=await parseLabelOrNumber({codeObj,words,scope});
+										let oldI=words.i;
+										ret=await parseLabelOrNumber({codeObj,words,scope,evalFoo:false});
+										if(!(ret.label instanceof Number))words.i=oldI;
 									}
 									let expectedRelAddess;
 									if(pointerName=="jump"){
-										expectedRelAddess=command[0]=="get"?1:2;
-										command[0]+=" jump +"+expectedRelAddess;
+										expectedRelAddess=command[0]=="get"?-1:2;
+										command[0]+=" jump "+expectedRelAddess;
 										command.number=commandRefference.command[command[0]];
 									}else if(pointerName=="move"){
 										expectedRelAddess=0;
@@ -3192,10 +3333,10 @@ const oxminCompiler=async function(inputFile,fileName){
 									if(pointerName){
 										ret.label??=new Number(expectedRelAddess);
 										if(ret.label instanceof Number){
-											if(+ret.label!=expectedRelAddess)throw Error(throwError(codeObj,". Try '"+command[0]+" "+pointerName+" +"+expectedRelAddess
+											if(+ret.label!=expectedRelAddess)throw Error(throwError(codeObj,". Try '"+command[0]+" "//+pointerName+" "+expectedRelAddess
 												+"'.\n These numbers are constants and depend on the virtual hardware of the 0xmin computer."
 												+" For reading(get) and writing(set) from an address relative to the Jump pointer use:"
-												+"'get jump +1' or 'set jump +2'"
+												+"'get jump -1' or 'set jump +2'"
 											));
 										}
 									}
@@ -3205,6 +3346,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								}
 								//words.i==0
 							}
+							if(words[words.i]?.[0]==",")words.i++;//allow 'nor, jump->4;' to separates opcodes and opands
 							//work out command?
 							let useBlock=false;//'block;'. Is similar to: 'def block;'
 							let label;
@@ -3434,8 +3576,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(codeScope&&!words.str.match(/^\s*}$|^;$/)&&isRunningCode){
 						codeScope.arrayLabels.push(codeObj);
 					}
-					words.push(...words1);
-					if(lineStr[lineStr.length-1]=="{"){
+					if(words.str[words.str.length-1]=="{"){
 						let isFunction=words.str.match(/\)\s*(<?[=-]>?)?\s*{/);
 						let isBlock=true;
 						let ret;
@@ -3469,7 +3610,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						scopeLevel++;
 						callStack.push(new CallStackObj({isFunction,scope,codeScope,sourceLineNumber,fileName,codeObj}));
 					}
-					if(lineStr.match(/}\s*;?/)){
+					if(words.str.match(/}\s*;?/)){
 						if(words.str.match(/^\s*}\s*;?\s*$/))codeObj.isNonMeta=false;
 						if(isRunningCode){
 							setReturns(scope,codeScope);
@@ -3478,9 +3619,23 @@ const oxminCompiler=async function(inputFile,fileName){
 							functionLevels.shift();
 						}
 						//if(codeScope.isFunction)
-						if(callStack[callStack.length-1].isFunction){functionLevels[0]--;}
+						if(callStack[callStack.length-1].isFunction){
+							if(scope.isFunctionCall&&functionLevels[0]==1&&!isRunningCode){
+								if(scope.parentFunction.code.length>0)await evalParamaters({
+									label:scope.parentFunction,
+									block:codeScope,
+									isFunctionCall:"}",
+									scope,words,codeObj,
+									lineStr0:"a()",
+									index:1,
+									wasDeclared:true,
+								});
+							}
+							functionLevels[0]--;
+						}
 						lastLabel=scope;
 						callStack.pop();
+
 						scope=callStack[callStack.length-1]?.scope//.parent;
 						codeScope=callStack[callStack.length-1]?.codeScope//.parent;
 						if(!scope){

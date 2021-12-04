@@ -145,3 +145,56 @@ aBlockLabel{//blocks can be labeled like this
 	123 def let a;//can also chains meta keywords like this.
 	move->a;
 };
+
+all_scope_types:{
+	//blocks;
+		let bar {};
+		let {};
+		{};
+		let bar : {};
+		let : {};
+		: {};
+		:: let bar {};
+		:: let {};
+		:: {};
+		:: let bar : {};
+		:: let : {};
+		:: : {};
+		:: bar {};
+		:: bar : {};
+		bar : {};
+	//function
+		let bar () {};
+		let () {};
+		() {};
+		let bar : () {};
+		let : () {};
+		: () {};
+		:: let bar () {};
+		:: let () {};
+		:: () {};
+		:: let bar : () {};
+		:: let : () {};
+		:: : () {};
+		bar : () {};
+		:: bar () {};
+		:: bar : () {};
+	//function call
+		bar () {};
+		bar {};
+		let bar ();
+		bar ();
+	//simple label
+		let bar;
+		bar;
+	//eval bracket
+		let ();
+		();
+		;
+}
+
+//#let bar : () {};
+//keyword label symbol bracket block
+//"bracket (?!block)" = evalBrackets
+//"bracket block" = parameters
+//"label (equality_symbol)? bracket" = arguments
