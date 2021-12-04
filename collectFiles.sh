@@ -2,7 +2,10 @@
 echo preparing repo for git
 echo code
 cp -r ./../compilers ./language
+cp -r ./../emulators ./language
 cp -r ./../code ./language
+cp -r ./../docs ./language
+cp -r ./../include ./language
 echo tpt
 cp ~/snap/the-powder-toy/32/.local/share/"The Powder Toy"/Saves/"a subframe tester.cps" the_powder_toy/Saves/
 echo sublime text

@@ -8,7 +8,7 @@ file_extensions:
   - 0xmin #ec
 scope: source.0xmin
 variables:
-  number: '((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
+  number: '(?:(?<!\w)\b|[\+\-])(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)\b' #'((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
   labelName: '([\w]+)(?!\.)(?!\w)'
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<[=-]>?|[=-]>|=' #{}=|={}
@@ -75,10 +75,10 @@ contexts:
       scope: keyword.declaration
       push: let_statement
 
-    - match: \b(else\s+)?if\b(?!\s*\.)(?=\([^;}]*?\){) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+    - match: \b((else\s+)?if|repeat)\b(?!\s*\.)(?=\([^;}]*?\){) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
       scope: keyword.control
       push: if_statement
-    - match: \belse\b(?!\s*\.)\s*(?={) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+    - match: \b(else|repeat)\b(?!\s*\.)\s*(?={) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
       scope: keyword.control
     - match: '\b(nor|red|blue|get|set|if|and|or|xor)\b' #'\b(if|else|for|while)\b'
       scope: support.constant #keyword.control.example-c
