@@ -1,4 +1,4 @@
-/*if(!io){
+if(!io){
 	#import lib "io.0xmin";
 };
 let int(number){
@@ -44,4 +44,4 @@ let function(inLen)={
 function(){
 	1;2;
 };
-def a.block;*/
+def a.block;
