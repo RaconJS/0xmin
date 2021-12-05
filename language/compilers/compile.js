@@ -3179,7 +3179,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 								let newfileNames=[];
-								let n=1;
+								let n=1;//TODO: replace 'parts' with 'words'
 								for(let i=partI+1;i<parts.length;[i++,n++]){
 									let match;
 									let part=parts[i];
@@ -3206,13 +3206,13 @@ const oxminCompiler=async function(inputFile,fileName){
 									let file=fileList[newfileName[0]]=await oxminCompiler.fileLoader(newfileName[0]);
 									await parseFunction({scope,codeScope:codeObj.codeScope,parts:getPartsFromFile(file),fileName:newfileName[1],callStack,codeObj});
 									//callStack.pop();//pops the file's scope. 
-								};loga(codeScope.getDataSummery().code)
+								};
 								endCommenting={//open files after import args are parsed into code objects.
 									codeObj:commentLastStatemets(codeScope,1,false),//returns codeObj
 									do:[]
 								};
 								for(let newfileName of newfileNames){
-									endCommenting.do.push(async()=>0);//await oxminImport({newfileName,codeObj,scope,fileName,callStack}));
+									endCommenting.do.push(async()=>await oxminImport({newfileName,codeObj,scope,fileName,callStack}));
 								}
 							}
 							else if(words[words.i]?.[0]=="assert"){//'assert move->label "my error message";'

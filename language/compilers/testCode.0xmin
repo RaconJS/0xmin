@@ -1,3 +1,4 @@
 //#import this "../code/version_2_code/prints.0xmin";
-1;2;3;#import lib"std.0xmin","";
+1;2;3;
+#import lib"std.0xmin";
 debugger;
