@@ -8,7 +8,7 @@ file_extensions:
   - 0xmin #ec
 scope: source.0xmin
 variables:
-  number: '(?:(?<!\w)\b|[\+\-])(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)\b' #'((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
+  number: '(?:\b|[\+\-])(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)\b' #'((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
   labelName: '([\w]+)(?!\.)(?!\w)'
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<[=-]>?|[=-]>|=' #{}=|={}
@@ -102,13 +102,13 @@ contexts:
       push: import_statement
     - match: '(?<=[@$#;{}]|^)\s*\bstatic\b' #
       scope: keyword.control
-    - match: '((?<=[@$#])\s*|\s*)\bassert\b' #'(?<=^|[;{}])\s*\bassert\b'
+    - match: '((?<=[@$#])\s*|\s*)\b(?:assert|delete)\b' #'(?<=^|[;{}])\s*\bassert\b'
       scope: keyword.control
     - match: '\.\.\.'
       scope: keyword.control
       push: deRefference
     
-    - match: '(?<=\.\.)\s*(?:prototype|supertype|parameters|length|array|splice|compile)\b'
+    - match: '(?<=\.\.)\s*(?:prototype|supertype|parameters|code|length|array|splice|compile)\b'
       scope: support.function.builtin
     - match: '\b(var|let|const|set|def)\b'
       scope: support.constant
@@ -138,15 +138,8 @@ contexts:
     - match: '([+\-*/~&|^!]|<<|>>|>>>|&&|\|\||\^\^|%)|(!=|==|===)'
       scope: keyword.control
 
-    - match: '\b(new|delete)\b'
+    - match: '\b(new|recur|repeat)\b'
       scope: keyword.control
-
-    - match: '\#(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: support.constant.weakScope
-      push: higher_code_brackets
-    - match: '\$(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: entity.name.weakScope
-      push: hiddenCodeScope_brackets
 
 
     - match: \bvoid\b(?!\s*\.)(?=[^;}]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
@@ -155,12 +148,27 @@ contexts:
 
     - match: \bvoid\b(?!\s*\.)
       scope: keyword.control
-    - match: '[#]'
-      scope: support.constant
+
+
+    - match: '\#(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+      scope: support.constant.weakScope.0xmin
+      push: higher_code_brackets
+    - match: '\$(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+      scope: entity.name.weakScope.0xmin
+      push: hiddenCodeScope_brackets
+    - match: '\@(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+      scope: keyword.control.assemblyScope.0xmin #source.assemblyScope.0xmin
+      push: mainScope
+
+    - match: '#(?:\s*;)?'
+      scope: support.constant.metaScope.0xmin
       #push: higher_code_singleLine
-    - match: '[$]'
-      scope: entity.name.keyword #support.constant
-    
+    - match: '\$(?:\s*;)?'
+      scope: entity.name.keyword.hiddenAssemblyScope.0xmin #support.constant
+    - match: '@(?:\s*;)?'
+      scope: keyword.control.assemblyScope.0xmin
+
+
     - match: '\{'
       push: mainScope
     - match: '\}'
@@ -171,7 +179,7 @@ contexts:
     #  pop: true
     #end line ";"
     
-    - include: define_blocks    
+    - include: function_call    
 
   main: #build settings
     #- meta_scope: keyword.declaration
@@ -279,7 +287,7 @@ contexts:
       push: set_statement
       pop: true
     - include: mainScope
-    - include: define_blocks
+    - include: function_call
     - match: '(?=[;}:])' #';|:'
       pop: true
     - match: '\s*(?<=\))\s*(=>|=)\s*(?={)' # '=>' or '=' in '() => {}'
@@ -293,8 +301,12 @@ contexts:
     - match: '{{labelName}}' # a.b.c.greenValue
       scope: entity.name.type #label
   set_statement:
+    - include: define_blocks
+    - include: function_call
     - include: base_statement
   let_statement:
+    - include: define_blocks
+    - include: function_call
     - include: base_statement
     - match: '{{labelName}}' #block_scope 
       scope: variable.name
@@ -303,38 +315,46 @@ contexts:
       scope: constant.numeric
     - match: '(?=[,;}{])'
       pop: true
-    - include: define_blocks
+    - include: function_call
     - include: mainScope
     - match: '{{labelName}}'
       scope: variable
       pop: true
-  define_blocks:
-    #- match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
-    #  scope: entity.name.function #class
-
-    - match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
-      scope: entity.name.function #class
-      push: function_params
-
+  function_call:
     - match: '{{labelName}}\s*(?=(=>?)?\s*\()' #funciton call "foo();""
       scope: variable.function
       push: define_blocks_callFunctionEqualsBit
+    - match: '{{labelName}}\s*(?=((=>?|::|)\s*)?{)' #'{{labelName}}\s*(?=\{)' #block
+      scope: variable.function #entity.name.function'
+  define_blocks:
+    - match: (?<=\b(?:let|var|set|def)\b)\s*\b(?:def|set)\b
+      scope: keyword.declaration
+    #- match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
+    #  scope: entity.name.function #class
+    - match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
+      scope: entity.name.function #class
+      push: function_params
     - match: '{{labelName}}\s*(?=((=>?|::|)\s*)?{)' #'{{labelName}}\s*(?=\{)' #block
       scope: entity.name.namespace #entity.name.function'
   define_blocks_callFunctionEqualsBit: #function call
     - match: '\('
       pop: true
+      push: evalBrackets
     - match: '=>'
       scope: keyword.declaration.arrowFunctionCall
     - match: '='
       scope: keyword.declaration.classCall
-  function:
-    - meta_scope: meta.function
-    - match: '[a-zA-Z0-9_]+'
-      scope: variable.function
-    - match: \(
-      scope: punctuation.section.group.begin
-      set: function_params
+  evalBrackets:
+    - include: mainScope
+    - match: \)
+      pop: true
+  #function_1:
+  #  - meta_scope: meta.function
+  #  - match: '[a-zA-Z0-9_]+'
+  #    scope: variable.function
+  #  - match: \(
+  #    scope: punctuation.section.group.begin
+  #    push: function_params
   function_params:
     - meta_scope: meta.function.params
     - match: \)

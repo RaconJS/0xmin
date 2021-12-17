@@ -1,4 +1,144 @@
+#"make file";
+#"log.table";
+#"log.code";
 //#import this "../code/version_2_code/prints.0xmin";
-1;2;3;
-#import lib"std.0xmin";
-debugger;
+# import lib "io.0xmin";
+def let get_user_input{
+	#let block{};
+	#let block1=block;
+	#let call()={
+		#static let this.block=block1;
+		#let ret;
+		move->ret;
+		get;
+		move->constructor.block.return;
+		set;
+		jump->constructor.block;
+		jump constructor.block.return->1 def ret;
+		$move->constructor.block.return;
+	};
+	delete block1;
+	#set block{
+		@{
+			#let main;
+			$move->return;
+			jump->main;
+			#let String.endInput{0x20028000};
+			0x20028000 def let endInput;
+			0x20000000 def let red;
+			0x20010000 def let confirm;
+			#let ret=return;
+			#let return.move;
+		}
+		def main;
+		confirmInput:{
+			move->terminal.input;
+			if;null;
+			xor;
+			move->return.move;
+			if;{//if terminal.input != String.confirm()
+				jump->main;
+			}
+			move->terminal.output;
+			set;//confirm input
+		}
+		recieveInput:{
+			$assert move->terminal.output;
+			//assert alu = confirm;
+			move->terminal.input;
+			or_8:{
+				def let a{};
+				#let b(){
+					set a{or;};
+					#recur 7 b();
+				}
+				#b();
+			}
+		}
+		cleanInput:{
+			move->confirm;
+			xor;
+			move->red;
+			jump+2;
+			"\x00"def let char;
+			move->char;
+			delete char;
+			or;
+		}
+		#set return.move->return;
+		move->return.move;
+		null def return;
+	}
+}::{def block;}
+$move->0xmin 0;
+def main;
+def get_user_input.call();
+move->0xmin 0;
+if;{
+	jump +2;
+	jump->main;
+}
+move->terminal.output;
+set;
+move->0xmin 0;
+jump->main;
+jump 0;
+void{
+	#;
+	let redFilt;
+	@;
+	move -0xff;
+	jump+3;
+	0x000ff000;
+	0x20000000;
+	move -> -1;
+	get;
+	move -> redFilt;
+	# let next;
+	jump -> next;
+	0x20000000 # def redFilt;
+	# def next;
+	if;
+	null;
+	xor;
+	# delete next;
+	move -> 0xmin 0;
+	if;//if x!=0;
+	#;
+	let then;
+	let else;
+	let endif;
+	@;
+	jump -> then;
+	jump -> else;
+	#;
+	let str0;
+	let str1;
+	@;
+	"0" # def str0;
+	"1" # def str1;
+	# def then;
+	# delete then;
+	$ move -> 0xmin 0;
+	move->str1;
+	get;
+	move->terminal.output;
+	set;
+	jump -1;
+
+	jump -> endif;
+	# def else;
+	# delete else;
+	$ move -> 0xmin 0;
+	move->str0;
+	get;
+	move->terminal.output;
+	set;
+	jump 0;
+	jump -> endif;
+	# def endif;
+	# delete endif;
+	# delete str0;
+	# delete str1;
+	//#debugger.typeof str;
+}
