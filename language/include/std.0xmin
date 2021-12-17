@@ -16,8 +16,9 @@ let function(inLen)={
 	var inputs{};
 	var outputs{};
 	#let b=block;
-	set this.block{...b();};
+	set this.block={...b();};
 	this.block=b=>this.block;
+	this=>{};debugger.codeof this;
 	this=>()=>{{
 		let i;
 		let inputs=this.block.inputs;
@@ -38,10 +39,11 @@ let function(inLen)={
 				move->arguments[i];set;
 			}
 		}
+		1;
 		//...this.block.call;
 	}}
 }
-function(){
+let a=function(){
 	1;2;
 };
-def a.block;
+//debugger a;
