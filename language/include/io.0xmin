@@ -5,10 +5,10 @@ def let start{
 }
 #let terminal{#let input,output;}
 def let io{
-	null def var input1;//move;get;
+	null def var input,input1;//move;get;
 		#def terminal.input;
 	0x20000000 def var input2;
-	null def var output1;//move;set;
+	null def var output,output1;//move;set;
 		#def terminal.output;
 	0x20000000 def var output2;
 };
