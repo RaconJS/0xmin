@@ -1,49 +1,328 @@
+#"!log.table";
+/*
+	{
+		let foo = (block)={
+			#let return;
+			#...decorator;
+			#set return = block();
+		}
+		let block(){
+			...code;
+		}
+		let newFoo=foo(block).return;
+	}=={
+		let foo = ()={
+			#let return;
+			#...decorator;
+			#set return = block();
+		}
+		let newFoo=foo(){
+			...code;
+		}
+	}
+*/
 if(!io){
 	#import lib "io.0xmin";
 };
-let int(number){
+#let int(number)={
 	def number;
-	let self=this;
-	set block{
+	#let self=this;
+	#set self{}
+	#set int.block{
 		def self;
 	}
 }::{
 	def let block{};
 };
-def main;
-let function(inLen)={
+if(main){def main;}
+#let function(inLen,outLen)={
 	//#assert block;
-	var inputs{};
-	var outputs{};
-	#let b=block;
-	set this.block={...b();};
-	this.block=b=>this.block;
-	this=>{};debugger.codeof this;
-	this=>()=>{{
-		let i;
-		let inputs=this.block.inputs;
-		repeat(inputs..length){
-			if(arguments[i]){
-				if(arguments[i]!=alu){
-					move->arguments[i];get;
-				}move->inputs[i];set;
-			}else{
-				break->0;
-				i--;
+	let return.block=block();
+	//#let set return.block.inputs{};
+	//#let set return.block.outputs{};
+	#let block=return.block;
+	#let loadData(){};
+	#let return.loadData=loadData;
+	set return()=>{{//
+		//loadData:
+			#let i=0;
+			#let inputs=this.block.inputs;
+			def let b{};
+			#let r->+inLen;
+			repeat(r){
+				set b{
+					if(arguments[+i]){
+						if(arguments[+i]!=alu){
+							move->arguments[+i];get;
+						}
+						move->block.inputs[+i];set;
+					}else{
+						#set break->0;
+						#set i=+i-1;
+					}
+					#set i=+i+1;
+				}
 			}
-			i++;
-		}
-		move->block.return;get;
-		if(i==inputs..length&&arguments[i]){
-			if(arguments[i]!=alu){
-				move->arguments[i];set;
+			delete b;
+			def loadData();
+		//call_function:
+			#let ret;
+			move->ret;
+			get;
+			move->this.block.return;
+			set;
+			{
+				jump->this.block;
+				jump this.block.return->1 def ret;
 			}
-		}
-		1;
-		//...this.block.call;
+			delete ret;
+			$move->this.block.return;
+		//return_data:
+			if(i==inputs..length&&arguments[+i]){
+				if(arguments[+i]!=alu){
+					move->arguments[i];set;
+				}
+			}
 	}}
+	if(return.block.inputs){#int(return.block.inputs);}
+	if(return.block.outputs){#int(return.block.outputs);}
+	#let return.fullBlock{
+		$move->block.return;
+		def block;
+		move->block.return;
+		null def block.return;
+	}
+	#int(fullBlock);
 }
-let a=function(){
-	1;2;
-};
-//debugger a;
+#let shortFunction(block,len){
+	#let return;
+	if(!len||(+len==0)){
+		#set return(from,to){
+			if(from && (from!=alu)){
+				if(from!=move){move->from;}
+				get;
+			}
+			def block();
+			if(to){move->to;set;}
+		}
+	}
+	#let return.block=block;
+}
+#let set import{
+	#let switch(){
+		#let switch(array,index,run)={
+			if(!run){
+				#let set run={
+					get;
+				}
+			}
+			#let toArray;
+			#let block=constructor.switch_foo.block;
+			pointers:{
+				#let moveState->0xmin;
+				$moveState->move;
+				jump->break;
+				#let startMove=block.startMove;
+				move startMove->array def toArray;
+				$move->array;//"move" is actually at "&array + index" when "run" is ran.
+				def run;
+				$move->moveState;
+			}
+			if(array){
+				move->toArray;get;move->block.toArray;set;
+			}
+			if(run){
+				move->run;
+				get;
+				move->block.run;
+				set;
+			}
+			if(index){
+				def constructor.switch_foo(index);
+			}
+			$move->array;
+		}::{
+			#var switch_foo=function(1){
+				#let toArray,run;
+				#let inputs{
+					null def let index;
+				}
+				//assert( +compile(`move 0;`)==0)
+				jump+3;
+				#let indexTo,indexFrom;
+				0x0010#def let shift;//move 1;
+				0x1000 #def let negative;//move -0;
+				;
+				move->inputs.index;get;
+				move->shift;red;
+				move->indexTo;set;
+				move->negative;or;
+				move->indexFrom;set;
+				#let startMove->indexFrom;
+				#delete shift,negative;
+				move +0 def toArray;
+				;
+				move+4 def indexTo;
+				get # def run;
+				move-4 def indexFrom;
+			}
+			#set switch_foo.fullBlock=>{
+				$move->switch_foo.block.return;
+				def switch_foo.block;
+				null def switch_foo.block.return;
+			}
+		}
+	}
+	#let switch_function(){//block
+		#let switch(array,index,run)={
+			//assert( +compile(`move 0;`)==0)
+			jump+3;
+			#let indexTo,indexFrom;
+			0x0010#def let shift;//move 1;
+			0x1000 #def let negative;//move -0;
+			;
+			if(index!=alu&&index){move->index;get;}
+			move->shift;red;
+			move->indexTo;set;
+			move->negative;or;
+			move->indexFrom;set;
+			#delete shift,negative;
+			move->array;
+			;
+			move+4 def indexTo;
+			if(run){def run;}
+			else{get;}
+			move-4 def indexFrom;
+		}
+	}
+	#let increment(){
+		#let increment=function(1){
+			#let inputs{null;}
+			move->inputs 0;get;
+			if;null;
+			#let temp,notIn,notOut;
+			#let const_2,redFilt,whiteFilt;
+			#let end;
+			vars:{
+				jump->break;
+				null # def notIn;
+				null # def notOut;
+				2 #def const_2;
+				#def redFilt;
+				0x20000000;
+				0x2fffffff #def whiteFilt;
+			}
+			move->notIn;set;nor;set;//notIn= ~input
+			if;if_overFlow:{
+				#let mv->0xmin;$mv->move;
+				jump->break;
+				move->redFilt;
+				get;
+				move->notIn;
+				jump->end;
+				$move->mv;
+			}//assert alu!=white
+			blue;if;null;//if(true)
+			move->const_2;blue;
+			if;if_ans_white:{
+				#let mv->0xmin;$mv->move;
+				jump->break;
+				move->whiteFilt;
+				get;
+				move->notIn;
+				jump->end;
+				$move->mv;
+			}//assert (ans != white) && (ans != black);
+			red;
+			move->notOut;set;nor;set;
+			move->notIn;red;
+			#def end;
+			if(out){move->out;set;}
+		}
+	}
+	#let increment_function(){
+		#let increment=shortFunction(){
+			#{
+				#let notIn,notOut;
+				#let const_2;
+			}
+			vars:{
+				jump->break;
+				null # def notIn;
+				null # def notOut;
+				2 # def const_2;
+			}
+			move->notIn;set;
+			nor;
+			set;//notIn= ~input
+			blue;
+			move->const_2;
+			blue;
+			red;
+			move->notOut;
+			set;
+			nor;
+			set;
+			move->notIn;
+			red;
+		}
+	}
+	#let add(){
+		#let add=function(2){
+			#let inputs{null;null}
+			#let redFilt=int=(0x20000000);
+			#let temp=int=(null);
+			#let const_2=int=(2);
+			loop:{
+				#let mv->0xmin;$mv->move;
+				xor:{
+					move->inputs 0;get;
+					move->inputs 1;xor;
+					move->redFilt;
+					if;jump+2;get;
+					move->temp;set;
+				}
+				and:{
+					move->inputs 0;get;
+					if;null;
+					move->inputs 1;and;
+					move->redFilt;
+					if;if:{#let mv->0xmin;$mv->move;
+						jump->break.if.break;
+						move->temp;get;
+						jump->break.loop.break;
+						$move->mv;
+					}
+					move->const_2;red;
+					move->inputs 1;set;
+				}
+				move->temp;get;
+				move->inputs 0;set;
+				move->mv;
+				jump->continue;
+			}
+			$move->temp;
+		}
+	}
+	#let runALU(){
+		#let runALU(from,to){
+			if(from){move->from;get;}
+			#set jump+2;null;null;
+			if(to){move->to;get;}
+		}
+	}
+	#let print(){
+		#let termintal.print(){
+			move->termintal.output;
+			set;
+			if(to){move->to;get;}
+		}
+	}
+}
+#(){
+	let print=function(1){
+		#let inputs{0;}
+		move->inputs[0];get;
+		move->io.output1;set;
+	}
+}
