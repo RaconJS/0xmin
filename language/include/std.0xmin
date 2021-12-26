@@ -184,7 +184,7 @@ if(main){def main;}
 			if(index!=alu&&index){move->index;get;}
 			move->shift;red;
 			move->indexTo;set;
-			move->negative;or;
+			move->negative;xor;
 			move->indexFrom;set;
 			#delete shift,negative;
 			move->array;

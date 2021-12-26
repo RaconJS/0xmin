@@ -97,10 +97,11 @@ contexts:
     - match: '\bdebugger(\s*.\s*((labels|type|code)[oO]f|log))?\b'
       scope: keyword.control
 
+    - match: '\bimport\b(?!\s*\.)'
+      scope: keyword.control
+      push: import_statement
     - match: '\bimport\b'
       scope: keyword.control
-    - match: '\bimport\b(?!\s*\.)'
-      push: import_statement
     - match: '(?<=[@$#;{}]|^)\s*\bstatic\b' #
       scope: keyword.control
     - match: '((?<=[@$#])\s*|\s*)\b(?:assert|delete)\b' #'(?<=^|[;{}])\s*\bassert\b'
