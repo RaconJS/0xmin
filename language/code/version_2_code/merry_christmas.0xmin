@@ -1,0 +1,79 @@
+#"make file";
+#"!log.table";
+#"!log.code";
+#import lib "std.0xmin";
+...import.increment_function;
+...import.switch_function;
+#let str=""
+//  0123456789abcdef
+..."~~~~~~~~~~~~~~~~"//0
+..."MERRY CHRISTMAS!"//1
+..."~~~~~~~~~~~~~~~~"//2
+..."|      /\\      |"//4
+..."|     /o~\\     |"//5
+..."|    /~~~o\\    |"//6
+..."|   /~o~o~~\\   |"//7
+..."|  /________\\  |"//8
+..."|      ||      |"//9
+..."\xe4--------------\xe6"//10
+..."|from 0xmin V3 |"//3
+..."\xe0--------------\xdf"//3
+;
+#let for(len,block){
+	#let i;
+	#let next;
+	jump->next;
+	0x20000000#def let zero;
+	null#def i;
+	#def let max;
+	{def let a=0x20000000|(+len);}
+	#def next;
+	move->zero;get;move->i;set;
+	for:{
+		#let mv->0xmin;$mv->move;
+		def block(i);
+		increment(i,i);
+		if;null;
+		move->max;
+		xor;
+		move->mv;
+		if;jump->continue;
+	}
+	#let return=this;
+}
+#let print(str){
+	#let len{def let a=0x20000000|str..length;};#let i;
+	#let block{
+		switch(str,i);
+		move->io.output;set;
+		move->terminal.output;set;
+	}
+	#let next;
+	jump->next;
+	0x20000000#def let zero;
+	null#def i;
+	#def let max;
+	def len;
+	#def next;
+	move->zero;get;move->i;set;
+	for:{
+		#let mv->0xmin;$mv->move;
+		def block;
+		increment(i,i);
+		if;null;
+		move->max;
+		xor;
+		move->mv;
+		if;jump->continue;
+	}
+}
+#let block(i){
+	move->i;get;
+	move->io.output;set;
+	switch(str,i);
+	move->io.output;set;
+	move->terminal.output;set;
+}
+for(str..length,block);//print(str);
+jump 0;
+def str;

@@ -2409,7 +2409,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(lbl==elseObject&&refLevel==0){//'else if(){'
 					if(scope.ifStatementValue?.bool===false){//if(bool==valse) then it doesn't run the if's block code
 						codeScope.isFunction=false;
-						if(words[words.i]=="if"){//'else if(){'
+						if(words[words.i]?.[0]=="if"){//'else if(){'
 							lbl=ifObject;words.i++;
 						}
 					}else{
@@ -3004,7 +3004,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							newScope.scopes.parent=label;
 							newScope.scopes.let=scope.getLet();
 							newScope.scopes.var=scope.getVar();
-							if((bailArg.relAddress??maxRepeats)>=maxRepeats)break;
+							if((bailArg.relAddress??maxRepeats)>=maxRepeats||bailArg.relAddress<0)break;
 							else bailArg.relAddress=i;
 							await parseFunction({scope:newScope,parts:code,codeObj});
 						}
@@ -3458,11 +3458,8 @@ const oxminCompiler=async function(inputFile,fileName){
 								//words.i=oldI;
 								codeObj.debug=await debuggingTool.parse({scope,codeScope,words,codeObj,parts,phaseLevel,isMeta:true});//a function that runs in the non-meta phase
 							}
-							if(words[words.i]?.[0]){
-								addToNonMeta=true;//isMeta'#' is parsed similar to non-meta code
-							}
-							else{
-								addToNonMeta=true;
+							else{// if(codeObj.phaseLevel>=2){//'$' or '@' code;
+								addToNonMeta=true;//
 							}
 						}
 						if(addToNonMeta)addToNonMetaBlock:{
@@ -3479,7 +3476,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								codeObj.isMeta=true;
 								break addToNonMetaBlock;
 							}
-							if(isMeta&&["var", "let", "set", "def"].includes(words[words.i][0])){// "let"or "#" in "#a=b" or "var a=b"
+							if(phaseLevel<=1||["var", "let", "def"].includes(words[words.i][0])){// "let"or "#" in "#a=b" or "var a=b"
 								command.number=undefined;
 								addToNonMeta=false;//allow for '#set a->b' != 'set a->b'
 								codeObj.isNonMeta=false;

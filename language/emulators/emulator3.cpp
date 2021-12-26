@@ -1,15 +1,16 @@
 //e
 //UNFINISHED
+//sleep
 #include <chrono>
 #include <future>
 #include <thread>
 #include <iostream>
 #include <cmath>
-
+//read file
 #include <fstream>
 #include <iterator>
 #include <vector>
-
+//terminal dimentions
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -242,7 +243,7 @@ class NumberDisplay{
 		filt30 get_jump;
 		u32 set_jump;
 		u32 set_bray;
-		void onUpdate(int i);
+		void onUpdate();
 	}cpu;
 	class{
 		public:
@@ -252,11 +253,17 @@ class NumberDisplay{
 			;
 		}
 		void onUpdate(){
-			cout<<cpu.move<<cpu.jump;
+			//int[2]
+			cout<<ctx.moveTo(
+				terminal.dims[0]+terminal.offset_x+4,
+				terminal.dims[0]+terminal.offset_y+7
+			);
+			cout<<cpu.move;
+			cout<<cpu.jump;
 		}
 		private:
 	}cpuDisplay;
-	void CPU0xmin3::onUpdate(int i){
+	void CPU0xmin3::onUpdate(){
 		//pointers
 			filt30 get_jump=ram[jump];//for 'get jump -1;'
 			jump+=jump_next;
@@ -308,15 +315,17 @@ class NumberDisplay{
 	}
 //----
 void doStep(int i){
-	cpu.onUpdate(i);
+	cpu.onUpdate();
+	//cpuDisplay.onUpdate();
 	numberDisplay.onUpdate();
 	terminal.onUpdate();
 }
 int main(int argc, char const *argv[]){
 	// copies all data into buffer
+	string fileName;
+	if(argc<=1)fileName="testCode.filt";//"../compilers/quine.filt";
+	else fileName=argv[1];
 	{
-		string fileName=argv[1];
-		if(argc<=1)fileName="testCode.filt";//"../compilers/quine.filt";
 		std::ifstream inputFile(fileName, std::ios::binary );
 		std::vector<char> buffer(std::istreambuf_iterator<char>(inputFile), {});
 		ram=new filt30[buffer.size()];
@@ -331,7 +340,6 @@ int main(int argc, char const *argv[]){
 			//cout<<(void*)(long)ram[n]<<" ";
 		}
 		ramLen=(int)buffer.size()/4;
-		cout<<"size:"<<ramLen<<"\n";
 		buffer.clear();//free memory "hopefully"
 	}
 	{
@@ -340,6 +348,8 @@ int main(int argc, char const *argv[]){
 		cpuDisplay.innit();
 		numberDisplay.innit();
 		cpu.ram=ram;
+		cout<<ctx.moveTo(terminal.dims[0]+terminal.offset_x+4,5);
+		cout<<"size:"<<ramLen<<"\n";
 	}
 	int num=0;
 	for(int i=0;i<40000&&!cpu.hasHault;i++,num++){
@@ -347,7 +357,7 @@ int main(int argc, char const *argv[]){
 			doStep(i);
 		//}
 		ctx.update();
-		mySleep(1./8);
+		//mySleep(1000./(60.*8.));
 		//cout<<hex cpu.jump<<" ";//<<":"<<(void*)(long)cpu.jump<<":"<<(void*)(long)cpu.move<<" ";
 	}{
 		//std::future<std::string> future = std::async(handleInput);

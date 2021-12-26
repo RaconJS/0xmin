@@ -1,0 +1,118 @@
+#"make file";
+#"!log.table";
+#"!log.code";
+import lib "std.0xmin";
+//...import.add;
+...import.increment;
+...import.switch_function;
+let int1(n)={
+	set constructor.vals{
+		def n;
+	}
+}::{let vals{}}
+let hault(){print();move->0xmin 1;jump 0;}
+#let print(in){
+	if(in!=alu&&in){move->in; get;}
+	move->io.output1;set;
+}
+let ary{
+	move+10;get;move-4;set;or;
+	#int(this);
+}
+let charSet={
+	def"+-" def let sign;
+	#def let commands;
+	// "         G S  n "
+	def"mj~<>g^&|_s_?___";
+	#def let numbers;
+	def"0123456789ABCDEF";
+	#int1(this);
+};
+#let endOn=int(0x10000000+248);
+#let i=int(0x10000000);
+move->i;
+for:{
+	$move->i;
+	get;if;null;
+	move->endOn;xor;
+	if;jump+2;
+	jump->break;
+	{
+		#let zero=int(0x10000000);
+		#let temp=int(null);
+		print(i);
+		switch(0xmin,i);
+		#let val=int(null);
+		move->zero;or;
+		move->val;set;
+		command:{
+			move->int(0x1000000f);and;
+			move->temp;set;
+			switch(charSet.commands,temp);
+			move->terminal.output;set;
+		}
+		#let doEndl;
+		test_isPointer:{
+			move->val;get;if;//if(true)
+			move->int(0xf-1);and;
+			move->terminal.output;
+			if;jump->doEndl;//if val!= move||jump; then end there
+		}
+		sign:{
+			move->val;get;
+			if;null;
+			move->int(0x1000);and;
+			if;if:{#let then;//if is negative
+				#let mv->0xmin;$mv->move;
+				jump->then;
+				#def let else;
+					move->charSet.sign 0;
+					get;
+					move->charSet.sign 1;
+					jump->break;
+				#def then;
+					$move->mv;
+					move->charSet.sign 1;
+					get;
+			}
+			move->terminal.output;set;
+		}
+		//assert move->terminal.output;
+		#let j=int(null);
+		#let jEnd=int(0x10);
+		move->int(0x100);get;
+		move->j;set;
+		command_numbers:{
+			move->val;get;move->j;blue;
+			move->zero;or;
+			move->int(0x1000000f);and;
+			move->temp;set;
+			switch(charSet.numbers,temp);
+			move->terminal.output;set;
+			move->j;get;
+			move->jEnd;if;null;xor;
+			if;jump->2;jump->break;//if j==j1 then break;
+			xor;
+			move->int(0x10);
+			blue;
+			move->j;set;
+			jump->continue;
+			$move->jEnd;
+		}
+		delete j,jEnd;
+		move->terminal.output;
+		#def doEndl;{
+			#let endl={" ";#int(this);}
+			move->endl;get;move->terminal.output;
+			set;
+			//def let newLine{set;set;set;set;set;set;set;set;set;set;set;set;}//\n
+		}
+	}
+	increment(i);
+	move->i;set;
+	jump->continue;
+}$move->endOn;
+#let next;
+jump ->next;
+#def next;
+def int1.vals;
