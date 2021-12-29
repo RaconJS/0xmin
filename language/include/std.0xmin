@@ -25,7 +25,7 @@ if(!io){
 	#import lib "io.0xmin";
 };
 #let int(number)={
-	def number;
+	def let return=number;
 	#let self=this;
 	#set self{}
 	#set int.block{
