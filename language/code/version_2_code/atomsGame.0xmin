@@ -1,0 +1,50 @@
+#"!make file";
+#"!log.table";
+#"log.code";
+#{
+#import lib"std.0xmin";
+}
+...import.switch_function;
+let Pos(x)={
+	//#assert x instanceof number;
+	def {0x20000000}
+	def {0x20000000}
+	if(!x){}
+	else if(x<30){#set this[0]=>0x20000000|(1<<(+x));}
+	else if(x<32){#set this[1]=>0x20000000|(1<<(x-30));}
+	#{
+		let and(a,b){
+			move->a;get;
+			move->b;and;
+			move->this;set;
+			move+1;
+			move->a+1;get;
+			move->b+1;and;
+			move->this+1;set;
+		}
+		static let redFilt=int(0x20000000).return->0;
+		let isNot0(){
+			move->this 0;
+			get;if;null;
+			move->Pos.redFilt;
+			xor;
+		}
+	}
+}
+#let grid{#int(this);
+	0b100000000000000000000000000000;
+	0b100000000000000000000000000000;
+}
+let guess={//function(1){
+	#let rayPos=Pos(0);#int(rayPos);//next ray posision
+	#let rayDir=int(0x20000000);//ray direction
+	test_Pos:{
+		#let test=int(Pos(0)).return;
+		def test.and(rayPos,grid);
+		def test.isNot0();
+		//if (grid[rayPos] contains an atom)then reflect
+		move->rayDir;
+		if;
+
+	}
+}def guess;
