@@ -1,9 +1,7 @@
 #"!make file";
 #"!log.table";
 #"log.code";
-#{
 #import lib"std.0xmin";
-}
 ...import.switch_function;
 let Pos(x)={
 	//#assert x instanceof number;
@@ -22,6 +20,9 @@ let Pos(x)={
 			move->b+1;and;
 			move->this+1;set;
 		}
+		let: set(a){
+
+		}
 		static let redFilt=int(0x20000000).return->0;
 		let isNot0(){
 			move->this 0;
@@ -31,20 +32,112 @@ let Pos(x)={
 		}
 	}
 }
+let State()={{
+	#;
+	let moveP->0xmin;
+	let jumpP->0xmin;
+	def let this.set{
+		$jumpP->jump;
+		$moveP->move;
+	}
+	let this.get(){
+		//$jump->jumpP;
+		move->moveP;
+	}
+	set this.set(){};
+	if(!block){
+		#let set block = {};
+	}
+	#set return=>{
+		recur 2 #def let s=State();
+		...block();debugger s;
+		$def s.get();
+	}
+}}
+let int.redFilt()={
+	0x20000000;
+	#int(this);
+}
 #let grid{#int(this);
 	0b100000000000000000000000000000;
 	0b100000000000000000000000000000;
 }
 let guess={//function(1){
-	#let rayPos=Pos(0);#int(rayPos);//next ray posision
-	#let rayDir=int(0x20000000);//ray direction
-	test_Pos:{
-		#let test=int(Pos(0)).return;
-		def test.and(rayPos,grid);
-		def test.isNot0();
-		//if (grid[rayPos] contains an atom)then reflect
-		move->rayDir;
-		if;
+	let for_eachStep:{
+		$def let s=State();
+		#let rayPos=Pos(0);#int(rayPos);//next ray posision
+		#let rayDir=int.redFilt();//ray direction
+		#let neighbours=int.redFilt();
+		forI:{
+			#let i=int.redFilt();
+			$def let i.s=State();
+			forJ:{
+				let j=int.redFilt();
+				$def let j.s=State();
+				{
+					move->rayPos;get;
+					#let neighbour,int((neighbour=Pos(0)));
+					move->neighbours;
+					if;:{#let s=State();
 
+						jump->break;
+
+					}
+				}
+				def increment(j,j);
+				move->int();
+				xor;
+				def i.s.get();
+				if;jump->continue;
+			}
+			def increment(i,i);
+			move->int();
+			xor;
+			def i.s.get();
+			if;jump->continue;
+		}
+		test_Pos:{
+			#let test=int(Pos(0)).return;
+			test_infront:{
+				def test.and(rayPos,grid);
+				def test.isNot0();
+				//if (grid[rayPos] contains an atom)then reflect
+				if;:{
+					#let then,else;
+					$def let s=State();
+					jump->then;
+					#def else;{
+						jump->break;
+					}
+					$def s.get();
+					#def then;{
+						move->rayDir;
+						let{0b10;#int(this);}::{move->this;}
+						xor;
+						def s.get();
+					}#delete s;
+				}
+			}
+			testLeft:{
+				def test.and(rayPos,grid);
+				def test.isNot0();
+				//if (grid[rayPos] contains an atom)then reflect
+				if;:{
+					#let then,else;
+					$def let s=State();
+					jump->then;
+					#def else;{
+						jump->break;
+					}
+					$def s.get();
+					#def then;{
+						move->rayDir;
+						let{0b10;#int(this);}::{move->this;}
+						xor;
+						def s.get();
+					}#delete s;
+				}
+			}
+		}
 	}
 }def guess;

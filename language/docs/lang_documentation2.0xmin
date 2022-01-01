@@ -9,27 +9,33 @@ else if(){}
 else{}
 delete;
 import;
-static;
 debugger;
+static;
 recur;
-repeat(){}
+repeat;
+void;
 //weak scopeing keywords/symbols
 @;
 $;
 #;
-void;
-// not implemented special statements
-void;
-//assembly key words
+//assembly keywords
+//pointers/assembly keywords
 move;
 jump;
+//other assembly keywords
 nor;
 red;
 blue;
 get;
 set;
 if;
-
+and;
+xor;
+or;
+get jump;
+set jump;
+//other compter parts
+alu;
 //assignment
 =;
 =>;
@@ -45,23 +51,30 @@ if;
 ( == != > < >= <=);
 //1 or 2 argument operators
 ( + ); //(a+b) or cast to number 
-( ~ ); //(a nor b)
+( ~ ); //(a nor b) or bitewite not
+( ... ); //concatnate operator or destructuring operator {...a}
+//get property operators
+.  ;//'.' = get property 'b' of label 'a'
+.. ;//'..' = get the internal property
 
 //scopes
 //let scopes aka block scopes
 {} 
 //weak blocks
-${} #{} void{} if(){}
+@{} ${} #{} 
+void{} static{}
+if(){} else{} else if(){} repeat(){}
 //labeled blocks (with break and continue)
 a:{} 
 //weak blocks
-$a:{} #a:{} void a:{}
+@a:{} $a:{} #a:{} void a:{}
+if(){}
 //var scopes. aka object scope (with this and return)
 a{}
 //function types
 (){} ()={} ()=>{}
 //extension scopes
-::{} ::#{} ::${} ::void{}
+::{} ::@{} ::#{} ::${} ::void{}
 
 
 //keyword property names
@@ -76,7 +89,7 @@ continue;
 constructor;
 //property used in classes
 prototype;
-
+supertype;
 //inbuilt global objects
 0xmin;
 Number;
@@ -104,7 +117,7 @@ use; //e.g. use(x,y,0xmin){can only use the arguments}
 0xmin.Object;
 new;
 #{
-	instructions{//the block is also a label
+	instructions:{//the block is also a label
 		//create labels
 			#let myLabel;//create a label with unlabeled-block-scope 
 			#let myLabel;//over right the label with a new one at the same scope.
@@ -113,11 +126,11 @@ new;
 		//pointer control
 			move -1;//move the data pointer (the pointer is named "move") back 1 step
 			jump -> myLabel;//(i.e. "goto" in c++) move the jump pointer to the location of "myLabel"
-		//ALU operations. for operator `X(a,b)`, the CPU does `X(accumilator,*move)`
+		//ALU operations. for operator `X(a,b)`, the CPU does `accumilator = X(accumilator,*move) || accumilator;`
 			nor;//logical NOR
-			red;//variable_red_shift
+			red;//variable_red_shift(B) `accumilator <<= ((*move) & -(*move))`
 			blue;//variable_blue_shift(B)
-			get;//read to accumilator
+			get;//read value from the dataPointer to accumilator or in C++`accumilator = *move;`
 			//new commands
 			xor;
 			and;
@@ -139,7 +152,7 @@ new;
 	move->labelName;//move the data_pointer to labelName
 	jump->labelName;
 }
-scope_types{
+scope_types:{
 	@{} ${} #{} void{} if(1){}//weak scopes
 	{} a:{}//let scopes aka block scopes
 	let a{}//var scopes. objects
@@ -147,7 +160,7 @@ scope_types{
 	let a(){} let a()={} let a()=>{}//functions
 	a::{} a::#{} a::${} a::void{}//extension scope
 }
-function_calls{
+function_calls:{
 	//e.g. with foo
 	let foo(){
 		;
@@ -160,7 +173,7 @@ function_calls{
 	foo(){}
 }
 
-aBlockLabel{//blocks can be labeled like this
+aBlockLabel:{//blocks can be labeled like this
 	123 def let a;//can also chains meta keywords like this.
 	move->a;
 };
@@ -227,15 +240,79 @@ non_bracket_programming:{
 	//instead of block scope, use "delete;"
 	#let i;
 	0 def i;
-	#delete i;//"i" cannot be used beyond this point.
+	#delete i;//"i" cannot be used beyond this point*.
 }
-# let className() = {
-	constructor;
-	# var property;
+let className() = {
+	...constructor;
 } :: {
-	# var set prototype {
+	var set prototype {
+		...prototype;
 	}
-	# var set supertype {
+	var set supertype {
+		...supertype;
 	}
-	# var staticProperty;
+	...staticProperties;
 }
+about_import:{
+	#import "someCode.0xmin";
+	//is equivalent to
+	let...someCode;
+	
+	#import this "";//run file relative to this file.
+	#import main "";//run file relative to the first file being run aka 'main.0xmin'.
+	#import lib ""; //imports a library. Runs a file from the include folder.
+}
+recur_:{
+	#;
+	recur 1;//allows for self calling functions
+	#let wrong_recursiveFunction(i){
+		#debugger i;
+		wrong_recursiveFunction(i+1);//throws an Error: "Self calling functions are not allowed to prevent infinite recursion."
+	}
+	#let correct_recursiveFunction(i){
+		#debugger i;
+		recur 4 #correct_recursiveFunction(i+1);//ignores this line after 4 levels of recursion
+	}
+	correct_recursiveFunction(0);//will log: 0,1,2,3,4
+	#let i;
+	recur 4;//can use number.
+	recur label;//can use a label.
+	recur (i*2 + 1);//can use an expresion by useing brackets.
+	//same syntax for repeat
+	repeat 4;//can use number.
+	repeat label;//can use a label.
+	repeat (label*2 + 1);//can use an expresion by useing brackets.
+	#{delete i;}
+	//repeat and recur statements can be ended early e.g.
+	{
+		repeat 2;//this will run normally once and
+		let maxRepeat=10;
+		#let limitLoop(){
+			#debugger maxRepeat;
+			#set maxRepeat=2;
+		}
+		repeat maxRepeat # limitLoop();//will print: 10,2,2.
+	}
+}
+@ static void repeat 2 recur 2 @ jump +0 -> move -1 # def let set : a = 2 + null;
+
+@
+	static
+	void
+
+	repeat 2
+	recur 2
+@
+	jump +0 -> move -1
+#
+	def:
+		a = 2 ,
+		b = 3 ,
+		let:
+			letA,
+			letB,
+			set:
+				letSetC
+	let set:
+		letSetD
+;

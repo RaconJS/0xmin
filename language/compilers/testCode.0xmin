@@ -1,3 +1,4 @@
-
-#let int(){};
-#debugger int(()).return;
+#let foo(){
+	recur 1 foo();
+}
+#foo();

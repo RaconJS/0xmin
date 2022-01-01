@@ -329,7 +329,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						obj[key]=0;
 					})(obj);
 				}
-				intoVoidBlock(){
+				intoVoidBlock(){//'void{'
 					this.labels.jump=new Pointer({address:0,name:"jump"});
 					this.labels.move=new Pointer({address:0,name:"move"});
 					this.labels.alu=new Register({address:0,name:"alu",label:undefined});
@@ -344,7 +344,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						isDefaultLabel:true,
 						parent:this,
 						labels:{
-							...(oldLabel?.isDefaultLabel?oldLabel:{}),//this.labels,
+							...(oldLabel?.isDefaultLabel?oldLabel.labels:{}),//this.labels,
 							[this.name]:this,
 						},
 						scopes:{
@@ -412,16 +412,15 @@ const oxminCompiler=async function(inputFile,fileName){
 					return this;
 				}
 				getLet(){//i know that this is the opposite order to "findLabel". This is intentional.
-					if(this[Scope.searchScopeSymbol]){
-						throw Error("label:'"+this.name+"', compiler bug?");
-						return;
-					}
+					if(Object.isFrozen(this)){return objectsScope;}//frozen objects can't be unfrozen
+					if(this[Scope.searchScopeSymbol]){throw Error("label:'"+this.name+"', compiler bug?");return;}
 					else this[Scope.searchScopeSymbol]=true;
 					let scope=this.scopes.let??this.scopes.code?.getLet?.()??this.scopes.parent?.getLet?.()??this.parent?.getLet?.();
 					delete this[Scope.searchScopeSymbol];
 					return scope;
 				}
 				getVar(){
+					if(Object.isFrozen(this)){return objectsScope;}//frozen objects can't be unfrozen
 					if(this[Scope.searchScopeSymbol]){throw Error("label:'"+this.name+"', compiler bug?");return;}
 					else this[Scope.searchScopeSymbol]=true;
 					let scope=this.scopes.var??this.scopes.code?.getVar?.()??this.scopes.parent?.getVar?.()??this.parent?.getVar?.();
@@ -1363,7 +1362,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(!block)break;//'(' for non-function bracket scope
 								let index=words[i].index;
 								let i1=i;
-								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,codeObj,makeVars,wasDeclared}));
+								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
 								for(;i<words.length;i++){//adjust words.i
 									if(!words[i+1]||words[i+1]?.index>=index)break;
 								}
@@ -1396,6 +1395,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					//insert code for string parsing
 				};
 				class BracketValue{
+					scope;
 					constructor(data={}){Object.assign(this,data)}
 					removeLabel(){
 						delete this.block;
@@ -1461,6 +1461,17 @@ const oxminCompiler=async function(inputFile,fileName){
 					bool;
 					block;
 				};
+				class UndefinedBracketValue extends BracketValue{
+					scope;
+					constructor(data={}){
+						super({
+							type:"label",
+							label:labelNull,
+							bool:false,
+							number:undefined,
+						...data});
+					}
+				}
 				const evalBrackets=async function insidersEvalBrackets(context,{brackets=0,argsList=[],i=0}={}){//words[i-1] == "("
 					i++;
 					let pointerOperators=["->", "<->", "<=>", "<-", "=>", "<=", "=", "==","===", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
@@ -1478,7 +1489,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					//words.i++;
 					var lineStr=words.map(v=>v[0]).join(" ");//lineStr isfor testing only
 					if(0)loga(words.str,"||",words.i);
-					let processLabelCases=async(word,lastLabel)=>{
+					const processLabelCases=async(word,lastLabel)=>{
 						let {label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({
 							codeObj:context.codeObj,scope:context.scope,words:context.words,
 						lastLabel,pointerOperators,makeVars:0});
@@ -1520,6 +1531,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							//done before the opperator:'+-*/' part so 
 							//can do '1'
 							let arg=args[args.length-1];
+							if(!(arg instanceof BracketValue)){
+								arg=new UndefinedBracketValue({scope});
+							}
 							arg.toLabel(codeObj);
 							let word=words[++words.i]?.[0];
 							if(word&&!word.match(/[#]/)){
@@ -1843,10 +1857,10 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 						else{
 							if(word=="null"){
-								args.push(new BracketValue({bool:false,label:labelNull,type:"label"},{brackets,argsList,i}));
+								args.push(new BracketValue({scope,bool:false,label:labelNull,type:"label"},{brackets,argsList,i}));
 							}
 							else if(word=="undefined"){
-								args.push(new BracketValue({bool:false,label:labelUndefined,type:"label"},{brackets,argsList,i}));
+								args.push(new BracketValue({scope,bool:false,label:labelUndefined,type:"label"},{brackets,argsList,i}));
 							}
 							else{found=false;}
 							if(found){words.i++;continue;}
@@ -1893,8 +1907,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				let labelTrue =new NumberObj({bool:true ,parent:"temp"},{sourceLineNumber:"NA"},1,"{true}" );
 				let labelFalse=new NumberObj({bool:false,parent:"temp"},{sourceLineNumber:"NA"},0,"{false}");
-				let labelNull=new Scope({name:"{null}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
 				let labelUndefined=new Scope({name:"{undefined}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
+				let labelNull=new Scope({name:"{null}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
+				labelNull.arrayLabels=[new CodeObj({command:{number:0}},labelNull,"null;")];
+				labelNull.code=[...labelNull.arrayLabels];
+				if(EndBracket)labelNull.code.push(new EndBracket(labelNull));
+				for(let i of [labelTrue,labelFalse,labelUndefined,labelNull])Object.freeze(i);
 			//---
 			//other stuff that works
 				const getWordsLength=words=>[...words].splice(0,words.i).map(v=>v[0]).join(" ").length;
@@ -2149,10 +2167,10 @@ const oxminCompiler=async function(inputFile,fileName){
 									newLabel.sourceLineNumber=codeObj.sourceLineNumber;
 									//block1.labels[name]=newLabel;
 									label=newLabel;
-									block=block1;
 									wasDeclared=true;
 									createdNewLabel=true;
 								}else createdNewLabel=false;
+								block=block1;
 								//create declares a new label.
 								if(createdNewLabel){//'set var a;' ==> js'this.a??={};' 'var a' ==> js'this.a={};'
 									(isArrayItem?block.arrayLabels:block.labels)[name]=label;
@@ -2204,7 +2222,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//----
 			function parsePhaseNumber({lineStr,codeScope}){
 				let symbol=lineStr.match(/(?<=^\s*(::)?)([#$@]|\bvoid\b)/)?.[0]??"";//
-				let phaseLevel=(symbol=="#"?1 :symbol=="$"?2 :symbol=="@"?3 :symbol=="void"?3 :codeScope?.phaseLevel??3);
+				let phaseLevel=(symbol=="#"?1 :symbol=="$"?2 :symbol=="@"?3 :/*symbol=="void"?3 :*/codeScope?.phaseLevel??3);
 				return phaseLevel;
 			}
 			//a function of code spaghetti
@@ -2247,7 +2265,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(match=lineStr.match(/(\([\s\S]*\)\s)?(=>|=)?\s*{/)) {// any block. matches: up to '::#a:()=>{}'
 						//from '{}' to '#a:()={}' . /#? label? :? (...args)? {}/
 						isBlock=true;
-						isWeakScope=!(hasLetScope=!(lineStr.match(/(([#$@]|void|static)\s*)+{/)));//'#{' 'lbl:#{' '::' doesnt have let scope
+						isWeakScope=!(hasLetScope=!(lineStr.match(/(([#$@]|void|static)\s*)+(?:::?)?\s*{/)));//'#{' 'lbl:#{' '::' doesnt have let scope
 						//encludes 'var a #(){'
 						if(lineStr.match(/::/)){//up to 'var a::{'
 							// can also do '{}::{}' or '{}::a{}'
@@ -2294,7 +2312,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					for(;i<words.length;i++){
 						let thisIsName=false;
 						let word=words[i][0];
-						if(!lbl&&word.match(/\b(let|var|set|def|void|static)\b/)){// /(def)?(let|var|set)/
+						if(word!=":"&&!lbl&&word.match(/\b(let|var|set|def|void|static)\b/)){// /(def)?(let|var|set)/
 							if(word=="def"){
 								hasDef=true;
 								isVarScope=true;
@@ -2309,12 +2327,14 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(["set"].includes(word))varType1=word;
 								isVarScope=true;
 							}
-						}else {//newer parser
+						}
+						else if(word.match(/[@$#]/)){}//ignore phase level symbols
+						else {//newer parser
 							//words.i=i;
 							words.i=i;let name;
 							let asd=lbl;
 							let createdNewLabel;//type: '{}'
-							({label:lbl,block:lblBlock,name,refLevel,wasDeclared,createdNewLabel}=await parseMakeVariable({words,scope,codeObj,varType,varType1,isVoid,hasDef,doBrackets:false}));
+							({label:lbl,block:lblBlock,name,refLevel,wasDeclared,createdNewLabel}=await parseMakeVariable({words,scope,codeObj,varType,varType1,hasDef,doBrackets:false}));
 							if(varType1=="set"&&varType&&!createdNewLabel){//'#let a;#let set a{};' == '#let a;#set a{};' dont create new label_block
 								varType=false;
 							}
@@ -2630,13 +2650,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				}else{
 					delete codeScope.phaseLevel;
 				}
-				if(isFunction!==true&&isFunction){
+				if(isFunction!==true&&isFunction){//class
 					codeScope.isFunction=isFunction;//set function type 'foo=(){' or 'foo=>(){'
-					let constructorLabel=new Scope({});//adds inheritence object
+					let constructorLabel;
+					constructorLabel=new Scope({name:"prototype",isDefaultLabel:true});//adds inheritence object
 					constructorLabel.scopes.parent=codeScope;
 					codeScope.labels["prototype"]??=constructorLabel;
 					
-					constructorLabel=new Scope({});//allows for un overwritable objects object
+					constructorLabel=new Scope({name:"supertype",isDefaultLabel:true});//allows for un overwritable objects object
 					constructorLabel.scopes.parent=codeScope;
 					codeScope.labels["supertype"]??=constructorLabel;//TODO change this mechanic
 				}else codeScope.isFunction??=isFunction;
@@ -3026,9 +3047,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				});
 				//UNFINISHED
 				//const commandInterfaseObject=Scope.fromJavascriptJSON(JSON.stringify(commandRefference));
-				labelNull.arrayLabels=[new CodeObj({command:{number:0}},labelNull,"null;")];
-				labelNull.code=[...labelNull.arrayLabels];
-				if(EndBracket)labelNull.code.push(new EndBracket(labelNull));
 				const ifObject=new Scope.Function({name:"{if}",defaultFunction(){}});
 				const elseObject=new Scope.Function({name:"{else}",defaultFunction(){}});
 
@@ -3120,6 +3138,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			let scopeLevel=0;
 			callStack.push(new CallStackObj({scope,codeScope,sourceLineNumber,fileName,codeObj}));
 			let repeatNum=0;//'repeat n code;'
+			let phaseMap={"1":"#","2":"$","3":"@","#":"1","$":"2","@":"3"}
 			//functions
 				const setEndBlock=(scope,codeScope,codeObj)=>{
 					for(let i=0;i<2;i++){
@@ -3284,7 +3303,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let argsObj={words,scope,lineStr};
 						let index=0;
 						let addToNonMeta=false;
-						specifier_statements:{
+						specifier_statements:for(let i=0;i<4;i++){
 							if(words[words.i]?.[0]=="static"&&functionLevels[0]<=1){
 								//'(){ static let a; }' and '{static let a;}' is like '::{let a;}'
 								//static statements only runs in function scope and does not add code
@@ -3292,7 +3311,14 @@ const oxminCompiler=async function(inputFile,fileName){
 								isRunningCode=true;
 								words.i++;
 							}
-							if(words[words.i]?.[0]=="recur"){//sets recursion limit, allows for self function calls
+							else if(words[words.i]?.[0]=="void"){//doesn't generate code.
+								codeObj.isVoid=true;//e.g.'@void{}' or '#void ...;'
+								if(phaseLevel<=phaseMap["#"]){//'#void'
+									codeScope.code.pop().isDeleted=true;
+								}
+								words.i++;
+							}
+							else if(words[words.i]?.[0]=="recur"){//sets recursion limit, allows for self function calls
 								//e.g.'recur n foo();'
 								words.i++;
 								let val;
@@ -3318,7 +3344,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									break mainForLoop;
 								}
 							}
-							if(words[words.i]?.[0]=="repeat"&&words[words.length-1]?.[0]!="{"){
+							else if(words[words.i]?.[0]=="repeat"&&words[words.length-1]?.[0]!="{"){
 								//'repeat n code;'
 								//does NOT handle 'repeat n{...code;}'
 								words.i++;
@@ -3342,7 +3368,13 @@ const oxminCompiler=async function(inputFile,fileName){
 									throw Error(throwError(codeObj,", expected number argument after 'repeat'. e.g. try `repeat 10 foo();`"))
 								}
 								codeObj.isARepeat=true;//for '...block'; so it doesnt repeat the repeats
+								if((repeatNum|0)<=0){
+									repeatNum=0;
+									codeScope.code.pop();
+									break mainForLoop;
+								}
 							}
+							else break;
 						}if(!isRunningCode)break ifBlock;
 						if(words[words.length-1]?.[0]=="{")break ifBlock;
 						if(isBlock){break ifBlock;}
@@ -3699,13 +3731,16 @@ const oxminCompiler=async function(inputFile,fileName){
 								let hasDef=false;
 								let varType=false,varType1=false;
 								let setMode=false;
+								let doingDefTypes=true;
 								let oldArg;
 								{//if(isVarWord(words[words.i][0])){
 									//words.i++;//words[words.i]= a label;
 									//words.splice(words.i,1,...words[words.i][0].split(",").map(v=>v.match(/[\w\W]*/)));
+									varType1="set";//'#i=0;'  use  'set' default type;
 									for(let i=0;i<words.length&&words.i<words.length;i++){
 										if(words[words.i][0]==";")break;
-										if(isVarWord(words[words.i][0])){
+										if(isVarWord(words[words.i][0])&&doingDefTypes){
+											if(i==0)varType1=false;//'#let i=0;' ignore the default 'set'
 											switch(words[words.i][0]){
 												case"def":
 													hasDef=true;//Infinity;//2;
@@ -3727,9 +3762,12 @@ const oxminCompiler=async function(inputFile,fileName){
 											}
 											words.i++;
 											label=undefined;
-											continue;
 										}
-										{
+										else if(words[words.i]?.[0]==":"){//'let set : let;' ends
+											doingDefTypes=false;
+										}
+										else{
+											doingDefTypes=true;
 											if(!label){
 												({label}=await parseMakeVariable({words,codeObj,scope,varType,varType1,hasDef}));
 											}
@@ -3745,7 +3783,7 @@ const oxminCompiler=async function(inputFile,fileName){
 													}
 												}
 											}
-											if(words[words.i]?.[0]==","){
+											if(words[words.i]?.[0]==","){//'let a,b;'
 												oldArg=label;
 												label=undefined;
 												words.i++;
@@ -3854,9 +3892,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(parts[i+1]+""==";"){i++;}//'};' == '}' which counts as 1 line
 						scopeLevel--;
 					}
-					if(repeatNum>1){
+					if((repeatNum|0)>1){
 						repeatNum--;i--;continue;
-					}else if(repeatNum==1)repeatNum=0;
+					}else if((repeatNum|0)<=1)repeatNum=0;
 				}
 			}
 			if(i>=bail){

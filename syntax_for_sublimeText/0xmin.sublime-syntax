@@ -379,11 +379,11 @@ contexts:
       scope: variable.function #variable.parameter
       pop: true
       push: import_statement1
-    - match: ';}'
+    - match: '[;}]'
       pop: true
     - include: mainScope
   import_statement1:
-    - match: ';}'
+    - match: '[;}]'
       pop: true
     - include: mainScope
   deRefference:
