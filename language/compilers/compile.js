@@ -2,6 +2,7 @@
 //BODGED
 //UNFINISHED
 //NEEDSTESTING
+//TODO: remove index system from evalParamaters
 //TODO: remove the endBracket i.e. `code:["}"]` system.
 //TODO: add a parseKeywords();
 //TODO: allow for custom keywords
@@ -540,7 +541,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					let codeObj=Scope.currentCodeObj??this.sourceCodeObj;
 					if(this[Scope.searchAddressSymbol]){
 						//errorLog("Error: pottencial recursion.",Error());
-						throw new Error(throwError(
+						throw new Error(throwError(codeObj,
 							" , label:'"+this.name+"'$ references itself in deffinition. Can be caused by e.g.'#set A->B;#set B->A;'. Try adding: '1234 def "+this.name+";'"
 						));
 					}
@@ -761,10 +762,10 @@ const oxminCompiler=async function(inputFile,fileName){
 						let finds1=0;
 						for(let i=callStack.length-1;i>=0;i--){//prevent infinite loops
 							if((callStack[i].codeObj.callLineObj&&callStack[i].codeObj.callLineObj==this.codeObj.callLineObj)||callStack[i].codeObj==this.codeObj){
-								if(callStack[i].maxRecursion!=undefined){
-									finds1=finds;
-								}
 								finds++;
+							}
+							if(callStack[i].maxRecursion!=undefined&&callStack[i].maxRecursion>callStack[i].recursionLevel){
+								finds1=finds;
 							}
 							if(this.maxRecursion==undefined&&finds-finds1>=2){//doesn't work bellow '2'. Dont know why
 								console.warn(CallStackObj.listStr());
@@ -897,6 +898,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					words.str=words.map(v=>v[0]).join(" ");
 				}
 				const evalParamaters=async function({index,lineStr0,words,scope,label,codeObj,makeVars=true,wasDeclared,args,block,isFunctionCall,dontRun}){
+					//index system is OBSILETE
 					if(index==undefined){//called by 'words' system
 						//BODGED doesnt change 'words.i' or 'index' after parsing
 						lineStr=[...words].splice(words.i,words.length-words.i).map(v=>v[0]).join(" ");
@@ -915,9 +917,13 @@ const oxminCompiler=async function(inputFile,fileName){
 					);
 					if(functionType){//&&label.isFunction){//label?.parameters
 						let foo=label;
-						let words=[...lineStr.matchAll(wordsRegex)];
+						//let words;
+						if(0){
+							words=[...lineStr.matchAll(wordsRegex)];
+							stringstoStr(words,codeObj);
+							words.i=0;
+						}
 						//[...lineStr.matchAll(/(["'`])[\s\S]*?\1|,|;|\(|\)|<?[\-=]>?|[^()<>\-=,\s]+/g)].map(v=>v); //|(?<=\()|(?=\)|;)/); //old version
-						stringstoStr(words,codeObj);
 						let brackets=0,openedBrackets=false;
 						let word;
 						let index=0;
@@ -983,7 +989,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						label.isInstance=true;
 						let i=0;
 						if(!(block?.isFunctionCall&&!dontRun)){
-							for(words.i=0;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
+							for(;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
 								//if(words[words.i].index<index)continue;
 								let word=words[words.i][0];
 								if(word[0]=="("){brackets++;
@@ -1363,9 +1369,10 @@ const oxminCompiler=async function(inputFile,fileName){
 								let index=words[i].index;
 								let i1=i;
 								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
-								for(;i<words.length;i++){//adjust words.i
+								if(0)for(;i<words.length;i++){//adjust words.i; index system is OBSILETE
 									if(!words[i+1]||words[i+1]?.index>=index)break;
 								}
+								i=words.i-1;
 								//i=Math.max(i1,i);//use the new index next iteration
 								word=words[i+1]?.[0];
 								//thisIsName=false;
@@ -1608,6 +1615,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 								else if(operator.match(/^([+\-*/]|%|[&|\^~]|\*\*|>>>?|<<)$/)){
+									//loga(word,args.map(v=>(v.number||"")+" "+(v.type||v)))
 									arg0.toNumber();
 									arg1.toNumber();
 									ans=arg0;//new BracketValue({scope,label:arg0,block,type:"number"});
@@ -1674,17 +1682,19 @@ const oxminCompiler=async function(inputFile,fileName){
 											if(arg0.type=="label"){
 												let subAddress=0;
 												if(arg1.label){
-													arg0.label.codeObj=arg1.label;
+													arg0.label.codeObj=!arg1.bool?undefined:arg1.label;
 												}
-												arg0.label.relAddress=(arg1.number|0)-(arg0.number|0);
-												ans.number=0;
+												else{
+													arg0.label.relAddress=(arg1.number|0)-(arg0.number|0);
+													ans.number=0;
+												}
 											}
 											else{
 												if(arg1.type=="label"){
 													arg0.toLabel(codeObj);
-													arg0.label.codeObj=arg1.label;
-													arg0.label.relAddress=(arg1.number||0);
-													ans.number=0;
+													arg0.label.codeObj=!arg1.bool?undefined:arg1.label;
+													//arg0.label.relAddress=(arg1.number||0);
+													//ans.number=0;
 												}
 												else{
 													ans.number=arg1.number;
@@ -1787,6 +1797,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									if(ans.type=="bool"){
 										ans.toNumber();
 									}
+									else ans.toNumber();
 									let ints=[
 										(arg0.label?.relAddress??0)+(arg0.number||arg0.bool*(arg0.type=="bool")||0),
 									];
@@ -2186,6 +2197,10 @@ const oxminCompiler=async function(inputFile,fileName){
 								didParse=true;
 							}
 						}
+					}else{//'#set ( );' e.g. '#set (a->b)->2'
+						//NEEDSTESTING might conflict with the 'parseLabelOrNumber' bit a few lines down
+						let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
+						({label}=ret);
 					}{
 						//({label,didParse}=await parseSetStatement({words,codeObj,scope,label,block,name}));
 						if(!didParse){//doesnt use an '=' OBSILETE replaced by
@@ -3307,14 +3322,15 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(words[words.i]?.[0]=="static"&&functionLevels[0]<=1){
 								//'(){ static let a; }' and '{static let a;}' is like '::{let a;}'
 								//static statements only runs in function scope and does not add code
-								codeScope.code.pop().isDeleted=true;//remove this codeObj
+								if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;//remove this codeObj
 								isRunningCode=true;
 								words.i++;
 							}
+							else if(!isRunningCode)break ifBlock;
 							else if(words[words.i]?.[0]=="void"){//doesn't generate code.
 								codeObj.isVoid=true;//e.g.'@void{}' or '#void ...;'
 								if(phaseLevel<=phaseMap["#"]){//'#void'
-									codeScope.code.pop().isDeleted=true;
+									if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;
 								}
 								words.i++;
 							}
@@ -3348,10 +3364,11 @@ const oxminCompiler=async function(inputFile,fileName){
 								//'repeat n code;'
 								//does NOT handle 'repeat n{...code;}'
 								words.i++;
-								let val;
+								let val,wasDeclared;
 								if(words[words.i]=="(")({label:val}=await evalBrackets({words,codeObj,scope,evalFoo:false}));
-								({label:val}=await parseLabelOrNumber({words,codeObj,scope,evalFoo:false}));
+								else ({label:val,wasDeclared}=await parseLabelOrNumber({words,codeObj,scope:codeScope,makeVars:false}));
 								if(val instanceof Scope)val=val.relAddress;
+								else{val = +val;}
 								if(val*0!=0)val=0;//handle infinity
 								if(!isNaN(+val)){
 									if(val*0!=0)val=0;//handle infinity
@@ -3370,7 +3387,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								codeObj.isARepeat=true;//for '...block'; so it doesnt repeat the repeats
 								if((repeatNum|0)<=0){
 									repeatNum=0;
-									codeScope.code.pop();
+									if(!codeObj.isDeleted)codeScope.code.pop();
 									break mainForLoop;
 								}
 							}
@@ -3765,6 +3782,7 @@ const oxminCompiler=async function(inputFile,fileName){
 										}
 										else if(words[words.i]?.[0]==":"){//'let set : let;' ends
 											doingDefTypes=false;
+											words.i++;
 										}
 										else{
 											doingDefTypes=true;
@@ -3772,7 +3790,7 @@ const oxminCompiler=async function(inputFile,fileName){
 												({label}=await parseMakeVariable({words,codeObj,scope,varType,varType1,hasDef}));
 											}
 											if(label){
-												if(label?.isBlock){
+												if(label?.isBlock&&!useBlock){
 													//label.parent=scope;
 													let newScope=label;
 													newScope.isMeta=false;
@@ -4101,6 +4119,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						  toCodeObj.computerState.move!=codeObj.computerState.move
 						//||toCodeObj.state.jump!=codeObj.state.jump
 					){
+						loga(codeObj.computerState.move,toCodeObj.computerState.move)
 						//throw Error(
 						console.warn(throwError(codeObj,
 							" @: "
@@ -4211,8 +4230,9 @@ else{
 		return [inputFile,fileName];
 	})();
 	let fileWriter=()=>new Promise((resolve,reject)=>{//minFilt.lua or a.filt
-		if(!buildSettings.makeFile){resolve("no file");return;}
-		let newFileName=process.argv[3]??"minFilt.lua";//??"a.filt"??"minFilt.lua";
+		let newFileName=process.argv[3];
+		if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
+		newFileName??="minFilt.lua";//??"a.filt"??"minFilt.lua";
 		let fileType=newFileName.match(/(?<=\.)[^.]*$/)?.[0]??"filt";
 		let content=outputFile;
 		if(fileType=="lua"){

@@ -1,0 +1,250 @@
+#"make file";
+#"!log.table";
+#"log.code";
+#import lib "std.0xmin";
+//uses 'std.int(x)' (a function that adds variable integers (or blocks) to an array or memory)
+//uses 'std.io and std.io.terminal',
+#let not(){
+	#let temp;
+	move->temp;
+	set;nor;
+	jump+2;
+	null def temp;
+}
+void{{
+	def let a = 0b11110000;
+	def let b = 0b11001100;
+	def let c = 0b10101010;
+	#let d = ~(a &c) &b | (~a ~ b);//(a & ~b)
+	#let d = a &c ~ ~b | (a & ~b);
+	//110
+}}
+let doStep={
+	#let a,b,c;
+	#let int;
+	#let set int(val)={
+		def val;
+		#let val1=+val;
+		#let self=this;
+		set constructor.block{
+			def self;
+		}
+		set constructor.block1{
+			def val1;
+		}
+	}::{let block{};let block1{};}
+	#let isEnd;
+	let memory {
+		#let start;
+		0b10101010 def a;
+		#def start;
+		def int.block1;
+		0b11001100 def b;
+		def int.block;
+		0b11110000 def c;
+
+		0x3fffffff def isEnd;
+	}
+	void{
+		def memory;
+	}$jump=>0;
+	#let const_red=int(0x20000000);//is also used as 'isEnd'
+	#let const_2=int(2);
+	#let const_white=int(0x3fffffff);
+	#let bool1=int(0);
+	null;
+	$move->b;
+	move->const_2;get;
+	move->bool1;set;
+	@{
+		#let a1=int(0);
+		move->b;get;
+		move->const_2;red;
+		move->a1;set;
+		if(0){
+			move->a;get;
+			if;null;
+			move->const_red;red;
+			move->a1;
+			if;:{
+				jump+2;
+				jump->break;
+				or;set;
+			}#delete a;
+		}
+	}
+	@{
+		#let c1=int(0);
+		move->b;get;
+		move->const_2;blue;
+		move->c1;set;
+		if(0){
+			move->c;get;
+			if;null;
+			move->const_red;blue;
+			move->c1;
+			if;:{
+				jump+2;
+				jump->break;
+				or;set;
+			}
+		}
+	}
+	//assert move->c1;
+	#let temp=c1;
+	#delete c1;
+	#(){#set ~(a &c) &b | (~a ~ b);}
+	#(){#set ~(a &c) &b | (a & ~b);}
+	@{
+		@{
+			{if;null;}
+			move->a1;and;
+			#let finally;
+			catch:{//(a&c == 0) => (~(a&c)&b == b) ('=>' == implies)
+				if;jump->break;
+				move->b;get;
+				move->temp;set;
+				jump->finally;
+				$move->a1;
+			}
+			move->temp;set;nor;
+			catch:{//(~(a &c) == 0) => (ans == (a&~b))
+				if;jump->break;
+				move->const_white;get;
+				move->bool1;set;
+				move->temp;
+			}
+			move->b;and;
+			move->temp;set;
+		}
+		#def finally;
+		@{
+			move->a1;get;nor;
+			move->b;nor;
+			#let temp1=a1;#delete a1;
+			move->temp1;set;
+		}
+		move->bool1;get;{if;null;}nor;
+		move->temp1;
+		if;:{#let then,else;//if(~(a &c) != 0)... else(ans == (a&~b))
+			jump->then;
+			#def else;//ans = temp1;
+				get;
+				move->temp;
+			jump->break;
+			#def then;//ans = temp|temp1;
+				$move->temp1;get;
+				move->temp;or;
+		}
+	}
+	move->b;
+}::{
+	let struct(val){
+		if(val){
+			def val;
+		}else{
+			1;
+		}
+		...this.int.block1;
+	}
+	let startMemory(){
+		def this.endMemory();
+		#def let len=this.int.block1..length+1-this.endMemory()..length;
+		repeat len null;
+	}
+	let endMemory(){
+		1;
+		0x3fffffff;
+		0x0ffff000;
+	}
+};
+#let memory{
+	def doStep.startMemory();
+	def doStep.struct(0b000000000000000000000000000010);
+	//def doStep.struct(0b000000000000000000000000001000);
+	//def doStep.struct(0b000000000000000000000000000010);
+	//def doStep.struct(0b100000000000000000000000000001);
+	//def doStep.struct(0b100000000000000000000000000001);
+	def doStep.endMemory();
+	//debugger a[3];
+};
+#let startMV->memory[1] ,:
+	//set startMV->#(1+doStep.int.block1..length)*1
+;
+mainLoop:{
+	#let const_1=int(1);
+	#let const_2=int(2);
+	#let n=int(0);
+	move->int((1<<11));get;
+	move->n;set;
+	move->startMV;
+	#def let continue;null;
+	processAllMemory:{
+		forwards:{
+			$move->doStep.b;
+			def doStep;
+			move->doStep.temp;set;
+			move->doStep.isEnd;get;
+			if;null;nor;
+			move->doStep.b;
+			move doStep.a->doStep.b;//next value
+			$move->doStep.b;
+			if;jump->continue;//do while (ram[&doStep.isEnd] !=white;)
+		}
+		move doStep.b->doStep.a;
+		$move->doStep.b;
+		backwards:{
+			move->doStep.temp;get;
+			move->doStep.b;set;
+			move doStep.b->doStep.a;//last value
+			$move->doStep.b;
+			move->doStep.isEnd;get;
+			if;null;nor;
+			move->doStep.b;
+			if;
+			jump->continue;
+		}
+		repeat 2 move doStep.a->doStep.b;get;
+		repeat 3 move -0xff;
+		$move->0xmin;
+		//$move->startMV;
+	}
+	move->io.output1;set;
+	move->int(0x00010000);or;
+	move->int(0x0001ffff);and;
+	printLoop:{
+		#let oldAlu=int(0);
+		move->oldAlu;set;
+		#let temp=int(0);
+		move->temp;set;
+		#let mv->0xmin;$mv->move;
+		#def let continue;
+		@{
+			printChar:{
+				//assert alu = temp;
+				//assert aluIf=false;
+				move->const_1;and;
+				move->int(".#");
+				if;move 1;get;
+				move -0xff;
+				$move->0xmin;
+				//assert move->0xmin;
+				move->terminal.output;set;
+				move->temp;get;
+			}
+			move->const_2;blue;
+			move->temp;set;
+			if;//if true
+			move->const_2;blue;
+			move->temp;
+			if;jump->continue;
+		}
+		#def break;
+		move->oldAlu;get;
+	}
+	#delete temp;
+	move->n;
+	move->startMV;set;
+	jump->continue;
+}
+def memory;

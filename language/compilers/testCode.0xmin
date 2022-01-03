@@ -1,4 +1,1 @@
-#let foo(){
-	recur 1 foo();
-}
-#foo();
+#import this "../code/version_2_code/rule110.0xmin";

@@ -1,0 +1,208 @@
+#"make file";
+#"!log.table";
+#"log.code";
+#import lib "std.0xmin";
+#let not(){
+	#let temp;
+	move->temp;
+	set;nor;
+	jump+2;
+	null def temp;
+}
+void{{
+	def let a = 0b11110000;
+	def let b = 0b11001100;
+	def let c = 0b10101010;
+	#let d = ~(a &c) &b | (~a ~ b);//(a & ~b)
+	#let d = a &c ~ ~b | (a & ~b);
+	//110
+}}
+let doStep={
+	#let a,b,c;
+	#let int;
+	#let set int(val)={
+		def val;
+		#let val1=+val;
+		#let self=this;
+		set constructor.block{
+			def self;
+		}
+		set constructor.block1{
+			def val1;
+		}
+	}::{let block{};let block1{};}
+	let memory {
+		#let start;
+		0b10101010 def a;
+		#def start;
+		def int.block;
+		0b11001100 def b;
+		def int.block1;
+		0b11110000 def c;
+	}
+	void{
+		def memory;
+	}
+	#let const_red=int(0x20000000);
+	#let const_2=int(2);
+	#let const_white=int(0x2fffffff);
+	#let bool1=int(0);
+	null;
+	$move->b;
+	move->const_2;get;
+	move->bool1;set;
+	@{
+		#let a1=int(0);
+		move->b;get;
+		move->const_2;red;
+		move->a1;set;
+		if(0){
+			move->a;get;
+			if;null;
+			move->const_red;red;
+			move->a1;
+			if;:{
+				jump+2;
+				jump->break;
+				or;set;
+			}#delete a;
+		}
+	}
+	@{
+		#let c1=int(0);
+		move->b;get;
+		move->const_2;blue;
+		move->c1;set;
+		if(0){
+			move->c;get;
+			if;null;
+			move->const_red;blue;
+			move->c1;
+			if;:{
+				jump+2;
+				jump->break;
+				or;set;
+			}
+		}
+	}
+	//assert move->c1;
+	#let temp=c1;
+	#delete c1;
+	#(){#set ~(a &c) &b | (~a ~ b);}
+	#(){#set ~(a &c) &b | (a & ~b);}
+	@{
+		@{
+			{if;null;}
+			move->a1;and;
+			#let finally;
+			catch:{//(a&c == 0) => (~(a&c)&b == b) ('=>' == implies)
+				if;jump->break;
+				move->b;get;
+				move->temp;set;
+				jump->finally;
+				$move->a1;
+			}
+			move->temp;set;nor;
+			catch:{//(~(a &c) == 0) => (ans == (a&~b))
+				if;jump->break;
+				move->const_white;get;
+				move->bool1;set;
+				move->temp;
+			}
+			move->b;and;
+			move->temp;set;
+		}
+		#def finally;
+		@{
+			move->a1;get;nor;
+			move->b;nor;
+			#let temp1=a1;#delete a1;
+			move->temp1;set;
+		}
+		move->bool1;get;{if;null;}nor;
+		move->temp1;
+		if;:{#let then,else;//if(~(a &c) != 0)... else(ans == (a&~b))
+			jump->then;
+			#def else;//ans = temp1;
+				get;
+				move->temp;
+			jump->break;
+			#def then;//ans = temp|temp1;
+				$move->temp1;get;
+				move->temp;or;
+		}
+	}
+	move->b;
+}::{let struct(val){
+	if(val){
+		def val;
+	}else{
+		1;
+	}
+	...this.int.block1;
+	$jump=>0;
+}};
+#let memory{
+	def doStep.struct(0b010000000000000000000000000000);
+	def doStep.struct(0b000000000000000000000000100000);
+	def doStep.struct(0b000000000000000000000000000010);
+	def doStep.struct(0b100000000000000000000000000001);
+	def doStep.struct(0b100000000000000000000000000001);
+	//debugger a[3];
+};
+#let startMV->memory,:set startMV->#(1+doStep.int.block1..length)*1;
+#let n=int((1<<11));
+move->startMV;mainLoop:{
+	#def let start;
+	def doStep;
+	$move->startMV;
+	//set;
+	move->io.output1;set;
+	move->int(0x00010000);or;
+	move->int(0x0001ffff);and;
+	printLoop:{
+		#let oldAlu=int(0);
+		move->oldAlu;set;
+		#let temp=int(0);
+		#let const_1=int(1);
+		#let const_2=int(2);
+		#let mv->0xmin;$mv->move;
+
+		#def let continue;
+		move->temp;set;
+		if;null;
+		move->const_2;blue;
+		if;jump+2;jump->break;//ends loop when out of ints
+		move->temp;get;
+		printChar:{
+			//assert alu = temp;
+			if;null;
+			move->const_1;and;
+			if;:{#let then,mvEnd->terminal.output,mv->0xmin;
+				$mv->move;
+				jump->then;
+				#def let else;
+					move->int(".");get;
+					move->mvEnd;
+					jump->break;
+				#def then;
+					$move->mv;
+					move->int("#");get;
+					move->mvEnd;
+			}
+			set;
+		}
+		move->temp;get;
+		move->const_2;blue;
+		move->mv;
+		jump->continue;
+		$move->const_2;
+		#def break;
+		move->oldAlu;get;
+	}
+	#delete temp;
+	move->n;
+	move->startMV;set;
+	jump->start;
+}
+#int(memory);
