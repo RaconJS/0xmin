@@ -328,7 +328,8 @@ int main(int argc, char const *argv[]){
 	{
 		std::ifstream inputFile(fileName, std::ios::binary );
 		std::vector<char> buffer(std::istreambuf_iterator<char>(inputFile), {});
-		ram=new filt30[buffer.size()];
+		ramLen=(int)buffer.size()/4;
+		ram=new filt30[ramLen];
 		for(int i=3;i<buffer.size();i+=4){
 			int n=(int)(i/4);
 			u32 val=0;
@@ -339,7 +340,6 @@ int main(int argc, char const *argv[]){
 			ram[n]=val;
 			//cout<<(void*)(long)ram[n]<<" ";
 		}
-		ramLen=(int)buffer.size()/4;
 		buffer.clear();//free memory "hopefully"
 	}
 	{

@@ -294,25 +294,75 @@ recur_:{
 		repeat maxRepeat # limitLoop();//will print: 10,2,2.
 	}
 }
-@ static void repeat 2 recur 2 @ jump +0 -> move -1 # def let set : a = 2 + null;
+structure_of_a_line_of_code:{
+	@ static void repeat 2 recur 2 @ jump +0 -> move -1 # def let set : a = 2 + null;
+	@
+		static
+		void
 
-@
-	static
-	void
-
-	repeat 2
-	recur 2
-@
-	jump +0 -> move -1
-#
-	def:
-		a = 2 ,
-		b = 3 ,
-		let:
-			letA,
-			letB,
-			set:
-				letSetC
-	let set:
-		letSetD
-;
+		repeat 2
+		recur 2
+	@
+		jump +0 -> move -1
+	#
+		def:
+			a = 2 ,
+			b = 3 ,
+			let:
+				letA,
+				letB,
+				set:
+					letSetC
+		let set:
+			letSetD
+	;
+}
+structures_and_uses:{
+	about_void:{
+		//void{} is useful for datatype casting
+		//e.g. in C++
+		`
+			struct StructA{
+				int a;
+				int b;
+			}
+			struct StructB{
+				int a;
+				int b;
+				int c;
+			}
+			int main(){
+				StructA original=new AA();
+				StructB &casted=(StructB*)&original;
+				return 0;
+			}
+		`
+		//translates to:
+		{
+			#let StructA(){
+				null def let a;
+				null def let b;
+			}
+			#let StructB(){
+				null def let a;
+				null def let b;
+				null def let c;
+			}
+			#def let main(){
+				void{
+					def let original=StructA=();
+				}
+				void{
+					def let casted=StructB=();
+				}
+				def original();
+			}
+		}
+	}
+	:{
+		let{}//unnamed object. has its own 'this' and 'return' properties.
+		let{...code;#this;#return;}"is just like:"let object{...code;}
+		:{...code;#continue;#break;}//unnamed labeled block
+		@;if;null;//clears the if flag, setting it to 0.
+	}
+}
