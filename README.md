@@ -56,17 +56,38 @@ use 0xmin instruction set.
 move+4;
 and;
 or;
+if;null;
 jump-3;
 ```
+each of these lines of code can be translated indepently, directly into machine code.
+The 0xmin compiler has sertain debugging support with the 'jump' and 'move' commands that wont be picked up if they are typed as numbers.
+
 ### level2 assembly-ish
-0xmin has very high level macros support.
-like in C++, `#` is used for macros.
-unlike C++, macros can be on the same line.
-using the assembly part of 0xmin, we can use **labels**.
+Macro code is represented by `#`, hidden aka context code by `$` and assembly by `@`.
+This level/paradime is for people who are missing the '{' or '}' keys on there keyboard.
+0xmin has very high level macros support. e.g. object orintated macros.
+Like in C++, `#` is used for macros.
+Unlike C++, macros can be on the same line.
+Using the assembly part of 0xmin, we can use **labels**.
 ```
 //labels can be created with 'let' or 'var', defined with 'def'
+//labels can be used in the assembly language with the '->' arrow (called 'to')
 # let label;
 null;
-456 # def label;
-jump->label;
+xor # def label;//
+jump -> label;//jump -1;
 ```
+The code above will infinitly "jump to label".
+
+Access to labels can be removed with `delete`
+e.g.`#let label;#def label;#delete label;`
+`delete` deletes only prevents code past that point from accessing that label, the label still technically exists. (just like local scopes)
+`delete` can be used instead of local scopes.
+### level3 oop
+in 0xmin all labels can be used as a function, array, label, code block and object all at the same time.
+#### functions:
+All macro functions hault.
+To achieve this the compiler bans unbounded recursion and doesnt use for/while loops.
+instead recursion and iteration must specify the maximum amount when first called.
+`recur (n) foo();` `repeat (n) foo();`
+with `recur`, it wont throw an error if you try to go over the bounds but will just not run.
