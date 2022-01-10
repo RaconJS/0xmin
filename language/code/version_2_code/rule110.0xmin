@@ -1,6 +1,6 @@
 #"make file";
 #"!log.table";
-#"log.code";
+#"!log.code";
 #import lib "std.0xmin";
 //uses 'std.int(x)' (a function that adds variable integers (or blocks) to an array or memory)
 //uses 'std.io and std.io.terminal',
@@ -171,11 +171,29 @@ let doStep={
 #let startMV->memory[1] ,:
 	//set startMV->#(1+doStep.int.block1..length)*1
 ;
+
+#let print(str){
+	#let i=0;
+	#let printChar(){
+		#set i->str;
+		move->i;get;
+		move->terminal.output;set;
+		#set i=i+1;
+	}
+	repeat str..length def printChar();
+}
+{
+	let str="rule110:";
+	#set str{def String.pos(0,1);}
+	#int(str);
+	def print(str);
+}
+#let max=#(1<<(11-1));
 mainLoop:{
 	#let const_1=int(1);
 	#let const_2=int(2);
 	#let n=int(0);
-	move->int((1<<11));get;
+	move->int(max);get;
 	move->n;set;
 	move->startMV;
 	#def let continue;null;
@@ -210,20 +228,19 @@ mainLoop:{
 		//$move->startMV;
 	}
 	move->io.output1;set;
-	move->int(0x00010000);or;
-	move->int(0x0001ffff);and;
 	printLoop:{
 		#let oldAlu=int(0);
 		move->oldAlu;set;
 		#let temp=int(0);
-		move->temp;set;
+		move->int(0x00008000);get;
+		move->temp;set;if;//if true;
 		#let mv->0xmin;$mv->move;
 		#def let continue;
 		@{
 			printChar:{
 				//assert alu = temp;
 				//assert aluIf=false;
-				move->const_1;and;
+				move->oldAlu;and;
 				move->int(".#");
 				if;move 1;get;
 				move -0xff;
@@ -232,19 +249,38 @@ mainLoop:{
 				move->terminal.output;set;
 				move->temp;get;
 			}
-			move->const_2;blue;
-			move->temp;set;
 			if;//if true
 			move->const_2;blue;
-			move->temp;
+			move->temp;set;
 			if;jump->continue;
 		}
 		#def break;
 		move->oldAlu;get;
 	}
 	#delete temp;
-	move->n;
-	move->startMV;set;
-	jump->continue;
+	move->n;get;
+	move->const_2;
+	if;null;blue;
+	move->n;set;
+	move->startMV;
+	if;jump->continue;
+}
+{
+	let a{def String.pos(12,0);}
+	#int(a);
+	def print(a);
+	#let str="done";
+	#int(str);
+	print:{
+		#let i=0;
+		#let printChar(){
+			#set i->str;
+			move->i;get;
+			move->terminal.output;set;
+			#set i=i+1;
+		}
+		repeat str..length def printChar();
+	}
+	jump 0;
 }
 def memory;

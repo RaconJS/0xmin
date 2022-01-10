@@ -34,6 +34,37 @@ if(!io){
 }::{
 	def let block{};
 };
+#let const(number)={
+	#let i=0;
+	#let data=const.block;
+	#let copy;
+	repeat (data..length){
+		if((+data[i])==(+number)){
+			#set copy=data[i];
+			#set break->-1;
+		}
+		else{
+			#set i=i+1;
+		}
+	}
+	if(+i == +data..length){
+		def let return=number;
+		#let self=this;
+		#set self{}
+		#set const.block{
+			def self;
+		}
+	}else{
+		def let return=number;
+		#let self=this;
+		#set self{}
+		#set const.block{
+			def self;
+		}
+	}
+}::{
+	def let block{};
+};
 if(main){def main;}
 #let function(inLen,outLen)={
 	//#assert block;
@@ -178,8 +209,8 @@ if(main){def main;}
 			//assert( +compile(`move 0;`)==0)
 			jump+3;
 			#let indexTo,indexFrom;
-			0x0010#def let shift;//move 1;
-			0x1000 #def let negative;//move -0;
+			0 1#def let shift;//0 1;
+			0 -0#def let negative;//0 -0;
 			;
 			if(index!=alu&&index){move->index;get;}
 			move->shift;red;
