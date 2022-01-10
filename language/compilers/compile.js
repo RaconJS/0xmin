@@ -6,6 +6,7 @@
 //TODO: remove the endBracket i.e. `code:["}"]` system.
 //TODO: add a parseKeywords();
 //TODO: allow for custom keywords
+//BUG: 'let foo{repeat 3 null;};foo();'
 const errorMsg="\x1b[31m"+" 0xmin-ERROR ::"+"\x1b[0m ";
 function errorLog(...args){console.log(...args);};
 function loga(...args){console.log(...args);};
@@ -992,7 +993,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							for(;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
 								//if(words[words.i].index<index)continue;
 								let word=words[words.i][0];
-								if(word[0]=="("){brackets++;
+								if(word[word.length-1]=="("){brackets++;//allow for words: '= (' and '=> ('
 									openedBrackets=true;
 									if(brackets>1){
 										let {label}=await evalBrackets({lineStr,scope,codeObj,words});
@@ -1151,7 +1152,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					let wasDeclared=true,isDeclared=true,refLevel=0,arrayCodeObj;
 					if(startLabel)block=scope;
 					{
-						let words=[...lineStr.matchAll(/(["`'])[\s\S]*?\1|[,;]|[\w_]+|\.+|(?:=>?)\s*\(|(?:<?[\-=]>?)|\(|\[|\]|[\S]/g)];
+						let words=[...lineStr.matchAll(/(["`'])[\s\S]*?\1|[,;]|[\w_]+|\.+|(?:=>?)\s*\(|(?:<?[\-=]>?)|\(|\[|\]|>>>?|<<|[&|^*]{2}|[\S]/g)];
 						stringstoStr(words,codeObj);
 						let i=0;
 						let thisIsName=false;//stops parsing 'label label'. if true => dont accept any more symbols.
@@ -1394,6 +1395,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							index=0;
 						}
 					}
+					if(label){label.wasDeclared=wasDeclared;}
 					return {index,label,block,name,lblName,wasDeclared,refLevel,arrayCodeObj};
 				};
 			//---
@@ -1482,8 +1484,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				const evalBrackets=async function insidersEvalBrackets(context,{brackets=0,argsList=[],i=0}={}){//words[i-1] == "("
 					i++;
 					let pointerOperators=["->", "<->", "<=>", "<-", "=>", "<=", "=", "==","===", "!=", "||", "&&", "^^", ">", "<", ">=", "<="];
-					let operatorRegex= /^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|[#$@])$/;
-					let operatorRegex1=/^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|[#$@])$|^[+-](?=[0-9]?)/;
+					let operatorRegex= /^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|[#$@]|<<|>>>?)$/;
+					let operatorRegex1=/^[><!]=?$|(<?[\-=]{1,2}>?|\|\|?|=?=?=|&&?|\^\^?|nor|[+\-*/]|[\%]|[&|\^~]|\*\*|[#$@]|<<|>>>?)$|^[+-](?=[0-9]?)/;
 					let name,block;
 					let {words,scope,codeObj,label,args}=context;
 					brackets??=0;
@@ -1495,7 +1497,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					brackets++;
 					//words.i++;
 					var lineStr=words.map(v=>v[0]).join(" ");//lineStr isfor testing only
-					if(0)loga(words.str,"||",words.i);
+					if(0)loga(words.str,"||",words.i,"??",brackets);
 					const processLabelCases=async(word,lastLabel)=>{
 						let {label,wasDeclared,block,arrayCodeObj,didParse,name,refLevel}=await parseLabelOrNumber({
 							codeObj:context.codeObj,scope:context.scope,words:context.words,
@@ -1558,10 +1560,13 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							let arg0=args[args.length-3],arg1=args[args.length-1],ans;
 							let operator=args[args.length-2];
+							let undefinedTest=arg=>{if(arg.label&&arg.wasDeclared===false)arg.label=labelUndefined;return arg;}
+							undefinedTest(arg1);
 							//'a + = b' or 'a &-> b' doesnt return a new Label.
 							if(args.length>=3&&(args[args.length-3] instanceof BracketValue)){//'lbl && lbl' label operator label
 								//errors here be be due to syntax errors like 'a || ||' instead of 'a || b'
 								if(operator.match(/^(&&|\^\^|\|\|)$/)){
+									undefinedTest(arg0);
 									if(operator=="&&")ans=arg0.bool?arg1:arg0;
 									else if(operator=="||")ans=arg0.bool?arg0:arg1;
 									else if(operator=="^^")ans=!arg0.bool?arg1:!arg1.bool?arg0:new BracketValue({scope,label:labelFalse,bool:false,type:"label"});
@@ -1573,6 +1578,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 								else if(operator.match(/^([!=><]=|===|[><])$/)){//'a == b'
+									undefinedTest(arg0);
 									ans=new BracketValue({scope});
 									ans.toBool();
 									let operators={
@@ -1615,7 +1621,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 								else if(operator.match(/^([+\-*/]|%|[&|\^~]|\*\*|>>>?|<<)$/)){
-									//loga(word,args.map(v=>(v.number||"")+" "+(v.type||v)))
+									undefinedTest(arg0);
 									arg0.toNumber();
 									arg1.toNumber();
 									ans=arg0;//new BracketValue({scope,label:arg0,block,type:"number"});
@@ -1923,7 +1929,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				labelNull.arrayLabels=[new CodeObj({command:{number:0}},labelNull,"null;")];
 				labelNull.code=[...labelNull.arrayLabels];
 				if(EndBracket)labelNull.code.push(new EndBracket(labelNull));
-				for(let i of [labelTrue,labelFalse,labelUndefined,labelNull])Object.freeze(i);
+				for(let i of [labelTrue,labelFalse,labelUndefined,labelNull]){
+					for(let j in i)if(i.hasOwnProperty(j)&&typeof i[j]=="object")Object.freeze(i[j]);
+					Object.freeze(i);
+				}
 			//---
 			//other stuff that works
 				const getWordsLength=words=>[...words].splice(0,words.i).map(v=>v[0]).join(" ").length;
@@ -2269,7 +2278,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						phaseLevel=2;
 						words.i++;
 					}else phaseLevel=3;
-					if(match=lineStr.match(/(?<=[\w_"]+\s*)(=>|<=|=|->|<-)(?=\s*[\s\S]*?(\([\w\W]*\))?\s*{)/)){//'label=>{'
+					if(match=lineStr.match(/(?<=[\w_"\]]+\s*)(=>|<=|=|->|<-)(?=\s*[\s\S]*?(\([\w\W]*\))?\s*{)/)){//'label=>{'
 						equalsSign=match[0];//'=>' or '<=' ('a = b.ref' or 'a = b.val')
 						command="set";
 					}
@@ -3318,89 +3327,96 @@ const oxminCompiler=async function(inputFile,fileName){
 						let argsObj={words,scope,lineStr};
 						let index=0;
 						let addToNonMeta=false;
-						specifier_statements:for(let i=0;i<4;i++){
-							if(words[words.i]?.[0]=="static"&&functionLevels[0]<=1){
-								//'(){ static let a; }' and '{static let a;}' is like '::{let a;}'
-								//static statements only runs in function scope and does not add code
-								if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;//remove this codeObj
-								isRunningCode=true;
-								words.i++;
-							}
-							else if(!isRunningCode)break ifBlock;
-							else if(words[words.i]?.[0]=="void"){//doesn't generate code.
-								codeObj.isVoid=true;//e.g.'@void{}' or '#void ...;'
-								if(phaseLevel<=phaseMap["#"]){//'#void'
-									if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;
+						line_specifiers:{
+							//can apply to any line of code
+							for(let i=0;i<2;i++){//'static void'
+								if(words[words.i]?.[0]=="static"&&functionLevels[0]<=1){
+									//'(){ static let a; }' and '{static let a;}' is like '::{let a;}'
+									//static statements only runs in function scope and does not add code
+									if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;//remove this codeObj
+									isRunningCode=true;
+									words.i++;
 								}
-								words.i++;
+								else if(!isRunningCode)break ifBlock;
+								else if(words[words.i]?.[0]=="void"){//doesn't generate code.
+									codeObj.isVoid=true;//e.g.'@void{}' or '#void ...;'
+									if(phaseLevel<=+phaseMap["#"]){//'#void'
+										if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;
+									}
+									words.i++;
+								}
+								else break;
 							}
-							else if(words[words.i]?.[0]=="recur"){//sets recursion limit, allows for self function calls
-								//e.g.'recur n foo();'
-								words.i++;
-								let val;
-								({label:val}=await parseLabelOrNumber({words,codeObj,scope,evalFoo:false}));
-								if(val instanceof Scope)val=val.relAddress;
-								if(!isNaN(+val)){
-									if(val*0!=0)val=0;//handle infinity
-									if(codeObj.callLineObj.maxRecursion==undefined){
-										codeObj.callLineObj.recursionLevel=0;
-										codeObj.callLineObj.maxRecursion=+val;
+							for(let i=0;i<2;i++){//''
+								if(words[words.i]?.[0]=="recur"){//sets recursion limit, allows for self function calls
+									//e.g.'recur n foo();'
+									words.i++;
+									let val;
+									({label:val}=await parseLabelOrNumber({words,codeObj,scope,evalFoo:false}));
+									if(val instanceof Scope)val=val.relAddress;
+									if(!isNaN(+val)){
+										if(val*0!=0)val=0;//handle infinity
+										if(codeObj.callLineObj.maxRecursion==undefined){
+											codeObj.callLineObj.recursionLevel=0;
+											codeObj.callLineObj.maxRecursion=+val;
+										}else{
+											codeObj.callLineObj.maxRecursion=Math.min(codeObj.callLineObj.maxRecursion,+val);
+											//can instead do `let finds=1;` at the call-stack class.
+											//codeObj.callLineObj.recursionLevel||=1;//avoid doubleing bug.
+										}
 									}else{
-										codeObj.callLineObj.maxRecursion=Math.min(codeObj.callLineObj.maxRecursion,+val);
-										//can instead do `let finds=1;` at the call-stack class.
-										//codeObj.callLineObj.recursionLevel||=1;//avoid doubleing bug.
+										throw Error(throwError(codeObj,", expected number argument after 'recur'. e.g. try `recur 10 foo();`"))
 									}
-								}else{
-									throw Error(throwError(codeObj,", expected number argument after 'recur'. e.g. try `recur 10 foo();`"))
+									if(codeObj.callLineObj.recursionLevel>=codeObj.callLineObj.maxRecursion){
+										const isStrict=false;
+										if(isStrict)throw Error(throwError(codeObj,"recursion limit of '"+codeObj.maxRecursion+"' reached. Try using a higher repeat or make sure the recursion stops"));
+										codeObj.callLineObj.recursionLevel=undefined;
+										break mainForLoop;
+									}
 								}
-								if(codeObj.callLineObj.recursionLevel>=codeObj.callLineObj.maxRecursion){
-									const isStrict=false;
-									if(isStrict)throw Error(throwError(codeObj,"recursion limit of '"+codeObj.maxRecursion+"' reached. Try using a higher repeat or make sure the recursion stops"));
-									codeObj.callLineObj.recursionLevel=undefined;
-									break mainForLoop;
-								}
-							}
-							else if(words[words.i]?.[0]=="repeat"&&words[words.length-1]?.[0]!="{"){
-								//'repeat n code;'
-								//does NOT handle 'repeat n{...code;}'
-								words.i++;
-								let val,wasDeclared;
-								if(words[words.i]=="(")({label:val}=await evalBrackets({words,codeObj,scope,evalFoo:false}));
-								else ({label:val,wasDeclared}=await parseLabelOrNumber({words,codeObj,scope:codeScope,makeVars:false}));
-								if(val instanceof Scope)val=val.relAddress;
-								else{val = +val;}
-								if(val*0!=0)val=0;//handle infinity
-								if(!isNaN(+val)){
+								else if(words[words.i]?.[0]=="repeat"&&words[words.length-1]?.[0]!="{"){
+									//'repeat n code;'
+									//does NOT handle 'repeat n{...code;}'
+									words.i++;
+									let val,wasDeclared;
+									if(words[words.i]=="(")({label:val}=await evalBrackets({words,codeObj,scope,evalFoo:false}));
+									else ({label:val,wasDeclared}=await parseLabelOrNumber({words,codeObj,scope:codeScope,makeVars:false}));
+									if(val instanceof Scope)val=val.relAddress;
+									else{val = +val;}
 									if(val*0!=0)val=0;//handle infinity
-									if(repeatNum==0&&!codeObj.callLineObj.isARepeat){
-										repeatNum=val;
+									if(!isNaN(+val)){
+										if(val*0!=0)val=0;//handle infinity
+										if(repeatNum==0&&!codeObj.callLineObj.isARepeat){
+											repeatNum=val;
+										}
+										else{
+											repeatNum=Math.min(repeatNum,val);
+											codeObj.words.splice(0,words.i);//removes 'repeat x' from codeObj
+											codeObj.words.str=words.map(v=>v[0]).join(" ");
+											words.i=0;
+										}
+									}else{
+										throw Error(throwError(codeObj,", expected number argument after 'repeat'. e.g. try `repeat 10 foo();`"))
 									}
-									else{
-										repeatNum=Math.min(repeatNum,val);
-										codeObj.words.splice(0,words.i);//removes 'repeat x' from codeObj
-										codeObj.words.str=words.map(v=>v[0]).join(" ");
-										words.i=0;
+									codeObj.isARepeat=true;//for '...block'; so it doesnt repeat the repeats
+									if((repeatNum|0)<=0){
+										repeatNum=0;
+										if(!codeObj.isDeleted)codeScope.code.pop();
+										break mainForLoop;
 									}
-								}else{
-									throw Error(throwError(codeObj,", expected number argument after 'repeat'. e.g. try `repeat 10 foo();`"))
 								}
-								codeObj.isARepeat=true;//for '...block'; so it doesnt repeat the repeats
-								if((repeatNum|0)<=0){
-									repeatNum=0;
-									if(!codeObj.isDeleted)codeScope.code.pop();
-									break mainForLoop;
-								}
+								else break;
+							}if(!isRunningCode)break ifBlock;
+							if(words[words.length-1]?.[0]=="{")break ifBlock;
+							if(isBlock){break ifBlock;}
+							if(words.length==0){
+								lastLabel=undefined;
+								break ifBlock;
 							}
-							else break;
-						}if(!isRunningCode)break ifBlock;
-						if(words[words.length-1]?.[0]=="{")break ifBlock;
-						if(isBlock){break ifBlock;}
-						if(words.length==0){
-							lastLabel=undefined;
-							break ifBlock;
 						}
-						if(words[words.i]?.[0].match(phaseSymbolRegex)){words.i++;}//'repeat 2 # in 'repeat 2 #jump+2;'
 						special_statements:{
+							if(words[words.i]?.[0].match(phaseSymbolRegex)){words.i++;}//'repeat 2 # in 'repeat 2 #jump+2;'
+
 							if(words[words.i]?.[0]=="import"){
 								isMeta=true;
 								addToNonMeta=false;
@@ -3623,9 +3639,14 @@ const oxminCompiler=async function(inputFile,fileName){
 									if(words[words.i][0]=="("){
 										usedBracketParse=true;
 										let value=await evalBrackets({words,scope,codeObj,makeVars:false});
-										if(value.type=="bool"){label=[0,1][+value.bool];}
-										else if(value.type=="number"){label=value.number;command.number=value.number;}
-										else if(value.type=="label"){label=value.label;}
+										if(value.type=="bool"){command.number=label=[0,1][+value.bool];}
+										else if(value.type=="number"){
+											value.number+=value.label?.relAddress||0;
+											label=value.toNumber().number;
+										}
+										else if(value.type=="label" && value.type=="string"){
+											label=value.label;
+										}
 									}
 									else ({label,wasDeclared}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false,evalFoo:false}));
 									if(!isNaN(label)){//"0x1234;"
@@ -3647,6 +3668,7 @@ const oxminCompiler=async function(inputFile,fileName){
 											}
 											useBlock=label;
 											command.pointer=label;
+											command.number??=label?.arrayLabels?.[0]?.command?.number
 											codeObj.isNonMeta=true;
 											addToNonMeta=true;
 										}
@@ -3694,6 +3716,9 @@ const oxminCompiler=async function(inputFile,fileName){
 										jumpOpand=arg;
 										parseOffsetNumbers(0);//jump label +4 
 									}else if(!arg){//e.g. word == '->' or '=>'
+										if(phaseLevel>+phaseMap["$"]){//'@block -> 2;' 
+											ignoreBlock=false;
+										}
 									}else{//'block #;'
 										ignoreBlock=false;
 									}
@@ -4119,7 +4144,6 @@ const oxminCompiler=async function(inputFile,fileName){
 						  toCodeObj.computerState.move!=codeObj.computerState.move
 						//||toCodeObj.state.jump!=codeObj.state.jump
 					){
-						loga(codeObj.computerState.move,toCodeObj.computerState.move)
 						//throw Error(
 						console.warn(throwError(codeObj,
 							" @: "

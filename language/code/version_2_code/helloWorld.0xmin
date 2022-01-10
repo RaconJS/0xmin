@@ -1,0 +1,17 @@
+#"make file";
+#"log.table";
+#"!log.code";
+import lib "std.0xmin";
+#let string=int("Morros Mau`lmn!").return;
+#let i=0;
+let(){
+	#let pos->string,set pos->+i;
+	move->pos;
+	get;
+	move->terminal.output;
+	set;
+	#set i=i+1;
+}::{
+	repeat string..length this();
+}
+#delete i,string;

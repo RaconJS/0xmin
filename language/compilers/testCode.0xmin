@@ -1,1 +1,3 @@
-#import this "../code/version_2_code/rule110.0xmin";
+let a{2;2;3}
+#set a[0]=>{};
+def a;

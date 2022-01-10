@@ -1,37 +1,153 @@
-#"!make file";
+#"make file";
 #"!log.table";
 #"log.code";
-#import lib"std.0xmin";
-...import.switch_function;
-let Pos(x)={
-	//#assert x instanceof number;
-	def {0x20000000}
-	def {0x20000000}
-	if(!x){}
-	else if(x<30){#set this[0]=>0x20000000|(1<<(+x));}
-	else if(x<32){#set this[1]=>0x20000000|(1<<(x-30));}
-	#{
-		let and(a,b){
-			move->a;get;
-			move->b;and;
-			move->this;set;
-			move+1;
-			move->a+1;get;
-			move->b+1;and;
-			move->this+1;set;
-		}
-		let: set(a){
+//old version
+(){
+	#import lib"std.0xmin";
+	...import.switch_function;
+	let Pos(x)={
+		//#assert x instanceof number;
+		def {0x20000000}
+		def {0x20000000}
+		if(!x){}
+		else if(x<30){#set this[0]=>0x20000000|(1<<(+x));}
+		else if(x<32){#set this[1]=>0x20000000|(1<<(x-30));}
+		#{
+			let and(a,b){
+				move->a;get;
+				move->b;and;
+				move->this;set;
+				move+1;
+				move->a+1;get;
+				move->b+1;and;
+				move->this+1;set;
+			}
+			let: set(a){
 
-		}
-		static let redFilt=int(0x20000000).return->0;
-		let isNot0(){
-			move->this 0;
-			get;if;null;
-			move->Pos.redFilt;
-			xor;
+			}
+			static let redFilt=int(0x20000000).return->0;
+			let isNot0(){
+				move->this 0;
+				get;if;null;
+				move->Pos.redFilt;
+				xor;
+			}
 		}
 	}
+	let State()={{
+		#;
+		let moveP->0xmin;
+		let jumpP->0xmin;
+		def let this.set{
+			$jumpP->jump;
+			$moveP->move;
+		}
+		let this.get(){
+			//$jump->jumpP;
+			move->moveP;
+		}
+		set this.set(){};
+		if(!block){
+			#let set block = {};
+		}
+		#set return=>{
+			recur 2 #def let s=State();
+			...block();debugger s;
+			$def s.get();
+		}
+	}}
+	let int.redFilt()={
+		0x20000000;
+		#int(this);
+	}
+	#let grid{#int(this);
+		0b100000000000000000000000000000;
+		0b100000000000000000000000000000;
+	}
+	let guess={//function(1){
+		let for_eachStep:{
+			$def let s=State();
+			#let rayPos=Pos(0);#int(rayPos);//next ray posision
+			#let rayDir=int.redFilt();//ray direction
+			#let neighbours=int.redFilt();
+			forI:{
+				#let i=int.redFilt();
+				$def let i.s=State();
+				forJ:{
+					let j=int.redFilt();
+					$def let j.s=State();
+					{
+						move->rayPos;get;
+						#let neighbour,int((neighbour=Pos(0)));
+						move->neighbours;
+						if;:{#let s=State();
+
+							jump->break;
+
+						}
+					}
+					def increment(j,j);
+					move->int();
+					xor;
+					def i.s.get();
+					if;jump->continue;
+				}
+				def increment(i,i);
+				move->int();
+				xor;
+				def i.s.get();
+				if;jump->continue;
+			}
+			test_Pos:{
+				#let test=int(Pos(0)).return;
+				test_infront:{
+					def test.and(rayPos,grid);
+					def test.isNot0();
+					//if (grid[rayPos] contains an atom)then reflect
+					if;:{
+						#let then,else;
+						$def let s=State();
+						jump->then;
+						#def else;{
+							jump->break;
+						}
+						$def s.get();
+						#def then;{
+							move->rayDir;
+							let{0b10;#int(this);}::{move->this;}
+							xor;
+							def s.get();
+						}#delete s;
+					}
+				}
+				testLeft:{
+					def test.and(rayPos,grid);
+					def test.isNot0();
+					//if (grid[rayPos] contains an atom)then reflect
+					if;:{
+						#let then,else;
+						$def let s=State();
+						jump->then;
+						#def else;{
+							jump->break;
+						}
+						$def s.get();
+						#def then;{
+							move->rayDir;
+							let{0b10;#int(this);}::{move->this;}
+							xor;
+							def s.get();
+						}#delete s;
+					}
+				}
+			}
+		}
+	}def guess;
 }
+
+#import lib"std.0xmin";
+...import.switch_function;
+...import.increment_function;
 let State()={{
 	#;
 	let moveP->0xmin;
@@ -48,96 +164,92 @@ let State()={{
 	if(!block){
 		#let set block = {};
 	}
-	#set return=>{
+	#(){#set return=>{
 		recur 2 #def let s=State();
 		...block();debugger s;
 		$def s.get();
-	}
+	}}
 }}
-let int.redFilt()={
-	0x20000000;
-	#int(this);
-}
-#let grid{#int(this);
-	0b100000000000000000000000000000;
-	0b100000000000000000000000000000;
-}
-let guess={//function(1){
-	let for_eachStep:{
-		$def let s=State();
-		#let rayPos=Pos(0);#int(rayPos);//next ray posision
-		#let rayDir=int.redFilt();//ray direction
-		#let neighbours=int.redFilt();
-		forI:{
-			#let i=int.redFilt();
-			$def let i.s=State();
-			forJ:{
-				let j=int.redFilt();
-				$def let j.s=State();
-				{
-					move->rayPos;get;
-					#let neighbour,int((neighbour=Pos(0)));
-					move->neighbours;
-					if;:{#let s=State();
-
-						jump->break;
-
-					}
-				}
-				def increment(j,j);
-				move->int();
-				xor;
-				def i.s.get();
-				if;jump->continue;
-			}
-			def increment(i,i);
-			move->int();
-			xor;
-			def i.s.get();
-			if;jump->continue;
-		}
-		test_Pos:{
-			#let test=int(Pos(0)).return;
-			test_infront:{
-				def test.and(rayPos,grid);
-				def test.isNot0();
-				//if (grid[rayPos] contains an atom)then reflect
-				if;:{
-					#let then,else;
-					$def let s=State();
-					jump->then;
-					#def else;{
-						jump->break;
-					}
-					$def s.get();
-					#def then;{
-						move->rayDir;
-						let{0b10;#int(this);}::{move->this;}
-						xor;
-						def s.get();
-					}#delete s;
-				}
-			}
-			testLeft:{
-				def test.and(rayPos,grid);
-				def test.isNot0();
-				//if (grid[rayPos] contains an atom)then reflect
-				if;:{
-					#let then,else;
-					$def let s=State();
-					jump->then;
-					#def else;{
-						jump->break;
-					}
-					$def s.get();
-					#def then;{
-						move->rayDir;
-						let{0b10;#int(this);}::{move->this;}
-						xor;
-						def s.get();
-					}#delete s;
-				}
-			}
-		}
+let repeat(block,len,isNotShort){
+	#{
+		let isLong=#(isNotShort===true)||(len>30);
+		let int(n)={
+			def n;
+			let s=this;
+			set constructor.block{def s;}
+		}::{let block{}}
+		#{#let i=int=(0);}
+		if(!block.i||(+block.i..length==0)){#let set block.i -> i;}
+		if(max){}
+		else if(+isLong){#let set max=int=(0x20000000|+len);}
+		else{#let set max=int=(1<<(+len-1));}
 	}
-}def guess;
+	move->max;get;
+	move->io.output1;set;
+	move->i;set;
+	forLoopBody:{
+		//assert alu=i,if=true;
+		$def let continue.state=State=();
+		if(+isLong){
+			move->max;
+			if;null;
+			xor;
+			xor;
+			//assert alu=i;
+		}
+		else{}
+		//assert alu=i;
+		$def let break.state=State=();
+		#let next;
+		if;jump->next;jump->break;
+		def int.block;
+		#def next;
+		def block;
+		#delete next;
+		if(+isLong){
+			move->i;get;
+			def increment();
+			move->i;set;
+		}
+		else{
+			move->i;get;if;//if(true);
+			move->int=(2);blue;
+			move->i;set;
+		}
+		@def continue.state.get();
+		jump->continue;
+		$def break.state.get();
+	}
+}
+let Pos()={
+	null def let filtNumber;
+	null def let val;
+}
+def let grid{
+	repeat 10 @ 0x20000000;
+}
+let addToPos=function(3){
+	#const_2=int=(2);
+	//magnitude[0],sign[0],magnitude[1],sign[1]
+	#let inputs{
+		null def let modes;//increment_isNegative;
+		null def let inPos;
+		null def let outPos;
+	}
+	x:{
+		move->inputs.modes;get;if;//if(true)
+		move->int=(1);and;if;
+	}
+}
+def main;
+#let a{
+	#let i;
+	move->int=(100);get;
+	move->i;blue;
+	move->io.output1;set;
+	move->int=("w");get;
+	move->terminal.output;set;
+}
+//def{let b={def repeat(a,3);}def repeat(b,3);}//::{def repeat(this,3);}
+def repeat(repeat(a,3),3);
+jump ;

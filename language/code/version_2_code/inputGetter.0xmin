@@ -1,12 +1,19 @@
 #"make file";
-#"log.table";
-#"log.code";
+#"!log.table";
+#"!log.code";
 # import lib "io.0xmin";
-def let get_user_input{
+let get_user_input{
 	#let block{};
 	#let block1=block;
-	#let call()={
+	#let call(shouldWait)={
 		#static let this.block=block1;
+		if(shouldWait === true){
+			move->block.shouldWait;get;
+			move->block.waitLine;set;
+		}else if(shouldWait === false){
+			move->block.shouldWait;get;
+			move->block.waitLine;set;
+		}
 		#let ret;
 		move->ret;
 		get;
@@ -26,6 +33,9 @@ def let get_user_input{
 			0x20000000 def let red;
 			#let ret=return;
 			#let return.move;
+			#let waitLine;
+			jump waitLine->return def let isWait;
+			jump waitLine->main def let isNotWait;
 		}
 		def main;
 		confirmInput:{
@@ -36,7 +46,8 @@ def let get_user_input{
 			xor;
 			move->return.move;
 			if;{//if terminal.input != String.confirm()
-				jump->main;
+				#def waitLine;
+				jump->return;
 			}
 			move->terminal.output;
 			set;//confirm input
@@ -45,14 +56,7 @@ def let get_user_input{
 			$assert move->terminal.output;
 			//assert alu = confirm;
 			move->terminal.input;
-			or_8:{
-				def let a{};
-				#let b(){
-					set a{or;};
-					#recur 7 b();
-				}
-				#b();
-			}
+			repeat 8 or;
 		}
 		cleanInput:{
 			move->confirm;
@@ -69,16 +73,26 @@ def let get_user_input{
 		null def return;
 	}
 }::{def block;}
-$move->0xmin 0;
-def main;
+#let int(val)={
+	def val;let self=this;#set int.block{def self;}
+}::{def let block}
+#def main;
+move->int(String.pos(0,0));get;
+move->terminal.output;set;
 def get_user_input.call();
-move->0xmin 0;
-if;{
-	jump +2;
-	jump->main;
+if;:{
+	#let then,mv->0xmin;
+	$mv->move;
+	jump->then;
+	#def let else;
+		move->int("O");get;move->terminal.output;
+	jump -> break;
+	$move->mv;
+	#def then;
+		move->int("\x00");or;move->terminal.output;
 }
-move->terminal.output;
 set;
-move->0xmin 0;
+
+move->0xmin;
 jump->main;
-jump 0;
+def String.pos(5,6);
