@@ -2449,7 +2449,6 @@ const oxminCompiler=async function(inputFile,fileName){
 							//if(words1[0]?.[0]=="(")words1.i++;
 							{
 								codeScope=new Scope({parent:scope,name:"if block"});
-								codeScope.name="if block";
 								newScope=codeScope;
 								codeScope.scopes.parent=scope;//lbl;
 								if(!hasLetScope){
@@ -2580,7 +2579,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 				else{//if(!isFunction){//unlabled normal scope "{" or "lbl:{"
-					codeScope.scopes.parent=lblBlock;
+					if(!isFunctionCall)codeScope.scopes.parent=lblBlock;
 					//throw new Error(errorMsg+"could not find label:"+'"'+lineStr+'"');
 					if(isJoiningBLock){}
 					else if(isLabeledBlock){//"lbl:{" or ":{"
@@ -3211,6 +3210,15 @@ const oxminCompiler=async function(inputFile,fileName){
 				let oldSourceLineNumber=sourceLineNumber;
 				let lineStr=(parts[i]+"");//.replaceAll(/^\s+/g,"").replaceAll(/\s+/g," ");
 				mainForLoop:{
+					let updatePhase=()=>{
+						let match;
+						if(match=words[words.i]?.[0].match(phaseSymbolRegex)){
+							codeObj.phaseLevel=phaseLevel=phaseMap[match];//get number
+							codeObj.isMeta=isMeta=phaseLevel<3;
+							codeObj.isNonMeta=isNonMeta=phaseLevel>1;
+							words.i++;
+						}//'repeat 2 # in 'repeat 2 #jump+2;'
+					}
 					let isRunningCode=functionLevels[0]==0;//scope is the physical scope not the codeScope
 					let partI=parts.i=i;
 					let phaseLevel=parsePhaseNumber({lineStr,codeScope});
@@ -3341,7 +3349,14 @@ const oxminCompiler=async function(inputFile,fileName){
 								else if(words[words.i]?.[0]=="void"){//doesn't generate code.
 									codeObj.isVoid=true;//e.g.'@void{}' or '#void ...;'
 									if(phaseLevel<=+phaseMap["#"]){//'#void'
-										if(!codeObj.isDeleted)codeScope.code.pop().isDeleted=true;
+										if(!codeObj.isDeleted){
+											codeObj.isDeleted=true;
+											codeScope.code.pop();
+											codeScope.arrayLabels.pop();
+											if(!parts[partI].isCodeObj){
+												codeScope.codeBlock.code.pop();
+											}
+										}
 									}
 									words.i++;
 								}
@@ -3396,17 +3411,21 @@ const oxminCompiler=async function(inputFile,fileName){
 											words.i=0;
 										}
 									}else{
-										throw Error(throwError(codeObj,", expected number argument after 'repeat'. e.g. try `repeat 10 foo();`"))
+										throw Error(throwError(codeObj,", expected number argument after 'repeat'. e.g. try `repeat 10 foo();`"));
 									}
-									codeObj.isARepeat=true;//for '...block'; so it doesnt repeat the repeats
-									if((repeatNum|0)<=0){
+									if((repeatNum|0)<=0&&!codeObj.callLineObj?.isARepeat){//'repeat 0 x;' == '{};' == do nothing
+										//doesn't apply to:'...block'
 										repeatNum=0;
 										if(!codeObj.isDeleted)codeScope.code.pop();
 										break mainForLoop;
 									}
+									codeObj.isARepeat=true;
 								}
 								else break;
-							}if(!isRunningCode)break ifBlock;
+							}
+
+							codeObj.phaseLevel=phaseLevel;
+							if(!isRunningCode)break ifBlock;
 							if(words[words.length-1]?.[0]=="{")break ifBlock;
 							if(isBlock){break ifBlock;}
 							if(words.length==0){
@@ -3415,8 +3434,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 						}
 						special_statements:{
-							if(words[words.i]?.[0].match(phaseSymbolRegex)){words.i++;}//'repeat 2 # in 'repeat 2 #jump+2;'
-
+							updatePhase();//'repeat 2 # in 'repeat 2 #jump+2;'
 							if(words[words.i]?.[0]=="import"){
 								isMeta=true;
 								addToNonMeta=false;
@@ -3849,7 +3867,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeObj.isMeta=isMeta;
 						lastLabel=newLastLabel;
 					}
-					if(codeScope&&!words.str.match(/^\s*}$|^;$/)&&isRunningCode){
+					if(codeScope&&!words.str.match(/^\s*}$|^;$/)&&isRunningCode&&!codeObj.isDeleted){
 						codeScope.arrayLabels.push(codeObj);
 					}
 					if(words.str[words.str.length-1]=="{"){
