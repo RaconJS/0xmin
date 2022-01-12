@@ -146,19 +146,28 @@ let doStep={
 			1;
 		}
 		...this.int.block1;
+		#let size()={#set this->int.block1..length+1;}
 	}
 	let startMemory(){
 		def this.endMemory();
 		#def let len=this.int.block1..length+1-this.endMemory()..length;
 		repeat len null;
+		#void let size()={#set this->int.block1..length+endMemory().size();}
 	}
 	let endMemory(){
 		1;
 		0x3fffffff;
 		0x0ffff000;
+		//#void {#let size()={#set this->endMemory().size();}}//compiler bug, #void{} doens't work
 	}
+	//#debugger endMemory();
 };
 #let memory{
+	#let templates{
+		#int(this);
+		def let struct=doStep.struct(0b100000000000000000000000000000);
+		def let end=doStep.endMemory();
+	}
 	def doStep.startMemory();
 	def doStep.struct(0b000000000000000000000000000010);
 	//def doStep.struct(0b000000000000000000000000001000);

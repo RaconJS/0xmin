@@ -39,10 +39,10 @@ for:{
 	jump->break;
 	{
 		#let zero=int(0x10000000);
-		#let temp=int(null);
+		#let temp=int(0);
 		print(i);
-		switch(0xmin,i);
-		#let val=int(null);
+		def switch(0xmin,i);
+		#let val=int(0);
 		move->zero;or;
 		move->val;set;
 		command:{
@@ -78,7 +78,7 @@ for:{
 			move->terminal.output;set;
 		}
 		//assert move->terminal.output;
-		#let j=int(null);
+		#let j=int(0);
 		#let jEnd=int(0x10);
 		move->int(0x100);get;
 		move->j;set;

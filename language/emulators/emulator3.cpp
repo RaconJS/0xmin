@@ -1,3 +1,4 @@
+float runSpeed=60;//fps
 /*0xmin dev:
 	I cant work out how to use the monitor, (with my own cpu). 
 	I tried sending ascii codes for 1 frame 
@@ -13,9 +14,8 @@
 	and keep-alive bit is 0x20000000.
 */
 //UNFINISHED
-//sleep
-#include <chrono>
-#include <future>
+//sleep + multi-threading for inputs.
+// #include <chrono>
 #include <thread>
 //normal stuff
 #include <iostream>
@@ -25,9 +25,9 @@
 #include <iterator>
 #include <vector>
 //terminal dimentions
-#include <sys/ioctl.h>
-#include <unistd.h>
-//get key inputs
+	// #include <sys/ioctl.h>
+	// #include <unistd.h>
+//get key inputs, use `cin` without enter
 #include <termios.h>//termios, TCSANOW, ECHO, ICANON
 #include <unistd.h>//STDIN_FILENO
 using namespace std ;
@@ -115,17 +115,17 @@ using namespace std ;
 		};
 		string clearWindow(){
 			return "\033[H\033[2J\033[3J";
-			struct winsize dimentions;
-			ioctl(STDOUT_FILENO, TIOCGWINSZ, &dimentions);
-			width=dimentions.ws_col;
-			height=dimentions.ws_row;
-			string str="";
-			for(int i=0;i<height&&i<100;i++){
-				for(int j=0;j<width-1&&j<300;j++){
-					str+=' ';
-				}if(i<height-1)str+='\n';
-			}
-			return "\033[0;0H\033[J"+str+"\033[0;0H\033[J";
+			// struct winsize dimentions;
+			// ioctl(STDOUT_FILENO, TIOCGWINSZ, &dimentions);
+			// width=dimentions.ws_col;
+			// height=dimentions.ws_row;
+			// string str="";
+			// for(int i=0;i<height&&i<100;i++){
+			// 	for(int j=0;j<width-1&&j<300;j++){
+			// 		str+=' ';
+			// 	}if(i<height-1)str+='\n';
+			// }
+			// return "\033[0;0H\033[J"+str+"\033[0;0H\033[J";
 		}
 		public:
 		int width=132,height=43-4;
@@ -503,14 +503,13 @@ void doStep(int i){
 }
 std::thread inputThread;
 void mainThread(){
-
 	int num=0;
 	for(int i=0;i<40000&&!cpu.hasHault;i++,num++){
 		//for(int i=0;i<1&&!cpu.hasHault;i++,num++){
 			doStep(i);
 		//}
 		ctx.update();
-		mySleep(1000./(60.));
+		mySleep(1000./runSpeed);
 		//cout<<hex cpu.jump<<" ";//<<":"<<(void*)(long)cpu.jump<<":"<<(void*)(long)cpu.move<<" ";
 		/*if(cpu.hasHault){break;
 			//string a;cin>>a;cpu.jump++;
@@ -524,11 +523,27 @@ void mainThread(){
 int main(int argc, char const *argv[]){
 	// copies all data into buffer
 	string fileName;
-	if(argc<=1){
-		cout<<"0xmin:ERROR: emulator needs '.filt' file.";return 1;
-		fileName="a.filt";//"../compilers/quine.filt";
+	if(argc>2){//0:???,1:file,2:file exists, 3:speed
+		if(argv[2][0]=='0'){//if emulator is exicuted using the 0xmin bash command
+			cout//&& if given file didnt exist
+				<<"\x1b[36;1m"<<"emulator :: "<<"\x1b[0m"
+				<<"\x1b[31;1m"<<"0xmin-ERROR :: "<<"\x1b[0m"
+				<<"file: '"<<argv[1]<<"' does not exist."
+				<<" Emulator needs '.filt' file."
+			;return 1;
+		}
+		else fileName=argv[1];
+		if(argc>3){
+			runSpeed=stof(argv[3]);cout<<runSpeed;
+		}
+	}else{//0:???,
+		if(argc<=1){
+			fileName="a.filt";//"../compilers/quine.filt";
+		}
+		else {
+			fileName=argv[1];
+		}
 	}
-	else fileName=argv[1];
 	{
 		std::ifstream inputFile(fileName, std::ios::binary );
 		std::vector<char> buffer(std::istreambuf_iterator<char>(inputFile), {});
@@ -560,6 +575,7 @@ int main(int argc, char const *argv[]){
 	inputThread = std::thread(R2KeyBoard::inputListener);
 	inputThread.detach();
 	main.join();
+	cout<<endl;
 	return 0;
 }
 //moveTo(x,y);

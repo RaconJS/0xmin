@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #requires nodejs v16.7.0
 function useExamples {
 	#to use do
@@ -6,11 +7,14 @@ function useExamples {
 	./compile.sh inputFileName.0xmin minFilt.lua
 }
 function compile {
+	mainfolder=$(dirname ${BASH_SOURCE[0]});
 	#process inputs
 		inputFileName=$1;
 		outFileName=$2;
+		externalOutFile=false; #true => dont make an internal file, for compiler->emulator
 		isRunningFile=false;
 		isUsingOutFileNameToExicute=true;
+		runSpeed=60;
 		runFileName="";
 		args=("$@");
 		# get number of elements 
@@ -26,12 +30,17 @@ function compile {
 			if [[ "$operator" = "-run" || "$operator" = "-r" ]]; then
 				if [[ $((i + 1)) < $ELEMENTS ]];then 
 					isRunningFile=$val1;
+					if [[ $externalOutFile == false ]];then #for pipelineing compiler into emulator
+						outFileName=$mainfolder/../emulators/a.filt;
+						runFileName=$mainfolder/../emulators/a.filt;
+					fi
 				fi
 				i=$(($i + 1));
 				continue;
-			elif [[ "$operator" = "-e" ]]; then #exicute '.filt' file name
+			elif [[ "$operator" = "-e" ]]; then #'0xmin -e code.filt;' exicute '.filt' file
 				if [[ $((i + 1)) < $ELEMENTS ]];then 
 					runFileName=$val1;
+					isUsingOutFileNameToExicute=false;
 					isRunningFile=true;
 				fi
 				i=$(($i + 1));
@@ -40,9 +49,24 @@ function compile {
 			elif [[ $operator == "-o" ]]; then
 				if [[ $((i + 1)) < $ELEMENTS ]];then
 					outFileName=$val1;
+					externalOutFile=true;
 					if $isUsingOutFileNameToExicute; then
 						runFileName=$val1;
 					fi
+				fi
+				i=$(($i + 1));
+				continue;
+			#'-s $runSpeed_in_fps'
+			elif [[ $operator == "-s" ]]; then
+				if [[ $((i + 1)) < $ELEMENTS ]];then
+					runSpeed=$val1;
+				fi
+				i=$(($i + 1));
+				continue;
+			#'-sm $runSpeed_in_fps*60'
+			elif [[ $operator == "-sm" ]]; then
+				if [[ $((i + 1)) < $ELEMENTS ]];then
+					runSpeed=$(($val1*60));
 				fi
 				i=$(($i + 1));
 				continue;
@@ -51,15 +75,21 @@ function compile {
 			inputFileName=$val;
 			fi
 		done
-	#!/usr/bin/env bash
+	
 	#code.0xmin => code.filt or code.lua
 	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
-	mainfolder=$(dirname ${BASH_SOURCE[0]});
 	nodejs $mainfolder/compile.js $inputFileName $outFileName; #(nodejs test.js);
 	if [[ -f minFilt.lua && -e "$powderToyScriptsFolder" ]]; then #if file exists
-		a=1 #mv minFilt.lua "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
-	fi;if $isRunningFile; then
-		$mainfolder/../emulators/emulator3 $runFileName;
+		mv minFilt.lua "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
+	fi;
+	if [[ $isRunningFile == 1 ]]; then
+		test=0;
+		if [[ -f $runFileName ]]; then
+			test=1;
+		else
+			test=0;
+		fi;
+		$mainfolder/../emulators/emulator3 $runFileName $test $runSpeed;
 	fi
 	return;
 }

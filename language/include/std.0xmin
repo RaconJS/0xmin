@@ -25,6 +25,7 @@ if(!io){
 	#import lib "io.0xmin";
 };
 #let int(number)={
+	if(number==null){#set number=0;}
 	def let return=number;
 	#let self=this;
 	#set self{}
