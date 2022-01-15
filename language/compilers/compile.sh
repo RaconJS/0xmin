@@ -31,6 +31,7 @@ function compile {
 				if [[ $((i + 1)) < $ELEMENTS ]];then 
 					isRunningFile=$val1;
 					if [[ $externalOutFile == false ]];then #for pipelineing compiler into emulator
+						mv $mainfolder/../emulators/a.filt $mainfolder/../emulators/aOld.filt;
 						outFileName=$mainfolder/../emulators/a.filt;
 						runFileName=$mainfolder/../emulators/a.filt;
 					fi
