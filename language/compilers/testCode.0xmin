@@ -1,15 +1,3 @@
-#let i=0;
-let foo(){
-	#void{
-		//#debugger.typeof i;
-		#set i=i+1;
-	}
-	1;
-}
-let a{
-	repeat 3 foo();
-	debugger.log a"label.code[0].isARepeat";
-}
-repeat 0 2;
-...a;
-a();
+let a="asd";
+def let {a();}::{debugger.log this[0] "label.name";}
+debugger.labelsof 0xmin;
