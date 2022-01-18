@@ -144,23 +144,22 @@ contexts:
       scope: keyword.control
 
 
-    - match: (?:\bvoid\b|@)(?!\s*\.)(?=[^;}]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
+    - match: (?:\bvoid\b)(?!\s*\.)(?=[^;}]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
       scope: keyword.control
       push: mainScope_void
-
     - match: \bvoid\b(?!\s*\.)
       scope: keyword.control
 
 
-    - match: '\#(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+    - match: '\#(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
       scope: support.constant.weakScope.0xmin
       push: higher_code_brackets
-    - match: '\$(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+    - match: '\$(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
       scope: entity.name.weakScope.0xmin
       push: hiddenCodeScope_brackets
-    - match: '\@(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
+    - match: '\@(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
       scope: keyword.control.assemblyScope.0xmin #source.assemblyScope.0xmin
-      push: mainScope
+      push: mainScope_void #mainScope
 
     - match: '#(?:\s*;)?'
       scope: support.constant.metaScope.0xmin
@@ -189,7 +188,7 @@ contexts:
       scope: keyword.declaration
       push: startFile
   startFile:
-    - match: \#?(["'`]){{buildSettingWords}}\1;?|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
+    - match: \#?\s*(["'`]){{buildSettingWords}}\1;?|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
       scope: keyword.declaration
     - match: '(?=[^\s])'
       push: mainScope
@@ -233,11 +232,12 @@ contexts:
     - match: '{'
       scope: variable.function
       push: higher_code_brackets1
+      pop: true
     - include: base_statement
   higher_code_brackets1:
     - match: '}'
       scope: variable.function
-      pop: 2
+      pop: 1
     - include: higher_code
   hiddenCodeScope_brackets:
     - match: '[()]'
@@ -257,13 +257,14 @@ contexts:
     - match: '{'
       scope: keyword.control
       push: mainScope_void1
+      pop: true
     - match: \b(let|var|set|def)\b
       scope: keyword.declaration
     - include: mainScope
   mainScope_void1:
     - match: '}'
       scope: keyword.control
-      pop: 2
+      pop: true
     - include: mainScope
 
   higher_code_singleLine:
@@ -290,7 +291,7 @@ contexts:
       pop: true
     - include: mainScope
     - include: function_call
-    - match: '(?=[;}:])' #';|:'
+    - match: '(?=[;}]|:+\s*{)' #';|:'
       pop: true
     - match: '\s*(?<=\))\s*(=>|=)\s*(?={)' # '=>' or '=' in '() => {}'
       scope: 'support.constant.0xmin.operator'

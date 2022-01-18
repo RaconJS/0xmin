@@ -1,17 +1,18 @@
-#"make file";
-#"log.table";
-#"!log.code";
-def let std{import lib "std.0xmin";}//in C++ :`#include <iostream>` imports the standary library into a namespace called 'std';
-#let string=std.int=("Hello World!").return;//C++ `const char[] string = "Hello World!";` allocates some memory to the string "hello world";
-#let i=0;//`#define i=0;`
-let(){//lamda, create an unnamed function
-	#let pos->string,set pos->+i;//in C++ `char* pos=string+(int)i;`
-	move->pos;//these 4 lines do: C++ `cout<<(*pos);` 
-	get;//load pos to accumilator
-	move->std.terminal.output;
-	set;//write accumilator to std.terminal.output
-	#set i=i+1;//C++ `i++;`
-}::{
+#"make file";                               //compilation setting: "create a file"
+#"log.table";                               //compilation setting: "create a file"
+#"!log.code";                               //compilation setting: "create a file"
+def let std{import lib "std.0xmin";}        //C++ :`#include <iostream>` imports the standary library into a namespace called 'std';
+debugger std.terminal;
+#let string=std.int=("Hello World!").return;//C++ :`const char[] string = "Hello World!";` allocates some memory to the string "hello world";
+#let i=0;                                   //C++ :`#define i=0;` 'i' is not given a memory location.
+let(){                                      //C++ :`void foo(){`
+	#let pos->string,set pos->+i;           //in C++ :`char* pos=string+(int)i;`
+	move->pos;                              //these 4 lines do: C++ `cout<<(*pos);` 
+	get;                                    //load pos to accumilator
+	move->std.terminal.output;              
+	set;                                    //write accumilator to std.terminal.output
+	#set i=i+1;                             //C++ :`i++;`
+}::{                                        //C++ :`}`
 	repeat string..length this();//C++`for(int i=0;i<sizeof(string);i++){foo();}`
 }
-#delete i,string;
+#delete i,string;                           //C++ (ish):`#undefine i,string;` ends the scope of these variables

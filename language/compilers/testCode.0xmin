@@ -1,3 +1,5 @@
-let a="asd";
-def let {a();}::{debugger.log this[0] "label.name";}
-debugger.labelsof 0xmin;
+#"log.table";
+#"log.code";
+//import this "../code/version_2_code/ramensions.0xmin";
+let a;
+a..TESTING;

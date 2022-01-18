@@ -41,32 +41,6 @@
 	}
 	#let return=this;
 }
-#let print(str){
-	#let len{def let a=0x20000000|str..length;};#let i;
-	#let block{
-		switch(str,i);
-		move->io.output;set;
-		move->terminal.output;set;
-	}
-	#let next;
-	jump->next;
-	0x20000000#def let zero;
-	null#def i;
-	#def let max;
-	def len;
-	#def next;
-	move->zero;get;move->i;set;
-	for:{
-		#let mv->0xmin;$mv->move;
-		def block;
-		increment(i,i);
-		if;null;
-		move->max;
-		xor;
-		move->mv;
-		if;jump->continue;
-	}
-}
 #let block(i){
 	move->i;get;
 	move->io.output;set;

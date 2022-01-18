@@ -1,0 +1,93 @@
+#"!log.table";
+import lib "std.0xmin";
+...import.switch_function;
+...import.increment_function;
+let for(init,condition,increment,block){
+	def init;
+	loop:{
+		#let continue.state->0xmin;
+		#let break.state->0xmin;
+		$continue.state->move;
+		def condition;
+		$break.state->move;
+		if;
+		jump+2;
+		jump->break;
+		def block;
+		def increment;
+		move->continue.state;
+		jump->continue;
+		$move->break.state;
+	}
+}
+let ramension()={
+	#static void {
+		var memoryPart(){
+			null def let sum;//sum
+			null def let i;//i's left
+			#static void{
+				#var block_p1=memoryPart();
+				#var block=memoryPart();
+				#var block_n1=memoryPart();
+				#let{
+					@void{
+						def block_n1;
+						def block;
+						def block_p1;
+					}
+				}::{#int(this);}
+			}
+		}
+		var memory{};
+		var block{
+			
+			null;
+			$move->memoryPart.block;
+			#let goto_y()={
+				null;
+				#let a;
+			}::{}
+			#let:
+				i=int=(null),//int;
+				b=int=(null),//int;
+			let:
+				a=int=(null),//int;
+				x=int=(null),//int;
+				y=int=(null)//int*;
+			;
+			let moveToY=int=(null);
+			let yToMove=int=(null);
+			#let setCommands{
+				#let shift{
+					let{
+						0 +1;
+					}::{
+						(this..compile);
+						debugger.codeof this..compile;
+					}
+				}
+				move->y;get;
+				move->int=(shift);
+				red;
+
+			}
+			def setCommands;
+			let{
+				start:{
+					move->x;get;
+					move->i;set;
+				}
+				condision:{
+
+				}
+				{}
+				block:{}
+			}::{
+				for(this[0],this[1],this[2],this[3]);
+			}
+			def memory;
+			repeat 10 int();
+		}
+	}
+}
+def ramension.block;
