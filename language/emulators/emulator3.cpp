@@ -366,18 +366,25 @@ class NumberDisplay{
 	filt30* input;//=ram[2];
 	filt30* output;//=ram[4];
 	filt30 oldOutput=0;
+	int pos[2];
 	void innit(){
 		input=&ram[2];//from keyboard
 		output=&ram[4];//to screen
-		oldOutput=*input;
+		oldOutput=*output+1;
+		pos[0]=4+terminal.dims[0]+terminal.offset_x;
+		pos[1]=5;
+		cout<<ctx.moveTo(pos[0],pos[1]);
+		cout<<"out   :0";
 	}
 	void onUpdate(){
 		if((*output).value!=oldOutput.value){//dont need to redraw if its the same
-			cout<<ctx.moveTo(4+terminal.dims[0]+terminal.offset_x,3);
-			cout<<(*output&0xfffffff)<<" ";
+			cout<<ctx.moveTo(pos[0],pos[1]);
+			cout<<"out   :          ";
+			cout<<ctx.moveTo(pos[0],pos[1]);
+			cout<<"out   :";
+			cout<<hex(*output&0xfffffff)<<" ";
 			oldOutput=*output;
 		}
-		cout<<ctx.moveTo(3+terminal.dims[0]+terminal.offset_x,3);
 	}
 }numberDisplay;
 //cpu

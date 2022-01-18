@@ -2,6 +2,7 @@
 //BODGED
 //UNFINISHED
 //NEEDSTESTING
+//TESTING
 //TODO: remove index system from evalParamaters
 //TODO: remove the endBracket i.e. `code:["}"]` system.
 //TODO: add a parseKeywords();
@@ -502,6 +503,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								},
 								parent:self.parent,
 							}),
+							get "TESTING"(){loga("???",Error());},
 							"length":new NumberObj({parent:this,name:"[length]"+codeLen(),
 								isFunction:true,
 								defaultFunction({label,scope,codeObj}){
@@ -531,9 +533,31 @@ const oxminCompiler=async function(inputFile,fileName){
 							}),
 							"code":new Scope({code:this.code,arrayLabels:this.code,isBlock:true,parent:self}),
 							"compile":new Scope.Function({name:"[compile]",//UNFINISHED
-								parameters:["phase"],
+								parameters:["phase","overWrite"],
 								defaultFunction({label,scope,codeObj}){
-
+									let arg_phase=this.labels["phase"];
+									let arg_overWrite=this.labels["overWrite"];
+									let hardSet=Boolean(arg_overWrite&&arg_overWrite.wasDeclared!==false&&arg_overWrite.relAddress);
+									let string=(arg_phase?.code[0]?.char??"@")+(arg_phase?.code[1]?.char??"");
+									let phase=phaseMap[string];
+									let oldName=label.name;
+									if(phase>=phaseMap["$"]){
+										({code:label.code}=compileNonMeta(self));
+										if(EndBracket)label.code.push(new EndBracket(label));
+										label.name=oldName+"$";
+									}
+									if(phase>=phaseMap["@"]){
+										({scope:label}=compileCodeCollector(self));
+										if(EndBracket)label.code.push(new EndBracket(label));
+										label.name=oldName+"@";
+									}
+									if(hardSet){//remove source assembly code from the machine code
+										//to pure machine code. stays the same after it compiles
+										for(let i in self.code){
+											self.code[i]=new CodeObj({number:i.toValueValue},i.toValueValue+";",codeObj);
+										}
+									}
+									return {label};
 								},
 							}),
 						},
@@ -631,6 +655,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				isMeta;//false->blocks code collecter
 				phaseLevel=phaseMap["@"];//3 = all 3 phases.; 2 == "#" 1== "$"; 0 == no phaes e.g. function
 			}
+			Scope.Function=()=>{};
 			Scope.Function=class extends Scope{
 				name;
 				parameters=[];
@@ -1545,7 +1570,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					for(;i<words.length*3&&(words.i<words.length||args.length>=2)&&brackets>0;i++){
 						let word=words[words.i]?.[0]??"";
 						// 'A operater B' or 'operator A'
-						if(!word[0].match(/["'`]/)&&word.match(/[#$@]|[:,]|::/)){words.i++;continue;}
+						if(!word[0]?.match(/["'`]/)&&word.match(/[#$@]/)){words.i++;continue;}
 						if(word.match(/^(\.|\.\.)$/)){//'"asd".a' => convert to label and get property
 							//done before the opperator:'+-*/' part so 
 							//can do '1'
@@ -1878,11 +1903,12 @@ const oxminCompiler=async function(inputFile,fileName){
 							continue;
 						}
 						//if end brackets /[^,;)]+/
-						if((brackets==1&&word==",")||word==";"||word.match(/^[)\]]$/)||args.length==1&&words.i>=words.length){
+						if((brackets==1&&word.match(/^(?:[:,]|::)$/))||word==";"||word.match(/^[)\]]$/)||args.length==1&&words.i>=words.length){
 							//end on: '1+1,' or '1+1;' or '1+1)'
 							if(args.length==1)break;
 						}
 						else{
+							let found=true;
 							if(word=="null"){
 								args.push(new BracketValue({scope,bool:false,label:labelNull,type:"label"},{brackets,argsList,i}));
 							}
@@ -2300,6 +2326,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						equalsSign=match[0];//'=>' or '<=' ('a = b.ref' or 'a = b.val')
 						command="set";
 					}
+					match=/(?<=\([\s\S]*\)\s*)(?:=>|=)?(?=\s*{)/
 					if(lineStr.match(/\([\s\S]*\)\s*(=>|=)?\s*{/)){// '(){' or '()={'
 						// =, ,=> for class/method/arrow function
 						isFunction=lineStr.match(/(=>|=)?(?=\s*{)/)?.[0]||true;
@@ -2755,9 +2782,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let i=words.i;//e.g. words: [debugger.typeof, i=label, ;]
 						if(cmd?.isDebugger){
 							let error=this.warnColour((isMeta?"#":"")+cmd.name+"::"+codeObj.sourceLineNumber+"::");
-							loga(words.map(v=>v[0]),"??",words.i);
 							let {label,wasDeclared,name,didParse}=await parseLabelOrNumber({error,words,scope,codeObj,makeVars:false});
-							loga(words.map(v=>v[0]),"!!",words.i);
 							if(didParse&&!wasDeclared&&(label instanceof Scope||label==undefined)){
 								if(typeof name == "symbol"){
 									name=String(name);
@@ -2825,9 +2850,10 @@ const oxminCompiler=async function(inputFile,fileName){
 								//errorMsg+"line"+codeObj.sourceLineNumber+
 								if(1||label instanceof Scope){
 									//let list=[];for(let i in label.labels)list.push(i);
+									let data=label.getDataSummery();
 									console.warn(error+"'"+label.name+"':",
-										(label.isFunction?"function":label.isBlock?"block":label.wasDeclared!==false?"label": "undefined"),
-										"| defined:",!!label.codeObj
+										data.type,//(label.isFunction?"function":label.isBlock?"block":label.wasDeclared!==false?"label": "undefined"),
+										"| defined:",data.def//!!label.codeObj
 									);
 								}else{
 									throw Error(throwError(codeObj,"label:"+words[words.i]+"was not declared",error));
@@ -2870,7 +2896,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									vm.createContext(sandbox);
 									const code = "log = ["+(""+str).match(/(?<=^.)[\s\S]*(?=.$)/)?.[0]+"\n]";//removes start and end ' " 's
 									try{vm.runInContext(code, sandbox);}catch(error){
-										if(!(TEST=1))console.warn(error);
+										console.warn(error);
 										throw Error(throwError(codeObj,", Could not run the javascript. threw:{{'"+error+"'}}"))
 									}
 									console.warn(error,...sandbox.log)
@@ -3331,25 +3357,40 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					else{//parts are strings
 						varType="meta";isBlock=false;//break up line into words.
+						let brackets=0;
 						for(let i=partI;i<parts.length;[i++,parts.skipParts++,codeObj.skipParts++]){// 'code "str" more code;' joins str's with normal words.
 							lineStr=parts[i]??"";
 							if(lineStr instanceof Str){
 								words.push(parts[i]);
 							}
 							else{
-								let lastMatch;
 								words.push(...lineStr.matchAll(wordsRegex));//better one: /([_\w,\[]+\s*\.\s*)*[_\w,\[]+|\[|(->|<-)|[+-]?(0[xb])?[0-9a-fA-F]/g)];//
+								trackBrackets:{
+									for(let j of (parts[i]+"").match(/[()]/g)??[]){
+										if(j=="(")brackets++;
+										else if(j==")")brackets--;
+										if(brackets<=0)break;
+									}
+								}
 								if((parts[i]+"").match(/{\s*$/)){
 									isBlock=true;
 									break;
 								}
-								if(lastMatch=parts[i].match(/[;}]\s*$/)&&words.length){
+								if(parts[i].match(/[;}]\s*$/)&&words.length
+									){
 									break;
 								}
-								if(lastMatch=parts[1+i]?.match?.(/}\s*$/)&&words.length>0){//treat '1}' as 2 separate code objects
+								if(parts[1+i]?.match?.(/}\s*$/)&&words.length>0){//treat '1}' as 2 separate code objects
 									break;
 								}
 							}
+						}
+						const isStrict=true;
+						if(isStrict)if(brackets!=0){
+							if(brackets>0)throw Error(throwError(codeObj,
+								"unballanced '()' brackets. May cause compiler errors in surtain cases."+
+								" Try adding ')'s."
+							));
 						}
 						words.str=words.map(v=>v[0]).join(" ");
 					}
@@ -3661,7 +3702,7 @@ const oxminCompiler=async function(inputFile,fileName){
 										}
 									}
 								}
-								else{
+								else if(command.number==undefined){
 									words.i--;
 								}
 								//words.i==0
@@ -4063,21 +4104,26 @@ const oxminCompiler=async function(inputFile,fileName){
 			//non-meta pass
 			(function nonMetaPass(){
 				let states=[OxminState.state=new OxminState()];
+				let nextState;
+				let setState=(codeObj)=>{
+					codeObj.computerState=new OxminState({
+						jump:codeObj.parent.findPointer("jump")?.address,
+						move:codeObj.parent.findPointer("move")?.address,
+					});
+				}
 				for(let i=0;i<nonMetaCode.length;i++){
 					//if(codeObj.hasDebugger)debuggerObj.parse({});
 					let isJumping=false;
 					let codeObj=nonMetaCode[i].codeObj;
 					let isMeta=nonMetaCode[i].isMeta;
-					if(!states[codeObj.voidLevel]){
+					if(!states[codeObj.voidLevel])
+					for(let i=0;i<=codeObj.voidLevel&&states.length<=codeObj.voidLevel;i++){
 						states.push(new OxminState(OxminState.state));
 					}//assuming "{" count as non-meta codeObjects
 					else if(codeObj.voidLevel!=states.length-1)states.pop();
 					OxminState.state=states[codeObj.voidLevel];
 					Scope.currentCodeObj=codeObj;
-					codeObj.computerState=new OxminState({
-						jump:codeObj.parent.findPointer("jump")?.address,
-						move:codeObj.parent.findPointer("move")?.address,
-					});
+					setState(codeObj);
 					codeObj.semiValue=undefined;//compiled to 0bmin
 					let dif;
 					if(codeObj.command?.type=="string"){
@@ -4108,12 +4154,19 @@ const oxminCompiler=async function(inputFile,fileName){
 					else{
 						const movePointers=(dif)=>{
 							if(codeObj.command.pointer){
-								if(codeObj.command.pointer.name!="jump"){
+								if(codeObj.command.moveMode=="=>"){
+									//codeObj.command.pointer.address+=dif;
+									codeObj.parent.findPointer(codeObj.command.pointer.name).address+=dif;
+									if(codeObj.command.pointer.name=="jump"){
+										isJumping=true;
+									}
+									if(codeObj.command.pointer.name=="move"){
+										//setState(codeObj)
+									};
+								}
+								else if(codeObj.command.pointer.name!="jump"){
 									codeObj.command.pointer.address+=dif;//move pointer
 									//codeObj.command.pointer.address=codeObj.command.pointer.address;
-								}else if(codeObj.command.moveMode=="=>"){
-									codeObj.parent.findPointer("jump").address+=dif;
-									isJumping=true;
 								}
 							}
 							codeObj.jumpOpand.value=dif;
@@ -4175,7 +4228,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 	//find (!isMeta) binary code
 		let hasWarned=false;
-		const compileCodeCollector=function(scope){
+		const compileCodeCollector=function(scope,throwWarnings=false){
 			const codeCollector=function*(scope){//ignore "codeObj.isMeta"
 				for(let i of scope.code){//codeObj
 					if(i.isMeta||(i.isVoid&&!i.hasDef))continue;
@@ -4203,7 +4256,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						//||toCodeObj.state.jump!=codeObj.state.jump
 					){
 						//throw Error(
-						console.warn(throwError(codeObj,
+						if(throwWarnings)console.warn(throwError(codeObj,
 							" @: "
 							+"jumping from lines"
 							+"'" +"0xmin"+codeObj.computerState.jump+" -> 0xmin"+toCodeObj.lineNumber+"'"
@@ -4235,7 +4288,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					croppedSource:v.croppedSource,//unsure about this line
 				},num+" #30bit;",newScope);//the string doesnt matter as long as it doesnt do anything when run.
 			});//code converted to list of numbers
-			newScope.code=codeFilts;
+			newScope.arrayLabels=codeFilts;
+			newScope.code=code;
+			newScope.isBlock=true;
 			return {scope:newScope,code,}
 		}
 	//----
@@ -4252,7 +4307,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		compileNonMeta(scope);
 		
 		CallStackObj.phase=CallStackObj.phases[2]="";//"code collection phase"
-		parsed.codeList=[...compileCodeCollector(scope).code];
+		parsed.codeList=[...compileCodeCollector(scope,true).code];
 
 		parsed.outputFile=parsed.codeList.map(v=>v?.toValueValue);
 		if(buildSettings.drawTable)console.table(parsed.codeList.map(v=>{
