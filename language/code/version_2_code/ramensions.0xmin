@@ -40,9 +40,6 @@ let ramension()={
 		}
 		var memory{};
 		var block{
-			
-			null;
-			$move->memoryPart.block;
 			#let goto_y()={
 				null;
 				#let a;
@@ -57,37 +54,62 @@ let ramension()={
 			;
 			let moveToY=int=(null);
 			let yToMove=int=(null);
-			#let setCommands{
-				#let shift{
-					let{
-						0 +1;
-					}::{
-						(this..compile);
-						debugger.codeof this..compile;
+			#{
+				let goto()={
+					#def let a;
+					#set constructor.block{
+						move->a;set;
 					}
+				}::{let block{}}
+				let gofrom()={
+					#def let a;
+					#set constructor.block{
+						move->a;set;
+					}
+				}::{let block{}}
+				#let setCommands{
+					#let shift{
+						let{0 +1;}::{(this..compile()[0]*2);}
+						#int=(this);
+					}
+					#let negative{
+						let{0 -0;}::{(this..compile()[0]);}
+						#int=(this);
+					}
+					move->y;get;
+					move->shift;red;
+					move->moveToY;set;
+					def goto.block;
+					move->negative;or;
+					move->yToMove;set;
+					def gofrom.block;
 				}
-				move->y;get;
-				move->int=(shift);
-				red;
-
 			}
 			def setCommands;
+			#let endFor;
 			let{
 				start:{
-					move->x;get;
-					move->i;set;
+					move->x;get;nor;
+					move->i;set;//i = ~x
 				}
 				condision:{
-
+					move->i;get;//while i!=white
+					if;nor;
 				}
-				{}
-				block:{}
+				add1:{
+					move->i;get;
+					def increment();
+					move->i;set;
+				}
+				block:{
+					
+				}
 			}::{
-				for(this[0],this[1],this[2],this[3]);
+				def for(this[0],this[1],this[2],this[3]);
 			}
 			def memory;
 			repeat 10 int();
 		}
 	}
 }
-def ramension.block;
+//def ramension.block;

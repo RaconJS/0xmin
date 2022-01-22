@@ -1,5 +1,2 @@
-#"log.table";
-#"log.code";
-//import this "../code/version_2_code/ramensions.0xmin";
-let a;
-a..TESTING;
+let ["asd"]=#.;
+debugger asd;

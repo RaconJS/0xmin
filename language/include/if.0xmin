@@ -1,0 +1,15 @@
+let then(block,scope){#;
+
+	set scope{
+		...block;
+	}
+}
+let boolKey;
+let if(bool){#;
+	let set block,scope,return;//
+	let set scope[boolKey]=+bool;debugger scope[boolKey];
+	repeat scope[boolKey] then(block,scope);
+}
+let else(){
+	repeat (!scope[boolKey]) then(block,scope);
+}

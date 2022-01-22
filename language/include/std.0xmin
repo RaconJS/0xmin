@@ -141,7 +141,7 @@ if(main){def main;}
 	#let return.block=block;
 }
 #let set import{
-	#let switch(){
+	#let switch(){//obsilete
 		#let switch(array,index,run)={
 			if(!run){
 				#let set run={
@@ -284,7 +284,8 @@ if(main){def main;}
 				null # def notOut;
 				2 # def const_2;
 			}
-			move->notIn;set;
+			move->notIn;
+			set;
 			nor;
 			set;//notIn= ~input
 			blue;
@@ -294,7 +295,6 @@ if(main){def main;}
 			move->notOut;
 			set;
 			nor;
-			set;
 			move->notIn;
 			red;
 		}
