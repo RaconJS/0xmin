@@ -342,10 +342,11 @@ const oxminCompiler=async function(inputFile,fileName){
 					this.labels.move=new Pointer({address:0,name:"move"});
 					this.labels.alu=new Register({address:0,name:"alu",label:undefined});
 					this.labels.alu=new Register({address:0,name:"alu",label:undefined});
-					Object.assign(this,);
+					//Object.assign(this,);
 					return this;
 				}
 				intoLabeledLetBlock(codeObj){//"label:{"
+					if(Object.isFrozen(this))return this;
 					let oldLabel=this.findLabel("continue");//'continue' is similar to 'this'
 					this.labels["continue"]??=new Label({//for 'jump->continue.blockName;'
 						name:this.name,
@@ -380,9 +381,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return this;
 				}
 				intoVarBlock(codeObj){//"label{"
-					if(this.findLabel(this.name)){//allows use of old label in scope with same name. strange rule
-						if(0)this.labels[this.name]=this.findLabel(this.name);
-					}
+					if(Object.isFrozen(this))return this;
 					{
 						this.labels["this"]??=this;new Label({
 							name:"this",
@@ -503,7 +502,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								},
 								parent:self.parent,
 							}),
-							get "TESTING"(){loga("???",Error());},
 							"length":new NumberObj({parent:this,name:"[length]"+codeLen(),
 								isFunction:true,
 								defaultFunction({label,scope,codeObj}){
@@ -681,8 +679,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			};
 			class NumberObj extends Scope{
 				isBlock=true;
-				constructor(dataObj,codeObj,value,name){
-					if(!dataObj.parent)throw Error("compiler: type error: dataObj.parent is undefined.");
+				constructor(dataObj,codeObj,value,name,forceCreation=false){
+					//forceCreation should only be used for built in constants e.g. 'true' or 'null'.
+					if(!forceCreation&&!dataObj.parent)throw Error("compiler: type error: dataObj.parent is undefined.");
 					name??=value;
 					let scope=dataObj.scope??undefined;
 					super({});
@@ -696,7 +695,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							isNonMeta:true,
 							isMeta:false,
 							phaseLevel:phaseMap["@"],
-							sourceLineNumber:codeObj.sourceLineNumber,
+							sourceLineNumber:forceCreation?codeObj?.sourceLineNumber:codeObj.sourceLineNumber,
 							//toValueValue:value,
 						},value+";",this)],
 						relAddress:value,
@@ -849,7 +848,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//if(TST>=5000){throw new Error("::"+scope?.name+"::"+name);}
 				if((!scope)||(scope[findLabel.key]??0)>0)return;
 				scope[findLabel.key]??=0;
-				scope[findLabel.key]++;
+				scope[findLabel.key]++;if(name=="(int){true}")throw Error();
 				let label=scope.labels.hasOwnProperty(name)&&(scope.labels[name]||scope.labels[name]===null)?scope:(undefined
 					??findLabelParent(scope.scopes.code,name)
 					??findLabelParent(scope.scopes.let,name)
@@ -974,6 +973,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						}).intoVarBlock(codeObj);
 						if(isFunctionCall&&block){
 							parametersObj["block"]=block;
+							parametersObj["scope"]=scope.scopes.code.scopes.parent;
 						}
 						if(block?.isFunctionCall&&!dontRun){
 							label.name=""+foo.name+"(){}";
@@ -1181,6 +1181,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					let label,lblName=undefined,hasDef,name;
 					let wasDeclared=true,isDeclared=true,refLevel=0,arrayCodeObj;
 					if(startLabel)block=scope;
+					startLabel??=scope;
 					{
 						let words=[...lineStr.matchAll(/(["`'])[\s\S]*?\1|[,;]|[\w_]+|\.+|(?:=>?)\s*\(|(?:<?[\-=]>?)|\(|\[|\]|>>>?|<<|[&|^*]{2}|[\S]/g)];
 						stringstoStr(words,codeObj);
@@ -1279,6 +1280,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									label=startLabel;
 								}
 								block=label;
+								refLevel++;
 								if(word=="[")i+=1;
 								if(word=="(")i+=2;//start after brackets
 								words.i=i;
@@ -1357,7 +1359,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 									else{label=undefined;}
 								}
-								else{
+								else{//'a['b']' or 'a.("b")'
 									if(indexArg instanceof Str)indexArg=indexArg.string;
 									if(typeof indexArg=="string"||indexArg instanceof Scope){//'a.("b")'
 										if(indexArg instanceof StringObj){
@@ -1398,22 +1400,30 @@ const oxminCompiler=async function(inputFile,fileName){
 									}
 								}
 								thisIsName=true;
-							}else if(word[word.length-1]=="("&&evalFoo){
-								if(i==0){//'(1+1)()'
-									label=startLabel;
+							}else if(word[word.length-1]=="("){
+								if(evalFoo){
+									if(i==0){//'(1+1)()'
+										label=startLabel;
+									}
+									if(!block)break;//'(' for non-function bracket scope
+									let index=words[i].index;
+									let i1=i;
+									({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
+									if(0)for(;i<words.length;i++){//adjust words.i; index system is OBSILETE
+										if(!words[i+1]||words[i+1]?.index>=index)break;
+									}
+									i=words.i-1;
+									//i=Math.max(i1,i);//use the new index next iteration
+									word=words[i+1]?.[0];
+									//thisIsName=false;
+									refLevel++;
 								}
-								if(!block)break;//'(' for non-function bracket scope
-								let index=words[i].index;
-								let i1=i;
-								({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
-								if(0)for(;i<words.length;i++){//adjust words.i; index system is OBSILETE
-									if(!words[i+1]||words[i+1]?.index>=index)break;
+								else{//for workng out label/number/operator types
+									for(let brackets=1;i<words.length&&brackets>0;i++){
+										if(words[i][0]=="(")brackets++;
+										if(words[i][0]==")")brackets--;
+									}
 								}
-								i=words.i-1;
-								//i=Math.max(i1,i);//use the new index next iteration
-								word=words[i+1]?.[0];
-								//thisIsName=false;
-								refLevel++;
 							}else if([",", ";","}"].includes(word)){
 								break;
 							}else {
@@ -1599,20 +1609,20 @@ const oxminCompiler=async function(inputFile,fileName){
 							undefinedTest(arg1);
 							//'a + = b' or 'a &-> b' doesnt return a new Label.
 							if(args.length>=3&&(args[args.length-3] instanceof BracketValue)){//'lbl && lbl' label operator label
-								//errors here be be due to syntax errors like 'a || ||' instead of 'a || b'
-								if(operator.match(/^(&&|\^\^|\|\|)$/)){
-									undefinedTest(arg0);
-									if(operator=="&&")ans=arg0.bool?arg1:arg0;
-									else if(operator=="||")ans=arg0.bool?arg0:arg1;
-									else if(operator=="^^")ans=!arg0.bool?arg1:!arg1.bool?arg0:new BracketValue({scope,label:labelFalse,bool:false,type:"label"});
-									else if(operator=="??"){//
-										throw Error("compiler error:"+throwErrorLine(codeObj)+"'??' does not entirely work so is not implemented YET."+throwErrorFile(codeObj))
-										ans=(arg0.type=="label"?!arg0.wasDeclared:arg0.type=="number"?!isNaN(arg0.number):arg0.type=="string"?arg0.string!=undefined:true)
-											?arg0:arg1
-										;
+								let stopBoolChain=()=>{//stops `a=b=c` to be like `a<b<c` == `(a<b)&&(b<c)`
+									let arg;
+									if(arg0.type=="bool")arg=arg0;
+									if(arg1.type=="bool")arg=arg1;
+									if(arg){
+										arg.label=undefined;
+										arg.number=+arg.bool;
 									}
 								}
-								else if(operator.match(/^([!=><]=|===|[><])$/)){//'a == b'
+								//errors here be be due to syntax errors like 'a || ||' instead of 'a || b'
+								if(operator.match(/^([!=><]=|===|[><])$/)){//'a == b'
+									//allows for bool chains: 'a<b<c' ==> `(a<b)&&(b<c)`,
+									//in 'a<b<c' the label part 'b' is saved across the two operations.
+									//bool chains end when a non-chaining operator (e.g. '+') is done. The label is then removed.
 									undefinedTest(arg0);
 									ans=new BracketValue({scope});
 									ans.toBool();
@@ -1655,7 +1665,21 @@ const oxminCompiler=async function(inputFile,fileName){
 										ans.type="bool";
 									}
 								}
+								if(operator.match(/^(&&|\^\^|\|\|)$/)){
+									stopBoolChain();
+									undefinedTest(arg0);
+									if(operator=="&&")ans=arg0.bool?arg1:arg0;
+									else if(operator=="||")ans=arg0.bool?arg0:arg1;
+									else if(operator=="^^")ans=!arg0.bool?arg1:!arg1.bool?arg0:new BracketValue({scope,label:labelFalse,bool:false,type:"label"});
+									else if(operator=="??"){//
+										throw Error("compiler error:"+throwErrorLine(codeObj)+"'??' does not entirely work so is not implemented YET."+throwErrorFile(codeObj))
+										ans=(arg0.type=="label"?!arg0.wasDeclared:arg0.type=="number"?!isNaN(arg0.number):arg0.type=="string"?arg0.string!=undefined:true)
+											?arg0:arg1
+										;
+									}
+								}
 								else if(operator.match(/^([+\-*/]|%|[&|\^~]|\*\*|>>>?|<<)$/)){
+									stopBoolChain();
 									undefinedTest(arg0);
 									arg0.toNumber();
 									arg1.toNumber();
@@ -1696,6 +1720,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									//DOTO need to change 'equalsOperator' so it does "=" part and the "+" part
 								}
 								else if(operator.match(/^(<?[\-=]>?|\.\.\.)$/)){if(!(words[words.i]?.[0]??"").match(operatorRegex1)){//done last
+									stopBoolChain();
 									if(operator.match(/<[-=]/)){// 'a<-b' == 'b->a'
 										let carry=arg0;
 										arg0=arg1;
@@ -1942,12 +1967,14 @@ const oxminCompiler=async function(inputFile,fileName){
 						let type=ans.type;
 						if(ans.type=="bool"){
 							ans.number=+ans.bool;
-							ans.toNumber();
+							//ans.toNumber();
+							//ans.label=undefined;
 						}
 						if(ans.type=="number"){
 							//ans.label=new NumberObj({parent:scope},codeObj,ans.number);
 							ans.bool=Boolean(ans.number)
 							ans.refLevel=0;
+							ans.label=undefined;
 						}
 						if(ans.type=="string"){
 							ans.toLabel(codeObj);
@@ -1959,10 +1986,10 @@ const oxminCompiler=async function(inputFile,fileName){
 					}label=ans.label;
 					return ans;
 				};
-				let labelTrue =new NumberObj({bool:true ,parent:"temp"},{sourceLineNumber:"NA"},1,"{true}" );
-				let labelFalse=new NumberObj({bool:false,parent:"temp"},{sourceLineNumber:"NA"},0,"{false}");
-				let labelUndefined=new Scope({name:"{undefined}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
-				let labelNull=new Scope({name:"{null}",bool:false,parent:"temp",sourceLineNumber:"NA",relAddress:NaN});
+				let labelTrue =new NumberObj({bool:true ,sourceLineNumber:"NA"},undefined,1,"{true}" ,true);
+				let labelFalse=new NumberObj({bool:false,sourceLineNumber:"NA"},undefined,0,"{false}",true);
+				let labelUndefined=new Scope({name:"{undefined}",bool:false,sourceLineNumber:"NA",relAddress:NaN});
+				let labelNull=new Scope({name:"{null}",bool:false,sourceLineNumber:"NA",relAddress:NaN});
 				labelNull.arrayLabels=[new CodeObj({command:{number:0}},labelNull,"null;")];
 				labelNull.code=[...labelNull.arrayLabels];
 				if(EndBracket)labelNull.code.push(new EndBracket(labelNull));
@@ -2007,6 +2034,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let index,label,wasDeclared,name,refLevel;
 						index=getWordsLength(words);
 						({index,label,block,name,lblName,wasDeclared,refLevel,arrayCodeObj}=await evalLabel({index,startLabel,lineStr,scope,makeVars,words,codeObj,evalFoo}));
+
 						for(;words.i<words.length;words.i++){//adjust words.i
 							if(!(getWordsLength(words)<index))break;
 						}
@@ -2240,7 +2268,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								didParse=true;
 							}
 							if(!(words[words.i]?.[0]??"").match(/^\w+/)){// 'label+2' ignors 'label let'
-								
 								//let ret=await parseSetStatement({words,scope,codeObj,label,block,name});
 								let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
 								({label}=ret);//,block,name,refLevel,wasDeclared
@@ -2386,10 +2413,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let thisIsName=false;
 						let word=words[i][0];
 						if(word!=":"&&!lbl&&word.match(/\b(let|var|set|def|void|static)\b/)){// /(def)?(let|var|set)/
-							if(word=="def"){
-								hasDef=true;
-								isVarScope=true;
-							}else if(word=="void"){
+							if(word=="void"){
 								if(lastPhaseSymbol){
 									phaseLevel=phaseMap[lastPhaseSymbol];
 									if(lastPhaseSymbol=="#"){
@@ -2403,6 +2427,10 @@ const oxminCompiler=async function(inputFile,fileName){
 							}else if(word=="static"){
 								isStatic=true;
 								scope=functionScope;
+							}
+							else if(word=="def"){
+								hasDef=true;
+								isVarScope=true;
 							}else{//let var set
 								if(["var", "let"].includes(word))varType=word;
 								if(["set"].includes(word))varType1=word;
@@ -2462,6 +2490,10 @@ const oxminCompiler=async function(inputFile,fileName){
 							lastWasName=thisIsName;
 						}
 					}
+				}
+				if(Object.isFrozen(lbl)&&lbl){
+					lbl=(await evalParamaters({label:lbl,words:["(",")",],lineStr0:new CodeObj({},"()",scope)}).label);
+					lblName=lbl?.name;
 				}
 				//spaghetti starts here. SPAGHETTI
 				isFunctionCall&&=(equalsSign||!(varType1||varType))&&lblName!=undefined;
@@ -3146,6 +3178,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//'name' == normal label
 				//'{name}' == inbuilt object. e.g. '0xmin' or 'String'
 				//'<name>' == `debugger label();` == instanceOf function.
+				//'name(){}' == `let name(){debugger;};name(){};` == function call with block argument.
 				//'name{}' == `label{debugger;}` == physical scope of label.
 				//':name:' == `label::{debugger;}` == extension block.
 				//'name::data' == `debugger Object.getData(label);`
@@ -3416,7 +3449,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let argsObj={words,scope,lineStr};
 						let index=0;
 						let addToNonMeta=false;
-						line_specifiers:{
+						lineSpecifiers:{
 							//can apply to any line of code
 							for(let i=0;i<2;i++){//'static void'
 								if(words[words.i]?.[0]=="static"&&functionLevels[0]<=1){
@@ -3710,7 +3743,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(words[words.i]?.[0]==",")words.i++;//allow 'nor, jump->4;' to separates opcodes and opands
 							//work out command?
 							let useBlock=false;//'block;'. Is similar to: 'def block;'
-							let label;
+							let label;//the first expression if its a label.
 							if(codeObj.isNonMeta&&words[words.i])if(command.number==undefined)parse:{//"label->pointer;" or ";" or ""
 								//addToNonMeta=true;
 								command.number=undefined;
@@ -3747,7 +3780,7 @@ const oxminCompiler=async function(inputFile,fileName){
 											label=value.label;
 										}
 									}
-									else ({label,wasDeclared}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false,evalFoo:false}));
+									else ({label,wasDeclared}=await parseLabelOrNumber({words,scope,codeObj,makeVars:false,evalFoo:true}));
 									if(!isNaN(label)){//"0x1234;"
 										command.number=+label;
 										label=undefined;
@@ -3760,8 +3793,8 @@ const oxminCompiler=async function(inputFile,fileName){
 											codeObj.debug=await debuggingTool.parse({scope,words,codeObj,parts,isMeta:true});//a function that runs in the non-meta phase
 										}else{// if(!isMeta)// 'block;' or '#label->move' or 'label1->label2'.
 											// Used for: 'block;' --> 'def block;' exept doesnt set pointers (they do similar things)
-											words.i=oldI;
-											if(!usedBracketParse)label=(await parseLabelOrNumber({words,scope,codeObj,makeVars:false})).label;
+											//words.i=oldI;
+											//if(!usedBracketParse)label=(await parseLabelOrNumber({words,scope,codeObj,makeVars:false})).label;
 											if(label instanceof Str){// '"string";' == 'String("string")'
 												label=new StringObj({parent:codeScope},codeObj,label.string);
 											}
@@ -3788,7 +3821,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							let jumpOpcode;
 							let pointerOperators=["->", "<-", "=>", "<=", "="];
 							//
-								let arg;
+								let arg=label;
 								const parseOffsetNumbers=(n)=>{
 									arg=strToNumber(words[words.i]?.[0]);//n:["move +1 -> x;", "move -> x +1"]
 									if(!isNaN(arg)){//"move label -43 ->label2;" same as: "#move->label;#move-43;move->label2;""
@@ -3806,7 +3839,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(words[words.i]&&addToNonMeta&&codeObj.isNonMeta){//psudo regex:/^ (jump|move) ({{number}}? (->|=>) {{label}} {{number}})? {{number}}/
 								let name;
 								if(!isVarWord(words[words.i][0])){//"jump +4" or "jump label"
-									({label:arg,name}=await parseLabelOrNumber({words,lineStr,pointerOperators,scope,codeObj,makeVars:sloppyMode}));
+									let label,wasDeclared;
+									({label,name,wasDeclared}=await parseLabelOrNumber({words,lineStr,pointerOperators,scope,codeObj,makeVars:sloppyMode}));
+									arg=label;
 									let ignoreBlock=true;
 									if(!isNaN(+arg)){//jump +4
 										jumpOpand=arg;
