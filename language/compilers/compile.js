@@ -1056,71 +1056,39 @@ const oxminCompiler=async function(inputFile,fileName){
 								else if(word[0]==")"){brackets--;}
 								else if(word.match(/^(;|,)/)){}
 								else if(openedBrackets){
-									if(0){//old working version
-										let argument,didParse;
-										//index=word.index;
-										({label:argument,refLevel,didParse}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
-										let argument1=new Scope({
-											name:word,
+									let label,didParse;
+									//index=word.index;
+									let oldI=words.i;
+									({label,refLevel,didParse}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
+									let argument1=new Scope({
+										name:word,
+										parent:scope,
+									});
+									argument1.scopes.parent=label;
+									if(label instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
+										let num=+label;
+										let name=word;//foo.parameters[parameters.length];
+										label=new NumberObj({
 											parent:scope,
-										});
-										argument1.scopes.parent=label;
-										if(argument instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
-											let num=+argument;
-											let name=word;//foo.parameters[parameters.length];
-											argument=new NumberObj({
-												parent:scope,
-											},codeObj,num,name);
-											argument.scopes.parent=argument;
-											argument.relAddress=num;
-										}
-										let oldI=words.i;
-										if(refLevel==0&&(await parseSetStatement({scope,label:argument1,words,codeObj,tryTest:true})).didParse){
-											words.i=oldI;
-											//foo(a,c){};var b;foo(a=b,c=b);
-											let label;
-											({label}=await parseSetStatement({scope,label:argument1,words,codeObj}));//parseSetStatement
-											parametersObj[word]=label;
-										}else words.i=oldI;
-										if(argument)parameters.push(argument);
-										else throw Error(throwError(codeObj,"label '"+word+"' was not declared"));
-										words.i--;
+										},codeObj,num,name);
+										label.scopes.parent=label;
+										label.relAddress=num;
+									}if(label instanceof Str){
+										//toLabel from Str
+										label=label.toLabel({codeObj,scope});
 									}
-									if(1){
-										let label,didParse;
-										//index=word.index;
-										let oldI=words.i;
-										({label,refLevel,didParse}=await parseLabelOrNumber({lineStr,scope,codeObj,words,makeVars:false}));
-										let argument1=new Scope({
-											name:word,
-											parent:scope,
-										});
-										argument1.scopes.parent=label;
-										if(label instanceof Number){//'foo(2);' --> '#let a{2;};foo(a);'
-											let num=+label;
-											let name=word;//foo.parameters[parameters.length];
-											label=new NumberObj({
-												parent:scope,
-											},codeObj,num,name);
-											label.scopes.parent=label;
-											label.relAddress=num;
-										}if(label instanceof Str){
-											//toLabel from Str
-											label=label.toLabel({codeObj,scope});
-										}
-										let setName=refLevel==0&&(words[words.i]?.[0]??"").match(equalsRegexWord);
-										if(setName){
-											label=argument1;
-										}
-										({label}=await evalBrackets({scope,label,words,codeObj}));//parseSetStatement
-										if(setName){
-											//foo(a,c){};var b;foo(a=b,c=b);
-											parametersObj[word]=label;
-										}
-										else if(label)parameters.push(label);
-										else throw Error(throwError(codeObj,"label '"+word+"' was not declared"));
-										words.i--;
+									let setName=refLevel==0&&(words[words.i]?.[0]??"").match(equalsRegexWord);
+									if(setName){
+										label=argument1;
 									}
+									({label}=await evalBrackets({scope,label,words,codeObj}));//'a=b'
+									if(setName){
+										//foo(a,c){};var b;foo(a=b,c=b);
+										parametersObj[word]=label;
+									}
+									else if(label)parameters.push(label);
+									else throw Error(throwError(codeObj,"label '"+word+"' was not declared"));
+									words.i--;
 									continue;
 								}
 								//index+=word.length;
@@ -2065,143 +2033,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					return{index:words[words.i]?.index,didParse:false};
 				};
-				//set statement is OBSILETE. replace with eval brackets.
-				const parseSetStatement=async function({label,label2=null,words,block,codeObj,scope,tryTest=false,evalFoo=true}){ //... 'label => label'
-					if(tryTest)throw Error("compiler error: expected tryTest == false.\n\n not allowed to cause side effects.")
-					if(tryTest)evalFoo=false;
-					let lineStr=words[0]?.input;
-					let oldLabel=label;
-					let didParse=false;
-					block??=scope;
-					let match=words[words.i];//let match=lineStr.substring(index).match(/^(?<=\s*)(=>|<=|=|->|<-)/);//"#var lblA => lblB; can do #set a=>b; as well"
-					let oldI=words.i;
-					parsingBlock:{if(match)if(["=>", "<=", "=", "->", "<-"].includes(match[0])){//.match(/^(=)$/)){
-						words.i++;
-						let finalValue;//a label
-						evalBrackets_version2:{//TO_DO:{add maths evaluating e.g. "#var a=1+2*4/b;"}
-							if(label2){
-								finalValue=label2;
-							}
-							else{
-								let arg,num,block;
-								finalValue={};
-								//index=Math.max(index,words[words.i]?.index??words[words.i-1]?.index+words[words.i-1][0].length);
-								finalValue.block=block;
-								finalValue.number=undefined;
-								let doneLabel=false;
-								for(let i=0;i<2;i++){// /set {{label}}={{label}} ({{label}}||{{number}})?; "# a = b +2;""a = +2;"
-									//let currentBlock=block;
-									({label:arg,block}=await parseLabelOrNumber({words,scope,codeObj,makeVars:i==0?false:undefined}));
-									if(!doneLabel&&arg instanceof Scope){
-										doneLabel=true;
-										finalValue.type="label";
-										finalValue.label=arg;
-										finalValue.block=block;
-										//block=currentBlock;
-									}
-									else if(!isNaN(+arg)){
-										doneLabel=true;
-										finalValue.number=arg;
-									}
-								}
-								/*let oldI=words.i;
-								let num;
-								({label:num,block}=await parseLabelOrNumber({words,lineStr,scope,codeObj}));
-								if(arg instanceof Scope){
-									finalValue.type="label";
-									finalValue.label=arg;
-									finalValue.number=arg;
-								}
-								else if(!isNaN(+arg)){
-									finalValue.type;
-									finalValue.number=arg;
-								}*/
-							}
-						}
-						//label.scopes.parent.labels[label.name];
-						//label.scopes.parent=finalValue.label.scopes.parent;
-						//"set labelA=labelB;"
-						if(finalValue.number!=undefined||finalValue.label){// if("address" in (finalValue.label??{})){
-							didParse=!(finalValue.label instanceof Pointer||label instanceof Pointer);
-							if(tryTest)break parsingBlock;
-							//if(finalValue.label instanceof Pointer||(label instanceof Pointer))
-							if(finalValue.label)switch(match[0]){//"#set a -> b ;"
-								case"="://strong equals | like "parameter=argument"
-									//can get wrong name errors
-									block.labels[label.name]=finalValue.label;//??label.scopes.parent
-									label=finalValue.label;
-									//"A=B;" -> "scope.labels.A.name=B"
-									if(0){//BODGED, not sure if "=" works in every case.
-										label.codeObj=finalValue.label;
-										if(label.isBlock=finalValue.label.isBlock){
-											//label.isNonMeta=false;
-											label.code=finalValue.label.code;
-											if(label.isFunction=finalValue.label.isFunction){
-												label.parameters=finalValue.label.parameters;
-											}
-										}
-									}
-								break; 
-								case"=>"://weak equals | set block references | &a.block = &b.block;
-									//label.scopes.let=undefined;
-									//label.scopes.var=undefined;
-									//label.scopes.parent=finalValue.label;
-									if(finalValue.label.isBlock){//same as #set a()=>{def b;};
-										label.isBlock=true;
-										label.code=finalValue.label.code;//[...finalValue.label.code];
-									};
-									if(0){
-										label.code=finalValue.label.code;
-										label.isBlock=finalValue.label.isBlock;
-										label.parameters=finalValue.label.parameters;
-										label.isFunction=finalValue.label.isFunction;
-									}
-								break;
-								case"<=":
-									if(1)if(label.value.isBlock){
-										finalValue.isBlock=true;
-										finalValue.code=[...label.value.code];//same as #set a=>{...b;}
-									};
-									if(0){
-										label.code=[...finalValue.label.code];
-										label.isBlock=finalValue.label.isBlock;
-										label.parameters=[...finalValue.label.parameters];
-										label.isFunction=finalValue.label.isFunction;
-									}
-									errorLog("WARNING: use of experimental features. the use of the operator:'<' is not fully desided yet");
-								break;
-								case"->"://set def's refferences | &a.address = &b.address;
-									label.codeObj=finalValue.label;
-								break;
-								case"<-":{
-									finalValue.label.codeObj=label.codeObj;//undesided on what it should do
-									errorLog("WARNING: use of experimental features. the use of the operator:'<-' is not fully desided yet");
-								}break;default:
-								errorLog([match[0]]);
-								throw Error("logic error in .js: expected assignment symbol, got:'"+match[0]+"' check\n\tswitch(match[0])\n\tand\n\t['=','=>','->',etc...].includes(match[0])\nthis is not a 0xmin error.\n");
-							}
-							if(finalValue.number!=undefined){//#a=b+3;
-								if(["=", "=>","->"].includes(match[0])){
-									label.relAddress=finalValue.number;//not sure on this mechanic
-								}
-								else if(0){
-									if(finalValue.label)label.relAddress=finalValue.number;//'#set a->b+3'not sure on this mechanic
-									else label.relAddress+=finalValue.number;
-								}else{
-									throw Error("unfinished part of compiler");
-								}
-							}
-						}//label.address=finalValue.label.address;
-						else {
-							//errorLog(finalValue);
-							//throw new Error(throwError(codeObj,' unhandled expression: "'+codeObj.croppedSource +'"'));
-							break parsingBlock;
-						}
-						return{label,didParse};
-					}}
-					words.i=oldI;
-					return{label,didParse};
-				};parseSetStatement.test=({words})=>["=>", "<=", "=", "->", "<-"].includes(words[words.i][0]);
 				const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,hasDef=false,varType1=undefined,makeVars=true,doBrackets=true}){
 					//'#var label'
 						let {label,block,name,lblName,refLevel,wasDeclared}=await parseLabelOrNumber({
@@ -2286,7 +2117,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								didParse=true;
 							}
 							if(!(words[words.i]?.[0]??"").match(/^\w+/)){// 'label+2' ignors 'label let'
-								//let ret=await parseSetStatement({words,scope,codeObj,label,block,name});
 								let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
 								({label}=ret);//,block,name,refLevel,wasDeclared
 								//refLevel??=0;
@@ -2298,7 +2128,6 @@ const oxminCompiler=async function(inputFile,fileName){
 						let ret=await evalBrackets({words,scope,codeObj,label,block,name,wasDeclared});//new version but doesnt fully work
 						({label}=ret);
 					}{
-						//({label,didParse}=await parseSetStatement({words,codeObj,scope,label,block,name}));
 						if(!didParse){//doesnt use an '=' OBSILETE replaced by
 							let arg1;
 							let oldI=words.i;
