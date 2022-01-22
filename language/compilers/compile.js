@@ -513,20 +513,23 @@ const oxminCompiler=async function(inputFile,fileName){
 								parameters:["index","delete","array"],
 								defaultFunction({label,scope,codeObj}){
 									let args=[label.labels["index"],label.labels["delete"]];
+									args[0]=args[0].asNumber();
+									args[1]=args[1].asNumber();
 									let argsArray;
 									if(label.labels["array"] instanceof Scope){
 										argsArray=label.labels["array"];
+									}else{
+										argsArray=self;
 									}
-
-									//NEEDSTESTING and BODGED splicing in this way might cause errors
-									//let codePart=self.code.splice(args[0],args[1],getCode(argsArray));
-									let arrayPart=self.arrayLabels.splice(args[0],args[1],getCode(argsArray));
+									let arrayPart=self.arrayLabels.splice(args[0],args[1]);
+									self.code.splice(args[0],arrayPart.length);//prevents it removing the endbracket 
+									let codePart=[...arrayPart];loga(arrayPart.length)
 									for(let i in label.labels){
 										delete label.labels[i];
 									}
 									if(EndBracket)codePart.push(new EndBracket);
-									label.arrayLabels=codePart
-									label.code=codePart;
+									label.arrayLabels=arrayPart;
+									label.code=arrayPart;
 								},
 							}),
 							"code":new Scope({code:this.code,arrayLabels:this.code,isBlock:true,parent:self}),
@@ -609,6 +612,27 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(!this.isBlock){delete data.code;}
 					if(data.vars.length==0){delete data.vars;}
 					return data;
+				}
+				asNumber(){return this.relAddress;};
+				asObject(){return {...this.labels};};
+				asArray(){return [...this.arrayLabels.map(v=>v.label)];};
+				asString(){return this.arrayLabels.map(v=>v.char??"").join("");}
+				static toJSClass=class extends Array{
+					constructor(self){
+						return async()=>(await parseFunction({
+							scope:self,
+							parts:self.code,
+							codeScope:new Scope({parent:self,name:"<"+self.name+">"}),
+							codeObj:self.codeObj??"NA"
+						})).scope;
+					}
+				}
+				toJS(){
+					let newObj=new Scope.toJSClass(this);
+					Object.assign(newObj,{
+						...this.arrayLabels.map(v=>v.label??v.char??v.toValueValue??v.number)
+						,...this.labels});
+					return newObj;
 				}
 				static searchAddressSymbol=Symbol("isUsed");
 				static searchScopeSymbol=Symbol("isUsed");
@@ -828,8 +852,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			}if(0)EndBracket=undefined;//used then trying to remove "}"s
 			const findLabel=function(scope,name){
 				return findLabelParent(scope,name)?.labels[name];
-				//TST++
-				//if(TST>=5000){throw new Error("::"+scope?.name+"::"+name);}
 				if((!scope)||(scope[findLabel.key]??0)>0)return;
 				scope[findLabel.key]??=0;
 				scope[findLabel.key]++;
@@ -844,8 +866,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				return label;
 			};findLabel.key=Symbol("");
 			const findLabelParent=function(scope,name){
-				//TST++
-				//if(TST>=5000){throw new Error("::"+scope?.name+"::"+name);}
 				if((!scope)||(scope[findLabel.key]??0)>0)return;
 				scope[findLabel.key]??=0;
 				scope[findLabel.key]++;if(name=="(int){true}")throw Error();
@@ -1446,9 +1466,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 			//---
 			//
-				const evalString=async function({words,scope,codeObj}){//UNFINISHED
-					//insert code for string parsing
-				};
 				class BracketValue{
 					scope;
 					constructor(data={}){Object.assign(this,data)}
@@ -2050,6 +2067,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				};
 				//set statement is OBSILETE. replace with eval brackets.
 				const parseSetStatement=async function({label,label2=null,words,block,codeObj,scope,tryTest=false,evalFoo=true}){ //... 'label => label'
+					if(tryTest)throw Error("compiler error: expected tryTest == false.\n\n not allowed to cause side effects.")
 					if(tryTest)evalFoo=false;
 					let lineStr=words[0]?.input;
 					let oldLabel=label;
@@ -2454,40 +2472,6 @@ const oxminCompiler=async function(inputFile,fileName){
 							i=words.i;
 							lblName=name;
 							break;
-						}
-						//old but working label parser
-						if(0){
-							if(0){}
-							else if(word.match(/\w+/)){
-								if(lastWasName){
-									break;
-								}
-								lastWasName=true;
-								if(!lblBlock){
-									if(command=="let"){
-										lblBlock=scope.getLet();
-									}else if(command=="var"){
-										lblBlock=scope.getVar();
-									}else{
-										lblBlock=scope;
-									}
-								}
-								else{
-									lblBlock=lbl;
-								}
-								lbl=lbl?lblBlock.labels[word]:findLabel(lblBlock,word);
-								if(!lbl){
-									lbl??=new Scope({name:word});
-									lbl.scopes.parent=lblBlock;
-									lbl.parent=scope;
-									//lbl.lineNumber=lbl.getVar().lineNumber;
-									lbl.sourceLineNumber=sourceLineNumber;
-								}
-								if(i<words.length&&!isLabeledBlock)lblBlock.labels[word]=lbl;//can do a.a.a.a.a.a{}
-							}else if(word=="."){
-								if(!lbl)throw new Error(throwError(codeObj,+'label:"'+words[i-1][0]+'" is undefined'));
-							}
-							lastWasName=thisIsName;
 						}
 					}
 				}
