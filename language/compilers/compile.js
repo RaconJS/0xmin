@@ -533,7 +533,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								},
 							}),
 							"code":new Scope({code:this.code,arrayLabels:this.code,isBlock:true,parent:self}),
-							"compile":new Scope.Function({name:"[compile]",//UNFINISHED
+							"compile":new Scope.Function({name:"[compile]",
 								parameters:["phase","overWrite"],
 								defaultFunction({label,scope,codeObj}){
 									let arg_phase=this.labels["phase"];
@@ -947,13 +947,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					words.str=words.map(v=>v[0]).join(" ");
 				}
-				const evalParamaters=async function({index,lineStr0,words,scope,label,codeObj,makeVars=true,wasDeclared,args,block,isFunctionCall,dontRun}){
-					//index system is OBSILETE
-					if(index==undefined){//called by 'words' system
-						//BODGED doesnt change 'words.i' or 'index' after parsing
-						lineStr=[...words].splice(words.i,words.length-words.i).map(v=>v[0]).join(" ");
-					}
-					else lineStr=lineStr0.substring(index);
+				const evalParamaters=async function({index,words,scope,label,codeObj,makeVars=true,wasDeclared,args,block,isFunctionCall,dontRun}){
+					lineStr=[...words].splice(words.i,words.length-words.i).map(v=>v[0]).join(" ");
 					let functionType=lineStr.match(/(?<=^\s*)(=>|=)?(?=\s*\()|\)?(?=\s*{)/);//"foo=>();" or "foo();"
 					this_:{
 						//'foo=();' == JS:'new foo();' foo().this== foo()
@@ -967,13 +962,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					);
 					if(functionType){//&&label.isFunction){//label?.parameters
 						let foo=label;
-						//let words;
-						if(0){
-							words=[...lineStr.matchAll(wordsRegex)];
-							stringstoStr(words,codeObj);
-							words.i=0;
-						}
-						//[...lineStr.matchAll(/(["'`])[\s\S]*?\1|,|;|\(|\)|<?[\-=]>?|[^()<>\-=,\s]+/g)].map(v=>v); //|(?<=\()|(?=\)|;)/); //old version
 						let brackets=0,openedBrackets=false;
 						let word;
 						let index=0;
@@ -1038,9 +1026,8 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 						}
 						label.isInstance=true;
-						let i=0;
 						if(!(block?.isFunctionCall&&!dontRun)){
-							for(;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
+							for(let i=0;words.i<words.length&&i<words.length&&(brackets>0||!openedBrackets);[words.i++,i++]){
 								//if(words[words.i].index<index)continue;
 								let word=words[words.i][0];
 								if(word[word.length-1]=="("){brackets++;//allow for words: '= (' and '=> ('
@@ -1394,12 +1381,8 @@ const oxminCompiler=async function(inputFile,fileName){
 										label=startLabel;
 									}
 									if(!block)break;//'(' for non-function bracket scope
-									let index=words[i].index;
 									let i1=i;
-									({index,label}=await evalParamaters({index,words,lineStr0:lineStr,scope,label,block,codeObj,makeVars,wasDeclared}));
-									if(0)for(;i<words.length;i++){//adjust words.i; index system is OBSILETE
-										if(!words[i+1]||words[i+1]?.index>=index)break;
-									}
+									({label}=await evalParamaters({words,scope,label,block,codeObj,makeVars,wasDeclared}));
 									i=words.i-1;
 									//i=Math.max(i1,i);//use the new index next iteration
 									word=words[i+1]?.[0];
@@ -2305,7 +2288,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 				if(Object.isFrozen(lbl)&&lbl){
-					lbl=(await evalParamaters({label:lbl,words:["(",")",],lineStr0:new CodeObj({},"()",scope)}).label);
+					lbl=(await evalParamaters({label:lbl,words:["(",")",]}).label);
 					lblName=lbl?.name;
 				}
 				//spaghetti starts here. SPAGHETTI
@@ -2382,7 +2365,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							isFunctionCall:(isFunction?"()":"")+"{",
 							label:lbl,
 							dontRun:true,
-							lineStr0:lineStr,words,codeObj,scope,wasDeclared,
+							words,codeObj,scope,wasDeclared,
 						});
 						let label=codeScope;
 						//label.parent=scope;
@@ -3861,8 +3844,6 @@ const oxminCompiler=async function(inputFile,fileName){
 										block:codeScope,
 										isFunctionCall:"}",
 										scope,words,codeObj,
-										lineStr0:"_()",
-										index:1,
 										wasDeclared:true,
 									});
 									//e.g. 'let label=foo(){static ...blockCode};'
