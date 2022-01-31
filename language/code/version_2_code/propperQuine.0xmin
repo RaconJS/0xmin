@@ -1,0 +1,1 @@
+#"make file";#"!log.code";#import lib "io.0xmin";let str=`'#"make file";#"!log.code";#import lib "io.0xmin";let str=';String.char(96);def str();String.char(96);";";def str();jump 0;`;'#"make file";#"!log.code";#import lib "io.0xmin";let str=';String.char(96);def str();String.char(96);";";def str();jump 0;

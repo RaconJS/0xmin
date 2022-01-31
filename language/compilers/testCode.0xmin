@@ -1,3 +1,11 @@
-let a{1;2;3;4;5}
-let b=a..splice(1,2);
-debugger a..code;
+#"log.table";
+let struct{
+	null def let a;
+	null def let b;
+}
+null;
+null;
+#def let a;
+#struct->a;
+move ->struct.b;
+null;

@@ -1,0 +1,7 @@
+#"make file";
+import lib "std.0xmin";
+"  {{ " ;String.col((3+8),0); " # # " ;String.col(15,0); " }}  ";String.pos(0,i);#set i=i+1;
+"  {  " ;String.col((3+8),0); "#####" ;String.col(15,0); "  }  ";String.pos(0,i);#set i=i+1;
+" {   " ;String.col((3+8),0); " # # " ;String.col(15,0); "   } ";String.pos(0,i);#set i=i+1;
+"  {  " ;String.col((3+8),0); "#####" ;String.col(15,0); "  }  ";String.pos(0,i);#set i=i+1;
+"  {{ " ;String.col((3+8),0); " # # " ;String.col(15,0); " }}  ";String.pos(0,i);#set i=i+1;

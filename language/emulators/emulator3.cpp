@@ -1,3 +1,4 @@
+//do ctrl+f "commands" to find the main emulator.
 float runSpeed=60;//fps
 /*0xmin dev:
 	I cant work out how to use the monitor, (with my own cpu). 
@@ -39,6 +40,66 @@ using namespace std ;
 	void mySleep(float x){
 		std::this_thread::sleep_for(std::chrono::microseconds((int)(x*1000)));
 	}
+	class TextCanvas{//col,pos,clear;
+		public://private:
+		struct{
+			int reset=0,bold=1,underline=4,inverse=7,bold_off=21,underline_off=24,inverse_off=27;
+		}text_style;
+		struct {
+			int black=30,red=31,green=32,yellow=33,blue=34,magenta=35,cyan=36,white=37;
+		}text_color;
+		void onload(){cout<<clearWindow()<<resetStyle()<<setStyle(text_style.bold)<<"textCanvas:::loaded\n"<<resetStyle();}
+		void unload(){cout/*<<clearWindow()*/<<resetStyle()<<setStyle(text_style.bold)<<"textCanvas:::deleted\n"<<resetStyle();}
+		string setColor(int colourNumber=0){
+			return (string)("\033["+to_string(((int*)&text_color)[colourNumber])+"m");
+			//return (string)("\033["+to_string(*((int**)&text_style)[colourNumber])+"m");
+		}
+		string moveTo(int x,int y){
+			return (string)("\033["+to_string(y)+";"+to_string(x)+"H");
+		};
+		string clearWindow(){
+			return "\033[H\033[2J\033[3J";
+		}
+		public:
+		int width=132,height=43-4;
+		TextCanvas(){ if(0)onload();};
+		~TextCanvas(){if(0)unload();}
+		string col(int args[2]){//0-15
+			const int map[]={0,4,2,6,1,5,3,7, 0+8,4+8,2+8,6+8,1+8,5+8,3+8,7+8};//from R2 terminal to bash terminal
+			const int mappedArgs[]={map[args[0]],map[args[1]]};
+			return "\x1b["+to_string(mappedArgs[0]+(mappedArgs[0]>7?90-8:30))
+			+(args[1]==0?"":";"+to_string(mappedArgs[1]+(mappedArgs[1]>7?100-8:40)))
+			+"m";
+		}
+		string col(int color,int bgColor){
+			int args[2]={color,bgColor};
+			return col(args);
+		}
+		string pos(int args[2]){//0-15
+			return "\033["+to_string(args[1])+";"+to_string(args[0])+"H";
+		}
+		string pos(int y,int x){
+			int args[2]={x,y};
+			return pos(args);
+		}
+		string update(){
+			cout<<std::flush;
+			return "";
+		}
+		string setStyle(int style,int col){
+			return "\033["+to_string(((int*)&text_style)[style])+";"+to_string(((int*)&text_color)[col])+"m";
+		}
+		string setColor(int col,int style){
+			return setStyle(style,col);
+		}
+		string resetStyle(){return setStyle(0);};
+		string setStyle(int colourNumber=0){
+			return (string)("\033["+to_string(((int*)&text_style)[colourNumber])+"m");
+			//return (string)("\033["+to_string(*((int**)&text_style)[colourNumber])+"m");
+		}
+		string clear(){return clearWindow();}
+		//string endWindow(){return "\033[K";}
+	}ctx;
 	//filt and bray represent the tpt elemets. 
 	struct filt30{//2^30 -1 states
 		public:
@@ -96,80 +157,14 @@ using namespace std ;
 			tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
 		}
 	}getKeyInput;
-	class TextCanvas{//col,pos,clear;
-		public://private:
-		struct{
-			int reset=0,bold=1,underline=4,inverse=7,bold_off=21,underline_off=24,inverse_off=27;
-		}text_style;
-		struct {
-			int black=30,red=31,green=32,yellow=33,blue=34,magenta=35,cyan=36,white=37;
-		}text_color;
-		void onload(){cout<<clearWindow()<<resetStyle()<<setStyle(text_style.bold)<<"textCanvas:::loaded\n"<<resetStyle();}
-		void unload(){cout/*<<clearWindow()*/<<resetStyle()<<setStyle(text_style.bold)<<"textCanvas:::deleted\n"<<resetStyle();}
-		string setColor(int colourNumber=0){
-			return (string)("\033["+to_string(((int*)&text_color)[colourNumber])+"m");
-			//return (string)("\033["+to_string(*((int**)&text_style)[colourNumber])+"m");
-		}
-		string moveTo(int x,int y){
-			return (string)("\033["+to_string(y)+";"+to_string(x)+"H");
-		};
-		string clearWindow(){
-			return "\033[H\033[2J\033[3J";
-			// struct winsize dimentions;
-			// ioctl(STDOUT_FILENO, TIOCGWINSZ, &dimentions);
-			// width=dimentions.ws_col;
-			// height=dimentions.ws_row;
-			// string str="";
-			// for(int i=0;i<height&&i<100;i++){
-			// 	for(int j=0;j<width-1&&j<300;j++){
-			// 		str+=' ';
-			// 	}if(i<height-1)str+='\n';
-			// }
-			// return "\033[0;0H\033[J"+str+"\033[0;0H\033[J";
-		}
-		public:
-		int width=132,height=43-4;
-		TextCanvas(){ if(0)onload();};
-		~TextCanvas(){if(0)unload();}
-		string col(int args[2]){//0-15
-			return "\x1b["+to_string(args[1])+to_string(args[1]>7?90-8:30)+";"+to_string(args[0])+to_string(args[0]>7?100-8:40)+"m";
-		}
-		string col(int color,int bgColor){
-			int args[2]={color,bgColor};
-			return col(args);
-		}
-		string pos(int args[2]){//0-15
-			return "\033["+to_string(args[1])+";"+to_string(args[0])+"H";
-		}
-		string pos(int y,int x){
-			int args[2]={x,y};
-			return pos(args);
-		}
-		string update(){
-			cout<<std::flush;
-			return "";
-		}
-		string setStyle(int style,int col){
-			return "\033["+to_string(((int*)&text_style)[style])+";"+to_string(((int*)&text_color)[col])+"m";
-		}
-		string setColor(int col,int style){
-			return setStyle(style,col);
-		}
-		string resetStyle(){return setStyle(0);};
-		string setStyle(int colourNumber=0){
-			return (string)("\033["+to_string(((int*)&text_style)[colourNumber])+"m");
-			//return (string)("\033["+to_string(*((int**)&text_style)[colourNumber])+"m");
-		}
-		string clear(){return clearWindow();}
-		//string endWindow(){return "\033[K";}
-	}ctx;
 //----
 filt30* ram;
 int ramLen;
+filt30 getCPU_currentWord();
 class R2Terminal{
 	public:
 	short int x=0,y=0;
-	short int bgColor=7,fgColor=15;
+	short int bgColor=0,fgColor=15;
 	short int dims[2]={16,12};
 	short int dims_internal[2]={16,16};
 	short int offset_x=2,offset_y=2;
@@ -177,21 +172,29 @@ class R2Terminal{
 		input=&ram[3];//from keyboard
 		output=&ram[5];//to screen
 		cout<<ctx.moveTo(1,1);
-		string str="";
-		str+="┌";for(int i=0;i<dims[0];i++)str+="─";str+="┐\n";
-		for(int i=0;i<dims[1];i++){
-			str+="│";
-			for(int j=0;j<dims[0];j++){
-				str+=' ';
-			}
-			str+="│";
-			str+='\n';
+		if(0){//testing larger terminal
+			short int asd[2]={40,100};
+			dims[0]=dims_internal[0]=asd[0];
+			dims[1]=dims_internal[1]=asd[1];
 		}
-		str+="└";for(int i=0;i<dims[0];i++)str+="─";str+="┘";
-		cout<<str;
+		else{
+			string str="";
+			str+="┌";for(int i=0;i<dims[0];i++)str+="─";str+="┐\n";
+			for(int i=0;i<dims[1];i++){
+				str+="│";
+				for(int j=0;j<dims[0];j++){
+					str+=' ';
+				}
+				str+="│";
+				str+='\n';
+			}
+			str+="└";for(int i=0;i<dims[0];i++)str+="─";str+="┘";
+			cout<<str;
+		}
 	}
 	filt30* input;//from keyboard
 	filt30* output;//to screen
+	filt30 filtObj;
 	filt30 redFilt =0x20000000;
 	filt30 data    =0x00020000; 
 	filt30 _char   =0x00000000;//0x10??,
@@ -239,32 +242,34 @@ class R2Terminal{
 			coutChar(charOut);
 			nextX();
 		}
+		cout<<ctx.resetStyle();
 	}
 	void onUpdate(){
 		//*input=redFilt;
 		handle_output:{
-			if(*output&redFilt){
-				if(*output&data){
-					switch((u32)*output&0x0000f000){
+			filt30 filtObj=getCPU_currentWord();
+			filtObj = !(filtObj&redFilt)?*output:filtObj;
+			if(filtObj&redFilt){
+				if(filtObj&data){
+					switch((u32)filtObj&0x0000f000){
 						case 0x00000000://char
-							print((char)*output&0xff);
+							print((char)filtObj&0xff);
 							break;
 						case 0x00001000://pos 0x1yyx
-							x=(*output&0x00f);
-							y=(*output&0xff0)/0x10;
+							x=(filtObj&0x00f);
+							y=(filtObj&0xff0)/0x10;
 							cout<<ctx.pos(y+1,x+1);
 							break;
 						case 0x00002000://col 0x20fb
-							fgColor=(*output&0x0f);
-							bgColor=(*output&0xf0)/0x10;
-							cout<<ctx.col(fgColor,bgColor);
+							fgColor=(filtObj&0x0f);
+							bgColor=(filtObj&0xf0)/0x10;
+							//cout<<ctx.col(fgColor,bgColor);
 							break;
 					}
 				}
 			}
 			*output=redFilt;
 		}
-		*output=redFilt;
 	}
 }terminal;
 char inputChar;
@@ -427,21 +432,41 @@ class NumberDisplay{
 			}
 			int x=4+terminal.dims[0]+terminal.offset_x;
 			int y0=7,y=y0;
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
+			//                     "get jump -1 +0x21234567";
+			cout<<ctx.moveTo(x,y)<<"                       ";
 			cout<<ctx.moveTo(x,y++)<<"move : "<<hex cpu.move;
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
+			cout<<ctx.moveTo(x,y)<<"                       ";
 			cout<<ctx.moveTo(x,y++)<<"jump : "<<hex cpu.jump;
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
+			cout<<ctx.moveTo(x,y)<<"                       ";
 			cout<<ctx.moveTo(x,y++)<<"alu  : "<<hex cpu.alu.value;
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
-			cout<<ctx.moveTo(x,y++)<<"*move: "<<hex ram[cpu.move];
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
+			cout<<ctx.moveTo(x,y)<<"                       ";
 			cout<<ctx.moveTo(x,y++)<<"if   : "<<cpu.aluif;
-			cout<<ctx.moveTo(x,y)<<"                       ";//"get jump -1 +0x21234567";
-			cout<<ctx.moveTo(x,y++)<<"word : "
-				<<(const char*[]){"move","jump","nor","red","blue","get","xor","and","or","get jump -1","set","if","set jump +3","","null",""}[cpu.currentWord&0xf]
+			cout<<ctx.moveTo(x,y)<<"                       ";
+			cout<<ctx.moveTo(x,y++)<<"*move: "<<hex ram[cpu.move];
+
+			cout<<ctx.moveTo(x,y)<<"                          ";//"get jump -1 +0x21234567";
+			cout<<ctx.moveTo(x,y++)<<"*jump: ";
+			if(!cpu.currentWord&0x00030000)
+				cout<<(const char*[]){"move","jump","nor","red","blue","get","xor","and","or","get jump -1","set","if","set jump +3","","null",""}[cpu.currentWord&0xf]
 				<<" "<<(const char[]){'+','-'}[(cpu.currentWord&0x1000)!=0]<<hex ((cpu.currentWord>>4)&0xff)
 			;
+			else if(!(cpu.currentWord&~0x20023fff)){
+				char str=(char)cpu.currentWord;
+				switch(cpu.currentWord&0x00003000){
+					case 0x0000:
+					if(0){}
+					else if(str>0x21)cout<<"\""<<str<<"\"";
+					else if(str=='\t')cout<<"\"\\t\"";
+					else if(str=='\n')cout<<"\"\\n\"";
+					else if(str=='\r')cout<<"\"\\r\"";
+					else if(str==' ')cout<<"\" \"";
+					else cout<<"String.char("<<hex(str)<<")";
+					break;//char
+					case 0x1000:cout<<"String.pos("<<(0xf&cpu.currentWord)<<","<<(0xff&(cpu.currentWord>>4))<<")";break;//pos
+					case 0x2000:cout<<"String.col("<<(0xf&cpu.currentWord)<<","<<(0xf&(cpu.currentWord>>4))<<")";break;//col
+				}
+			}
+			else cout<<hex(cpu.currentWord);
 			cout<<'\n';
 		}
 		private:
@@ -462,7 +487,7 @@ class NumberDisplay{
 			if(!blocker){
 				currentWord=ram[jump];
 			}
-			short int command=currentWord&0xf;
+			int command=currentWord&0x3000f;
 			short int address=(currentWord&0x0ff0)/0x10;
 			short int address_sign=(currentWord&0x1000)/0x1000;
 			jump_next=1;
@@ -475,7 +500,14 @@ class NumberDisplay{
 					break;
 				case 1://jump
 					jump_next=((address&~1)*(int[2]){1,-1}[address_sign])+(address&1);
-					if(address==0){hasHault=true;}
+					if(address==0){
+						if(!address_sign)hasHault=true;//'jump 0;' => 'hault;'
+						else if(inputWasPressed){//jump -0;' => 'wait for input';
+							jump++;
+							inputWasPressed=false;
+						};
+					}
+					
 					break;
 				case 2:ans=~(a|b);break;//'nor'
 				case 3:ans=a*(b&-b);break;//'red'
@@ -496,6 +528,7 @@ class NumberDisplay{
 				aluif=true;
 			}
 	}
+filt30 getCPU_currentWord(){return cpu.currentWord;}
 //----
 void doStep(int i){
 	cpu.onUpdate();
