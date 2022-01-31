@@ -156,7 +156,7 @@ scope_types:{
 	@{} ${} #{} void{} if(1){}//weak scopes
 	{} a:{}//let scopes aka block scopes
 	let a{}//var scopes. objects
-	a:{} $a:{} #a:{} void a:{}//
+	a:{} $a:{} #a:{} void a:{}//labeled block (break/continue)
 	let a(){} let a()={} let a()=>{}//functions
 	a::{} a::#{} a::${} a::void{}//extension scope
 }
@@ -364,5 +364,24 @@ structures_and_uses:{
 		let{...code;#this;#return;}"is just like:"let object{...code;}
 		:{...code;#continue;#break;}//unnamed labeled block
 		@;if;null;//clears the if flag, setting it to 0.
+	}
+}
+extra:{
+	scopeTypes:{//compiler
+		let a{
+			b:{
+				@{//c
+					//@{}: //d
+						self=d;
+						scopes.var=a;
+						scopes.let=b;
+						scopes.code=c;
+						scopes.parent=c;
+						parent=c;
+						;
+					//----
+				}
+			}
+		}
 	}
 }
