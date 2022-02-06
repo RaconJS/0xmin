@@ -1,11 +1,5 @@
 #"log.table";
-let struct{
-	null def let a;
-	null def let b;
-}
-null;
-null;
-#def let a;
-#struct->a;
-move ->struct.b;
-null;
+#let a;
+null move->a;
+ram 2;
+"w" def a;
