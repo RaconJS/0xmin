@@ -1,0 +1,47 @@
+//let a = struct{let a,b=5,c=2;};
+//"same as:"
+//let a = {null def let a;5 def let b; 2 def let c;};
+let struct(){
+	#void{
+		#;
+		let oldBlock={
+			#void delete;
+			...let block;//run code only
+		}//no this
+		let labels=oldBlock..labels;
+		let block{
+			#void delete;
+			#void ...var oldBlock;//properties only
+		};//make new block with properties of the new structure.
+		#let i=0;
+		let(){
+			#let label=labels[+i];
+			if(label..length>0){
+				set block{def label;}
+			}
+			else{
+				set block{null def label;}
+			}
+			#set i=i+1;
+		}::{
+			#repeat labels..length this();
+		}
+		//let return;
+		#set return = block;
+	}
+}
+let cast(pointer,block){//casts pointer into dataType block
+	#void{
+		#;
+		let i=0;
+		let:code=block..compile();
+		let(){
+			#;
+			code->pointer;
+			code->+i;
+			i=i+1;
+		}::{
+			#repeat code..length this();
+		}
+	}
+}

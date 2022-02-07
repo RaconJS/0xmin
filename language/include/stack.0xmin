@@ -1,0 +1,85 @@
+let Allocate{ {
+	var interface()={
+		def var block;
+	}::{
+		var allocate;
+		var deallocate;
+	}
+	let Key(key)={//i like to think of this like a cookie
+		if(!key){
+			#var set key;
+		}
+		#var findKey(label){//private macro method
+			#let val;
+			#set label{
+				#void {
+					#set val=[key];
+				}
+			}
+			#let set return=val;
+		}
+		#var addKey(scope)=>{
+			#let block={};
+			#let scope[key]=block;
+			#let return = block;
+		}
+		#var deleteKey(scope){
+			#delete scope[key];
+		}
+	}
+	var: Block,Stack,Heap;
+	set: Block(scope) = {
+		def var block = constructor[Key].addKey(scope).return;
+	} :: {
+		let class=this;
+		var allocate;
+		var deallocate;
+		{
+			let this[Key]=Key=(this);
+			#set allocate(label){
+				#let block=this[Key].findKey(label).return;
+				#set block{def label;}
+			}
+			#set deallocate(label){
+
+			}
+		}
+		var set prototype {}
+		var set supertype {}
+	}
+	var set Stack(maxLength,scope) = {
+		#static void{
+			var types={
+				let :["short_30"];
+				let :["medium_900"];
+				let :["long_230"];
+			}
+		}
+		#var type,length,maxLength;
+		if(+maxLength<(30)){//small stack
+			#set type=Stack.types.short;
+			def var set length=0b1;//uses redShift
+			def var set const_2=0b10;//increment/decrement
+			30 def var set maxLength;
+		}
+		def var set block = constructor[Key].addKey(scope).return;
+	} :: {
+		let class=this;
+		var allocate;
+		var deallocate;
+		{
+			let this[Key]=Key=(this);
+			#set allocate(label){
+				#let block=this[Key].findKey(label).return;
+				#set block{def label;}
+				block
+			}
+			#set deallocate(label){
+
+			}
+		}
+		var set prototype {}
+		var set supertype {}
+	}
+} }
+let s=Allocate.Stack();
