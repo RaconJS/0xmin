@@ -350,6 +350,56 @@ if(main){def main;}
 			if(to){move->to;get;}
 		}
 	}
+	#let input(){
+		#let input=function(0){def let{//reads the input buffer
+			@{
+				#let main;
+				jump->main;
+				0x20010000 def let confirm;
+				0x20000000 def let red;
+				#let ret=return;
+				#let return.move;
+				#let waitLine;
+				jump waitLine->return def let isWait;
+				jump waitLine->main def let isNotWait;
+			}
+			def main;
+			confirmInput:{
+				move->confirm;
+				get;
+				move->terminal.input;
+				if;null;
+				xor;
+				move->return.move;
+				if;{//if terminal.input != String.confirm()
+					#def waitLine;
+					jump->return;
+				}
+				move->terminal.output;
+				set;//confirm input
+			}
+			recieveInput:{
+				$assert move->terminal.output;
+				//assert alu = confirm;
+				move->terminal.input;
+				repeat 8 or;
+			}
+			cleanInput:{
+				move->confirm;
+				xor;
+				move->red;
+				jump+2;
+				#def let char;
+				"\x00";
+				move->char;
+				delete char;
+				or;
+			}
+			#set return.move->return;
+			move->return.move;
+			null def return;
+		}}
+	}
 }
 #(){
 	let print=function(1){

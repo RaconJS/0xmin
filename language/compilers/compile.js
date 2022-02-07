@@ -1835,12 +1835,11 @@ const oxminCompiler=async function(inputFile,fileName){
 										case"..."://concatnates code or strings.
 											if(arg0.type=="string"){//concat strings
 												arg1.toStringVal();
-												arg0.string.str+="+"+arg1.string.str;
-												arg0.string.str=JSON.stringify(arg0.string.string);
+												arg0.string=new Str({str:JSON.stringify(arg0.string.string+arg1.string.string)});
 												ans=arg0;
 												break;
 											}else {//'labelA ... labelB'
-												arg0.toLabel();
+												arg0.toLabel(codeObj);
 												if(!(arg1.type=="label"))arg1.toLabel(codeObj);
 												if(EndBracket){//removes '}'
 													arg0.label.code.pop();
@@ -3425,7 +3424,6 @@ const oxminCompiler=async function(inputFile,fileName){
 										if(!codeObj.isDeleted){
 											codeObj.isDeleted=true;
 											codeScope.code.pop();
-											codeScope.arrayLabels.pop();
 											if(!parts[partI].isCodeObj){
 												codeScope.codeBlock.code.pop();
 											}
@@ -3657,7 +3655,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								case"ram":{
 									command.number= 1;
 									command.pointer=scope.findPointer("ram");
-									console.warn("WARNING: the 'ram' may cause lineNumber bugs");
+									console.warn("WARNING: the 'ram' command may cause lineNumber bugs.");
 								}break;
 								default:
 								command.number=commandRefference.command[command[0]];
