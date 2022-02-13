@@ -351,9 +351,10 @@ if(main){def main;}
 		}
 	}
 	#let input(){
-		#let input=function(0){def let{//reads the input buffer
+		#let input=function(0){//reads the input buffer
 			@{
 				#let main;
+				$move->return;
 				jump->main;
 				0x20010000 def let confirm;
 				0x20000000 def let red;
@@ -389,8 +390,7 @@ if(main){def main;}
 				xor;
 				move->red;
 				jump+2;
-				#def let char;
-				"\x00";
+				"\x00"def let char;
 				move->char;
 				delete char;
 				or;
@@ -398,7 +398,7 @@ if(main){def main;}
 			#set return.move->return;
 			move->return.move;
 			null def return;
-		}}
+		}
 	}
 }
 #(){

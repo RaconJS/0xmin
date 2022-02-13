@@ -933,8 +933,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				scope[findLabel.key]++;if(name=="(int){true}")throw Error();
 				let label=scope.labels.hasOwnProperty(name)&&(scope.labels[name]||scope.labels[name]===null)?scope:(undefined
 					??findLabelParent(scope.scopes.code,name)
-					??findLabelParent(scope.scopes.let,name)
-					??findLabelParent(scope.scopes.var,name)
+					//??findLabelParent(scope.scopes.let,name)
+					//??findLabelParent(scope.scopes.var,name)
 					??findLabelParent(scope.parent,name)
 					??findLabelParent(scope.scopes.parent,name)
 				);
@@ -1034,7 +1034,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							//...foo,
 							name:"<"+foo.name+">",//instance name
 							//parent:globalScope,
-							parentFunction:foo,
+							parentFunction:foo,//'parentFunction' is only used in isFunctionCall
 							parent:scope,
 							code:[],//foo.code,
 							isBlock:true,
@@ -1044,7 +1044,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(isFunctionCall&&block){
 							parametersObj["block"]=block;
 							parametersObj["scope"]=scope.scopes.code.scopes.parent;
-							//'let a{foo{};}' '<foo>'.scope.name=='a{}'
+							//'let foo(){}; let a{foo{};};' '<foo>'.scope.name=='a{}'
 						}
 						if(block?.isFunctionCall&&!dontRun){
 							label.name=""+foo.name+"(){}";
@@ -1085,7 +1085,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								label.proto=foo;
 								label.super=foo;
 							}else{//'#set lbl=foo();' like 'new'.
-								label.scopes.parent=foo.scopes.parent;
+								label.scopes.parent=foo.scopes.parent;//NEEDSTESTING: this scoping bit
 								label.labels["this"]=block;//'obj.foo().this' == 'obj;'
 								label.scopes.var=undefined;
 							}
@@ -2141,18 +2141,25 @@ const oxminCompiler=async function(inputFile,fileName){
 							//if(code.popped)code.push(code.popped);//REMOVE: caused double brackets
 							//'let ...obj;' imports code. I might change this mechanic.
 							//'var ...obj;' imports variables.
-							//'...obj;' imports both.
-							if(varType!="let")Object.assign(scope.getLet().labels,label.labels);
-							if(!codeObj.isDeleted)commentLastStatemets(codeObj.codeScope);
-							if(varType!="var")await parseFunction({
-								scope,
-								codeScope:codeObj.codeScope,
-								parts:code,
-								fileName,
-								callStack,
-								functionLine:code[0]?.sourceLineNumber,
-								codeObj,
-							});
+							//'set ...obj;' imports code but does not run it
+							//'...obj;' imports both. (variables and then code)
+							if(varType1=="set"){
+								
+							}
+							else{
+								if(varType!="let")Object.assign(scope.getLet().labels,label.labels);
+								if(!codeObj.isDeleted)commentLastStatemets(codeObj.codeScope);
+								if(varType!="var")await parseFunction({
+									scope,
+									codeScope:codeObj.codeScope,
+									parts:code,
+									fileName,
+									callStack,
+									functionLine:code[0]?.sourceLineNumber,
+									codeObj,
+									isCodeInjection:true,
+								});
+							}
 							label=undefined;
 							varType=false;
 						}
@@ -2627,9 +2634,11 @@ const oxminCompiler=async function(inputFile,fileName){
 						);
 					}
 					lbl??=lastLabel;
-					codeScope.scopes.let=lastLabel.getLet();
-					codeScope.scopes.var=lastLabel.getVar();
+					//codeScope.scopes.let=lastLabel.getLet();
+					//codeScope.scopes.var=lastLabel.getVar();
 					codeScope.scopes.parent=lastLabel;
+					codeScope.parent=lastLabel;
+					isNew=false;//spaghetti line to stop codeScope.parent from being overwriten later
 					codeScope.name=":"+lbl.name+":";
 					lbl=codeScope;
 				}
@@ -2696,9 +2705,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				//-----
 				//weakest scope
 				let newCodeScope=new Scope({
+					name:"",
 					parent:scope,
 				});
 				let newScope=new Scope({
+					name:"{}",
 					parent:scope,
 				});
 				{//default: weak scope
@@ -2715,18 +2726,24 @@ const oxminCompiler=async function(inputFile,fileName){
 						parent:null,
 					});
 				}
-				if(words[words.i][0]=="::"){
-					isJoiningBLock=true;words.i++;
-				}
-				matchLabelCreation:{
-
-				}
-				parseEqualities:{
-
-				}
-				if(words[words.i]=="{"){
-					if(words[words.i-1]?.[0].match(phaseSymbolRegex)){
-						isWeakScope=true;
+				mainParse:{
+					if(words[words.i][0]=="::"){
+						words.i++;
+						isJoiningBLock=true;
+						newCodeScope.parent=scope;
+						newCodeScope.scopes.parent=lastLabel;//object scope: higher priority than scope.parent, only looks at the labels of the object scope.
+						break mainParse;
+					}
+					matchLabelCreation:{
+						;
+					}
+					parseEqualities:{
+						;
+					}
+					if(words[words.i]=="{"){
+						if(words[words.i-1]?.[0].match(phaseSymbolRegex)){
+							isWeakScope=true;
+						}
 					}
 				}
 				return {scope:newScope,codeScope:newCodeScope}
@@ -3202,7 +3219,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			/[+-]?(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)/;
 			const wordsRegex=/[#${}()]|(["'`])(?:\1|[\s\S]*?[^\\]\1)|::?|\.+|([_\w]+\s*\.\s*)*[_\w]+|,|[\[\]]|>>>?|<<|(<[-=]>|-?->|<--?|<==?|=?=>|=?=?=)|[><\!]=?|[+-]?(0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)|(\+\+?(?![0-9])|--?|\*\*?|\/)|(&&?|\|\|?|!|\^\^?|~|[£%@?¬])|[^\s]/g;
 			const phaseSymbolRegex=/(?<!["'`][\s\S]*?)[@$#]/;
-		const parseFunction=async function({scope,parts,codeScope,fileName,functionLine=1,codeObj}){
+		const parseFunction=async function({scope,parts,codeScope,fileName,functionLine=1,codeObj,isCodeInjection=false}){
 			fileName=fileName+"";//convert to string;
 			codeScope??=scope;
 			//codeScope??=new Scope({})
@@ -3304,7 +3321,8 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeObj.callLineObj=(parts[partI] instanceof String)?(parts[partI].callLineObj??parts[partI]):codeObj;
 						codeObj.isCodeObj=true;
 						codeObj.skipParts=0;
-						if(parts[i].parent&&scopeLevel==0){//allow for function scopes concats to use different scopes
+						//foo();
+						if(!isCodeInjection&&parts[i].parent&&scopeLevel==0){//allow for function scopes concats to use different scopes
 							//NEEDSTESTING
 							//'let a;{let b;a(){b}}{let c;a(){c}}'
 							scope.parent=parts[i].parent.parent;
