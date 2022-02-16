@@ -1,13 +1,1 @@
-#"!make file";
-#"!log.table";
-#"!log.code";
-//bug1
-let a,b;
-{let asd;
-	set b(){
-		debugger.typeof asd;
-	}
-}
-set a{
-	...b;
-}
+#delete;

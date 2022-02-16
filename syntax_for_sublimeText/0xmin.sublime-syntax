@@ -106,7 +106,7 @@ contexts:
       scope: keyword.control
     - match: '((?<=[@$#])\s*|\s*)\b(?:assert|delete)\b' #'(?<=^|[;{}])\s*\bassert\b'
       scope: keyword.control
-    - match: '\.\.\.'
+    - match: '\.\.\.(?!\s*{)'
       scope: keyword.control
       push: deRefference
     
@@ -390,6 +390,8 @@ contexts:
   deRefference:
     - match: '}'
       pop: 2
+    #- match: 'var|let|set'
+    #  scope: keyword.control
     - include: base_statement
     - match: '{{labelName}}'
       scope: entity.name.enum
