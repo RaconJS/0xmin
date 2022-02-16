@@ -9,6 +9,8 @@
 //TODO: allow for custom keywords
 //TODO: BUG: '#foo(,2,,3);' should do '#foo(undefined,2,undefined,undefined,3)' instead of '#foo(2,3)'
 //NOTE: the 'ram' command is processt in the '@' phase. 'ram' command can cause refference bugs.
++process.version.match(/[0-9]+/g)[0]>=16;
+try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 const errorMsg="\x1b[31m"+" 0xmin-ERROR ::"+"\x1b[0m ";
 function errorLog(...args){console.log(...args);};
 function loga(...args){console.log(...args);};
@@ -65,7 +67,6 @@ const commandRefference={
 		"set":10,//does:'move[0] = alu;'
 		"if":11,
 		"set jump +3":12,//does:'jump[2] = alu;'
-
 	},
 	commandList:{},
 	stringList:{},
@@ -155,7 +156,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			{
 				//doesn't match unmatched strings i.e. '....`' /(["'`])(?:\1|[\s\S]*?[^\\]\1)|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)|[\s\S]*?(?:[;{}]|(?=["'`]|\/\/|\/\*))/g
 				// /(?<=[{;}])|(?=})/
-				let lineRegex=/(["'`])(?:\1|[\s\S]*?[^\\](?:\1|$))|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)|}|[\s\S]*?(?:[;{]|(?=["'`}]|\/\/|\/\*))/g;
+				let lineRegex=/(["'`])(?:\1|[\s\S]*?[^\\](?:\1|$))|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)|}|[\s\S]*?(?:[;{]|$|(?=["'`}]|\/\/|\/\*))/g;
 				// /(["'`])(?:\1|[\s\S]*?[^\\]\1)|\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*(?:\n|$)|[\s\S]*?(?:[;{}]|(?=(["'`])[\s\S]*?\2|\/\/|\/\*))/g;
 				let p1=[];
 				let line="";
@@ -296,10 +297,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							set labels(val){parent.labels=val;},
 						},true);
 					}
-					//stop it defaulting to the Object class
-					//this.labels["constructor"]=undefined;
 					Object.assign(this,dataObj);
-					if(!(this.labels["constructor"] instanceof Scope))this.labels["constructor"]=undefined;
+					//stop it defaulting to the Object class
+					//if(!(this.labels["constructor"] instanceof Scope))this.labels["constructor"]=undefined;
 				}
 				//
 					labels={};
@@ -724,7 +724,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				parent=null;
 				constructor(dataObj,part,scope){//{string,codeObj={},scope,partI,isMeta,parts}
 					super((part??dataObj)+"");
-					Object.assign(this,dataObj);
+					if(dataObj instanceof String){//ignore indexes
+						for(let i in dataObj){
+							if(dataObj.hasOwnProperty(i)&&isNaN(+i)){
+								this[i]=dataObj[i];
+							}
+						}
+					}
+					else Object.assign(this,dataObj);
 					this.parent??=scope;
 					this.label??=undefined;
 					this.croppedSource??=(""+this).replace(/^[\s]*/g,"").replaceAll(/\s/g," ");
@@ -1084,7 +1091,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								label.scopes.parent=scope;
 								label.proto=foo;
 								label.super=foo;
-							}else{//'#set lbl=foo();' like 'new'.
+							}else{//'#set lbl=foo();' like 'new'. normal function call
 								label.scopes.parent=foo.scopes.parent;//NEEDSTESTING: this scoping bit
 								label.labels["this"]=block;//'obj.foo().this' == 'obj;'
 								label.scopes.var=undefined;
@@ -2105,7 +2112,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					return{index:words[words.i]?.index,didParse:false};
 				};
-				const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,hasDef=false,varType1=undefined,makeVars=true,doBrackets=true}){
+				const parseMakeVariable=async function({words,scope,codeObj,varType=undefined,varType1=undefined,varType2=undefined,hasDef=false,makeVars=true,doBrackets=true}){
 					//TODO: set statements should only use evalBrackets and not the parseLabelOrNumber. '#set foo() -> 2;' should be better supported.
 					//'#var label'
 						let {label,block,arrayCodeObj,name,lblName,refLevel,wasDeclared}=await parseLabelOrNumber({
@@ -2128,27 +2135,36 @@ const oxminCompiler=async function(inputFile,fileName){
 					let didParse;
 					if(label){
 						//label.codeObj=codeObj;label.address=0;
-						if(varType1=="..."){//concat lbl.code and lbl.labels. runs code
+						if(varType2=="..."){//concat lbl.code and lbl.labels. runs code
 							//var... a , let... b;
 							codeObj.isMeta=true;
 							codeObj.isNonMeta=false;
 							codeObj.phaseLevel=phaseMap["#"];
 							//isMeta=true;
 							label.parent=scope;
-							let code=[...label.code];
-							if(EndBracket)code.pop();//remove "}"
-							code=getCode(label);
+							if(!codeObj.isDeleted){
+								//commentLastStatemets(codeObj.codeScope);
+								codeObj.codeScope.code.pop();
+								codeObj.isDeleted=true;
+							}
+							code=getCode(label);//does not include ending: '}'s
 							//if(code.popped)code.push(code.popped);//REMOVE: caused double brackets
-							//'let ...obj;' imports code. I might change this mechanic.
-							//'var ...obj;' imports variables.
-							//'set ...obj;' imports code but does not run it
+							//'...let obj;' imports code. I might change this mechanic.
+							//'...var obj;' imports variables.
+							//'...set obj;' imports code but does not run it
 							//'...obj;' imports both. (variables and then code)
-							if(varType1=="set"){
-								
+							if(varType1=="set"){//'...def obj;'
+								code=code.map(v=>{
+									let newCodeObj=new CodeObj(v);
+									newCodeObj.codeScope=scope;
+									newCodeObj.parent=scope;
+									return v;
+								})
+								codeObj.codeScope.code.push(...code);
+								codeObj.codeScope.arrayLabels.push(...code);
 							}
 							else{
 								if(varType!="let")Object.assign(scope.getLet().labels,label.labels);
-								if(!codeObj.isDeleted)commentLastStatemets(codeObj.codeScope);
 								if(varType!="var")await parseFunction({
 									scope,
 									codeScope:codeObj.codeScope,
@@ -2164,7 +2180,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							varType=false;
 						}
 						else{
-							if(varType1!="..."&&(varType||(!strictMode&&0))){
+							if(varType2!="..."&&(varType||(!strictMode&&0))){
 								//({label}=await letvarPhrase(words,varType));
 								let block1=block;
 								let newLabel=new Label({name:lblName??name});
@@ -2181,7 +2197,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								let found=(isArrayItem?block1.arrayLabels:block1.labels)[name];
 								if(!found||(found&&!(varType1=="set"))){//'set var a;' ==> js'this.a??={};' 'var a' ==> js'this.a={};'
 									newLabel.scopes.parent=block1;
-									//newLabel.labels["constructor"]??=block1;
 									newLabel.sourceLineNumber=codeObj.sourceLineNumber;
 									//block1.labels[name]=newLabel;
 									label=newLabel;
@@ -2331,7 +2346,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				//let words=[...lineStr.substr(0,last1).matchAll(/\w+|\.|\[/g)];
 				let lastWasName=false;
 				let i=words.i;
-				let varType,varType1,isNew=false,wasDeclared;
+				//variable varType2 is not used here in line_evalVariable
+				let varType,varType1,varType2,isNew=false,wasDeclared;
 				{let words=[...allWords].splice(0,maxI);
 					stringstoStr(words,codeObj);
 					let lastPhaseSymbol="";
@@ -3633,7 +3649,10 @@ const oxminCompiler=async function(inputFile,fileName){
 									for(let i in defaultDeleteScope.labels){//clear the scope
 										let label=defaultDeleteScope.labels[i];
 										if(label){
-											if(!label.isBuiltIn)delete defaultDeleteScope.labels[i];
+											//if(!label.isBuiltIn)
+											{
+												delete defaultDeleteScope.labels[i];
+											}
 										}
 									}
 								}
@@ -3884,7 +3903,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								//can do:'var def a,b=a let c,def d,def set e,f=>a;'
 								//psudo regex:repeats of: /((var (def)?|let (def)?|set (def)?|def (var|let|set)?)? (({{label}} ((=>|<=|->|<-|=) {{label}})?) ({{label}} ((=>|<=|->|<-|=) {{label}})?)*)/g
 								let hasDef=false;
-								let varType=false,varType1=false;
+								let varType=false,varType1=false,varType2=false;
 								let setMode=false;
 								let doingDefTypes=true;
 								let oldArg;
@@ -3908,7 +3927,7 @@ const oxminCompiler=async function(inputFile,fileName){
 													varType="var";
 												break;
 												case"...":
-													varType1="...";
+													varType2="...";
 												break;
 												case"set"://is useful for 'let set a=b;'
 													varType1="set";
@@ -3925,7 +3944,7 @@ const oxminCompiler=async function(inputFile,fileName){
 										else{
 											doingDefTypes=true;
 											if(!label){
-												({label}=await parseMakeVariable({words,codeObj,scope,varType,varType1,hasDef}));
+												({label}=await parseMakeVariable({words,codeObj,scope,varType,varType1,varType2,hasDef}));
 											}
 											if(label){
 												if(label?.isBlock&&!useBlock){
@@ -3939,12 +3958,13 @@ const oxminCompiler=async function(inputFile,fileName){
 													}
 												}
 											}
-											if(words[words.i]?.[0]==","){//'let a,b;'
+											if(words[words.i]?.[0]==","){//'let a,b;' ==> 'let a;let b;'
 												oldArg=label;
 												label=undefined;
 												words.i++;
 												continue;
-											}else{
+											}else{//'let a set b;' ==> 'let a;set b;'
+												varType2=false;
 												varType1=false;
 												varType=false;
 												hasDef=0;
@@ -4434,7 +4454,6 @@ else{
 			resolve();
 		})
 	});
-	try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 	(async function(){
 		let [inputFile,fileName]=await fileLoader;
 		outputFile=null;
