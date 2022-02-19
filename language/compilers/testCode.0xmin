@@ -1,1 +1,10 @@
-#delete;
+@{${#{
+	;
+}}}
+let a{
+	#void;
+	let this = a;
+	let return;
+	@;
+	#void def return;
+}
