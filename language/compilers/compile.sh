@@ -79,7 +79,7 @@ function compile {
 	
 	#code.0xmin => code.filt or code.lua
 	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
-	if [[ $isUsingOutFileNameToExicute == 1 ]]; then
+	if [[ $isUsingOutFileNameToExicute == true ]]; then
 		nodejs $mainfolder/compile.js $inputFileName $outFileName; #(nodejs test.js);
 	fi
 	if [[ -f minFilt.lua && -e "$powderToyScriptsFolder" ]]; then #if file exists
