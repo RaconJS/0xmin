@@ -1,4 +1,0 @@
-#let:add=(a,b){
-	#set:this->a+b;
-};
-add(1+2);

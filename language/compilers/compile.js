@@ -13,7 +13,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	;
 	//(long string,string) => (array of words)
 	function parseFile(inputFile,fileName){
-		let words=inputFile.match(wordsRegex);
+		let words=inputFile.match(wordsRegex)??[];
 		words.fileName=fileName;
 		//remove comments
 		for(let i=0;i<words.length;i++){
@@ -35,12 +35,12 @@ const oxminCompiler=async function(inputFile,fileName){
 		"[":({"[ ]":class extends Array{}})["[ ]"],
 		"(":({"( )":class extends Array{}})["( )"],
 	});
-	function grammarPass(words,type="{",includeBrackets=false){
+	function bracketPass(words,type="{",includeBrackets=false){
 		words.i??=0;
 		let block=new bracketClassMap[type]??[];//the current container: {...} or [...] or (...)
 		let statement=[];//the current item: '...;' or '...,'
 		if(includeBrackets){//[...] => ['{',...,'}']
-			if(!words[words.i]==type)throw Error("compiler error");
+			if(words[words.i]!=type)throw Error("compiler error");
 			statement.push(words[words.i]);
 			words.i++;
 		}
@@ -48,7 +48,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
 			let word=words[words.i];
 			if(word in bracketMap){//handle brackets
-				statement.push(grammarPass(words,word,true));
+				statement.push(bracketPass(words,word,true));
 			}
 			else if(word=="," && type!="{"){
 				//';' only belongs to codeObjs, and not expressions
@@ -73,13 +73,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		}
 		if(includeBrackets){//[...] => ['{',...,'}']
-			if(!words[words.i]==bracketMap[type])throw Error("compiler error");
+			loga("??",words[words.i])
+			if(words[words.i]!=bracketMap[type])throw Error("unballanced "+type+" brackets");
 			statement.push(words[words.i]);
 			words.i++;
 		}
 		return block;
 	}
-	let parts=grammarPass(parseFile(inputFile,fileName));
+	let parts=bracketPass(parseFile(inputFile,fileName));
 	//chars->words->expresion->statement->codeObj->block
 	//
 	//(...)
