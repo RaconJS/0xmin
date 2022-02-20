@@ -1,10 +1,4 @@
-@{${#{
-	;
-}}}
-let a{
-	#void;
-	let this = a;
-	let return;
-	@;
-	#void def return;
-}
+#let:add=(a,b){
+	#set:this->a+b;
+};
+add(1+2);

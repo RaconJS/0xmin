@@ -5,33 +5,33 @@
 			#let return;
 			#...decorator;
 			#set return = block();
-		}
+		};
 		let block(){
 			...code;
-		}
+		};
 		let newFoo=foo(block).return;
-	}=={
+	};=={
 		let foo = ()={
 			#let return;
 			#...decorator;
 			#set return = block();
-		}
+		};
 		let newFoo=foo(){
 			...code;
-		}
-	}
+		};
+	};
 */
 if(!io){
 	#import lib "io.0xmin";
 };
 #let int(number)={
-	if(number==null){#set number=0;}
+	if(number==null){#set number=0;};
 	def let return=number;
 	#let self=this;
-	#set self{}
+	#set self{};
 	#set int.block{
 		def self;
-	}
+	};
 }::{
 	def let block{};
 };
@@ -43,30 +43,30 @@ if(!io){
 		if((+data[i])==(+number)){
 			#set copy=data[i];
 			#set break->-1;
-		}
+		};
 		else{
 			#set i=i+1;
-		}
-	}
+		};
+	};
 	if(+i == +data..length){
 		def let return=number;
 		#let self=this;
-		#set self{}
+		#set self{};
 		#set const.block{
 			def self;
-		}
-	}else{
+		};
+	};else{
 		def let return=number;
 		#let self=this;
-		#set self{}
+		#set self{};
 		#set const.block{
 			def self;
-		}
-	}
+		};
+	};
 }::{
 	def let block{};
 };
-if(main){def main;}
+if(main){def main;};
 #let function(inLen,outLen)={
 	//#assert block;
 	let return.block=block();
@@ -86,15 +86,15 @@ if(main){def main;}
 					if(arguments[+i]){
 						if(arguments[+i]!=alu){
 							move->arguments[+i];get;
-						}
+						};
 						move->block.inputs[+i];set;
-					}else{
+					};else{
 						#set break->0;
 						#set i=+i-1;
-					}
+					};
 					#set i=+i+1;
-				}
-			}
+				};
+			};
 			delete b;
 			def loadData();
 		//call_function:
@@ -106,48 +106,48 @@ if(main){def main;}
 			{
 				jump->this.block;
 				jump this.block.return->1 def ret;
-			}
+			};
 			delete ret;
 			$move->this.block.return;
 		//return_data:
 			if(i==inputs..length&&arguments[+i]){
 				if(arguments[+i]!=alu){
 					move->arguments[i];set;
-				}
-			}
-	}}
-	if(return.block.inputs){#int(return.block.inputs);}
-	if(return.block.outputs){#int(return.block.outputs);}
+				};
+			};
+	}};
+	if(return.block.inputs){#int(return.block.inputs);};
+	if(return.block.outputs){#int(return.block.outputs);};
 	#let return.fullBlock{
 		$move->block.return;
 		def block;
 		move->block.return;
 		null def block.return;
-	}
+	};
 	#int(fullBlock);
-}
+};
 #let shortFunction(block,len){
 	#let return;
 	if(!len||(+len==0)){
 		#set return(from,to){
 			if(from && (from!=alu)){
-				if(from!=move){move->from;}
+				if(from!=move){move->from;};
 				get;
-			}
+			};
 			def block();
-			if(to){move->to;set;}
-		}
-	}
+			if(to){move->to;set;};
+		};
+	};
 	#let return.block=block;
-}
+};
 #let set import{
 	#let switch(){//obsilete
 		#let switch(array,index,run)={
 			if(!run){
 				#let set run={
 					get;
-				}
-			}
+				};
+			};
 			#let toArray;
 			#let block=constructor.switch_foo.block;
 			pointers:{
@@ -159,26 +159,26 @@ if(main){def main;}
 				$move->array;//"move" is actually at "&array + index" when "run" is ran.
 				def run;
 				$move->moveState;
-			}
+			};
 			if(array){
 				move->toArray;get;move->block.toArray;set;
-			}
+			};
 			if(run){
 				move->run;
 				get;
 				move->block.run;
 				set;
-			}
+			};
 			if(index){
 				def constructor.switch_foo(index);
-			}
+			};
 			$move->array;
 		}::{
 			#var switch_foo=function(1){
 				#let toArray,run;
 				#let inputs{
 					null def let index;
-				}
+				};
 				//assert( +compile(`move 0;`)==0)
 				jump+3;
 				#let indexTo,indexFrom;
@@ -197,14 +197,14 @@ if(main){def main;}
 				move+4 def indexTo;
 				get # def run;
 				move-4 def indexFrom;
-			}
+			};
 			#set switch_foo.fullBlock=>{
 				$move->switch_foo.block.return;
 				def switch_foo.block;
 				null def switch_foo.block.return;
-			}
-		}
-	}
+			};
+		};
+	};
 	#let switch_function(){//block
 		#let switch(array,index,run)={
 			//assert( +compile(`move 0;`)==0)
@@ -213,7 +213,7 @@ if(main){def main;}
 			0 1#def let shift;//0 1;
 			0 -0#def let negative;//0 -0;
 			;
-			if(index!=alu&&index){move->index;get;}
+			if(index!=alu&&index){move->index;get;};
 			move->shift;red;
 			move->indexTo;set;
 			move->negative;xor;
@@ -222,14 +222,14 @@ if(main){def main;}
 			move->array;
 			;
 			move+4 def indexTo;
-			if(run){def run;}
-			else{get;}
+			if(run){def run;};
+			else{get;};
 			move-4 def indexFrom;
-		}
-	}
+		};
+	};
 	#let increment(){
 		#let increment=function(1){
-			#let inputs{null;}
+			#let inputs{null;};
 			move->inputs 0;get;
 			if;null;
 			#let temp,notIn,notOut;
@@ -243,7 +243,7 @@ if(main){def main;}
 				#def redFilt;
 				0x20000000;
 				0x2fffffff #def whiteFilt;
-			}
+			};
 			move->notIn;set;nor;set;//notIn= ~input
 			if;if_overFlow:{
 				#let mv->0xmin;$mv->move;
@@ -253,7 +253,7 @@ if(main){def main;}
 				move->notIn;
 				jump->end;
 				$move->mv;
-			}//assert alu!=white
+			};//assert alu!=white
 			blue;if;null;//if(true)
 			move->const_2;blue;
 			if;if_ans_white:{
@@ -264,26 +264,26 @@ if(main){def main;}
 				move->notIn;
 				jump->end;
 				$move->mv;
-			}//assert (ans != white) && (ans != black);
+			};//assert (ans != white) && (ans != black);
 			red;
 			move->notOut;set;nor;set;
 			move->notIn;red;
 			#def end;
-			if(out){move->out;set;}
-		}
-	}
+			if(out){move->out;set;};
+		};
+	};
 	#let increment_function(){
 		#let increment=shortFunction(){
 			#{
 				#let notIn,notOut;
 				#let const_2;
-			}
+			};
 			vars:{
 				jump->break;
 				null # def notIn;
 				null # def notOut;
 				2 # def const_2;
-			}
+			};
 			move->notIn;
 			set;
 			nor;
@@ -297,11 +297,11 @@ if(main){def main;}
 			nor;
 			move->notIn;
 			red;
-		}
-	}
+		};
+	};
 	#let add(){
 		#let add=function(2){
-			#let inputs{null;null}
+			#let inputs{null;null};
 			#let redFilt=int=(0x20000000);
 			#let temp=int=(null);
 			#let const_2=int=(2);
@@ -313,7 +313,7 @@ if(main){def main;}
 					move->redFilt;
 					if;jump+2;get;
 					move->temp;set;
-				}
+				};
 				and:{
 					move->inputs 0;get;
 					if;null;
@@ -324,32 +324,32 @@ if(main){def main;}
 						move->temp;get;
 						jump->break.loop.break;
 						$move->mv;
-					}
+					};
 					move->const_2;red;
 					move->inputs 1;set;
-				}
+				};
 				move->temp;get;
 				move->inputs 0;set;
 				move->mv;
 				jump->continue;
-			}
+			};
 			$move->temp;
-		}
-	}
+		};
+	};
 	#let runALU(){
 		#let runALU(from,to){
-			if(from){move->from;get;}
+			if(from){move->from;get;};
 			#set jump+2;null;null;
-			if(to){move->to;get;}
-		}
-	}
+			if(to){move->to;get;};
+		};
+	};
 	#let print(){
 		#let termintal.print(){
 			move->termintal.output;
 			set;
-			if(to){move->to;get;}
-		}
-	}
+			if(to){move->to;get;};
+		};
+	};
 	#let input(){
 		#let input=function(0){//reads the input buffer
 			@{
@@ -363,7 +363,7 @@ if(main){def main;}
 				#let waitLine;
 				jump waitLine->return def let isWait;
 				jump waitLine->main def let isNotWait;
-			}
+			};
 			def main;
 			confirmInput:{
 				move->confirm;
@@ -375,16 +375,16 @@ if(main){def main;}
 				if;{//if terminal.input != String.confirm()
 					#def waitLine;
 					jump->return;
-				}
+				};
 				move->terminal.output;
 				set;//confirm input
-			}
+			};
 			recieveInput:{
 				$assert move->terminal.output;
 				//assert alu = confirm;
 				move->terminal.input;
 				repeat 8 or;
-			}
+			};
 			cleanInput:{
 				move->confirm;
 				xor;
@@ -394,17 +394,17 @@ if(main){def main;}
 				move->char;
 				delete char;
 				or;
-			}
+			};
 			#set return.move->return;
 			move->return.move;
 			null def return;
-		}
-	}
-}
+		};
+	};
+};
 #(){
 	let print=function(1){
-		#let inputs{0;}
+		#let inputs{0;};
 		move->inputs[0];get;
 		move->io.output1;set;
-	}
-}
+	};
+};
