@@ -13,7 +13,7 @@ function compile {
 		outFileName=$2;
 		externalOutFile=false; #true => dont make an internal file, for compiler->emulator
 		isRunningFile=false;
-		isUsingOutFileNameToExicute=true;
+		isUsingOutFileNameToExicute=true; # '-e'  => false
 		runSpeed=60;
 		runFileName="";
 		args=("$@");
@@ -38,7 +38,7 @@ function compile {
 				fi
 				i=$(($i + 1));
 				continue;
-			elif [[ "$operator" = "-e" ]]; then #'0xmin -e code.filt;' exicute '.filt' file
+			elif [[ "$operator" = "-e" ]]; then #'0xmin -e code.filt;' execute '.filt' file
 				if [[ $((i + 1)) < $ELEMENTS ]];then 
 					runFileName=$val1;
 					isUsingOutFileNameToExicute=false;
@@ -79,17 +79,19 @@ function compile {
 	
 	#code.0xmin => code.filt or code.lua
 	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
-	nodejs $mainfolder/compile.js $inputFileName $outFileName; #(nodejs test.js);
+	if [[ $isUsingOutFileNameToExicute == 1 ]]; then
+		nodejs $mainfolder/compile.js $inputFileName $outFileName; #(nodejs test.js);
+	fi
 	if [[ -f minFilt.lua && -e "$powderToyScriptsFolder" ]]; then #if file exists
 		mv minFilt.lua "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
 	fi;
-	if [[ $isRunningFile == 1 ]]; then
+	if [[ $isRunningFile == true ]]; then
 		test=0;
 		if [[ -f $runFileName ]]; then
 			test=1;
 		else
 			test=0;
-		fi;
+		fi;echo $test;
 		$mainfolder/../emulators/emulator3 $runFileName $test $runSpeed;
 	fi
 	return;

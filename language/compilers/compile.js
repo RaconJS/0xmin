@@ -25,130 +25,61 @@ const oxminCompiler=async function(inputFile,fileName){
 		words.i=0;
 		return words;
 	}
-	class Scope extends Array{
-		parse(words){//checks grammer
-			for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
-				this.push(new CodeObj().parse(words))
-				//assert (word != ';') unless the next line is a ';' statement
-			}
-			return this;
+	const bracketMap=Object.freeze({
+		"{":"}",
+		"[":"]",
+		"(":")",
+	});
+	const bracketClassMap=Object.freeze({
+		"{":({"{ }":class extends Array{}})["{ }"],
+		"[":({"[ ]":class extends Array{}})["[ ]"],
+		"(":({"( )":class extends Array{}})["( )"],
+	});
+	function grammarPass(words,type="{",includeBrackets=false){
+		words.i??=0;
+		let block=new bracketClassMap[type]??[];//the current container: {...} or [...] or (...)
+		let statement=[];//the current item: '...;' or '...,'
+		if(includeBrackets){//[...] => ['{',...,'}']
+			if(!words[words.i]==type)throw Error("compiler error");
+			statement.push(words[words.i]);
+			words.i++;
 		}
-	};
-	class CodeObj extends Array{
-		isStatic=false;
-		parse(words){
-			let maxLen=words.length;
-			for(let i=words.i;i<maxLen&&words.i<words.length;i++){
-				let word=words[words.i];
-				//line types
-				switch(word){
-					case"repeat":{
-						this.push(new Statement.Repeat(words));
-					}break;
-					case"recur":{
-					}break;
-					case"void":{
-					}break;
-					case"":{
-					}break;
-					case"":{
-					}break;
-				}
+		let brackets=0;
+		for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
+			let word=words[words.i];
+			if(word in bracketMap){//handle brackets
+				statement.push(grammarPass(words,word,true));
 			}
-			return this;
-		}
-	};
-	class Statement extends Array{
-		parse(words){
-			for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
-				this.push(new CodeObj().parse(words))
-			}
-			return this;
-		}
-		static Repeat=class extends Statement{
-			parse(words){
-				//assert words[words.i] == 'repeat'
+			else if(word=="," && type!="{"){
+				//';' only belongs to codeObjs, and not expressions
+				statement.push(word);
 				words.i++;
-				this.push(new Expression().parse(words));
-				return this;
+				block.push(statement);
+				statement=[];
 			}
-		};
-	};
-	class Expression extends Array{//'a + b * c' [value1,value2] or '( [v,v] )'
-		parse(words){
-			for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
-				let word=words[words.i];
-				if(")]},".includes(word)){
-					break;
-				}
-				else{
-					this.push(new Value().parse(words));
-				}
+			else if(word=="}"||(type!="{" && ";)]}".includes(word))){
+				block.push(statement);
+				break;
 			}
-			return this;
-		}
-	};
-	class Value extends Array{//'a.b.c' ['(',expression,')'] or [name,'.',name]
-		hadBrackets=false;
-		parse(words){
-			if(words[words.i]=="("){
-				this.hadBrackets=true;
+			else if(word == ";" && type=="{"){
+				statement.push(word);
+				words.i++;
+				block.push(statement);
+				statement=[];
+			}
+			else{
+				statement.push(word);
 				words.i++;
 			}
-			for(let i=words.i,len=words.length;i<len&&words.i<words.length;i++){
-				let foundPart=false;
-				{
-					let word=words[words.i];
-					if("\"'`".includes(word[0])){
-						this.push(new Word.String(word));
-						words.i++;
-						found=true;
-					}
-					else if(words[0].match(/[\w_]/)){//variable name
-						this.push(new Word.Name(word));
-						words.i++;
-						found=true;
-					}
-				}
-				if(foundPart){//symbol part
-					foundPart=false;
-					if([".",".."].includes(word)){//optional dot operator
-						words.i++;
-						this.push(new Word(word));
-						foundPart=true;
-					}
-					let word=words[words.i];
-					if(!["(","[","{"].includes(word)){
-						break;
-					}else{
-						foundPart=true;
-					}
-					switch(word){
-						case"(":
-							words.i++;
-							this.push()
-						break;
-						case"..":
-						break;
-						case"(":
-						break;
-					}
-				}
-				if(words[words.i]==")"&& this.hadBrackets){
-					words.i++;
-					break;
-				}
-			}
-			return this;
 		}
-	}
-	class Word extends String{
-		constructor(word){
-			super(word);
+		if(includeBrackets){//[...] => ['{',...,'}']
+			if(!words[words.i]==bracketMap[type])throw Error("compiler error");
+			statement.push(words[words.i]);
+			words.i++;
 		}
-		static String=class extends Word{};
-		static Name=class extends Word{};
+		return block;
 	}
+	let parts=grammarPass(parseFile(inputFile,fileName));
 	//chars->words->expresion->statement->codeObj->block
 	//
 	//(...)
