@@ -1,0 +1,18 @@
+/*#{&x = 10; x = 4; *x = 6;}
+move -> x;//move == &x;
+move => x;//*move == &x;
+move <- x;//move == *x;
+move <= x;//*move == *x;
+move <-> x;//move == x;
+move <=> x;//*move == x;
+//move = x;//move == x;
+move = &x;
+move = [x];
+move = x;
+$ram 10;
+4 def x;
+$ram 4;
+6 def y;
+*/
+1;
+2 3;
