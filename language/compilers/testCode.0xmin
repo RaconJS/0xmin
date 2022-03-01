@@ -14,5 +14,10 @@ $ram 10;
 $ram 4;
 6 def y;
 */
-1;
-2 3;
+jump 6;
+{
+jump 0;
+null;null;null;null;
+}
+"hello world";
+jump 0;
