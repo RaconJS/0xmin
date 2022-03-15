@@ -4,8 +4,9 @@
 //debugger "'a' in scope.label.labels";
 {
 	0;
-	#let def a;//debugger "scope.label.labels.a";
+	#let a;//debugger "scope.label.labels.a";
 	0 a;
+	#def a;
 }
 {
 }

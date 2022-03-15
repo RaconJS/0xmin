@@ -495,7 +495,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			}
 			//UNFINISHED
-			for(let i=index;i<statement.length;i++){
+			let nameLast=false;
+			for(let i=index;i<statement.length&&index<statement.length;i++){
 				let word=statement[index];
 				if(["=","=>"].includes(word)){
 					let firstArg=args.pop();
@@ -525,6 +526,14 @@ const oxminCompiler=async function(inputFile,fileName){
 							//UNFINISHED: needs code for array assignment
 							args.push(firstArg);
 						}
+					}
+					break;
+				}
+				if(!nameLast){//not: 'name name'
+					if(word.match(nameRegex)||["(","[","{"].includes(word)){
+						let value;
+						({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
+						args.push(value);
 					}
 				}
 			}
@@ -604,7 +613,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				for(let i=0;i<queue.maxLen&&queue.size>0;i++){//lineObj instanceof CodeLine || lineObj instanceof Variable 
 					let oldLen=queue.size;
 					for(let i=0;i<oldLen&&i<queue.size;i++){
-						const lineObj=codeQueue[i];
+						const lineObj=queue.dequeue();
 						let failed;
 						if(lineObj instanceof CodeLine){
 							lineObj.cpuState=new CpuState({lineNumber,});
@@ -615,10 +624,8 @@ const oxminCompiler=async function(inputFile,fileName){
 							let {machineCode,failed}=assemblyCompiler.compileAssemblyLine({lineObj,assemblyCode,lineNumber});
 							assemblyCode.code[lineNumber++]=machineCode;
 						}else throw Error("compiler error: type error: lineObj");
-						if(!failed){
-							queue.dequeue();
-						}else{
-							queue.enqueue(queue.dequeue());
+						if(failed){
+							queue.enqueue(lineObj);
 						}
 					}
 					if(queue.size>=oldLen){
