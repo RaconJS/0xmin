@@ -137,7 +137,7 @@ contexts:
       scope: keyword.control
       push: main_equalsSign
 
-    - match: '([+\-*/~&¬|^!]|<<|>>|>>>|&&|\|\||\^\^|%)|(!=|==|===)'
+    - match: '([+\-*/~&¬|^!]|<<|>>|>>>|>|<|&&|\|\||\^\^|%)|(!=|==|===)'
       scope: keyword.control
 
     - match: '\b(new|recur|repeat)\b'
