@@ -1,23 +1,11 @@
-/*#{&x = 10; x = 4; *x = 6;}
-move -> x;//move == &x;
-move => x;//*move == &x;
-move <- x;//move == *x;
-move <= x;//*move == *x;
-move <-> x;//move == x;
-move <=> x;//*move == x;
-//move = x;//move == x;
-move = &x;
-move = [x];
-move = x;
-$ram 10;
-4 def x;
-$ram 4;
-6 def y;
-*/
-jump 6;
+//0xmin Assembly Small Macro language
+//0@$#L or ZASM
+//#set a = 2;
+//debugger "'a' in scope.label.labels";
 {
-jump 0;
-null;null;null;null;
+	0;
+	#let def a;//debugger "scope.label.labels.a";
+	0 a;
 }
-"hello world";
-jump 0;
+{
+}

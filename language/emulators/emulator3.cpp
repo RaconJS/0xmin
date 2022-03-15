@@ -1,3 +1,4 @@
+//g++ -pthread emulator3.cpp -o emulator3;
 //do ctrl+f "commands" to find the main emulator.
 float runSpeed=60;//fps
 /*0xmin dev:
