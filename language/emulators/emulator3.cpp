@@ -447,7 +447,7 @@ class NumberDisplay{
 
 			cout<<ctx.moveTo(x,y)<<"                          ";//"get jump -1 +0x21234567";
 			cout<<ctx.moveTo(x,y++)<<"*jump: ";
-			if(!cpu.currentWord&0x00030000)
+			if(!(cpu.currentWord&0x00030000))
 				cout<<(const char*[]){"move","jump","nor","red","blue","get","xor","and","or","get jump -1","set","if","set jump +3","","null",""}[cpu.currentWord&0xf]
 				<<" "<<(const char[]){'+','-'}[(cpu.currentWord&0x1000)!=0]<<hex ((cpu.currentWord>>4)&0xff)
 			;

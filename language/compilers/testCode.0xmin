@@ -1,12 +1,6 @@
-//0xmin Assembly Small Macro language
-//0@$#L or ZASM
-//#set a = 2;
-//debugger "'a' in scope.label.labels";
-{
-	0;
-	#let a;//debugger "scope.label.labels.a";
-	0 a;
-	#def a;
-}
-{
-}
+#let a;
+move->1;
+move->a;
+move->3;
+repeat 4 0;
+#def a;
