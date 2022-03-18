@@ -25,6 +25,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	const nameRegex=/^[\w_]/;
 	const stringRegex=/^["'`]/;
 	const openBracketRegex=/^[(\[{]/;
+	const endingStringList="@$#:;])}";
 	//(long string,string) => (array of words)
 	function parseFile(inputFile,fileName){
 		"use strict";
@@ -251,7 +252,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				assemblyPart:{
 					let value;
 					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope,codeObj}));
-					;
+					else if(state.phase=="$")({index,value}=await contexts.main_hidden({statement,index,scope,codeObj}));
 					word=statement[index];
 					if(word=="#")index++;
 					({index,value}=await contexts.main_meta({statement,index,scope,codeObj}));
@@ -284,35 +285,47 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				if(statement[index]==":")index++;
 				if(!found)metaState["set"]=true;
-				if(metaState["let"]){
+				for(let i=0;i<statement.length;i++){//'#let a,b,c;'
+					let foundExpression=false;
+					let word;
+					if(metaState["let"]){
+						let value;
+						({value,index}=await contexts.expression_short({statement,index,scope}));
+						if(value){
+							foundExpression=true;
+							const newLabel=new Variable({name:value.name});
+							let labelParent=(value.parent??scope.let.label);
+							if(metaState["set"])labelParent.labels[value.name]=newLabel;
+							else labelParent.labels[value.name]??=newLabel;
+							startValue=new Value({
+								type:"label",
+								label:newLabel,
+								name:newLabel.name,
+								parent:labelParent,
+							});
+						}
+					}
 					let value;
-					({value,index}=await contexts.expression_short({statement,index,scope}));
-					if(value){
-						const newLabel=new Variable({name:value.name});
-						let labelParent=(value.parent??scope.let.label);
-						if(metaState["set"])labelParent.labels[value.name]=newLabel;
-						else labelParent.labels[value.name]??=newLabel;
-						startValue=new Value({
-							type:"label",
-							label:newLabel,
-							name:newLabel.name,
-							parent:labelParent,
-						});
+					({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
+					foundExpression||=!!value;
+					if(metaState["def"]){
+						if(value instanceof Value && value.type=="label"){
+							contexts.meta_defineLabelToNextLine(value.label,scope,value);
+							scope.label.code.push(value.label);
+						}
 					}
-				}
-				let value;
-				({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
-				if(metaState["def"]){
-					if(value instanceof Value && value.type=="label"){
-						contexts.meta_defineLabelToNextLine(value.label,scope);
-					}
-					scope.label.code.push(value.label);
+					word=statement[index];
+					if(word==",")index++;
 				}
 				return {index};
 			},
-			meta_defineLabelToNextLine(label,scope){
+			async main_hidden({statement,index,scope,instruction}){
+
+				return{index};
+			}
+			meta_defineLabelToNextLine(label,scope,value){
 				//done in the line Assignment phase
-				if(label==undefined)throw Error("0xmin error: label is not defined");
+				if(label==undefined)throw Error("0xmin error: label '"+value.name+"' is not defined");
 				scope.label.code.push(new HiddenLine.Define({label,scope}));
 			},
 			async main_assembly_argument({statement,index,scope,instruction}){
@@ -642,7 +655,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	const assemblyCompiler={
 		async main(scope){
 			const codeQueue=this.collectCode(scope.label);
-			const {assemblyCode}=await this.assignMemory(codeQueue,scope.label);
+			const {assemblyCode}=await this.assignMemory(codeQueue,scope);
 			//(Variable) -> Variable
 			const machineCode=await this.compileAssembly(assemblyCode);//(Variable) -> MachineCode
 			return machineCode;
@@ -665,12 +678,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return codeQueue;
 			},
-			async assignMemory(codeQueue,codeObj){
+			/*async assignMemory(codeQueue,codeObj){
 				"use strict";
 				if(!codeObj instanceof Array)throw Error("compiler error: 'codeQueue' is not a normal Array.");
 				const code=codeObj.code;
 				const assemblyCode=new Variable();
-				let lineNumber=codeObj.address??0;
 				//task managing 
 				let queue={//circular queue
 					maxLen:codeQueue.length,
@@ -682,6 +694,11 @@ const oxminCompiler=async function(inputFile,fileName){
 						this.list[this.head++]=item;
 						this.head%=this.maxLen;
 					},
+					getNextItem(){
+						const item=this.list[this.tail++];
+						this.tail%=this.maxLen;
+						return item;
+					},
 					dequeue(){
 						if(this.size--==0)throw Error("compiler error: queue underflow");
 						const item=this.list[this.tail++];
@@ -689,53 +706,126 @@ const oxminCompiler=async function(inputFile,fileName){
 						return item;
 					},
 				};
-				const cpuState=new CpuState();
+				let stateUpdated=true;
 				for(let i=0;i<queue.maxLen&&queue.size>0;i++){//lineObj instanceof CodeLine || lineObj instanceof Variable 
 					let oldLen=queue.size;
+					let fails=0;
+					let lineNumber=codeObj.address??0;
+					const cpuState=new CpuState();
 					for(let i=0;i<oldLen&&i<queue.size;i++){
-						const lineObj=queue.dequeue();
+						const lineObj=queue.getNextItem();//queue.dequeue();
 						let failed;
 						if(lineObj instanceof CodeLine){
-							lineObj.cpuState=new CpuState(cpuState);
+							if(lineObj.cpuState)Object.assign(cpuState,lineObj.cpuState)
+							else lineObj.cpuState=new CpuState(cpuState);
 						}
 						if(lineObj instanceof HiddenLine){
-							({lineNumber,failed}=await assemblyCompiler.evalHiddenLine({lineObj,lineNumber,assemblyCode,codeObj}));
+							({failed,stateUpdated}=await assemblyCompiler.evalHiddenLine({lineObj,cpuState,assemblyCode,codeObj,stateUpdated}));
 						}else if(lineObj instanceof AssemblyLine){
-							let {machineCode,failed}=assemblyCompiler.compileAssemblyLine({lineObj,assemblyCode,lineNumber});
-							assemblyCode.code[lineNumber++]=machineCode;
+							if(stateUpdated){
+								assemblyCode.cpuState=cpuState;
+								stateUpdated=false;loga("?",)
+							}
+							assemblyCode.code[lineNumber++]=lineObj;
 							cpuState.jump++;
 						}else throw Error("compiler error: type error: lineObj");
-						if(failed){
-							queue.enqueue(lineObj);
+						if(failed){fails++
+							lineObj.cpuState=null;
+							//queue.enqueue(lineObj);
 						}
-						cpuState.lineNumber=cpuState.lineNumber;
 					}
-					if(queue.size>=oldLen){
+					if(queue.size>oldLen&&fails>=queue.size){
 						throw Error
 						("0xmin error: $ phase: uncomputable code. lens:"+oldLen+"->"+codeQueue.length);
 					}
 				}
 				return {lineNumber,assemblyCode};
+			},*/
+			async assignMemory(codeQueue,scope){
+				"use strict";
+				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
+				if(!(scope instanceof Scope))throw Error("compiler type error");
+				let lastFails=codeQueue.length;
+				let startingCpuState=new CpuState();
+				let cpuState=new CpuState();
+				const assemblyCode=new MachineCode()
+				for(let i=0;i<codeQueue.length;i++){
+					let fails=0;
+					cpuState.setValues(startingCpuState);
+					for(let i=0;i<codeQueue.length;i++){
+						const instruction=codeQueue[i];
+						let failed=false;
+						if(instruction instanceof HiddenLine){
+							///@mutates: cpuState,scope;
+							({failed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,scope,assemblyCode}));
+						}
+						else if(instruction instanceof AssemblyLine){
+							assemblyCode.code[cpuState.lineNumber]=instruction;
+							instruction.cpuState=new CpuState(cpuState);
+							///@mutates: instruction,cpuState;
+							({failed}=await this.compileAssemblyLine({instruction,assemblyCode,cpuState,code:codeQueue}));
+						}
+						if(failed){
+							fails++;
+						}
+					}
+					if(fails==0)break;
+					if(fails>=lastFails)throw Error("0xmin error: possibly uncomputable;");
+					lastFails=fails;
+				}
+				for(let i=0;i<assemblyCode.code.length;i++){
+					assemblyCode.code[i]??=this.nullValue;
+				}
+				return {assemblyCode};
 			},
 			//assembly compiling
-			compileAssemblyLine({lineObj,assemblyCode,lineNumber}){
-				if(!(lineObj instanceof AssemblyLine))throw Error("compiler error: type error;");
-				if(!(assemblyCode instanceof Variable))throw Error("compiler error: type error;");
-				if(!(typeof lineNumber == "number"))throw Error("compiler error: type error;");
-				const machineCode=new AssemblyLine(lineObj);
-				let binaryCode;
-				let command=lineObj.args[0]?.name;
-				if(command in this.assembly.instructionSet){
-					binaryCode|=this.assembly.instructionSet[command];
+			async compileAssemblyLine({instruction,cpuState,assemblyCode}){
+				Object.getPrototypeOf;
+				if(!(instruction instanceof AssemblyLine))throw Error("compiler error: type error;");
+				//const cpuState=instruction.cpuState;
+				if(!(cpuState instanceof CpuState))throw Error("compiler error: type error;");
+				const machineCode=instruction;//=new AssemblyLine(instruction);
+				let failed=false;
+				{
+					let arg=instruction.args[0];
+					let binaryValue=0;
+					//const cpuState=instruction.cpuState;
+					for(let i=0;i<instruction.args.length;i++){
+						arg=instruction.args[i];
+						({arg,failed}=await this.decodeArgument(instruction.args,i,cpuState));
+						failed||=isNaN(arg)&&!arg==undefined;//undefined or null are allowed to pass
+						if(failed)break;
+						let binaryArg;
+						if(typeof arg=="number"){
+							if(i==1&&instruction.type=="command"&&this.assembly.language=="0xmin"){
+								//compile address; handles 0xmin quirks
+								binaryArg=arg<0?(((2*(arg&1)-arg)&0xff)*0x10)|0x1000:(arg&0xff)*0x10;
+								binaryValue|=binaryArg;
+							}
+							else switch(instruction.type){
+								case"data":binaryValue|=binaryArg=arg;break;
+								case"command":binaryValue|=binaryArg=
+									(arg&((1<<this.assembly.machineCodeArgs[i][1])-1))
+									<<this.assembly.machineCodeArgs[i][0];break;
+							}
+							continue;
+						}
+						if(!arg){
+							binaryValue=this.nullValue.binaryValue; 
+						}
+					}
+					if(this.assembly.language=="0xmin"){
+						cpuState.lineNumber++;
+						cpuState.jump++;
+					}
+					machineCode.binaryValue=binaryValue;
 				}
-				machineCode.binaryValue=binaryCode;
-				return {machineCode,failed:false};
+				return {failed};
 			},
-			async evalHiddenLine({lineObj,lineNumber,assemblyCode,codeObj}){//shouldEval's $ or # code in the '$' phase
+			async evalHiddenLine({instruction,cpuState,assemblyCode}){//shouldEval's $ or # code in the '$' phase
 				//UNFINISHED
-				let code=lineObj;
 				let failed;
-				({lineNumber,faled}=code.run({lineNumber,}));
+				({lineNumber,faled}=instruction.run({cpuState,}));
 				return {lineNumber,failed};
 			},
 		//----
@@ -789,6 +879,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 			async decodeArgument(args,argNumber=0,cpuState,type="command"){
 				let arg=args[argNumber];
+				let failed=false;
 				if(arg instanceof bracketClassMap["("]){//code tree
 					let {value,index}=await contexts.expression({index:0,statement:arg});
 					arg=value;
@@ -798,15 +889,19 @@ const oxminCompiler=async function(inputFile,fileName){
 						let fromArg,toArg;
 						toArg=this.findPointerOrLabel(arg[0],cpuState);
 						fromArg=this.findPointerOrLabel(args[argNumber-1],cpuState);
+						if(toArg==undefined||fromArg==undefined)throw Error("0xmin error: labels in 'a->b' are undefined. try 'let a,b;'");
 						if(arg.operator=="<-"){
 							let carry=toArg;
 							toArg=fromArg;
 							fromArg=carry;
 						}
 						arg=toArg.lineNumber-fromArg.lineNumber;
+						failed=isNaN(+arg);
 						if(fromArg.type=="pointer"){
-							if(fromArg.name=="move"){
-								cpuState.move+=arg;
+							if(this.assembly.language=="0xmin"){
+								if(fromArg.name=="move"){
+									cpuState.move=toArg.lineNumber;
+								}
 							}
 						}
 					}
@@ -823,58 +918,14 @@ const oxminCompiler=async function(inputFile,fileName){
 						arg=this.assembly.instructionSet[arg];
 					}
 				}
-				return arg;//:number
+				return {arg,failed};//:number
 			},
-			async compileAssembly(assemblyCode){//ordered assembly code
-				if(!(assemblyCode instanceof Variable))throw Error("compiler error: type error;");
-				const code=assemblyCode.code;
-				const machineCode=new MachineCode();
-				const nullValue=this.nullValue;
-				const tempEmulator={//temporary emulator
-					cpuState:new CpuState(),
-
-				}
-				for(let i=0;i<code.length;i++){
-					let binaryValue=0;
-					const instruction=code[i];//instruction:AssemblyLine
-					let cpuState=instruction.cpuState;
-					temporary:{
-						tempEmulator.cpuState.lineNumber=instruction.cpuState.lineNumber;
-						tempEmulator.cpuState.jump=instruction.cpuState.jump;
-						cpuState=tempEmulator.cpuState;
+			async compileAssembly(machineCode){//ordered assembly code
+				for(let i=0;i<machineCode.code.length;i++){
+					const instruction=machineCode.code[i];
+					if(!instruction){
+						machineCode.code[i]=this.nullValue;
 					}
-					let outputInstruction=instruction;//new AssemblyLine({binaryValue:0});
-					if(!instruction||instruction==nullValue){
-						machineCode.code.push(nullValue);
-						continue;
-					}
-					else machineCode.code.push(outputInstruction);
-					let arg=instruction.args[0];
-					let number;
-					//const cpuState=instruction.cpuState;
-					for(let i=0;i<instruction.args.length;i++){
-						arg=instruction.args[i];
-						arg=await this.decodeArgument(instruction.args,i,cpuState);
-						let binaryArg;
-						if(typeof arg=="number"){
-							if(i==1&&instruction.type=="command"&&this.assembly.language=="0xmin"){
-								//compile address; handles 0xmin quirks
-								binaryArg=arg<0?(((2*(arg&1)-arg)&0xff)*0x10)|0x1000:(arg&0xff)*0x10;
-								binaryValue|=binaryArg;
-							}
-							else switch(instruction.type){
-								case"data":binaryValue|=binaryArg=arg;break;
-								case"command":binaryValue|=binaryArg=
-									(arg&((1<<this.assembly.machineCodeArgs[i][1])-1))
-									<<this.assembly.machineCodeArgs[i][0];break;
-							}
-							continue;
-						}
-						if(!arg){
-							binaryValue=nullValue.binaryValue; 
-						}
-					}
-					instruction.binaryValue=binaryValue;
 				}
 				return machineCode;
 			},
@@ -933,6 +984,15 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 		class CpuState extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
+			nextLine(){
+				if(assemblyCompiler.assembly.language=="0xmin"){
+					this.jump++;
+				}
+				this.lineNumber++;
+			}
+			setValues(newCpuState){
+				Object.assign(this,newCpuState);
+			}
 			jump=0;//:int ; line pointer
 			move=0;//:int ; data pointer
 			lineNumber=0;//:int
@@ -940,7 +1000,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		///@abstract
 		class CodeLine extends DataClass{//assembly line of code
 			//constructor(data){super();Object.assign(this,data??{})}
-			cpuState;//:CpuState
+			cpuState=null;//:CpuState|null
 			scope;
 		}
 		class AssemblyLine extends CodeLine{
@@ -962,17 +1022,17 @@ const oxminCompiler=async function(inputFile,fileName){
 			static Define=class extends HiddenLine{//'$def a;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
-				run({lineNumber:nextLineNumber}){
-					this.label.lineNumber=nextLineNumber;
-					return{lineNumber:nextLineNumber,failed:false};
+				run({cpuState}){//nextlineNumber
+					this.label.lineNumber=cpuState.lineNumber;
+					return{failed:false};
 				}
 			}
 			static RelocateCurrentLineNumber=class extends HiddenLine{//'$ram 10;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
-				run({lineNumber:nextLineNumber}){
-					nextLineNumber=this.label.lineNumber;
-					return{lineNumber:nextLineNumber,failed:false};
+				run({cpuState}){
+					cpuState.lineNumber=this.label.lineNumber;
+					return{failed:false};
 				}
 			}
 		}
