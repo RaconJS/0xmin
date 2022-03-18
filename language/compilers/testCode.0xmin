@@ -1,6 +1,4 @@
-#let a;
-move->1;
-move->a;
-move->3;
-repeat 4 0;
-#def a;
+if;#let then, endIf;
+jump->then;
+#def then;
+#def endIf;#delete then,endIf;
