@@ -20,7 +20,7 @@ const tabs=(obj,b=0)=>JSON.stringify(obj)
 const oxminCompiler=async function(inputFile,fileName){
 	"compiler error: type error;";
 	const wordsRegex=//does not include: /\s+/
-	/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]/g
+	/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]/g
 	;
 	const nameRegex=/^[\w_]/;
 	const stringRegex=/^["'`]/;
@@ -251,11 +251,11 @@ const oxminCompiler=async function(inputFile,fileName){
 			else{
 				assemblyPart:{
 					let value;
-					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope,codeObj}));
-					else if(state.phase=="$")({index,value}=await contexts.main_hidden({statement,index,scope,codeObj}));
+					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope:newScope}));
+					else if(state.phase=="$")({index,value}=await contexts.main_hidden({statement,index,scope:newScope}));
 					word=statement[index];
 					if(word=="#")index++;
-					({index,value}=await contexts.main_meta({statement,index,scope,codeObj}));
+					({index,value}=await contexts.main_meta({statement,index,scope:newScope}));
 					;
 				}
 			}
@@ -269,21 +269,27 @@ const oxminCompiler=async function(inputFile,fileName){
 			return {index,value:newScope};
 		},
 		//main
-			async main_meta({statement,index,scope}){//'#' ==> '# let set a;'
-				let metaState={
-					"let":false,
-					"set":false,
-					"def":false,
-				};
-				let word=statement[index];
-				let found=false;
-				let startValue;//:Value
+			keyWordList({statement,index,scope,keywords}){//'let set:'
+				//keywords: interface{[key:string]:false}
+				let word,found=false;
 				while(["let","set","def"].includes(word=statement[index])){
-					metaState[word]=true;
+					keywords[word]=true;
 					index++;
 					found=true;
 				}
 				if(statement[index]==":")index++;
+				return {index,found};
+			},
+			async main_meta({statement,index,scope}){//'#' ==> '# let set a;'
+				const metaState={
+					"let":false,
+					"set":false,
+					"def":false,
+				};
+				let found;
+				({index,found}=contexts.keyWordList({statement,index,scope,keywords:metaState}));
+				let word=statement[index];
+				let startValue;//:Value
 				if(!found)metaState["set"]=true;
 				for(let i=0;i<statement.length;i++){//'#let a,b,c;'
 					let foundExpression=false;
@@ -319,10 +325,53 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return {index};
 			},
-			async main_hidden({statement,index,scope,instruction}){
-
+			labelToRelLabel({statement,index,scope,value}){//'label' ==> 'label+10'
+				//relative label
+				let word=statement[index];
+				if(!(value instanceof Value))throw Error("compiler type error");
+				if(value.type=="label"){
+					let sign=0;
+					if("+-".includes(word)){//'$jump->label+10';
+						index++;
+						sign=+("-"==word);
+					}
+					let number;
+					({value:number,index}=contexts.number({statement,index,scope}));
+					value.number=number*[1,-1][sign]??0;
+				}
+				return {index};
+			},
+			async main_hidden({statement,index,scope}){
+				let value;
+				let word;
+				const state={"def":false,"set":false};
+				let found;
+				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
+				({value,index}=await contexts.expression_short({statement,index,scope}));
+				word=statement[index];
+				if(!found){
+					state["set"]=true;
+				}
+				if(state["def"]){
+					meta_defineLabelToNextLine(value.label,scope,value);
+					scope.label.code.push(new HiddenLine.Define({label:value.label}))
+				}
+				if(state["set"]){
+					if(["->","<-"].includes(word)){
+						index++;
+						let isReversed=word=="<-"?1:0;
+						let operator=new Operator("->");
+						operator[isReversed]=value;
+						({value,index}=await contexts.expression_short({statement,index,scope}));
+						operator[1-isReversed]=value;
+						word=statement[index];
+						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
+						let newLine=new HiddenLine.SetLabelOrPointer({operator});
+						scope.label.code.push(newLine);
+					}
+				}
 				return{index};
-			}
+			},
 			meta_defineLabelToNextLine(label,scope,value){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error("0xmin error: label '"+value.name+"' is not defined");
@@ -376,7 +425,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return{index};
 			},
-			async main_assembly({statement,index,scope,codeObj}){
+			async main_assembly({statement,index,scope}){
+				const codeObj=scope.label;
 				if(!statement[index])return{index};
 				if(!(codeObj instanceof Variable))throw Error("compiler error: type error;");
 				{
@@ -678,69 +728,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return codeQueue;
 			},
-			/*async assignMemory(codeQueue,codeObj){
-				"use strict";
-				if(!codeObj instanceof Array)throw Error("compiler error: 'codeQueue' is not a normal Array.");
-				const code=codeObj.code;
-				const assemblyCode=new Variable();
-				//task managing 
-				let queue={//circular queue
-					maxLen:codeQueue.length,
-					size:codeQueue.length,
-					list:codeQueue,
-					tail:0,head:0,
-					enqueue(item){
-						if(this.size++==this.maxLen)throw Error("compiler error: queue overflow");
-						this.list[this.head++]=item;
-						this.head%=this.maxLen;
-					},
-					getNextItem(){
-						const item=this.list[this.tail++];
-						this.tail%=this.maxLen;
-						return item;
-					},
-					dequeue(){
-						if(this.size--==0)throw Error("compiler error: queue underflow");
-						const item=this.list[this.tail++];
-						this.tail%=this.maxLen;
-						return item;
-					},
-				};
-				let stateUpdated=true;
-				for(let i=0;i<queue.maxLen&&queue.size>0;i++){//lineObj instanceof CodeLine || lineObj instanceof Variable 
-					let oldLen=queue.size;
-					let fails=0;
-					let lineNumber=codeObj.address??0;
-					const cpuState=new CpuState();
-					for(let i=0;i<oldLen&&i<queue.size;i++){
-						const lineObj=queue.getNextItem();//queue.dequeue();
-						let failed;
-						if(lineObj instanceof CodeLine){
-							if(lineObj.cpuState)Object.assign(cpuState,lineObj.cpuState)
-							else lineObj.cpuState=new CpuState(cpuState);
-						}
-						if(lineObj instanceof HiddenLine){
-							({failed,stateUpdated}=await assemblyCompiler.evalHiddenLine({lineObj,cpuState,assemblyCode,codeObj,stateUpdated}));
-						}else if(lineObj instanceof AssemblyLine){
-							if(stateUpdated){
-								assemblyCode.cpuState=cpuState;
-								stateUpdated=false;loga("?",)
-							}
-							assemblyCode.code[lineNumber++]=lineObj;
-							cpuState.jump++;
-						}else throw Error("compiler error: type error: lineObj");
-						if(failed){fails++
-							lineObj.cpuState=null;
-							//queue.enqueue(lineObj);
-						}
-					}
-					if(queue.size>oldLen&&fails>=queue.size){
-						throw Error
-						("0xmin error: $ phase: uncomputable code. lens:"+oldLen+"->"+codeQueue.length);
-					}
-				}
-				return {lineNumber,assemblyCode};
-			},*/
 			async assignMemory(codeQueue,scope){
 				"use strict";
 				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
@@ -849,8 +836,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				},
 				init(){
 					let name;
-					this.pointers[name="jump"]=new Pointer(name,0);
-					this.pointers[name="move"]=new Pointer(name,0);
+					this.pointers[name="jump"]=new Pointer(name);
+					this.pointers[name="move"]=new Pointer(name);
+					this.pointers[name="ram"]=new Pointer("lineNumber");
 				},
 				pointers:{},
 				registers:{
@@ -872,7 +860,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			nullValue:null,//will be defined later
 			findPointerOrLabel(value,cpuState){//:Pointer|Variable
 				/// value:number|Value
-				if(typeof value=="number")return new Variable({lineNumber:value});
+				if(typeof value=="number"){
+					return new Variable({lineNumber:value+cpuState.lineNumber});
+				}
 				if(!(value instanceof Value&&value.type=="label"))throw Error("compiler type error:");
 				
 				return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
@@ -895,7 +885,8 @@ const oxminCompiler=async function(inputFile,fileName){
 							toArg=fromArg;
 							fromArg=carry;
 						}
-						arg=toArg.lineNumber-fromArg.lineNumber;
+						//'jump->label-4';
+						arg=toArg.lineNumber-fromArg.lineNumber+(arg[0].type=="label"?arg[0].number:0);
 						failed=isNaN(+arg);
 						if(fromArg.type=="pointer"){
 							if(this.assembly.language=="0xmin"){
@@ -1035,6 +1026,31 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{failed:false};
 				}
 			}
+			static SetLabelOrPointer=class extends HiddenLine{//'$ram 10;'
+				constructor(data){super();Object.assign(this,data??{})}
+				operator=null;///:Variable
+				run({cpuState}){
+					let returnValue=0;
+					if(this.operator.operator=="->"){
+						let args=[
+							assemblyCompiler.findPointerOrLabel(this.operator[0],cpuState)
+						];
+						if(this.operator[1] instanceof Operator&&this.operator[1].operator=="->"){
+							//jump->move->2;
+						}
+						if(this.operator[1].type=="number"){//'$jump->5;'
+							returnValue=this.operator[1].number-args[0].lineNumber
+							args[0].lineNumber=this.operator[1].number;
+						}
+						else{//'$jump->label;' or '$label->jump'
+							args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
+							returnValue=args[1].lineNumber+this.operator[1].number-args[0].lineNumber;
+							args[0].lineNumber=args[1].lineNumber+this.operator[1].number;
+						}
+					}
+					return{failed:false,value:returnValue};
+				}
+			}
 		}
 		class MetaLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1069,19 +1085,23 @@ const oxminCompiler=async function(inputFile,fileName){
 				;
 			}
 		}
-		class Pointer extends Variable{
-			constructor(name,lineNumber){
-				super({name,lineNumber});
-			}
-			getState(cpuState){
-				if(!(cpuState instanceof CpuState))throw Error("compiler type error");
-				this.lineNumber=cpuState[this.name];
-				
-				return new Variable(this);
+		class Pointer {//extends Variable///similar to Variable
+			constructor(name){
+				this.name=name;
 			}
 			type="pointer";
-			//name;
-			//lineNumber;
+			cpuState;//the current bound cpuState
+			name;
+			getState(cpuState){
+				if(!(cpuState instanceof CpuState))throw Error("compiler type error");
+				this.cpuState=cpuState;
+				return this;
+			}
+			get lineNumber(){if(this.cpuState)return this.cpuState[this.name];}
+			set lineNumber(value){if(this.cpuState)this.cpuState[this.name]=value;}
+			setState(cpuState){
+				cpuState[this.name]=this.lineNumber;
+			}
 		}
 		class MachineCode extends Variable{
 			constructor(data){super();Object.assign(this,data??{});}
@@ -1124,7 +1144,16 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		}
 		class GlobalScope extends Scope{
-			label=new Variable({scope:this});
+			constructor(data){
+				super(data);
+			}
+			label=new Variable({
+				scope:this,
+				name:["GlobalObject"],
+				labels:{
+					"0xmin":new Variable({name:["0xmin"],lineNumber:0}),
+				},
+			});
 			parent=this;
 			let=this;
 			var=this;
