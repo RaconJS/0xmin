@@ -1,15 +1,5 @@
-//debugger 0xmin "label";
-@jump->6;
-$ram ->6;
-@"h";
-@"e";
-@"l";
-@"l";
-@"o";
-@" ";
-@"w";
-@"o";
-@"r";
-@"l";
-@"d";
-@jump 0;
+#let a=#(){
+	{};1;
+};
+#let b=a();
+debugger a "label.scope.code[0][1]";
