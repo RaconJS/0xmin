@@ -360,14 +360,13 @@ const oxminCompiler=async function(inputFile,fileName){
 					scope.label.code.push(new HiddenLine.Define({label:value.label}))
 				}
 				if(state["set"]){
-					if(["->","<-"].includes(word)){
+					if(["->","<-","=>","<="].includes(word)){
 						index++;
-						let isReversed=word=="<-"?1:0;
-						let operator=new Operator("->");
+						let isReversed=word[0]=="<"?1:0;
+						let operator=new Operator(word.match(/[\-=]/)[0]+">");
 						operator[isReversed]=value;
 						({value,index}=await contexts.expression_short({statement,index,scope}));
 						operator[1-isReversed]=value;
-						word=statement[index];
 						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
 						let newLine=new HiddenLine.SetLabelOrPointer({operator});
 						scope.label.code.push(newLine);
@@ -385,7 +384,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index];
 				let value;
 				if(({index,value}=contexts.number({index,statement})).value!=undefined){//'2'
-					instruction.args.push(value);
+					instruction.args.push(new Value.Number(value));
 				}
 				else if(word.match(nameRegex)){//'command' or 'label'
 					let value;
@@ -397,12 +396,12 @@ const oxminCompiler=async function(inputFile,fileName){
 					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:true}));
 					instruction.args.push(value);
 				}
-				else if(["->","<-"].includes(word)){
+				else if(["->","<-","=>","<="].includes(word)){
 					index++;
-					let operator=new Operator(word);
 					({index}=await contexts.main_assembly_argument({statement,index,scope,instruction}));
-					operator.push(instruction.args.pop());
-					instruction.args.push(operator);
+					let operator=new Operator(word,[instruction.args[instruction.args.length-2],instruction.args.pop()]);
+					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator});
+					instruction.args.push(hiddenLine);
 					//'[a, -> [], b]' => '[a, -> [b]]'
 				}
 				else if(word=="["){
@@ -905,9 +904,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 			async evalHiddenLine({instruction,cpuState,assemblyCode}){//shouldEval's $ or # code in the '$' phase
 				//UNFINISHED
-				let failed;
-				({lineNumber,faled}=instruction.run({cpuState,}));
-				return {lineNumber,failed};
+				let {relAddress,failed}=instruction.run({cpuState});
+				return {failed};
 			},
 		//----
 		//@ phase : (binary phase)
@@ -953,45 +951,30 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 			nullValue:null,//will be defined later
 			findPointerOrLabel(value,cpuState){//:Pointer|Variable
+				if(value instanceof HiddenLine){return value;}
+				if(!(value instanceof Value))throw Error("compiler type error:");``
 				/// value:number|Value
-				if(typeof value=="number"){
-					return new Variable({lineNumber:value+cpuState.lineNumber});
-				}
-				if(!(value instanceof Value&&value.type=="label"))throw Error("compiler type error:");
-				
-				return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
+				if(value.type=="number")
+					return new Variable({lineNumber:value.number});
+				else if(value.type=="label")return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
 			},
-			async decodeArgument(args,argNumber=0,cpuState,type="command"){
+			async decodeArgument(args,argNumber=0,cpuState,type="command"){///: {arg:number;failed:bool}
 				let arg=args[argNumber];
 				let failed=false;
 				if(arg instanceof bracketClassMap["("]){//code tree
 					let {value,index}=await contexts.expression({index:0,statement:arg});
 					arg=value;
 				}
-				if(arg instanceof Operator){
-					if(["->","<-"].includes(arg.operator)){
-						let fromArg,toArg;
-						toArg=this.findPointerOrLabel(arg[0],cpuState);
-						fromArg=this.findPointerOrLabel(args[argNumber-1],cpuState);
-						if(toArg==undefined||fromArg==undefined)throw Error("0xmin error: labels in 'a->b' are undefined. try 'let a,b;'");
-						if(arg.operator=="<-"){
-							let carry=toArg;
-							toArg=fromArg;
-							fromArg=carry;
-						}
-						//'jump->label-4';
-						arg=toArg.lineNumber-fromArg.lineNumber+(arg[0].type=="label"?arg[0].number:0);
-						failed=isNaN(+arg);
-						if(fromArg.type=="pointer"){
-							if(this.assembly.language=="0xmin"){
-								if(fromArg.name=="move"){
-									cpuState.move=toArg.lineNumber;
-								}
-							}
-						}
-					}
+				if(arg instanceof HiddenLine){
+					({relAddress:arg,failed}=arg.run({cpuState}));
+				}
+				else if(arg instanceof Operator){
+					throw Error("compiler type Error: @: operator argument not supported in @assembly phase");
 				}
 				else if(arg instanceof Value){
+					if(arg.type=="number"){
+						arg=arg.number;
+					}
 					if(arg.name in this.assembly.instructionSet){
 						arg=this.assembly.instructionSet[arg.name];
 					}
@@ -1022,8 +1005,8 @@ const oxminCompiler=async function(inputFile,fileName){
 		class Operator extends Array{
 			operator;//:string ;
 			type;//:string ; for special operator types e.g. '+=' or '=('
-			constructor(word){
-				super();
+			constructor(word,args=[]){
+				super(...args);
 				this.operator=word;
 			}
 		}
@@ -1056,9 +1039,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			bool=false;
 			number=0;//relAddress
 			array=[];//code
-			static Number=class extends Value{constructor(number){super({number,type:"number"})}}
+			static Number=
+			class Number extends Value{constructor(number){super({number,type:"number"});}}
 		}
-		Value.Number=class extends Value{type="number";}
 		class Stack{//UNUSED
 			list=[];
 			constructor(list){
@@ -1104,45 +1087,71 @@ const oxminCompiler=async function(inputFile,fileName){
 		class HiddenLine extends CodeLine{
 			//contains
 			run({lineNumber,scope,cpuState}){return {lineNumber,failed:false};}
-			static Define=class extends HiddenLine{//'$def a;'
+			static Define=
+			class Define extends HiddenLine{//'$def a;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
 				run({cpuState}){//nextlineNumber
 					this.label.lineNumber=cpuState.lineNumber;
-					return{failed:false};
+					return{failed:false,relAddress:this.label.lineNumber};
 				}
 			}
-			static RelocateCurrentLineNumber=class extends HiddenLine{//'$ram 10;'
+			static RelocateCurrentLineNumber=
+			class RelocateCurrentLineNumber extends HiddenLine{//'$ram 10;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
 				run({cpuState}){
 					cpuState.lineNumber=this.label.lineNumber;
-					return{failed:false};
+					return{failed:false,relAddress:this.label.lineNumber};
 				}
 			}
-			static SetLabelOrPointer=class extends HiddenLine{//'$ram 10;'
+			static SetLabelOrPointer=
+			class SetLabelOrPointer extends HiddenLine{//'$ram 10;'
 				constructor(data){super();Object.assign(this,data??{})}
 				operator=null;///:Variable
-				run({cpuState}){
+				isSearched=false;
+				run({cpuState}){///: {failed:boolean;relAddress:number}
 					let returnValue=0;
-					if(this.operator.operator=="->"){
-						let args=[
-							assemblyCompiler.findPointerOrLabel(this.operator[0],cpuState)
+					let failed=false;
+					if(["->","<-","=>","<="].includes(this.operator.operator)){
+						if(["<-","<="].includes(this.operator.operator)){
+							//reverse args
+							const temp=this.operator[0];
+							this.operator[0]=this.operator[1];
+							this.operator[1]=temp;
+							this.operator.operator=this.operator.operator[1]+">";
+						}
+						//true ==> mutates cpuState or label-lineNumbers
+						const isAssigning = this.operator.operator=="=>";
+						const args=[
+							assemblyCompiler.findPointerOrLabel(this.operator[0],cpuState),
+							this.operator[1]
 						];
-						if(this.operator[1] instanceof Operator&&this.operator[1].operator=="->"){
+						if(this.operator[1] instanceof HiddenLine||this.operator[0] instanceof HiddenLine){
+							if(this.isSearched)throw Error("compiler error: $: infinite recursion found.");
+							this.isSearched=true;
+							throw Error("compiler UNFINISHED error: '$a => b->c;' is not supported yet");
+							let {failed:failed1,relAddress}=this.operator[1].run({cpuState});
+							this.operator[1]=new Value.Number(relAddress);
+							failed||=failed1;
+							this.isSearched=false;
 							//jump->move->2;
 						}
-						if(this.operator[1].type=="number"){//'$jump->5;'
-							returnValue=this.operator[1].number-args[0].lineNumber
-							args[0].lineNumber=this.operator[1].number;
-						}
-						else{//'$jump->label;' or '$label->jump'
-							args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
-							returnValue=args[1].lineNumber+this.operator[1].number-args[0].lineNumber;
-							args[0].lineNumber=args[1].lineNumber+this.operator[1].number;
-						}
+						else if(this.operator[1] instanceof Value){
+							if(this.operator[1].type=="number"){//'$jump->5;'
+								returnValue=this.operator[1].number+cpuState.lineNumber-args[0].lineNumber;
+								failed||=isNaN(returnValue);
+								if(isAssigning)args[0].lineNumber=this.operator[1].number;
+							}
+							else{//'$jump->label;' or '$label->jump'
+								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
+								returnValue=args[1].lineNumber+this.operator[1].number-args[0].lineNumber;
+								failed||=isNaN(returnValue);
+								if(isAssigning)args[0].lineNumber=args[1].lineNumber+this.operator[1].number;
+							}
+						}else throw Error("compiler type error: $:");
 					}
-					return{failed:false,value:returnValue};
+					return{failed,relAddress:returnValue};
 				}
 			}
 		}
