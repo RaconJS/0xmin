@@ -26,6 +26,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	const stringRegex=/^["'`]/;
 	const openBracketRegex=/^[(\[{]/;
 	const endingStringList="@$#:;])}";
+	const functionCallTypes=["=>","=","->"];
 	//(long string,string) => (array of words)
 	function parseFile(inputFile,fileName){
 		"use strict";
@@ -141,7 +142,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
-			let codeObj=new Variable({type:"code line",});
+			let codeObj=new Variable({type:"(code line)",});
 			let newScope=new Scope({label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
 			let state={void:false,static:false,phase:"@"};
@@ -291,9 +292,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index];
 				let startValue;//:Value
 				if(!found)metaState["set"]=true;
-				for(let i=0;i<statement.length;i++){//'#let a,b,c;'
+				for(let i=0;i<statement.length&&index<statement.length;i++){//'#let a,b,c;'
 					let foundExpression=false;
 					let word;
+					word=statement[index];
+					if(endingStringList.includes(word)){break;}
 					if(metaState["let"]){
 						let value;
 						({value,index}=await contexts.expression_short({statement,index,scope}));
@@ -486,6 +489,18 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {index,value:codeObj};
 			},
 		//----
+		async functionDefinition({statement,index,scope}){//'()=>{}'
+			let word;
+			let parameters;{
+				//parse parameters
+				word=statement[index];
+				//assert word == '(';
+			}
+			word=statement[index];
+			let body;{
+				body=new Scope({parent:scope});
+			}
+		},
 		//'...scope;
 		async injectCode({statement,index,scope}){//UNFINISHED
 			if(statement[index]=="..."){
@@ -499,8 +514,39 @@ const oxminCompiler=async function(inputFile,fileName){
 			value.array;
 			return{index};
 		},
-		async parameter(){},
-		async argument(){},
+		async parameters({index=0,statement,scope,functionObj}){//'a,b,c' in '(a,b,c){};'
+			let word=statement[index];
+			functionObj.parameters=[];
+			//UNFINISHED
+		},
+		arguments_addArgument(argsObj,value){
+
+		},
+		async arguments({index,statement,scope,includeBrackets=true}){
+			//'(a, b, c) ::{} ::{}'
+			//always includes brackets
+			let argsObj={
+				obj:{},
+				list:[],
+			};
+			if(includeBrackets){
+				if(statement[index]=="("){
+					const argBlock=statement[index];
+					index+=3;
+				}else throw Error("compiler error: contexts.arguments() starts at '('")
+				//'::{}' => block argument
+				for(let i=0;i<statement.length&&index<statement.length;i++){
+					if(statement[index]!="::")break;
+					let value;
+					({value,index}=await contexts.expression_short({index,statement,scope}));
+					if(value){
+						argsObj.list.push(value);
+						argsObj.obj[value.name]=value.label;
+					}
+				}
+			}
+			return {index,argsObj};
+		},
 		async expression_short({index,statement,scope,shouldEval=true}){//a().b or (1+1)
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
@@ -508,9 +554,25 @@ const oxminCompiler=async function(inputFile,fileName){
 			let word=statement[index];
 			if(word=="("&&(
 				statement[index+3]=="{"||
-				["=>","=","->"].includes(statement[index+3])&&statement[index+4]=="{"
-			)){//function
-				;
+				functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
+			)){//function '(){}'
+				let functionObj=new MacroFunction({type:"function"});
+				await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
+				index+=3;//skip '(' '...' ')' in '(...){}'
+				word=statement[index];
+				if(functionCallTypes.includes(word)){
+					functionObj.callType=word;
+					index++;
+				}
+				word=statement[index+1];//word== '...' in '(){...}'
+				index+=3;
+				//word == '...code' in '(){...code}'
+				functionObj.scope=new Scope({
+					parent:scope,
+					code:word,
+					label:functionObj,
+				})
+				value=new Value({type:"label",label:functionObj});
 			}
 			else if("([".includes(word)){//'(label)'
 				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
@@ -587,7 +649,31 @@ const oxminCompiler=async function(inputFile,fileName){
 					value.name=name;
 					value.label=parent.labels[name];
 					return {index,value};
-				}else{
+				}else if("("==word||(functionCallTypes.includes(word)&&statement[index+1]=="(")){
+					//function call: 'foo()' to 'foo=>()::{}::{}'
+					let startIndex=index;
+					let functionType="";
+					if(functionCallTypes.includes(word)){
+						functionType=word;
+						index++;
+					}
+					{//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
+						let searchIndex=index;
+						if(functionCallTypes.includes(statement[searchIndex])){
+							searchIndex++;
+						}if(statement[searchIndex]=="{"){//
+							index=startIndex;
+							return {index,value};
+						}
+					}
+					let argsObj;
+					({index,argsObj}=await contexts.arguments({index,statement,scope,functionType}));
+					if(value.type=="label"&&value.label!=undefined){
+						({value}=await value.label.callFunction(argsObj,value,scope));
+					}
+					return {index,value};
+				}
+				else{
 					return {index,value};
 				}
 			},
@@ -601,6 +687,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				args.push(startValue);
 			}
 			let word=statement[index];
+			if(";)]}".includes(word))return{index,value:undefined};
 			let nextIndex=index;
 			if(includeBrackets){
 				if(includeBrackets && !"([{".includes(word)){
@@ -619,7 +706,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			let nameLast=false;
 			for(let i=index;i<statement.length&&index<statement.length;i++){
 				let word=statement[index];
-				if(["=","=>"].includes(word)){
+				//ignore '#' in '#(' or '#{'
+				if("#".includes(word)&&"({[".includes(statement[index+1])){
+					index++;
+				}
+				else if("#$@".includes(word)){
+					break;
+				}
+				else if(["=","=>"].includes(word)){
 					index++;
 					let firstArg=args.pop();
 					let assignmentType;
@@ -671,7 +765,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					break;
 				}
-				if(!nameLast){//not: 'name name'
+				else if(!nameLast){//not: 'name name'
 					if(word.match(nameRegex)||["(","[","{"].includes(word)){
 						let value;
 						({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
@@ -1059,23 +1153,90 @@ const oxminCompiler=async function(inputFile,fileName){
 		class Variable extends DataClass{// codeObj/label
 			constructor(data){super();Object.assign(this,data??{})}
 			//as value
-			type="label";
+				type="label";
 			//as object
-			name=undefined;///@string
-			labels={};//aka properties
-			prototype=null;///instanceof Variable
-			supertype=null;///instanceof Variable
+				name=undefined;///@string
+				labels={};//aka properties
+				prototype=null;///instanceof Variable
+				supertype=null;///instanceof Variable
+			//as array
+				code=[];//:(CodeLines|Variable)[]
 			//as function
-			parameters={};
-			scope=null;//the scope that the code should be called with. the scope contains the code
-			code=[];//:array of CodeLines lines
-			//assembly
-			relAddress=0;//number
-			//defineLine=null;//instanceof AssemblyLine
-			lineNumber=undefined;
+				callType="";//:'' | '=>' | '=' | '->' | '<-' etc...
+				parameters=[];//:string[]
+				scope=null;//the scope that the code should be called with. the scope contains the code
+			//as assembly
+				relAddress=0;//number UNUSED
+				lineNumber=undefined;
+				//defineLine=null;//instanceof AssemblyLine
+			//----
 			get address(){
 				const address=this.defineLine?.address;
 				return address==undefined?undefined:address+this.relAddress;
+			}
+			isSearched=false;
+			get returnLineNumber(){
+				if(isSearched)return;
+				isSearched=true;
+				let codeObj=this.code[this.code.length-1];
+				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber:codeObj.lineNumber;
+				isSearched=false;
+				return lineNumber;
+			}
+			getCode(){//: SourceCodeTree
+				const codeBlock=new bracketClassMap["{"];
+				if(this.isSearched)return codeBlock;
+				this.isSearched=true;
+				codeBlock.push(...(this.scope?.code||[]),
+					...this.code.map(v=>v.getCode?.()??[])//FIX
+				);
+				this.isSearched=false;
+				return codeBlock;
+			}
+			async callFunction(args={},callingValue,scope){
+				//args: {obj;list}
+				//args.obj: {[key:"string"]:Value}
+				//args.list: Value[]
+				const argsObj=new Variable({
+					labels:args.obj,
+					code:args.list.map(v=>v.label)
+				});
+				let codeBlock=this.getCode();//new code instance
+				let instanceScope=new Scope({
+					parent:this.scope,
+					label:argsObj,
+					code:codeBlock
+				});
+				let returnObj=new Variable({name:"(return)"});
+				switch(this.callType){
+					case"="://class
+					argsObj.labels["this"]??=argsObj;
+					argsObj.labels["return"]??=returnObj;
+					argsObj.labels["arguments"]??=argsObj;
+					break;
+					case"=>"://arrow function
+					;
+					break;
+					case"<="://'using(){}'
+					instanceScope.let=instanceScope;
+					instanceScope.var=instanceScope;
+					instanceScope.parent=instanceScope;
+					argsObj.labels["this"]??=callingValue.parent;
+					argsObj.labels["scope"]??=scope;
+					break;
+					default:
+					argsObj.labels["this"]=callingValue.parent;
+					argsObj.labels["return"]=returnObj;
+					argsObj.labels["arguments"]??=argsObj;
+				}
+				await evalBlock(codeBlock,undefined,instanceScope);
+				
+				//if no return label created, it returns the 
+				let newReturnObj=argsObj.labels["return"];
+				if(!(newReturnObj&&newReturnObj!=returnObj)){
+					newReturnObj=argsObj;
+				}
+				return {value:new Value({type:"label",label:newReturnObj})};
 			}
 			findLabel(name){//'a.b'
 				return
@@ -1085,9 +1246,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				;
 			}
 		}
-		class Pointer {//extends Variable///similar to Variable
+		class MacroFunction extends Variable{
+
+		}
+		class Pointer extends Variable{///similar to Variable
 			constructor(name){
+				super();
 				this.name=name;
+				delete this.lineNumber;
 			}
 			type="pointer";
 			cpuState;//the current bound cpuState

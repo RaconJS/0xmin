@@ -33,6 +33,7 @@ variables:
   assembly_commands: '\b(?:nor|red|blue|get|set|if)\b'
   assembly_registers: '\b(?:jump|move|alu|ram)\b'
   startFile: '!?(make file|log.code|log.table)'
+  functionCallSymbols: '=>|->|<-|='
 contexts:
   main:
     - match: '^'
@@ -50,7 +51,12 @@ contexts:
   line_start_1_base:
     - include: baseMain
     - match: \b(0xmin|0bmin)\b
+
       scope: variable.language.0xminObject.0xmin
+    - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
+      scope: 'keyword.declaration.function.0xmin'
+    - match: (?<=\)) #'foo = ()=>{}' function declaration
+      push: potentialFunctionDeclaration
     - match: '\b(?:static|void)\b'
       scope: keyword.control
     - match: 'recur|repeat'
@@ -75,6 +81,13 @@ contexts:
       scope: keyword.operator
   line_start_1:
     - include: line_start_1_base
+  potentialFunctionDeclaration: #'foo = ()=>{}' function declaration
+    - match: '\s*(?:{{functionCallSymbols}})\s*(?={)'
+      scope: 'keyword.declaration.function.0xmin'
+      pop: true
+    - match: '(?=[\S])'
+      pop: true
+    #- include: mainScope
   functionCall:
     - include: baseMain
     - match: '(?!::)'
