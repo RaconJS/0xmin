@@ -1,5 +1,3 @@
-#let a=#(){
-	{};1;
-};
-#let b=a();
-debugger a "label.scope.code[0][1]";
+0;
+move=>2;
+move->0xmin;
