@@ -141,11 +141,20 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			},
 		//----
+		phaseSetter({statement,index,scope,state}){
+			///state : {phase:string;}
+			let word=statement[index];
+			if("#$@".includes(word)){
+				state.phase=word;
+				index++;
+			}
+			return{index};
+		},
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			let codeObj=new Variable({type:"(code line)",});
 			let newScope=new Scope({label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
-			let state={void:false,static:false,phase:"@"};
+			let state={void:false,static:false,phase:""};
 			statement.maxRecur;
 			statement.recur??=0;
 			statement.recur++;
@@ -155,10 +164,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			if(["void","static","#","$","@"].includes(word))
 			loop:for(let i=index;i<statement.length;i++){
 				let word=statement[index];
-				if("#$@".includes(word)){
-					state.phase=word;
-					index++;
-				}
+				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
 					case"void":{
 						state.phase="void";
@@ -252,11 +258,20 @@ const oxminCompiler=async function(inputFile,fileName){
 			else{
 				assemblyPart:{
 					let value;
+					if(state.phase==""){//auto detect phase
+						word=statement[index];
+						if(["let","set"].includes(word))state.phase="#";
+						else if(["def","ram"].includes(word))state.phase="$";
+						else state.phase="@";
+					}
 					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope:newScope}));
 					else if(state.phase=="$")({index,value}=await contexts.main_hidden({statement,index,scope:newScope}));
 					word=statement[index];
-					if(word=="#")index++;
-					({index,value}=await contexts.main_meta({statement,index,scope:newScope}));
+					if(word=="#"){
+						state.phase="#"
+						index++;
+					}
+					if(state.phase=="#")({index,value}=await contexts.main_meta({statement,index,scope:newScope}));
 					;
 				}
 			}
@@ -554,7 +569,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			if(word=="("&&(
 				statement[index+3]=="{"||
 				functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
-			)){//function '(){}'
+			)){//function declaration '(){}'
 				let functionObj=new MacroFunction({type:"function"});
 				await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
 				index+=3;//skip '(' '...' ')' in '(...){}'
@@ -656,11 +671,12 @@ const oxminCompiler=async function(inputFile,fileName){
 						functionType=word;
 						index++;
 					}
-					{//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
-						let searchIndex=index;
+					if(0){//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
+						let searchIndex=index+3;
 						if(functionCallTypes.includes(statement[searchIndex])){
 							searchIndex++;
-						}if(statement[searchIndex]=="{"){//
+						}
+						if(statement[searchIndex]=="{"){//
 							index=startIndex;
 							return {index,value};
 						}
