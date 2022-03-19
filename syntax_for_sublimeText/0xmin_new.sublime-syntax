@@ -25,11 +25,11 @@ scope: source.0xmin
 #
 variables:
   number: '\b(?:undefined|null)\b|[+-]?(0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
-  labelName: '(?:[\w\[\]]+)(?!\.)(?!\w)'
+  labelName: '\b\w+\b'
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<=>|<=|=>|=|<->|<-|->'
   assembly_operators: '<->|<-|->'
-  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|[!$%*\-+=@#~|<>/?]'
+  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!$%*\-+=@#~|<>/?]'
   assembly_commands: '\b(?:nor|red|blue|get|set|if)\b'
   assembly_registers: '\b(?:jump|move|alu|ram)\b'
   startFile: '!?(make file|log.code|log.table)'
@@ -53,9 +53,14 @@ contexts:
     - match: \b(0xmin|0bmin)\b
 
       scope: variable.language.0xminObject.0xmin
+    - match: '{{labelName}}\s*(?=(?:{{functionCallSymbols}})?\s*\()'
+      scope: variable.function.0xmin
+      push: functionCall_1
+    - match: '(?<=\))\s*(?=(?:{{functionCallSymbols}})?\s*\()'
+      push: functionCall_1
     - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
-      scope: 'keyword.declaration.function.0xmin'
-    - match: (?<=\)) #'foo = ()=>{}' function declaration
+      scope: 'keyword.declaration.functionCall.0xmin'
+    - match: '\)' #'foo = ()=>{}' function declaration
       push: potentialFunctionDeclaration
     - match: '\b(?:static|void)\b'
       scope: keyword.control
@@ -83,15 +88,25 @@ contexts:
     - include: line_start_1_base
   potentialFunctionDeclaration: #'foo = ()=>{}' function declaration
     - match: '\s*(?:{{functionCallSymbols}})\s*(?={)'
-      scope: 'keyword.declaration.function.0xmin'
+      scope: 'keyword.declaration.functionSymbol.0xmin'
       pop: true
     - match: '(?=[\S])'
       pop: true
     #- include: mainScope
-  functionCall:
-    - include: baseMain
-    - match: '(?!::)'
+  functionCall_1:
+    - match: '\('
+      push: functionCall_2
+    - include: mainScope
+  functionCall_2:
+    - match: '\('
+      push: functionCall_normalBrackets
+    - match: '\)'
+      pop: 2
+    - include: mainScope
+  functionCall_normalBrackets:
+    - match: '\)'
       pop: true
+    - include: mainScope
   baseMain:
     - meta_scope: source.0xmin
     #- match: ()["'`]
