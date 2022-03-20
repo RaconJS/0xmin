@@ -260,8 +260,10 @@ const oxminCompiler=async function(inputFile,fileName){
 					let value;
 					if(state.phase==""){//auto detect phase
 						word=statement[index];
-						if(["let","set"].includes(word))state.phase="#";
-						else if(["def","ram"].includes(word))state.phase="$";
+						if(["let","set"].includes(word))
+							state.phase="#";
+						else if(["def","ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet))
+							state.phase="$";
 						else state.phase="@";
 					}
 					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope:newScope}));
@@ -317,7 +319,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						({value,index}=await contexts.expression_short({statement,index,scope}));
 						if(value){
 							foundExpression=true;
-							const newLabel=new Variable({name:value.name});
+							const newLabel=value.label??new Variable({name:value.name});
 							let labelParent=(value.parent??scope.let.label);
 							if(metaState["set"])labelParent.labels[value.name]=newLabel;
 							else labelParent.labels[value.name]??=newLabel;
@@ -369,12 +371,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				word=statement[index];
 				if(!found){
 					state["set"]=true;
+					state["def"]=true;
 				}
-				if(state["def"]){
-					meta_defineLabelToNextLine(value.label,scope,value);
-					scope.label.code.push(new HiddenLine.Define({label:value.label}))
-				}
-				if(state["set"]){
+				if(state["def"]){//'$def labelA;' or '$def labelA->labelB' ==> sets label address
 					if(["->","<-","=>","<="].includes(word)){
 						index++;
 						let isReversed=word[0]=="<"?1:0;
@@ -385,7 +384,12 @@ const oxminCompiler=async function(inputFile,fileName){
 						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
 						let newLine=new HiddenLine.SetLabelOrPointer({operator});
 						scope.label.code.push(newLine);
+					}else{
+						contexts.meta_defineLabelToNextLine(value.label,scope,value);
 					}
+				}
+				if(state["set"]){//'$set label;' => inserts contence of label
+					scope.label.code.push(value.label);
 				}
 				return{index};
 			},
@@ -503,18 +507,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {index,value:codeObj};
 			},
 		//----
-		async functionDefinition({statement,index,scope}){//'()=>{}'
-			let word;
-			let parameters;{
-				//parse parameters
-				word=statement[index];
-				//assert word == '(';
-			}
-			word=statement[index];
-			let body;{
-				body=new Scope({parent:scope});
-			}
-		},
 		//'...scope;
 		async injectCode({statement,index,scope}){//UNFINISHED
 			if(statement[index]=="..."){
@@ -564,42 +556,9 @@ const oxminCompiler=async function(inputFile,fileName){
 		async expression_short({index,statement,scope,shouldEval=true}){//a().b or (1+1)
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
-			let value,array;
+			let value,array;let failed;
 			let word=statement[index];
-			if(word=="("&&(
-				statement[index+3]=="{"||
-				functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
-			)){//function declaration '(){}'
-				let functionObj=new MacroFunction({type:"function"});
-				await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
-				index+=3;//skip '(' '...' ')' in '(...){}'
-				word=statement[index];
-				if(functionCallTypes.includes(word)){
-					functionObj.callType=word;
-					index++;
-				}
-				word=statement[index+1];//word== '...' in '(){...}'
-				index+=3;
-				//word == '...code' in '(){...code}'
-				functionObj.scope=new Scope({
-					parent:scope,
-					code:word,
-					label:functionObj,
-				})
-				value=new Value({type:"label",label:functionObj});
-			}
-			else if("([".includes(word)){//'(label)'
-				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
-			}
-			else if(word=="{"){
-				index++;
-				//makes block scope
-				let newScope=await evalBlock(statement[index],scope);
-				let label=newScope.label;
-				index++;
-				value=new Value({type:"label",label});
-			}
-			else if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {
+			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {
 				//'12'
 				let number=value;
 				if(shouldEval)value=new Value({number,type:"number",bool:!!number});
@@ -607,6 +566,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				//'"abc"'
 				let string=value;
 				if(shouldEval)value=new Value({string,type:"string",array});
+			}
+			else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,shouldEval})).failed){}
+			else if("([".includes(word)){//'(label)'
+				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
 			}else if(word.match(nameRegex)){//'label'
 				if(shouldEval){
 					value=new Value();
@@ -616,21 +579,25 @@ const oxminCompiler=async function(inputFile,fileName){
 					value.parent=parent;
 				}
 				index++;
-			}
-			else{
+			}else{
 				//value=new Value();
 				return {index,value:undefined};
 			}
 			for(let i=index;i<statement.length;i++){//'.asd'
 				if(index>=statement.length)break;
 				let word=statement[index];
+				let oldIndex=index;
 				({value,index}=await contexts.extend_value({index,statement,scope,value,shouldEval}));
+				if(index==oldIndex)break;
 			}
 			return {value,index};
 		},
+		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
+		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
+		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent
 		//expression_short:
 			async extend_value({index,statement,scope,value,shouldEval=true}){//.b or [] or ()
-				if(value==undefined||value.type=="undefined")value=scope;//'(.b)' == 'b'
+				if(value==undefined||value.type=="undefined")value=scope.label;//'(.b)' == 'b'
 				let word=statement[index];
 				if([".",".."].includes(word)){// 'a.'
 					let parent=value.label;
@@ -663,6 +630,10 @@ const oxminCompiler=async function(inputFile,fileName){
 					value.name=name;
 					value.label=parent.labels[name];
 					return {index,value};
+				}
+				//'foo(){}' or 'obj{}' extend function or object
+				else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:value,isExtension:true,shouldEval})).failed){
+					return {index,value};
 				}else if("("==word||(functionCallTypes.includes(word)&&statement[index+1]=="(")){
 					//function call: 'foo()' to 'foo=>()::{}::{}'
 					let startIndex=index;
@@ -670,16 +641,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(functionCallTypes.includes(word)){
 						functionType=word;
 						index++;
-					}
-					if(0){//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
-						let searchIndex=index+3;
-						if(functionCallTypes.includes(statement[searchIndex])){
-							searchIndex++;
-						}
-						if(statement[searchIndex]=="{"){//
-							index=startIndex;
-							return {index,value};
-						}
 					}
 					let argsObj;
 					({index,argsObj}=await contexts.arguments({index,statement,scope,functionType}));
@@ -691,6 +652,78 @@ const oxminCompiler=async function(inputFile,fileName){
 				else{
 					return {index,value};
 				}
+			},
+			delcare_typeChecks(isExtension,startValue){
+				if(isExtension){//'obj{}'
+					//type checking
+					if(startValue==undefined)throw Error("0xmin error: #: startValue is not defined");
+					if(!(startValue instanceof Value))throw Error("compiler type error:");
+					if(startValue.type!="label")throw Error("0xmin type error: startValue is not a label");
+					if(!startValue.label){
+						startValue.label=new Variable({name:startValue.name});
+					}
+				}
+			},
+			async delcareFunctionOrObject({index,statement,scope,startValue=undefined,isExtension=false,shouldEval=true}){
+				let value=startValue;
+				let word=statement[index];
+				if(word=="("&&(
+					statement[index+3]=="{"||
+					functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
+				)){//function declaration '(){}'
+					contexts.delcare_typeChecks(isExtension,startValue);
+					const functionObj=isExtension?startValue.label:new MacroFunction({type:"function"});
+					if(shouldEval)await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
+					index+=3;//skip '(' '...' ')' in '(...){}'
+					word=statement[index];
+					if(functionCallTypes.includes(word)){
+						functionObj.callType=word;
+						index++;
+					}
+					word=statement[index+1];//word== '...' in '(){...}'
+					index+=3;
+					if(shouldEval){
+						//word == '...code' in '(){...code}'
+						if(isExtension){//'foo(){}'
+							functionObj.code.push(
+								new MacroFunction({type:"function",
+									scope:new Scope({
+										parent:scope,
+										code:word,
+										label:functionObj,
+									}),
+								})
+							);
+						}
+						else{
+							functionObj.scope=new Scope({
+								parent:scope,
+								code:word,
+								label:functionObj,
+							});
+						}
+						value=startValue??new Value({type:"label",label:functionObj});
+					}
+					return {index,value,failed:false};//isExtension&&!startValue};
+				}
+				else if(word=="{"){
+					contexts.delcare_typeChecks(isExtension,startValue);
+					index++;
+					if(shouldEval){
+						//makes block scope
+						let newScope=await evalBlock(
+							statement[index],
+							scope,
+							isExtension
+								?new Scope({parent:scope,label:startValue.label,code:statement[index]})
+								:undefined
+						);
+						value=startValue??new Value({type:"label",label:newScope.label});
+					}
+					index+=2;
+					return {index,value,failed:false};//failed:isExtension&&!startValue};
+				}
+				else return {index,value,failed:true};
 			},
 		//----
 		async expression({index,statement,scope,startValue=undefined,includeBrackets=true,shouldEval=true}){//a + b
@@ -1213,8 +1246,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
 				codeBlock.push(...(this.scope?.code||[]),
-					...this.code.map(v=>v.getCode?.()??[])//FIX
-				);
+					...this.code.reduce((s,v)=>{s.push(...v.getCode?.()??[]);return s;},[])//FIX
+				);loga(codeBlock);
 				this.isSearched=false;
 				return codeBlock;
 			}
@@ -1389,7 +1422,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	parts=bracketPass(parts);
 	parts=await evalBlock(parts);
 	parts=await evalAssembly(parts);
-	//chars->words->expresion->statement->codeObj->block
+	//chars->words->expression->statement->codeObj->block
 	//
 	let outputFile=parts.asBinary();
 	let outputBinary=new Uint32Array(outputFile);
