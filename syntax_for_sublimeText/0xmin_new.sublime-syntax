@@ -1,6 +1,6 @@
 %YAML 1.2
 ---
-#pls_fix_this_spaghetti_
+#useful: https://www.sublimetext.com/docs/scope_naming.html
 # See http://www.sublimetext.com/docs/syntax.html
 name:
   0xmin_2
@@ -29,7 +29,7 @@ variables:
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<=>|<=|=>|=|<->|<-|->'
   assembly_operators: '<->|<-|->'
-  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!$%*\-+=@#~|<>/?]'
+  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?]'
   assembly_commands: '\b(?:nor|red|blue|get|set|if)\b'
   assembly_registers: '\b(?:jump|move|alu|ram)\b'
   startFile: '!?(make file|log.code|log.table)'
@@ -53,6 +53,10 @@ contexts:
     - match: \b(0xmin|0bmin)\b
 
       scope: variable.language.0xminObject.0xmin
+    - match: '{{labelName}}\s*(?=(?:(?:{{functionCallSymbols}})?\s*\([\s\S]*?\)\s*){)' #'foo(){}'
+      scope: entity.name.function
+    - match: '{{labelName}}\s*(?={)' #'foo(){}'
+      scope: entity.name.namespace
     - match: '{{labelName}}\s*(?=(?:{{functionCallSymbols}})?\s*\()'
       scope: variable.function.0xmin
       push: functionCall_1
@@ -62,21 +66,23 @@ contexts:
       scope: 'keyword.declaration.functionCall.0xmin'
     - match: '\)' #'foo = ()=>{}' function declaration
       push: potentialFunctionDeclaration
+
     - match: '\b(?:static|void)\b'
       scope: keyword.control
-    - match: 'recur|repeat'
+    - match: '\b(?:recur|repeat)\b'
       scope: keyword.control
     - match: '\b(?:import|debugger|delete)\b'
       scope: keyword.control
-    - match: (?:var|let|def|set)
+    - match: '\b(?:var|let|def|set)\b'
       scope: keyword.declaration.meta.0xmin
+
     - match: '{{assembly_commands}}'
       scope: support.constant
     - match: '{{assembly_registers}}'
       scope: keyword.control.register.0xmin
     - match: '#'
       scope: support.constant.meta.0xmin
-    - match: '\$'
+    - match: '\$' #(?:\s*\b(?:set|def)\b)*'
       scope: entity.name.hidden.0xmin
     - match: '@'
       scope: keyword.meta.0xmin
