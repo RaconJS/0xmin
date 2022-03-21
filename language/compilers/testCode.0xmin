@@ -1,7 +1,3 @@
-#let foo(a,b){
-	debugger a "label";
-};//debugger foo"label";
-//debugger foo"label";
-let a=2;
-set a+=5;
-debugger a "label?.lineNumber";
+let a="ss";
+set a{"ba"};
+debugger a "label";

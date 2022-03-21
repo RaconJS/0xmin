@@ -6,9 +6,9 @@
 //TODO
 //UNUSED
 
-//NEEDSTESTING: parameters
-//NEEDSTESTING: arguments
-//TODO: operators in expression e.g. 'a + b'
+//DONE: parameters
+//DONE: arguments
+//DONE: operators in expression e.g. 'a + b'
 //TODO: 'a..length' internal properties
 //TODO: add 'virtual' keyword in 'recur/repeat/virtual'. for structs e.g. 'virtual {};' or 'virtual obj;' compiles 'obj' relative to 'obj'
 +process.version.match(/[0-9]+/g)[0]>=16;
@@ -167,7 +167,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
-			let codeObj=new Variable({type:"(code line)",});
+			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope({label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
 			let state={void:false,static:false,phase:""};
@@ -497,12 +497,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						useInstruction=true;
 					}
 					else if(value.type=="string"){
-						codeObj.code.push(...value.string.split("").map(v=>new AssemblyLine({
-							type:"data",
-							dataType:"char",
-							args:[assemblyCompiler.assembly.extraInstructions.string_char,v.charCodeAt(0)],
-							scope,
-						})));
+						codeObj.code.push(Variable.fromValue(value));
 						useInstruction=false;
 					}
 					else if(value.type=="array"){
@@ -545,7 +540,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			let value;
 			({index,value}=await contexts.expression_short({statement,index,scope}));
-			value.array;
 			return{index};
 		},
 		async parameters({index=0,statement,scope,functionObj}){//'a,b,c' in '(a,b,c){};'
@@ -769,7 +763,6 @@ const oxminCompiler=async function(inputFile,fileName){
 								?new Scope({parent:scope,label:startValue.label,code:statement[index]})
 								:undefined
 						);
-						if(startValue)startValue.label=functionObj;
 						value=startValue??new Value({type:"label",label:newScope.label});
 					}
 					index+=2;
@@ -838,18 +831,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							//let doAssignMent=0||(firstArg.name in firstArg.parent.labels);
 							let newLabel;{
 								//mutation
-								if(!value){
-									newLabel=undefined;
-								}
-								else if(value.type=="label"){
-									newLabel=value.label;
-								}
-								else if(value.type=="number"){
-									newLabel=Variable.fromValue(new Value(value));//new Variable({type:"number",name:value.number,relAddress:value.number,lineNumber:value.number});
-								}
-								else if(["string", "array"].includes(value.type)){
-									newLabel=new Variable({code:value.array});
-								}
+								newLabel=Variable.fromValue(new Value(value))
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
@@ -883,7 +865,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					contexts.operators[word].do({args,hasEquals});
 				}
 				else if(!nameLast){//not: 'name name'
-					if(word.match(nameRegex)||["(", "[", "{"].includes(word)){
+					if(!endingStringList.includes(word)){//word.match(nameRegex)||["(", "[", "{"].includes(word)){
 						let value;
 						({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
 						args.push(value);
@@ -1147,7 +1129,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				this.label=label;
 				this.type="label";
 				this.number=label.lineNumber;
-				this.array=[...label.code];
 			}
 			parent;//'parent.name' ==> label
 			refType;//'a.b','a[b]','set a {b}';
@@ -1156,10 +1137,12 @@ const oxminCompiler=async function(inputFile,fileName){
 			type="label";//label|number|array|string; label == array == function
 			bool=false;
 			number=0;//relAddress
-			array=[];//code
+			get array(){return this.label?.code;}//code ///arry: Variable|CodeLine; from: Variable.prototype.code
+			set array(val){(this.label??=new Variable()).code=val;}
 			isExtendedByBlock=false;//done when 'foo(){}' or 'obj{}'; used so that: 'let foo(){}' ==> 'let foo = #(){}'
 			static Number=
 			class Number extends Value{constructor(number){super({number,type:"number"});}}
+			//Value.toNumber
 			toNumber(value=this){//to number type
 				let number;//:number
 				if(value.type=="number"){number=value.number}
@@ -1297,6 +1280,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//as value
 				type="label";
 			//as object
+				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant}
 				name=undefined;///@string
 				labels={};//aka properties
 				prototype=null;///instanceof Variable
@@ -1392,21 +1376,35 @@ const oxminCompiler=async function(inputFile,fileName){
 					??this.prototype?.findLabel?.(name)
 				;
 			}
-			static fromValue(value){//label|number|array|string
+			static fromValue(value,scope=undefined){//label|number|array|string
 				if(value?.type=="label")
 					return value.label;
 				if(value?.type=="number")
-					return new Variable({name:"("+value.number+")",lineNumber:value.number});
+					return new Variable({
+						name:"["+value.number+"]",
+						lineNumber:value.number,
+						code:[new AssemblyLine({type:"data",dataType:"number",args:[value.number],scope})]}
+					);
 				//if(value?.type=="array")//instance of built-in array
 				//	return new Variable({name:"<(array)>",code:value.array});
 				if(value?.type=="string")
-					return new Variable({name});
+					return valueStringToArray(value,scope);
 				return new Variable({name:"(undefined)",});
 			}
 		}
-		class MacroFunction extends Variable{
-
+		function valueStringToArray(value,scope){
+			if(value?.type=="string")
+			return new Variable({
+				name:"<(string)>",
+				code:value.string.split("").map(v=>new AssemblyLine({
+					type:"data",
+					dataType:"char",
+					args:[assemblyCompiler.assembly.extraInstructions.string_char,v.charCodeAt(0)],
+					scope,
+				}))
+			});
 		}
+		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
 			constructor(name){
 				super();
