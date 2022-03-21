@@ -1,8 +1,7 @@
-#let foo(){1;2};
-#set foo(){1;2;3};
-#let obj={11};
-#set obj{22};
-foo();//same as '$def set foo();'
-$def obj;//only defines lineNumber part
-debugger obj"label.code.length";//expects: "debugger: 2"
-//expects: "len(5): 00000001,00000002,00000001,00000002,00000003"
+#let foo(a,b){
+	debugger a "label";
+};//debugger foo"label";
+//debugger foo"label";
+let a=2;
+set a+=5;
+debugger a "label?.lineNumber";
