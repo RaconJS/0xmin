@@ -5,7 +5,6 @@
 //TESTING
 //TODO
 //UNUSED
-
 //DONE: parameters
 //DONE: arguments
 //DONE: operators in expression e.g. 'a + b'
@@ -14,119 +13,145 @@
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 function loga(...args){console.log(...args);};
-//tabify object
-const tabs=(obj,b=0)=>JSON.stringify(obj)
-	.replace(/([{},])/g,(n,v1)=>{
-		if(v1=="{")return v1+"\n"+"\t".repeat(++b);
-		if(v1=="}")return "\n"+"\t".repeat(--b)+v1;
-		if(v1==",")return v1+"\n"+"\t".repeat(b);
-	})
-	.replace(/({)\s+(})\s*(,)?/g,(n,v1,v2,v3)=>v1+v2+v3)
-;
+//extra foos
+	//tabify object
+	const tabs=(obj,b=0)=>JSON.stringify(obj)
+		.replace(/([{},])/g,(n,v1)=>{
+			if(v1=="{")return v1+"\n"+"\t".repeat(++b);
+			if(v1=="}")return "\n"+"\t".repeat(--b)+v1;
+			if(v1==",")return v1+"\n"+"\t".repeat(b);
+		})
+		.replace(/({)\s+(})\s*(,)?/g,(n,v1,v2,v3)=>v1+v2+v3)
+	;
+	Object.doubleFreeze=(obj)=>{
+		for(let i in obj)if(typeof obj[i]=="object"&&obj[i])Object.freeze(obj[i]);
+		Object.freeze(obj);
+	};
+//----
 const oxminCompiler=async function(inputFile,fileName){
 	"compiler error: type error;";
-	const wordsRegex=//does not include: /\s+/
-	/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]/g
-	;
-	const nameRegex=/^[\w_]/;
-	const stringRegex=/^["'`]/;
-	const openBracketRegex=/^[(\[{]/;
-	const endingStringList="@$#:;])}";
-	const functionCallTypes=["=>", "=", "->"];
-	//(long string,string) => (array of words)
-	function parseFile(inputFile,fileName){
-		"use strict";
-		let words=inputFile.match(wordsRegex)??[];
-		words.fileName=fileName;
-		//remove comments
-		for(let i=0;i<words.length;i++){
-			if(words[i].match(/^\/[\/*]|^\s/)){
-				words.splice(i,1);
-				i--;
+	//string consts
+		const wordsRegex=//does not include: /\s+/
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]/g
+		;
+		const nameRegex=/^[\w_]/;
+		const stringRegex=/^["'`]/;
+		const openBracketRegex=/^[(\[{]/;
+		const endingStringList="@$#:;])}";
+		const functionCallTypes=["=>", "=", "->"];
+	//----
+	//inputFile -> code tree
+		//(long string,string) => (array of words)
+		function parseFile(inputFile,fileName){
+			"use strict";
+			let words=inputFile.match(wordsRegex)??[];
+			words.fileName=fileName;
+			//remove comments
+			for(let i=0;i<words.length;i++){
+				if(words[i].match(/^\/[\/*]|^\s/)){
+					words.splice(i,1);
+					i--;
+				}
 			}
+			words.i=0;
+			return words;
 		}
-		words.i=0;
-		return words;
-	}
-	const bracketMap=Object.freeze({
-		"{":"}",
-		"[":"]",
-		"(":")",
-	});
-	const bracketClassMap=Object.freeze({//this object is for debugging
-		"{":({"{ }":class extends Array{recur;maxRecur;}})["{ }"],
-		"[":({"[ ]":class extends Array{}})["[ ]"],
-		"(":({"( )":class extends Array{}})["( )"],
-	});
-	function bracketPass(words,type="{",includeBrackets=false,stackLevel=0){
-		//stackLevel is for debugging only
-		words.i??=0;
-		let block=new bracketClassMap[type]??[];//the current container: {...} or [...] or (...)
-		let statement=[];//the current item: '...;' or '...,'
-		if(includeBrackets){//[...] => ['{',...,'}']
-			if(words[words.i]!=type)throw Error("compiler error");
-			block.push(words[words.i]);
-			words.i++;
-		}
-		let brackets=0;
-		for(let i=words.i,len=words.length;i<len+4&&words.i<words.length;i++){
-			let word=words[words.i];
-			let TEST=words.i==words.length-1;
-			if(word in bracketMap){//handle brackets '{...}' ==> ['{',[...],'}'];
-				words.i++;
-				statement??=[];
-				statement.push(word,//{
-					bracketPass(words,word,false,stackLevel+1)//...
-				,bracketMap[word]);//}
+		const bracketMap=Object.freeze({
+			"{":"}",
+			"[":"]",
+			"(":")",
+		});
+		const bracketClassMap=Object.freeze({//this object is for debugging
+			"{":({"{ }":class extends Array{recur;maxRecur;}})["{ }"],
+			"[":({"[ ]":class extends Array{}})["[ ]"],
+			"(":({"( )":class extends Array{}})["( )"],
+		});
+		function bracketPass(words,type="{",includeBrackets=false,stackLevel=0){
+			//stackLevel is for debugging only
+			words.i??=0;
+			let block=new bracketClassMap[type]??[];//the current container: {...} or [...] or (...)
+			let statement=[];//the current item: '...;' or '...,'
+			if(includeBrackets){//[...] => ['{',...,'}']
+				if(words[words.i]!=type)throw Error("compiler error");
+				block.push(words[words.i]);
 				words.i++;
 			}
-			else if((word=="," && type!="{")||((word == ";") && type=="{")){//then: new statement
-				statement??=[];
-				//';' only belongs to codeObjs, and not expressions
-				statement.push(word);
+			let brackets=0;
+			for(let i=words.i,len=words.length;i<len+4&&words.i<words.length;i++){
+				let word=words[words.i];
+				let TEST=words.i==words.length-1;
+				if(word in bracketMap){//handle brackets '{...}' ==> ['{',[...],'}'];
+					words.i++;
+					statement??=[];
+					statement.push(word,//{
+						bracketPass(words,word,false,stackLevel+1)//...
+					,bracketMap[word]);//}
+					words.i++;
+				}
+				else if((word=="," && type!="{")||((word == ";") && type=="{")){//then: new statement
+					statement??=[];
+					//';' only belongs to codeObjs, and not expressions
+					statement.push(word);
+					words.i++;
+					block.push(statement);
+					statement=undefined;//makes a new statement next cycle
+				}
+				else if(word=="}"||(type!="{" && ";)]}".includes(word))){
+					if(statement)
+					block.push(statement);//ends the block
+					statement=undefined;
+					break;
+				}
+				else if(0){
+					;
+				}
+				else{
+					statement??=[];
+					statement.push(word);
+					words.i++;
+				}
+			}
+			if(statement)block.push(statement);
+			if(includeBrackets){//[...] => ['{',...,'}']
+				if(words[words.i]!=bracketMap[type])throw Error("unballanced "+type+" brackets");
+				block.push(words[words.i]);
 				words.i++;
-				block.push(statement);
-				statement=undefined;//makes a new statement next cycle
 			}
-			else if(word=="}"||(type!="{" && ";)]}".includes(word))){
-				if(statement)
-				block.push(statement);//ends the block
-				statement=undefined;
-				break;
-			}
-			else if(0){
-				;
-			}
-			else{
-				statement??=[];
-				statement.push(word);
-				words.i++;
-			}
+			return block;
 		}
-		if(statement)block.push(statement);
-		if(includeBrackets){//[...] => ['{',...,'}']
-			if(words[words.i]!=bracketMap[type])throw Error("unballanced "+type+" brackets");
-			block.push(words[words.i]);
-			words.i++;
-		}
-		return block;
-	}
+	//----
 	//extra classes
 		class Operator_numeric{
 			//numOfArgs: 1|2;
 			///operation: () => number;
-			constructor(numOfArgs,operation){this.operation=operation;this.numOfArgs=numOfArgs;}
+			constructor(operation_2Args,leftArgOnly,rightArgOnly){//(a+b,a+,+b)
+				if(leftArgOnly)throw Error("compiler error: operator form: 'a +' is not supported");
+				this.operation=operation_2Args;
+				this.leftArgOnly=leftArgOnly;
+				this.rightArgOnly=rightArgOnly;
+			}
 			do({args,hasEquals}){
 				///ans:number;
-				let ans,arg0=args.pop(),fistArg;
-				if(this.numOfArgs==1)ans=this.operation(arg0.toNumber().number);
-				else ans=this.operation((fistArg=args.pop()).toNumber().number,arg0.toNumber().number);
-				if(hasEquals){if(fistArg.type=="label"&&fistArg.parent&&fistArg.parent.labels[fistArg.name]){
-					fistArg.label.lineNumber=ans;
-					fistArg.parent.labels[fistArg.name]=Variable.fromValue(fistArg);
-					args.push(fistArg);
-				}}
-				else args.push(new Value.Number(ans));
+				let ans,arg0=args.pop(),arg1,fistArg;
+				let do1Arg=true;//true=> does 1 arguments operation instead.
+				if(args.length>0&&this.operation_2Args){
+					arg1=args.pop();
+					if(arg1 instanceof Value){
+						ans=this.operation_2Args((fistArg=arg1).toNumber().number,arg0.toNumber().number);
+						do1Arg=false;
+						if(hasEquals){if(fistArg.type=="label"&&fistArg.parent&&fistArg.parent.labels[fistArg.name]){
+							fistArg.label.lineNumber=ans;
+							fistArg.parent.labels[fistArg.name]=Variable.fromValue(fistArg);
+							args.push(fistArg);
+						}}
+						else args.push(new Value.Number(ans));
+					}
+				}
+				if(do1Arg){
+					if(this.rightArgOnly)ans=this.operation(arg0.toNumber().number);
+					else if(this.leftArgOnly)ans=this.operation(arg0.toNumber().number);
+					args.push(new Value.Number(ans));
+				}
 			}
 		};
 	//----
@@ -183,12 +208,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
 					case"void":{
-						state.phase="void";
+						state.phase="void";index++;
 					}break;
 					case"static":{
-						state.phase="void";
+						state.phase="void";index++;
 					}break;
-					case":":{
+					case":":{index++;
 						break loop;
 					}break;
 					default:{
@@ -318,7 +343,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			keyWordList({statement,index,scope,keywords}){//'let set:'
 				//keywords: interface{[key:string]:false}
 				let word,found=false;
-				while(["let", "set", "def"].includes(word=statement[index])){
+				//["let", "set", "def"]
+				while((word=statement[index]) in keywords){
 					keywords[word]=true;
 					index++;
 					found=true;
@@ -366,8 +392,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
 					foundExpression||=!!value;
 					if(metaState["def"]){
-						if(value instanceof Value && value.type=="label"){
-							contexts.meta_defineLabelToNextLine(value.label,scope,value);
+						if(value instanceof Value && value.type=="label"){//for '@null $def: label'
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
 							scope.label.code.push(value.label);
 						}
 					}
@@ -424,10 +450,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return{index};
 			},
-			meta_defineLabelToNextLine(label,scope,value){
+			meta_defineLabelToNextLine(label,scope,value,useUnshift=false){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error("0xmin error: label '"+value.name+"' is not defined");
-				scope.label.code.push(new HiddenLine.Define({label,scope}));
+				let newLineObj=new HiddenLine.Define({label,scope});
+				if(useUnshift)scope.label.code.unshift(newLineObj);
+				else scope.label.code.push(newLineObj);
 			},
 			async main_assembly_argument({statement,index,scope,instruction}){
 				///@mutates: instruction,index;
@@ -478,6 +506,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				return{index};
 			},
 			async main_assembly({statement,index,scope}){
+				({index}=contexts.keyWordList({statement,index,scope,keywords:{}}));//'@: 123;' or '@ 123;'
 				const codeObj=scope.label;
 				if(!statement[index])return{index};
 				if(!(codeObj instanceof Variable))throw Error("compiler error: type error;");
@@ -684,6 +713,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(word.match(nameRegex)){//'a.b' ?
 							name=word;
 							nameFound=true;
+							index++;
 						}
 					}
 					if(!nameFound){//'a.123' ?
@@ -785,7 +815,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							statement[index],
 							scope,
 							isExtension
-								?new Scope({parent:scope,label:startValue.label,code:statement[index]})
+								?new ObjectScope({parent:scope,label:startValue.label,code:statement[index]})
 								:undefined
 						);
 						value=startValue??new Value({type:"label",label:newScope.label});
@@ -798,10 +828,10 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 		//----
 		operators:{
-			"+":new Operator_numeric(2,(a,b)=>a+b),
-			"-":new Operator_numeric(2,(a,b)=>a-b),
-			"*":new Operator_numeric(2,(a,b)=>a*b),
-			"/":new Operator_numeric(2,(a,b)=>a/b),
+			"+":new Operator_numeric((a,b)=>a+b),
+			"-":new Operator_numeric((a,b)=>a-b),
+			"*":new Operator_numeric((a,b)=>a*b),
+			"/":new Operator_numeric((a,b)=>a/b),
 		},
 		async expression({index,statement,scope,startValue=undefined,includeBrackets=true,shouldEval=true}){//a + b
 			let value=new Value();
@@ -812,7 +842,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				args.push(startValue);
 			}
 			let word=statement[index];
-			if(";)]}".includes(word))return{index,value:undefined};
 			let nextIndex=index;
 			if(includeBrackets){
 				if(includeBrackets && !"([{".includes(word)){
@@ -832,12 +861,12 @@ const oxminCompiler=async function(inputFile,fileName){
 			for(let i=index;i<statement.length&&index<statement.length;i++){
 				let word=statement[index];
 				//ignore '#' in '#(' or '#{'
-				if("#".includes(word)&&"({[".includes(statement[index+1])){
+				if("#$@".includes(word)&&"({[".includes(statement[index+1])){//'#()' or '#{}' ==> '()' '{}'
+					//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
 					index++;
 				}
-				else if("#$@".includes(word)){
-					break;
-				}
+				else if(";)]}".includes(word))break;
+				else if("#$@".includes(word))break;
 				else if(["=", "=>"].includes(word)){
 					index++;
 					let firstArg=args.pop();
@@ -1037,6 +1066,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			assembly:{//0xmin assembly language
 				language:"0xmin",
 				instructionSet:{
+					"null":0,
 					"move":0,
 					"jump":1,
 					"nor":2,
@@ -1167,7 +1197,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			isExtendedByBlock=false;//done when 'foo(){}' or 'obj{}'; used so that: 'let foo(){}' ==> 'let foo = #(){}'
 			static Number=
 			class Number extends Value{constructor(number){super({number,type:"number"});}}
-			//Value.toNumber
+			//Value.prototype.toNumber
 			toNumber(value=this){//to number type
 				let number;//:number
 				if(value.type=="number"){number=value.number}
@@ -1281,7 +1311,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							else{//'$jump->label;' or '$label->jump'
 								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
-								returnValue=args[1].lineNumber+this.operator[1].number-args[0].lineNumber;
+								returnValue=args[1].lineNumber+this.operator[1].toNumber().number-args[0].lineNumber;
 								failed||=isNaN(returnValue);
 								if(isAssigning)args[0].lineNumber=args[1].lineNumber+this.operator[1].number;
 							}
@@ -1319,6 +1349,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//as assembly
 				relAddress=0;//number UNUSED
 				lineNumber=undefined;
+				defs=[];//places where this code has been '$def this;' or '$set this;' used in : '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
 			//----
 			get address(){//UNUSED
@@ -1346,7 +1377,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						;
 						return s;
 					},[])
-				);loga(codeBlock)
+				);
 				this.isSearched=false;
 				return codeBlock;
 			}
@@ -1401,11 +1432,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {value:new Value({type:"label",label:newReturnObj})};
 			}
 			findLabel(name){//'a.b'
-				return
+				return (
 					this.supertype?.findLabel?.(name)
-					??{label:this.labels[name],parent:this}
+					??(this.labels[name]?{label:this.labels[name],parent:this}:undefined)
 					??this.prototype?.findLabel?.(name)
-				;
+				);
 			}
 			static fromValue(value,scope=undefined){//label|number|array|string
 				if(value?.type=="label")
@@ -1481,34 +1512,41 @@ const oxminCompiler=async function(inputFile,fileName){
 			isSearched=false;
 			code;//: bracketClassMap["{"];
 			findLabel(name){
-				const parent=this.findLabelParent(name);
+				const parent=this.findLabelParent(name);//:Variable
 				if(parent)return {parent,label:parent.labels[name]}
 				else return;
 			}
-			findLabelParent(name,topLevel=true){
+			findLabelParent(name,topLevel=true){//:Variable
 				if(this.isSearched||!this.label)return undefined;
-				if(name in this.label?.labels)return this.label;
+				this.isSearched=true;
+				let val=this.label.findLabel(name);
+				if(val){this.isSearched=false;return val.parent;}
+				//if(name in this.label.labels)return this.label;
 				if(this.parent){
-					this.isSearched=true;
-					let parent=this.parent.findLabelParent(name);
+					let parent=this.parent.findLabelParent(name,false);
 					this.isSearched=false;
 					return parent;
 				}
-				else return undefined;
+				else {this.isSearched=false;return undefined;}
 			}
 		}
 		class GlobalScope extends Scope{
 			constructor(data){
 				super(data);
+				const mainObject=this.label.prototype=new Variable({name:["0xmin"],lineNumber:0,labels:{
+					"null":Object.freeze(Object.assign(Variable.fromValue(new Value.Number(0)),assemblyCompiler.nullValue)),
+				}});
+				this.label.labels={"0xmin":mainObject};
 			}
 			label=new Variable({
 				scope:this,
 				name:["GlobalObject"],
-				labels:{
-					"0xmin":new Variable({name:["0xmin"],lineNumber:0}),
-				},
 			});
 			parent=this;
+			let=this;
+			var=this;
+		}
+		class ObjectScope extends Scope{
 			let=this;
 			var=this;
 		}
@@ -1518,11 +1556,12 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 	//----
 	{
-		assemblyCompiler.nullValue=new AssemblyLine({
+		const nullValue=assemblyCompiler.nullValue=new AssemblyLine({
 			type:"undefined",
-			args:[0],
+			args:[new Value({type:"label",name:"null",})],
 			binaryValue:0,
 		});
+		Object.doubleFreeze(nullValue);
 		assemblyCompiler.assembly.init();
 	}
 	//'{' ==> '{ ... }'
@@ -1578,7 +1617,7 @@ let buildSettings={makeFile:true}
 		  '...inFile.0xmin',
 		  '...outFileName.out',
 		]
-		console.error(errorMsg+"needs input .0xmin file");
+		console.error("0xmin error: "+"needs input .0xmin file");
 		return;
 		throw "needs input .0xmin file";
 	}

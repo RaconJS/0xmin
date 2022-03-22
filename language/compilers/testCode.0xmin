@@ -1,1 +1,21 @@
-...{0};
+//zasm
+#let: main,terminal,start,io;
+set def: start{
+	jump->main;
+	jump 0;
+};
+#let: terminal{#let: input,output;};
+set def: io{
+	#let def: input{
+		null ;//move;get;
+		0x20000000;$def: terminal.input;
+	};
+	#let def: output{
+		null;
+		0x20000000;$def: terminal.output;
+	}
+};
+set def: main{
+	$move->0xmin;
+};
+def: main;

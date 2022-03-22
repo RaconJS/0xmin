@@ -1,4 +1,5 @@
-#let main;
+//0xmin 2
+#let main,terminal,start;
 def let start{
 	jump->main;
 	jump 0;

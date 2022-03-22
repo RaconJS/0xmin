@@ -24,7 +24,7 @@ scope: source.0xmin
 #
 #
 variables:
-  number: '\b(?:undefined|null)\b|[+-]?(0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
+  number: '\b(?:undefined|null)\b|\b[+-]?(0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
   labelName: '\b\w+\b'
   buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<=>|<=|=>|=|<->|<-|->'
