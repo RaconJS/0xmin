@@ -223,7 +223,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return await contexts.main({statement,index,scope});
 				}
 			}
-			else if(["debugger", "import", "delete"].includes(word)){
+			else if(["debugger", "import", "delete","..."].includes(word)){
 				if(word=="debugger"){//debugger name "label";
 					index++;
 					word=statement[index];
@@ -262,6 +262,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							break;
 						}
 					}
+				}
+				else if(word=="..."){
+					({index}=await contexts.main_injectCode({index,statement,scope}));
 				}
 			}
 			if(statement[index]=="{"){
@@ -321,7 +324,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					found=true;
 				}
 				if(statement[index]==":")index++;
-				return {index,found};
+				return {index,found,keywords};
 			},
 			async main_meta({statement,index,scope}){//'#' ==> '# let set a;'
 				const metaState={
@@ -532,14 +535,33 @@ const oxminCompiler=async function(inputFile,fileName){
 		//----
 		//'...scope;
 		async injectCode({statement,index,scope}){//UNFINISHED
+			let failed=false;
 			if(statement[index]=="..."){
+				let value;
 				index++;
-			}
-			else{
-				return{index};
-			}
+				({index,value}=await contexts.expression_short({statement,index,scope}));
+				scope.code.push(...(Variable.fromValue(value)?.code??[]));
+			}else failed=true;
+			return{index,failed};
+		},
+		async main_injectCode({statement,index,scope}){
+			if(statement[index]!="...")return{index,failed:true};
+			index++;
+			//'...let: obj;' ==> insert properties of object
+			//'...set: obj;' ==> insert code of block
+			//'...def: foo;' ==> run code source in scope
+			const state={"let":false,"set":false,"def":false};
+			let found;
+			({index,found}=contexts.keyWordList({keywords:state,statement,index,scope}));
+			if(!found){state["def"]=true;}
 			let value;
 			({index,value}=await contexts.expression_short({statement,index,scope}));
+			const label=Variable.fromValue(value);
+			if(label){
+				if(state["let"])Object.assign(scope.labels,label.labels);
+				if(state["set"])scope.code.push(...label.code);
+				if(state["def"])await evalBlock(label.getCode(),undefined,scope);
+			}
 			return{index};
 		},
 		async parameters({index=0,statement,scope,functionObj}){//'a,b,c' in '(a,b,c){};'
@@ -723,7 +745,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					contexts.delcare_typeChecks(isExtension,startValue,isLet);
 					const newFunctionObj=shouldEval?new MacroFunction({
 						type:"function",
-
 					}):undefined;
 					const functionObj=isExtension&&!isLet?startValue.label:newFunctionObj;
 					if(shouldEval)await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
@@ -744,6 +765,10 @@ const oxminCompiler=async function(inputFile,fileName){
 						//word == '...code' in '(){...code}'
 						if(isExtension&&!isLet){//'foo(){}' use existing function
 							newFunctionObj.scope.label=functionObj;
+							if(functionObj.scope){//moves label.scope into label.code if it has not done aleady;
+								functionObj.code.push(new MacroFunction({scope:functionObj.scope}));
+								functionObj.scope=undefined;
+							}
 							functionObj.code.push(newFunctionObj);
 						}
 						if(startValue)startValue.label=functionObj;
@@ -1180,7 +1205,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		class CodeLine extends DataClass{//assembly line of code
 			//constructor(data){super();Object.assign(this,data??{})}
 			cpuState=null;//:CpuState|null
-			scope;
+			scope;//:Scope; UNUSED
 		}
 		class AssemblyLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1313,9 +1338,15 @@ const oxminCompiler=async function(inputFile,fileName){
 				const codeBlock=new bracketClassMap["{"];
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
-				codeBlock.push(...(this.scope?.code||[]),
-					...this.code.reduce((s,v)=>{s.push(...v.getCode?.()??[]);return s;},[])//FIX
-				);
+				if(this.scope?.code)codeBlock.push(...(this.scope?.code||[]));
+				else codeBlock.push(
+					...this.code.reduce((s,v)=>{
+						let code=v.getCode?.();
+						if(code instanceof Array)s.push(code);
+						;
+						return s;
+					},[])
+				);loga(codeBlock)
 				this.isSearched=false;
 				return codeBlock;
 			}
@@ -1383,8 +1414,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					return new Variable({
 						name:"["+value.number+"]",
 						lineNumber:value.number,
-						code:[new AssemblyLine({type:"data",dataType:"number",args:[value.number],scope})]}
-					);
+						code:[new AssemblyLine({type:"data",dataType:"number",args:[value.number],scope})],
+						scope:new Scope({code:new bracketClassMap["{"]([""+value.number,";"])}),
+					});
 				//if(value?.type=="array")//instance of built-in array
 				//	return new Variable({name:"<(array)>",code:value.array});
 				if(value?.type=="string")
