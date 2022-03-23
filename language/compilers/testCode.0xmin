@@ -1,19 +1,8 @@
-/*let tuple(){
-	let a{repeat 2 null;};
-	let b{repeat 1 null;};
-	let str{"constanst string";}
-	let int{repeat 1 null;};
+let tuple(){
+	#def let a;
+	null;
+	null;
+	#def let b;
+	null;
 };
-let getPointer(struct,location){
-	$set (location=virtual struct());
-};
-let sizeof=#(struct){
-	void:{
-		#let code=struct()..compile();
-		#set this<->code..length;
-	}
-}
-$getPointer();*/
-virtual :{
-	1;
-};
+let a=tuple();

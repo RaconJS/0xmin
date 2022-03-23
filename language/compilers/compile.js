@@ -5,11 +5,9 @@
 //TESTING
 //TODO
 //UNUSED
-//DONE: parameters
-//DONE: arguments
 //DONE: operators in expression e.g. 'a + b'
 //TODO: 'a..length' internal properties
-//TODO: add 'virtual' keyword in 'recur/repeat/virtual'. for structs e.g. 'virtual {};' or 'virtual obj;' compiles 'obj' relative to 'obj'
+//DONE: add 'virtual' keyword in 'recur/repeat/virtual'. for structs e.g. 'virtual {};' or 'virtual obj;' compiles 'obj' relative to 'obj'
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 function loga(...args){console.log(...args);};
@@ -297,7 +295,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual());
 			if(statement[index]=="{"){
 				index++;
-				scope.label.code.push(
+				newScope.label.code.push(
 					(await evalBlock(statement[index++],scope)).label
 				);
 				index++;
@@ -669,8 +667,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//'"abc"'
 				let string=value;
 				if(shouldEval)value=new Value({string,type:"string",array});
-			}
-			else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
+			}else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
 			else if("([".includes(word)){//'(label)'
 				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
 			}else if(word.match(nameRegex)){//'label'
@@ -708,7 +705,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					value.parent=parent;
 					let oldIndex=index;
 					if(shouldEval)if(word==".."){//UNFINISHED
-						value=new getInternals(value,{index,statement,scope});//internal object
+						value=getInternals(value,{index,statement,scope});//internal object
 					}
 					index++;
 					let name,nameFound=false;
@@ -720,16 +717,14 @@ const oxminCompiler=async function(inputFile,fileName){
 							nameFound=true;
 							index++;
 						}
-					}
-					if(!nameFound){//'a.123' ?
+					}if(!nameFound){//'a.123' ?
 						({index,value}=await contexts.number({index,statement,}));
-					}
-					if(!nameFound){//'a.("b")' ?
+						if(value)nameFound=true;
+					}if(!nameFound){//'a.("b")' ?
 						({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true}));
 						name=value?.string;
 						if(value)nameFound=true;
-					}
-					if(!nameFound){
+					}if(!nameFound){
 						throw Error("'"+statement[oldIndex]+"'"+" does not return a property name");
 					}
 					value.name=name;
@@ -754,8 +749,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						({value}=await value.label.callFunction(argsObj,value,scope));
 					}
 					return {index,value};
-				}
-				else{
+				}else{
 					return {index,value};
 				}
 			},
@@ -810,8 +804,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						value=startValue??new Value({type:"label",label:functionObj});
 					}
 					return {index,value,failed:false};//isExtension&&!startValue};
-				}
-				else if(word=="{"){
+				}else if(word=="{"){
 					contexts.delcare_typeChecks(isExtension,startValue,isLet);
 					index++;
 					if(shouldEval){
@@ -827,9 +820,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					index+=2;
 					return {index,value,failed:false};//failed:isExtension&&!startValue};
+				}else {
+					return {index,value,failed:true};
 				}
-				else {
-					return {index,value,failed:true};}
 			},
 		//----
 		operators:{
@@ -999,7 +992,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							({failed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,scope,assemblyCode}));
 						}
 						else if(instruction instanceof AssemblyLine){
-							assemblyCode.code[cpuState.lineNumber]=instruction;
+							if(cpuState.virtualLevel<=0)assemblyCode.code[cpuState.lineNumber]=instruction;
 							instruction.cpuState=new CpuState(cpuState);
 							///@mutates: instruction,cpuState;
 							({failed}=await this.compileAssemblyLine({instruction,assemblyCode,cpuState,code:codeQueue}));
@@ -1233,6 +1226,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				Object.assign(this,newCpuState);
 			}
 			relativeTo;//:CodeLine|Variable
+			virtualLevel=0;//:int
 			jump=0;//:int ; line pointer
 			move=0;//:int ; data pointer
 			lineNumber=0;//:int
@@ -1326,17 +1320,27 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{failed,relAddress:returnValue};
 				}
 			}
-			static Virtual=//'$virtual;' starts virtual scope
-			class Virtual extends HiddenLine{
-				cpuState;//:private CpuState
-				run({cpuState}){this.outerCpuState=cpuState;}
-			}
-			static Void=//'$void;' ends virtual scope
-			class Void extends HiddenLine{
-				linkedLine;//:private Virtual|CodeLine
-				constructor(linkedLine){super();this.linkedLine=linkedLine;}
-				run({cpuState}){cpuState.setValues(this.linkedLine.cpuState);}
-			}
+			//'virual {...};'
+				static Virtual=//'$virtual;' starts virtual scope
+				class Virtual extends HiddenLine{
+					cpuState;//:private CpuState
+					run({cpuState}){
+						this.cpuState=new CpuState(cpuState);
+						cpuState.virtualLevel++;
+						return{failed:false};
+					}
+				}
+				static Void=//'$void;' ends virtual scope
+				class Void extends HiddenLine{
+					linkedLine;//:private Virtual|CodeLine
+					constructor(linkedLine){super();this.linkedLine=linkedLine;}
+					run({cpuState}){
+						cpuState.setValues(this.linkedLine.cpuState);
+						cpuState.virtualLevel--;
+						return{failed:false};
+					}
+				}
+			//----
 		}
 		class MetaLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1403,6 +1407,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//args.obj: {[key:"string"]:Value}
 				//args.list: Value[]
 				const argsObj=new Variable({
+					name:"(argument object)",
 					labels:{},
 					code:[]
 				});
@@ -1413,7 +1418,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				let codeBlock=this.getCode();//new code instance
 				let instanceScope=new Scope({
-					parent:this.scope,
+					parent:this.scope??globalScope,
 					label:argsObj,
 					code:codeBlock
 				});
@@ -1472,15 +1477,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				return new Variable({name:"(undefined)",});
 			}
 		}
-		class InternalLabels{
-			constructor(val){this.value=new Value(val);}
-		}
+		//Internal
+		//--
 		function getInternals(value,{index,scope,statement}){
 			value.type="label";
 			value.label=new Variable({name:"(internal)"});
-			value.label.labels={
-				length:new Variable({}),
-			};
+			return value;
 		}
 		function valueStringToArray(value,scope){
 			if(value?.type=="string")
@@ -1592,6 +1594,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		assemblyCompiler.assembly.init();
 	}
 	//'{' ==> '{ ... }'
+	let globalScope;
 	async function evalBlock(block,parentScope=undefined,scope=undefined){
 		//does not include brackets
 		const includeBrackets=false;
@@ -1599,6 +1602,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		if(!scope){
 			if(!parentScope){
 				scope=new GlobalScope({code:block});
+				if(!globalScope)globalScope=scope;
 			}else{
 				scope=new BlockScope({parent:parentScope,code:block});
 			}
