@@ -1,19 +1,20 @@
-//0xmin 2
-#let main,terminal,start;
-def let start{
+//zasm
+#let: main,terminal,start,io;
+set def: start{
 	jump->main;
 	jump 0;
-}
-#let terminal{#let input,output;}
-def let io{
-	null def var input,input1;//move;get;
-		#def terminal.input;
-	0x20000000 def var input2;
-	null def var output,output1;//move;set;
-		#def terminal.output;
-	0x20000000 def var output2;
 };
-#set main{
+#set: terminal{#let: input,output;};
+set def: io{
+	let def: input{
+		null ;//move;get;
+		0x20000000;$def: terminal.input;
+	};
+	let def: output{
+		null;
+		0x20000000;$def: terminal.output;
+	}
+};
+set def: main{
 	$move->0xmin;
-}
-#def main;
+};
