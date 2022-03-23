@@ -69,7 +69,7 @@ contexts:
 
     - match: '\b(?:static|void)\b'
       scope: keyword.control
-    - match: '\b(?:recur|repeat)\b'
+    - match: '\b(?:recur|repeat|virtual)\b'
       scope: keyword.control
     - match: '\b(?:import|debugger|delete)\b'
       scope: keyword.control

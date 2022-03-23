@@ -195,14 +195,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope({label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
-			let state={void:false,static:false,phase:""};
+			let state={void:false,static:false,virtual:false,phase:""};
 			statement.maxRecur;
 			statement.recur??=0;
 			statement.recur++;
 			let word=statement[index];let asd=2;
 			if(index>=statement.length)return{index,value:newScope};
 			if(statement.recur<=(statement.maxRecur??1))
-			if(["void", "static", "#", "$", "@"].includes(word))
+			if(["void", "static", "virtual", "#", "$", "@"].includes(word))
 			loop:for(let i=index;i<statement.length;i++){
 				let word=statement[index];
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
@@ -213,7 +213,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					case"static":{
 						state.phase="void";index++;
 					}break;
-					case":":{index++;
+					case"virtual":{
+						state.virtual=true;index++;
+					}case":":{index++;
 						break loop;
 					}break;
 					default:{
@@ -248,7 +250,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return await contexts.main({statement,index,scope});
 				}
 			}
-			else if(["debugger", "import", "delete","..."].includes(word)){
+			else if(["debugger", "import", "delete", "..."].includes(word)){
 				if(word=="debugger"){//debugger name "label";
 					index++;
 					word=statement[index];
@@ -292,6 +294,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					({index}=await contexts.main_injectCode({index,statement,scope}));
 				}
 			}
+			if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual());
 			if(statement[index]=="{"){
 				index++;
 				scope.label.code.push(
@@ -299,9 +302,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				);
 				index++;
 			}
-			else{
-				assemblyPart:{
-					let value;
+			else{assemblyPart:{
+					let value,virtualLine;
 					if(state.phase==""){//auto detect phase
 						word=statement[index];
 						if(["let", "set"].includes(word))
@@ -321,6 +323,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					;
 				}
 			}
+			if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine));
 			statement.recur--;
 			if(statement.recur==0){
 				statement.maxRecur=undefined;
@@ -443,10 +446,12 @@ const oxminCompiler=async function(inputFile,fileName){
 						scope.label.code.push(newLine);
 					}else{
 						contexts.meta_defineLabelToNextLine(value.label,scope,value);
+						if(value.label)value.label.defs.push(scope.label);
 					}
 				}
 				if(state["set"]){//'$set label;' => inserts contence of label
 					scope.label.code.push(value.label);
+					if(value.label)value.label.defs.push(scope.label);
 				}
 				return{index};
 			},
@@ -703,7 +708,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					value.parent=parent;
 					let oldIndex=index;
 					if(shouldEval)if(word==".."){//UNFINISHED
-						value.label={};//internal object
+						value=new getInternals(value,{index,statement,scope});//internal object
 					}
 					index++;
 					let name,nameFound=false;
@@ -1207,6 +1212,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				return new Value.Number(number);
 			}
 		}
+		//returns interal values
 		class Stack{//UNUSED
 			list=[];
 			constructor(list){
@@ -1320,6 +1326,17 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{failed,relAddress:returnValue};
 				}
 			}
+			static Virtual=//'$virtual;' starts virtual scope
+			class Virtual extends HiddenLine{
+				cpuState;//:private CpuState
+				run({cpuState}){this.outerCpuState=cpuState;}
+			}
+			static Void=//'$void;' ends virtual scope
+			class Void extends HiddenLine{
+				linkedLine;//:private Virtual|CodeLine
+				constructor(linkedLine){super();this.linkedLine=linkedLine;}
+				run({cpuState}){cpuState.setValues(this.linkedLine.cpuState);}
+			}
 		}
 		class MetaLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1349,7 +1366,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//as assembly
 				relAddress=0;//number UNUSED
 				lineNumber=undefined;
-				defs=[];//places where this code has been '$def this;' or '$set this;' used in : '#undef: this;'
+				defs=[];//UNUSED;//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
 			//----
 			get address(){//UNUSED
@@ -1454,6 +1471,16 @@ const oxminCompiler=async function(inputFile,fileName){
 					return valueStringToArray(value,scope);
 				return new Variable({name:"(undefined)",});
 			}
+		}
+		class InternalLabels{
+			constructor(val){this.value=new Value(val);}
+		}
+		function getInternals(value,{index,scope,statement}){
+			value.type="label";
+			value.label=new Variable({name:"(internal)"});
+			value.label.labels={
+				length:new Variable({}),
+			};
 		}
 		function valueStringToArray(value,scope){
 			if(value?.type=="string")
