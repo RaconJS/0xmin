@@ -5,9 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
-//DONE: operators in expression e.g. 'a + b'
-//TODO: 'a..length' internal properties
-//DONE: add 'virtual' keyword in 'recur/repeat/virtual'. for structs e.g. 'virtual {};' or 'virtual obj;' compiles 'obj' relative to 'obj'
+//TODO: javascript-like bool operators e.g.'a && b' ==> `eval's b if a`
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 function loga(...args){console.log(...args);};
@@ -152,6 +150,17 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			}
 		};
+		class Operator_bool{//UNFINISHED
+			constructor(operation){
+				this.operation=operation;
+			}
+			next(){//next Arg
+
+			}
+			do({args}){//only first arg
+
+			}
+		}
 	//----
 	const contexts={
 		//simple
@@ -814,10 +823,21 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 		//----
 		operators:{
-			"+":new Operator_numeric((a,b)=>a+b),
-			"-":new Operator_numeric((a,b)=>a-b),
-			"*":new Operator_numeric((a,b)=>a*b),
-			"/":new Operator_numeric((a,b)=>a/b),
+			"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
+			"-":new Operator_numeric((a,b)=>a-b,0,a=>-a),
+			"*":new Operator_numeric((a,b)=>a*b,0,a=> a),
+			"/":new Operator_numeric((a,b)=>a/b,0,a=>1/a),
+			">>>":new Operator_numeric((a,b)=>a>>>b),
+			">>":new Operator_numeric((a,b)=>a>>b),
+			"<<":new Operator_numeric((a,b)=>a<<b),
+			"**":new Operator_numeric((a,b)=>a**b),
+			"%":new Operator_numeric((a,b)=>a%b),
+			"^":new Operator_numeric((a,b)=>a^b),
+			"&":new Operator_numeric((a,b)=>a&b),
+			"~":new Operator_numeric((a,b)=>~(a|b),0,a=>~a),
+			//
+			"!":new Operator_numeric(0,0,a=>+!a),
+
 		},
 		async expression({index,statement,scope,startValue=undefined,includeBrackets=true,shouldEval=true}){//a + b
 			let value=new Value();
@@ -1224,16 +1244,16 @@ const oxminCompiler=async function(inputFile,fileName){
 				else if(value.type=="array")throw Error("0xmin type error: the array  Value type is not fully supported yet.")
 				return new Value.Number(number);
 			}
-		}
-		//returns interal values
-		class Stack{//UNUSED
-			list=[];
-			constructor(list){
-				if(list instanceof Stack){
-					;
+			toJS(){//UNUSED
+				switch(this.type){
+					case"number":return this.number;break;
+					case"string":return this.string;break;
+					case"array":return this.array;break;
+					case"label":return {...this.label.labels};break;
 				}
 			}
 		}
+		//returns interal values
 		class CpuState extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
 			nextLine(){
