@@ -120,7 +120,10 @@ const oxminCompiler=async function(inputFile,fileName){
 		class Operator_numeric{
 			//numOfArgs: 1|2;
 			///operation: () => number;
-			constructor(operation_2Args,leftArgOnly,rightArgOnly){//(a+b,a+,+b)
+			operation;
+			leftArgOnly;
+			rightArgOnly;
+			constructor(operation_2Args=0,leftArgOnly=0,rightArgOnly=0){//(a+b,a+,+b)
 				if(leftArgOnly)throw Error("compiler error: operator form: 'a +' is not supported");
 				this.operation=operation_2Args;
 				this.leftArgOnly=leftArgOnly;
@@ -130,10 +133,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				///ans:number;
 				let ans,arg0=args.pop(),arg1,fistArg;
 				let do1Arg=true;//true=> does 1 arguments operation instead.
-				if(args.length>0&&this.operation_2Args){
+				if(args.length>0&&this.operation){
 					arg1=args.pop();
 					if(arg1 instanceof Value){
-						ans=this.operation_2Args((fistArg=arg1).toNumber().number,arg0.toNumber().number);
+						ans=this.operation((fistArg=arg1).toNumber().number,arg0.toNumber().number);
 						do1Arg=false;
 						if(hasEquals){if(fistArg.type=="label"&&fistArg.parent&&fistArg.parent.labels[fistArg.name]){
 							fistArg.label.lineNumber=ans;
@@ -151,6 +154,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		};
 		class Operator_bool{//UNFINISHED
+			operation;
 			constructor(operation){
 				this.operation=operation;
 			}
@@ -188,7 +192,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return {index,value:undefined};
 				}
 			},
-			number({index,statement,scope}){//is optional
+			number({index,statement,scope}){//number is optional
 				let number=+statement[index];
 				if(!isNaN(number)){
 					index++;
@@ -215,7 +219,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
 					case"void":{
-						state.void="void";index++;
+						state.void=true;index++;
 					}break;
 					case"static":{
 						state.phase="void";index++;
@@ -259,7 +263,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			else if(["debugger", "import", "delete", "..."].includes(word)){
 				if(word=="debugger"){//debugger name "label";
-					({index}=evalDebugger({index,statement,scope}));
+					({index}=await evalDebugger({index,statement,scope}));
 				}
 				else if(word=="delete"){
 					index++;
@@ -271,7 +275,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								delete value.parent.labels[value.name];
 							}
 						}else break;
-						if(!word==","){//delete a,b,c ;
+						if(word!=","){//delete a,b,c ;
 							break;
 						}
 					}
@@ -280,6 +284,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					({index}=await contexts.main_injectCode({index,statement,scope}));
 				}
 			}
+			let virtualLine;
 			if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual());
 			if(statement[index]=="{"){
 				index++;
@@ -289,7 +294,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				index++;
 			}
 			else{assemblyPart:{
-					let value,virtualLine;
+					let value;
 					if(state.phase==""){//auto detect phase
 						word=statement[index];
 						if(["let", "set"].includes(word))
@@ -298,14 +303,14 @@ const oxminCompiler=async function(inputFile,fileName){
 							state.phase="$";
 						else state.phase="@";
 					}
-					if(state.phase=="@")({index,value}=await contexts.main_assembly({statement,index,scope:newScope}));
-					else if(state.phase=="$")({index,value}=await contexts.main_hidden({statement,index,scope:newScope}));
+					if(state.phase=="@")({index}=await contexts.main_assembly({statement,index,scope:newScope}));
+					else if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
 					word=statement[index];
 					if(word=="#"){
 						state.phase="#"
 						index++;
 					}
-					if(state.phase=="#")({index,value}=await contexts.main_meta({statement,index,scope:newScope}));
+					if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
 					;
 				}
 			}
@@ -457,7 +462,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				///@mutates: instruction,index;
 				let word=statement[index];
 				let value;
-				if(({index,value}=contexts.number({index,statement})).value!=undefined){//'2'
+				if(({index,value}=contexts.number({index,statement,scope})).value!=undefined){//'2'
 					instruction.args.push(new Value.Number(value));
 				}
 				else if(word.match(nameRegex)){//'command' or 'label'
@@ -555,7 +560,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeObj.code.push(instruction);
 					}
 				}
-				return {index,value:codeObj};
+				return {index};
 			},
 		//----
 		//'...scope;
@@ -614,7 +619,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		arguments_addArgument(argsObj,value){
 
 		},
-		async arguments({index,statement,scope,includeBrackets=true}){
+		async arguments({index,statement,scope,functionType,includeBrackets=true}){
 			//'(a, b, c) ::{} ::{}'
 			//always includes brackets
 			let argsObj={
@@ -626,8 +631,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					const argBlock=statement[index+1];
 					index+=3;
 					for(const statement of argBlock){
-						let index=0;
-						({value,index}=await contexts.expression({index,statement,scope,includeBrackets:false}));
+						let {value,index}=await contexts.expression({index:0,statement,scope,includeBrackets:false});
 						if(value){
 							argsObj.list.push(value);
 							//argsObj.obj[value.name]=value.label;
@@ -647,7 +651,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			return {index,argsObj};
 		},
-		async expression_short({index,statement,scope,shouldEval=true,isLet=false}){//a().b or (1+1)
+		async expression_short({index,statement,scope,shouldEval=true,isLet=false,includeBrackets=false}){//a().b or (1+1)
+			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
 			let value,array;let failed;
@@ -709,7 +714,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							index++;
 						}
 					}if(!nameFound){//'a.123' ?
-						({index,value}=await contexts.number({index,statement,}));
+						({index,value}=await contexts.number({index,statement,scope}));
 						if(value)nameFound=true;
 					}if(!nameFound){//'a.("b")' ?
 						({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true}));
@@ -729,7 +734,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					return {index,value};
 				}
 				//'foo(){}' or 'obj{}' extend function or object
-				else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:value,isExtension:true,shouldEval,isLet})).failed){
+				else if(!({index,value}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:value,isExtension:true,shouldEval,isLet})).failed){
 					value.isExtendedByBlock=true;
 					return {index,value};
 				}else if("("==word||(functionCallTypes.includes(word)&&statement[index+1]=="(")){
@@ -825,7 +830,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		operators:{
 			"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
 			"-":new Operator_numeric((a,b)=>a-b,0,a=>-a),
-			"*":new Operator_numeric((a,b)=>a*b,0,a=> a),
+			"*":new Operator_numeric((a,b)=>a*b),
 			"/":new Operator_numeric((a,b)=>a/b,0,a=>1/a),
 			">>>":new Operator_numeric((a,b)=>a>>>b),
 			">>":new Operator_numeric((a,b)=>a>>b),
@@ -939,22 +944,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		},
 	};
-	//Operator used here
-	function parseExpressionGrouping({statement,index=0},operator=new Operator()){//returns tree:structure
-		///@types statement:(string:(operator|label)|Value|Variable)[]
-		for(let i=index;i<statement.length&&index<statement.length;i++){
-			let word=statement[index];
-			index++;
-			if("=".includes(word)){//a = b => [b,=,a]
-				if(statement[index]=="("){//class function call
-
-				}
-				else{
-					args=parseExpressionGrouping({statement,index});
-				}
-			}
-		}
-	}
 	const assemblyCompiler={
 		async main(label){//(Variable) => Variable / MachineCode
 			const codeQueue=this.collectCode(label);
@@ -988,7 +977,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let lastFails=codeQueue.length;
 				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
-				const assemblyCode=new MachineCode()
+				const assemblyCode=new MachineCode();
 				for(let i=0;i<codeQueue.length;i++){
 					let fails=0;
 					cpuState.setValues(startingCpuState);
@@ -1126,7 +1115,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				let arg=args[argNumber];
 				let failed=false;
 				if(arg instanceof bracketClassMap["("]){//code tree
-					let {value,index}=await contexts.expression({index:0,statement:arg});
+					const scope=undefined;
+					throw Error("compiler error: @: scope is not defined. '@()' is not supported yet");
+					let {value,index}=await contexts.expression({index:0,statement:arg,scope});
 					arg=value;
 				}
 				if(arg instanceof HiddenLine){
@@ -1206,7 +1197,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		///@abstract
 		class DataClass{
 			//constructs data class
-			con(data){
+			constructor(data){
 				"use strict";
 				Object.assign(this,data);
 				Object.seal(this,data);
@@ -1227,6 +1218,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			refType;//'a.b','a[b]','set a {b}';
 			label;//label Object
 			name;//label name (from parent.labels)
+			string;
 			type="label";//label|number|array|string; label == array == function
 			bool=false;
 			number=0;//relAddress
@@ -1367,7 +1359,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					run({cpuState}){
 						this.cpuState=new CpuState(cpuState);
 						cpuState.virtualLevel++;
-						return{failed:false};
+						return{failed:false,relAddress:0};
 					}
 				}
 				static Void=//'$void;' ends virtual scope
@@ -1377,7 +1369,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					run({cpuState}){
 						cpuState.setValues(this.linkedLine.cpuState);
 						cpuState.virtualLevel--;
-						return{failed:false};
+						return{failed:false,relAddress:0};
 					}
 				}
 			//----
@@ -1433,11 +1425,11 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			isSearched=false;
 			get returnLineNumber(){
-				if(isSearched)return;
-				isSearched=true;
+				if(this.isSearched)return;
+				this.isSearched=true;
 				let codeObj=this.code[this.code.length-1];
 				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber:codeObj.lineNumber;
-				isSearched=false;
+				this.isSearched=false;
 				return lineNumber;
 			}
 			getCode(){//: SourceCodeTree
