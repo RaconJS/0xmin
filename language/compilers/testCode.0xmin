@@ -1,19 +1,2 @@
-let struct(){
-	void #let aa;
-	$def aa;
-	$debugger aa "label.lineNumber";
-	null;
-	null;
-	void #def let b;
-	null;
-};
-let a=struct();
-let b=a..compile;
-debugger b..length()"value";
-//move->a.a;
-/*
-#$@0
-#highlevel: label creation;
-$macro: memory assignment & emulation;
-@assembly: command => binary;
-0 0xmin: that compiles to 0xmin;*/
+let foo(a){debugger: (+a) "value.toJS()"}
+foo()::2;
