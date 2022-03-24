@@ -76,6 +76,8 @@ contexts:
     - match: '\b(?:var|let|def|set)\b'
       scope: keyword.declaration.meta.0xmin
 
+    - match: '\b(?:compile|array|code|labels)\b'
+      scope: support.function
     - match: '{{assembly_commands}}'
       scope: support.constant
     - match: '{{assembly_registers}}'
@@ -85,7 +87,7 @@ contexts:
     - match: '\$' #(?:\s*\b(?:set|def)\b)*'
       scope: entity.name.hidden.0xmin
     - match: '@'
-      scope: keyword.meta.0xmin
+      scope: keyword.assembly.0xmin
     - match: '{{assembly_operators}}'
       scope: support.constant.operator.0xmin
     - match: '{{operators}}'

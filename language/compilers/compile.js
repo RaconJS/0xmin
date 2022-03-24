@@ -206,7 +206,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
 					case"void":{
-						state.phase="void";index++;
+						state.void="void";index++;
 					}break;
 					case"static":{
 						state.phase="void";index++;
@@ -250,28 +250,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			else if(["debugger", "import", "delete", "..."].includes(word)){
 				if(word=="debugger"){//debugger name "label";
-					index++;
-					word=statement[index];
-					let inputValue;
-					let value;
-					if(!word.match(stringRegex)){//'debugger' =>  'debugger name' optional argument;
-						let value;
-						({value,index}=await contexts.expression_short({index,statement,scope}));
-						if(value)inputValue=value;
-						word=statement[index];
-					}
-					if(({value,index}=contexts.string({index,statement,scope})).value!=undefined){
-						const str = value;
-						const vm=require("vm");
-						const sandbox = {log:"no log;",...{index,statement,scope,value:inputValue,label:inputValue?.label}};
-						vm.createContext(sandbox);
-						const code = "log = ["+str+"\n]";
-						try{vm.runInContext(code, sandbox);}catch(error){
-							console.warn(error);
-							throw Error(", Could not run the javascript. threw:{{'"+error+"'}}");
-						}
-						console.warn("debugger:",...sandbox.log)
-					}else{throw Error("expected string in 'debugger' ");}
+					({index}=evalDebugger({index,statement,scope}));
 				}
 				else if(word=="delete"){
 					index++;
@@ -422,9 +401,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			async main_hidden({statement,index,scope}){
 				let value;
 				let word;
-				const state={"def":false,"set":false};
+				const state={"def":false,"set":false,"debugger":false};
 				let found;
 				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
+				if(state["debugger"]){
+					scope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
+					index=statement.length;
+					return {index};
+				}
 				({value,index}=await contexts.expression_short({statement,index,scope}));
 				word=statement[index];
 				if(!found){
@@ -700,13 +684,11 @@ const oxminCompiler=async function(inputFile,fileName){
 			async extend_value({index,statement,scope,value,shouldEval=true,isLet=false}){//.b or [] or ()
 				if(value==undefined||value.type=="undefined")value=scope.label;//'(.b)' == 'b'
 				let word=statement[index];
-				if([".", ".."].includes(word)){// 'a.'
+				if([".", ".."].includes(word)){// 'a.' or 'a..'
+					let isInternal=word=="..";
 					let parent=value.label;
 					value.parent=parent;
 					let oldIndex=index;
-					if(shouldEval)if(word==".."){//UNFINISHED
-						value=getInternals(value,{index,statement,scope});//internal object
-					}
 					index++;
 					let name,nameFound=false;
 					word=statement[index];
@@ -725,10 +707,16 @@ const oxminCompiler=async function(inputFile,fileName){
 						name=value?.string;
 						if(value)nameFound=true;
 					}if(!nameFound){
-						throw Error("'"+statement[oldIndex]+"'"+" does not return a property name");
+						throw Error("0xmin error: "+"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name");
 					}
 					value.name=name;
-					value.label=parent.labels[name];
+
+					if(shouldEval){
+						if(isInternal){//'a..b';
+							value.label=getInternals(value,{index,statement,scope}).labels[name];//internal object
+						}//'a.b'
+						else value.label=parent.labels[name];
+					}
 					return {index,value};
 				}
 				//'foo(){}' or 'obj{}' extend function or object
@@ -948,9 +936,9 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 	}
 	const assemblyCompiler={
-		async main(scope){
-			const codeQueue=this.collectCode(scope.label);
-			const {assemblyCode}=await this.assignMemory(codeQueue,scope);
+		async main(label){//(Variable) => Variable / MachineCode
+			const codeQueue=this.collectCode(label);
+			const {assemblyCode}=await this.assignMemory(codeQueue,label);
 			//(Variable) -> Variable
 			const machineCode=await this.compileAssembly(assemblyCode);//(Variable) -> MachineCode
 			return machineCode;
@@ -973,12 +961,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return codeQueue;
 			},
-			async assignMemory(codeQueue,scope){
+			async assignMemory(codeQueue,label){
 				"use strict";
 				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
-				if(!(scope instanceof Scope))throw Error("compiler type error");
+				if(!(label instanceof Variable))throw Error("compiler type error");
 				let lastFails=codeQueue.length;
-				let startingCpuState=new CpuState({relativeTo:scope.label});
+				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
 				const assemblyCode=new MachineCode()
 				for(let i=0;i<codeQueue.length;i++){
@@ -988,8 +976,8 @@ const oxminCompiler=async function(inputFile,fileName){
 						const instruction=codeQueue[i];
 						let failed=false;
 						if(instruction instanceof HiddenLine){
-							///@mutates: cpuState,scope;
-							({failed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,scope,assemblyCode}));
+							///@mutates: cpuState,label;
+							({failed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,label,assemblyCode}));
 						}
 						else if(instruction instanceof AssemblyLine){
 							if(cpuState.virtualLevel<=0)assemblyCode.code[cpuState.lineNumber]=instruction;
@@ -1055,8 +1043,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {failed};
 			},
 			async evalHiddenLine({instruction,cpuState,assemblyCode}){//shouldEval's $ or # code in the '$' phase
-				//UNFINISHED
-				let {relAddress,failed}=instruction.run({cpuState});
+				let relAddress,failed;
+				if(instruction.run[Symbol.toStringTag]=="AsyncFunction")
+					({relAddress,failed}=await instruction.run({cpuState}));
+				else
+					({relAddress,failed}=instruction.run({cpuState}));
 				return {failed};
 			},
 		//----
@@ -1153,6 +1144,35 @@ const oxminCompiler=async function(inputFile,fileName){
 		//----
 	};
 	//classes
+		async function evalDebugger({statement,index,scope,word=undefined,cpuState=undefined}){
+			let failed=false;
+			word??=statement[index];
+			if(word=="debugger"){//debugger name "label";
+				if(statement[index]=="debugger")index++;//if done in '#' phase
+				word=statement[index];
+				let inputValue;
+				let value;
+				if(!word.match(stringRegex)){//'debugger' =>  'debugger name' optional argument;
+					let value;
+					({value,index}=await contexts.expression_short({index,statement,scope}));
+					if(value)inputValue=value;
+					word=statement[index];
+				}
+				if(({value,index}=contexts.string({index,statement,scope})).value!=undefined){
+					const str = value;
+					const vm=require("vm");
+					const sandbox = {log:"no log;",...{index,statement,scope,value:inputValue,label:inputValue?.label,cpuState}};
+					vm.createContext(sandbox);
+					const code = "log = ["+str+"\n]";
+					try{vm.runInContext(code, sandbox);}catch(error){
+						console.warn(error);
+						throw Error(", Could not run the javascript. threw:{{'"+error+"'}}");
+					}
+					console.warn("debugger:",...sandbox.log)
+				}else{throw Error("expected string in 'debugger' ");}
+			}
+			return{index,failed};
+		}
 		///@abstract
 		//includes '= (' '+ =' '- ='
 		class Operator extends Array{
@@ -1341,6 +1361,20 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 			//----
+			static Debugger=
+			class Debugger extends HiddenLine{
+				statement;//:code tree
+				index;//:number
+				scope;//:Scope
+				word="debugger";//:const
+				//also uses cpuState;
+				constructor(data){super();Object.assign(this,data??{})}
+				async run({cpuState}){
+					this.cpuState=new CpuState(cpuState);
+					await evalDebugger(this);
+					return {failed:false};
+				}
+			}
 		}
 		class MetaLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1440,6 +1474,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					argsObj.labels["scope"]??=scope;
 					break;
 					default:
+					instanceScope.let=instanceScope;
 					argsObj.labels["this"]=callingValue.parent;
 					argsObj.labels["return"]=returnObj;
 					argsObj.labels["arguments"]??=argsObj;
@@ -1478,11 +1513,49 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		}
 		//Internal
+			class BuiltinFuntion extends Variable{
+				constructor(foo){super();this.run=foo;}
+				run=({value,args})=>new Value();
+				async callFunction(args={},callingValue,scope){
+					//args: {obj;list}
+					//args.obj: {[key:"string"]:Value}
+					//args.list: Value[]
+					return {value:await this.run({
+						args:args.list,
+						label:callingValue.parent,
+						value:callingValue,
+						scope
+					})};
+				}
+			}
+			const Internal=new (class extends Variable{
+				constructor(){
+					super();
+					for(let i in this.labels){
+						this.labels[i]=new BuiltinFuntion(this.labels[i]);
+						Object.assign(this.labels[i],{
+							name:"{"+i+"}",
+						})
+					}
+				};
+				labels={
+					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
+					"length":async({label})=>new Value({type:"number",number:label.code.length,name:"(..length)"}),
+					"code":async({label})=>new Value({type:"label",label:new Variable({name:"(..code)",//BODGED
+						code:label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""}))),
+					})}),
+					"array":async({label})=>new Value({type:"label",label:new Variable({name:"(..array)",code:label.code})}),
+					"labels":async({label})=>{
+						let list=[];
+						for(let i in label.labels)list.push(i);
+						return new Value({type:"number",label:list,number:69});
+					},
+					"compile":async({label})=>new Value({type:"label",label:await assemblyCompiler.main(label),}),
+				};
+			});
 		//--
-		function getInternals(value,{index,scope,statement}){
-			value.type="label";
-			value.label=new Variable({name:"(internal)"});
-			return value;
+		function getInternals(value,{index,scope,statement}){//:Variable
+			return new Variable(Internal);
 		}
 		function valueStringToArray(value,scope){
 			if(value?.type=="string")
@@ -1518,6 +1591,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 		}
 		class MachineCode extends Variable{
+			//code:AssemblyLine[];
 			constructor(data){super();Object.assign(this,data??{});}
 			asBinary(){
 				return this.code.map(v=>v.binaryValue);
@@ -1614,7 +1688,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		return scope;
 	}
 	async function evalAssembly(scope){
-		let assemblyCode=await assemblyCompiler.main(scope);
+		let assemblyCode=await assemblyCompiler.main(scope.label);
 		return assemblyCode;
 	}
 	let parts=inputFile;
