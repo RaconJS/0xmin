@@ -51,12 +51,13 @@ contexts:
   line_start_1_base:
     - include: baseMain
     - match: \b(0xmin|0bmin)\b
-
       scope: variable.language.0xminObject.0xmin
-    - match: '{{labelName}}\s*(?=(?:(?:{{functionCallSymbols}})?\s*\([\s\S]*?\)\s*){)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=(?:\([\s\S]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function
     - match: '{{labelName}}\s*(?={)' #'foo(){}'
       scope: entity.name.namespace
+    - match: '\)' #'foo = ()=>{}' function declaration
+      push: potentialFunctionDeclaration
     - match: '{{labelName}}\s*(?=(?:{{functionCallSymbols}})?\s*\()'
       scope: variable.function.0xmin
       push: functionCall_1
@@ -64,8 +65,6 @@ contexts:
       push: functionCall_1
     - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
       scope: 'keyword.declaration.functionCall.0xmin'
-    - match: '\)' #'foo = ()=>{}' function declaration
-      push: potentialFunctionDeclaration
 
     - match: '\b(?:static|void)\b'
       scope: keyword.control

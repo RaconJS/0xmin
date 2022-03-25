@@ -35,7 +35,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
 		const openBracketRegex=/^[(\[{]/;
-		const endingStringList="@$#:;])}";
+		const endingStringList=":;])}";
 		const functionCallTypes=["=>", "=", "->"];
 	//----
 	//inputFile -> code tree
@@ -235,7 +235,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						break loop;
 					}
 				}
-			}
+			}word=statement[index];
 			if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
 				index++;
 				let repeatingIndex_number=index;
@@ -280,7 +280,13 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(value.parent&&value.label&&value.type=="label"){
 								delete value.parent.labels[value.name];
 							}
-						}else break;
+						}else {
+							//delete all from let scope
+							const labels=newScope.let.label.labels;
+							for(let i in labels){
+								delete labels[i];
+							}
+						}
 						if(word!=","){//delete a,b,c ;
 							break;
 						}
@@ -334,7 +340,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			phaseSetter({statement,index,scope,state}){
 				///state : {phase:string;}
 				let word=statement[index];
-				if("#$@".includes(word)){
+				if("@$#".includes(word)){
 					state.phase=word;
 					index++;
 				}
@@ -503,11 +509,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				return{index};
 			},
 			async main_assembly_arguments({statement,index,scope,instruction}){//'get' 
-				//ends at one of: '@$#' or ':;])}'
 				for(let i=index;i<statement.length;i++){//returns a list of Value's/strings/numbers 
-					let word=statement[index];
+					let word=statement[index],failed;
 					if(index>=statement.length)break;
-					if("@$#:;])}".includes(word))break;
+					if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
 					({index}=await contexts.main_assembly_argument({statement,index,scope,instruction}));
 				}
 				return{index};
@@ -622,8 +627,15 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			//UNFINISHED
 		},
-		arguments_addArgument(argsObj,value){
-
+		endingSymbol({index,statement}){
+			//'#()' or '#{}' ==> '()' '{}'
+			//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
+			let failed=false;
+			if("@$#".includes(statement[index])){
+				if("([{".includes(statement[index+1]))index++;
+				else failed=true;
+			}if(endingStringList.includes(statement[index]))failed=true;
+			return {index,failed};
 		},
 		async arguments({index,statement,scope,functionType,includeBrackets=true}){
 			//'(a, b, c) ::{} ::{}'
@@ -658,13 +670,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			return {index,argsObj};
 		},
+
 		async expression_short({index,statement,scope,shouldEval=true,isLet=false,includeBrackets=false}){//a().b or (1+1)
 			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
 			let word=statement[index];
-			let value,array;let failed;
-			if("#$@".includes(word)&&"({[".includes(statement[index+1]))index++;//'#()' or '#{}' ==> '()' '{}'
+			let value,array,failed;
+			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index};
 			word=statement[index];
 			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {
 				//'12'
@@ -736,6 +749,7 @@ const oxminCompiler=async function(inputFile,fileName){
 
 					if(shouldEval){
 						if(isInternal){//'a..b';
+							loga("??")
 							const label=getInternals(value,{index,statement,scope}).labels[name];//internal object
 							if(label)({value}=await label.callFunction(undefined,value,scope));
 						}//'a.b'
@@ -883,12 +897,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			for(let i=index;i<statement.length&&index<statement.length;i++){
 				let word=statement[index];
 				//ignore '#' in '#(' or '#{'
-				if("#$@".includes(word)&&"({[".includes(statement[index+1])){//'#()' or '#{}' ==> '()' '{}'
-					//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
-					index++;
-				}
-				else if(";)]}".includes(word))break;
-				else if("#$@".includes(word))break;
+				if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
 				else if(["=", "=>"].includes(word)){
 					index++;
 					let firstArg=args.pop();
@@ -1357,9 +1366,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							else{//'$jump->label;' or '$label->jump'
 								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
 								if(!args[1])throw Error("compiler error: args[1] is not defined");
-								returnValue=args[1].lineNumber+this.operator[1].toNumber().number-args[0].lineNumber;
+								returnValue=args[1].lineNumber-args[0].lineNumber;
 								failed||=isNaN(returnValue);
-								if(isAssigning)args[0].lineNumber=args[1].lineNumber+(this.operator[1].toNumber().number);
+								if(isAssigning)args[0].lineNumber=args[1].lineNumber;
 							}
 						}else throw Error("compiler type error: $:");
 					}
@@ -1486,6 +1495,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				let returnObj=new Variable({name:"(return)"});
 				switch(this.callType){
 					case"="://class
+					instanceScope.let=instanceScope;
+					instanceScope.var=instanceScope;
 					argsObj.labels["this"]??=argsObj;
 					argsObj.labels["return"]??=returnObj;
 					argsObj.labels["arguments"]??=argsObj;
@@ -1523,6 +1534,18 @@ const oxminCompiler=async function(inputFile,fileName){
 				);
 			}
 			getNumber(){return this.lineNumber;}
+			getString(){return this.code.reduce((str,code)=>str+(code instanceof Variable)?code.getString():String.fromCharCode(+code.args[0])??"","")}
+			toValue(type="number"){//:string
+				let value=new Value();
+				value.type=type;
+				switch(type){
+					case"number":value.number=this.getNumber();break;
+					case"label":value.label=this;break;
+					case"string":value.string=this.getString();break;
+					//case"array":value.label=this.getNumber();break;//unsupported
+				}
+				return value;
+			}
 			static fromValue(value,scope=undefined){//label|number|array|string
 				if(value?.type=="label")
 					return value.label;
