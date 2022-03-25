@@ -1,17 +1,11 @@
-let struct=#(data)={
-	#void:{
-		this[]
-		#let:this..compile;
-	};
-};
-repeat 1 let vec2=struct()::{
+/*repeat 0 let vec2=struct()::{
 	def let a{null};
 	def let b{null};
+};*/
+let sizeof(block)={
+	void #set: #{$this=>#(block..compile..length)}..compile;
+	//void delete;
 };
-let sizeof(struct){
-	#let asd;
-	#set ({$asd=>2;})..compile;
-};
-debugger sizeof({1;1;}).asd"label";
-//debugger sizeof(vec2)"label";
+//debugger sizeof({2}) "label.lineNumber";
 //debugger: (+struct())"value.toJS()";
+#let a= #(..a);
