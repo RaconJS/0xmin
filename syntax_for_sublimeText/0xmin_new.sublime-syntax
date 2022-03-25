@@ -75,9 +75,8 @@ contexts:
       scope: keyword.control
     - match: '\b(?:var|let|def|set)\b'
       scope: keyword.declaration.meta.0xmin
-
-    - match: '\b(?:compile|array|code|labels)\b'
-      scope: support.function
+    - match: '\.\.'
+      push: internalScope
     - match: '{{assembly_commands}}'
       scope: support.constant
     - match: '{{assembly_registers}}'
@@ -94,6 +93,11 @@ contexts:
       scope: keyword.operator
   line_start_1:
     - include: line_start_1_base
+  internalScope:
+    - match: '\b(?:length|compile|array|code|labels)\b'
+      scope: 'support.function'
+    - match: '(?=\S)'
+      pop: true
   potentialFunctionDeclaration: #'foo = ()=>{}' function declaration
     - match: '\s*(?:{{functionCallSymbols}})\s*(?={)'
       scope: 'keyword.declaration.functionSymbol.0xmin'
