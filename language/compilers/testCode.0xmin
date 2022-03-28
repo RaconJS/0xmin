@@ -1,11 +1,23 @@
-/*repeat 0 let vec2=struct()::{
+let struct;
+#set struct(block){};
+debugger struct "label.getCode()"
+//let vec2=struct();
+/*
+#set struct(block)={
+	void #set #this(){
+		void debugger this"label";
+		void ...block();
+		void this..compile;
+	};
+};
+let vec2=struct()::arg1{
 	def let a{null};
 	def let b{null};
-};*/
+};
 let sizeof(block)={
-	void #set: #{$this=>#(block..compile..length)}..compile;
+	void #:{$..this=>#(block..compile..length)}..compile;
 	//void delete;
 };
-//debugger sizeof({2}) "label.lineNumber";
+*/
+//debugger struct"label.name";
 //debugger: (+struct())"value.toJS()";
-#let a= #(..a);

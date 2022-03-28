@@ -93,7 +93,7 @@ contexts:
   line_start_1:
     - include: line_start_1_base
   internalScope:
-    - match: '\b(?:length|compile|array|code|labels)\b'
+    - match: '\b(?:length|compile|array|code|labels|this|seal|freeze)\b'
       scope: 'support.function'
     - match: '(?=\S)'
       pop: true
