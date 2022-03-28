@@ -8,6 +8,7 @@
 //TODO: javascript-like bool operators e.g.'a && b' ==> `eval's b if a`
 //TODO: bugcheck: add line/column numbers
 //TODO: bugcheck: add state checking for jump command. e.g. prevent 'jump+2;move+2;null;'
+let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
 function loga(...args){console.log(...args);};
@@ -305,7 +306,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				);
 				index++;
 			}
-			else{assemblyPart:{
+			else{assemblyPart:{loga
 					let value;
 					if(state.phase==""){//auto detect phase
 						word=statement[index];
@@ -635,7 +636,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if("([{".includes(statement[index+1]))index++;
 				else failed=true;
 			}if(endingStringList.includes(statement[index]))failed=true;
-			return {index,failed};
+			return {index,failed:index>=statement.length};
 		},
 		async arguments({index,statement,scope,functionType,includeBrackets=true}){
 			//'(a, b, c) ::{} ::{}'
@@ -679,6 +680,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			let value,array,failed;
 			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index};
 			word=statement[index];
+			if(word instanceof Array)loga(statement)
 			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {
 				//'12'
 				let number=value;
@@ -701,7 +703,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				index++;
 			}else{
 				//value=new Value();
-				return {index,value:undefined};
+				if(!TESTING)return {index,value:undefined};
 			}
 			let asd=value;
 			for(let i=index;i<statement.length;i++){//'.asd'
@@ -718,7 +720,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent
 		//expression_short:
 			async extend_value({index,statement,scope,value,shouldEval=true,isLet=false}){//.b or [] or ()
-				if(value==undefined||value.type=="undefined")value=scope.label;//'(.b)' == 'b'
+				if(value==undefined||value.type=="undefined")value=scope.var.label.toValue("label");//'(.b)' == 'b'
 				let word=statement[index];
 				if([".", ".."].includes(word)){// 'a.' or 'a..'
 					let isInternal=word=="..";
@@ -747,9 +749,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					value.name=name;
 
-					if(shouldEval){
+					if(shouldEval)if(parent){
 						if(isInternal){//'a..b';
-							loga("??")
 							const label=getInternals(value,{index,statement,scope}).labels[name];//internal object
 							if(label)({value}=await label.callFunction(undefined,value,scope));
 						}//'a.b'
@@ -1248,7 +1249,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			set array(val){(this.label??=new Variable()).code=val;}
 			isExtendedByBlock=false;//done when 'foo(){}' or 'obj{}'; used so that: 'let foo(){}' ==> 'let foo = #(){}'
 			static Number=
-			class Number extends Value{constructor(number){super({number,type:"number"});}}
+			class Number extends Value{constructor(number,data={}){super({number,type:"number",...data});}}
 			//Value.prototype.toNumber
 			toNumber(value=this){//to number type
 				let number;//:number
@@ -1463,7 +1464,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				else codeBlock.push(
 					...this.code.reduce((s,v)=>{
 						let code=v.getCode?.();
-						if(code instanceof Array)s.push(code);
+						if(code instanceof Array)s.push(["{",code,"}"]);
 						;
 						return s;
 					},[])
@@ -1481,15 +1482,19 @@ const oxminCompiler=async function(inputFile,fileName){
 					labels:{},
 					code:[]
 				});
+				const newLabel=new Variable({name:"<"+this.name+">"});
 				for(let i=0;i<args.list.length;i++){
 					let label=Variable.fromValue(args.list[i]);
-					if(this.parameters.length)argsObj.labels[this.parameters[i].name]=label;
+					if(this.parameters.length){
+						argsObj.labels[this.parameters[i].name]=label;
+						newLabel.labels[this.parameters[i].name]=label;
+					}
 					argsObj.code.push(label);
 				}
 				let codeBlock=this.getCode();//new code instance
 				let instanceScope=new Scope({
 					parent:this.scope??globalScope,
-					label:argsObj,
+					label:newLabel,
 					code:codeBlock
 				});
 				let returnObj=new Variable({name:"(return)"});
@@ -1497,9 +1502,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					case"="://class
 					instanceScope.let=instanceScope;
 					instanceScope.var=instanceScope;
-					argsObj.labels["this"]??=argsObj;
-					argsObj.labels["return"]??=returnObj;
-					argsObj.labels["arguments"]??=argsObj;
+					newLabel.labels["this"]??=newLabel;
+					newLabel.labels["return"]??=newLabel;
+					newLabel.labels["arguments"]??=argsObj;
 					break;
 					case"=>"://arrow function
 					;
@@ -1508,21 +1513,20 @@ const oxminCompiler=async function(inputFile,fileName){
 					instanceScope.let=instanceScope;
 					instanceScope.var=instanceScope;
 					instanceScope.parent=instanceScope;
-					argsObj.labels["this"]??=callingValue.parent;
-					argsObj.labels["scope"]??=scope;
+					newLabel.labels["this"]??=callingValue.parent;
+					newLabel.labels["scope"]??=scope;
 					break;
 					default:
 					instanceScope.let=instanceScope;
-					argsObj.labels["this"]=callingValue.parent;
-					argsObj.labels["return"]=returnObj;
-					argsObj.labels["arguments"]??=argsObj;
+					newLabel.labels["this"]=callingValue.parent;
+					newLabel.labels["return"]=returnObj;
+					newLabel.labels["arguments"]??=argsObj;
 				}
 				await evalBlock(codeBlock,undefined,instanceScope);
-				
 				//if no return label created, it returns the 
-				let newReturnObj=argsObj.labels["return"];
+				let newReturnObj=newLabel.labels["return"];
 				if(!(newReturnObj&&newReturnObj!=returnObj)){
-					newReturnObj=argsObj;
+					newReturnObj=newLabel;
 				}
 				return {value:new Value({type:"label",label:newReturnObj})};
 			}
@@ -1592,18 +1596,22 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				};
 				labels={
+					///(Variable)=>Value
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
-					"length":async({label})=>new Value({type:"number",number:label.code.length,name:"(..length)"}),
-					"code":async({label})=>new Value({type:"label",label:new Variable({name:"(..code)",//BODGED
+					"length":async({label})=>new Value.Number(label.code.length),
+					"code":async({label})=>new Variable({name:"(..code)",//BODGED
 						code:label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""}))),
-					})}),
-					"array":async({label})=>new Value({type:"label",label:new Variable({name:"(..array)",code:label.code})}),
+					}).toValue("label"),
+					"array":async({label})=>new Variable({name:"(..array)",code:label.code}).toValue("label"),
 					"labels":async({label})=>{
 						let list=[];
 						for(let i in label.labels)list.push(i);
-						return new Value({type:"number",label:list,number:69});
+						return new Value({type:"array",array:list,number:69});
 					},
-					"compile":async({label})=>new Value({type:"label",label:await assemblyCompiler.main(label),}),
+					"compile":async({label})=>(await assemblyCompiler.main(label)).toValue("label"),
+					"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
+					"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
+					"this":async({label})=>label.toValue("label"),
 				};
 			});
 		//--
