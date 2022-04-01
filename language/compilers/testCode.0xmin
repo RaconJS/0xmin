@@ -1,23 +1,27 @@
-let struct;
-#set struct(block){};
-debugger struct "label.getCode()"
-//let vec2=struct();
-/*
-#set struct(block)={
-	void #set #this(){
-		void debugger this"label";
-		void ...block();
-		void this..compile;
+
+#let call(block){
+	#let return;
+	jump->block;
+	move->block;//move move->block;
+	move<-block;//move block->move;
+	#def return;
+};
+#let: Struct(){
+	#let: int=#(int)={
+		void #set: ..this.block{
+			$def set: int;
+		};
+		#set: return = block;
 	};
+	#let: block{};
+	#let: return = int;
 };
-let vec2=struct()::arg1{
-	def let a{null};
-	def let b{null};
+#def let: adder{
+	#def let asd;
+	$debugger asd "cpuState";
+	//$def move=>..this;
+	//#let int=Struct();
+	//$def set int.block;
 };
-let sizeof(block)={
-	void #:{$..this=>#(block..compile..length)}..compile;
-	//void delete;
-};
-*/
-//debugger struct"label.name";
-//debugger: (+struct())"value.toJS()";
+//debugger: Struct()"2";
+//{}(){}{}{}(){}(){}{}{}()()();
