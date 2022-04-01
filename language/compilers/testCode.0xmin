@@ -1,4 +1,3 @@
-
 #let call(block){
 	#let return;
 	jump->block;
@@ -7,21 +6,22 @@
 	#def return;
 };
 #let: Struct(){
-	#let: int=#(int)={
-		void #set: ..this.block{
-			$def set: int;
+	#let: int(val)={
+		void #set: int.block{
+			$def set: val;
 		};
-		#set: return = block;
+		#set: return = val;
 	};
-	#let: block{};
+	#let: int.block{};
 	#let: return = int;
 };
 #def let: adder{
-	#def let asd;
-	$debugger asd "cpuState";
 	//$def move=>..this;
-	//#let int=Struct();
-	//$def set int.block;
+	#let int=Struct();
+	$def set int.block;
+	#int(1);#int(124);
 };
+#let foo()={};//calling `foo.code[0]:MacroFunction` type functions does not work properly
+debugger: foo"label";
 //debugger: Struct()"2";
 //{}(){}{}{}(){}(){}{}{}()()();
