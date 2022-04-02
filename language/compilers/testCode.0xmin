@@ -16,10 +16,10 @@
 	#let: return = int;
 };
 #def let: adder{
-	//$def move=>..this;
+	$def move=>..this;
 	#let int=Struct();
+	jump=>int.block..return;
 	$def set int.block;
-	#int(1);#int(124);
 };
 //debugger a()"label.code[0]";
 //{}(){}{}{}(){}(){}{}{}()()();
