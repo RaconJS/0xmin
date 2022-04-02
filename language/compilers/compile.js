@@ -208,7 +208,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			///statement:code tree|Scope;
-			if(statement instanceof Scope){await evalBlock(statement.code,statement,scope.label);}
+			if(statement instanceof FunctionScope){await evalBlock(statement.code,statement,scope.label);return;}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
@@ -805,40 +805,28 @@ const oxminCompiler=async function(inputFile,fileName){
 					functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
 				)){//function declaration '(){}'
 					contexts.delcare_typeChecks(isExtension,startValue);
-					const newFunctionObj=shouldEval?new MacroFunction({
-						type:"function",
-					}):undefined;
-					const functionObj=isExtension?startValue.label:newFunctionObj;
-					if(shouldEval)await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
+					let functionObj={callType:null};//:Variable|temp object
+					if(shouldEval){
+						functionObj=isExtension?startValue.label
+							:new MacroFunction({type:"function",})
+						;await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
+					}
+					value=functionObj.toValue("label");
 					index+=3;//skip '(' '...' ')' in '(...){}'
 					word=statement[index];
 					if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
-						newFunctionObj.callType=word;
 						functionObj.callType=word;
 						index++;
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
-					newFunctionObj.scope=new Scope({fromName:"delcareFunctionOrObject/function",
+					functionObj.code.push(new FunctionScope({fromName:"delcareFunctionOrObject/function",
 						label:new Variable({name:"(scope function)"}),
 						parent:scope,
 						code:word,
-					});
-					newFunctionObj.functionPrototype??=new Variable({name:"(prototype)"});
-					newFunctionObj.functionPrototype??=new Variable({name:"(supertype)"});
+					}));
+					functionObj.functionPrototype??=new Variable({name:"(prototype)"});
+					functionObj.functionSupertype??=new Variable({name:"(supertype)"});
 					index+=3;
-					if(shouldEval){
-						//word == '...code' in '(){...code}'
-						if(isExtension){//'foo(){}' use existing function
-							newFunctionObj.scope.label=functionObj;
-							if(functionObj.scope){//moves label.scope into label.code if it has not done aleady;
-								functionObj.code.push(new MacroFunction({scope:functionObj.scope}));
-								functionObj.scope=undefined;
-							}
-							functionObj.code.push(newFunctionObj);
-						}
-						if(startValue)startValue.label=functionObj;
-						value=startValue??new Value({type:"label",label:functionObj});
-					}
 					return {index,value,failed:false};//isExtension&&!startValue};
 				}else if(word=="{"){//'{}' object declaration
 					contexts.delcare_typeChecks(isExtension,startValue);
@@ -994,8 +982,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(
 						lineObj instanceof HiddenLine||
 						lineObj instanceof AssemblyLine
-					){codeQueue.push(lineObj);break;}
-					if(lineObj instanceof Scope)lineObj=lineObj.label;
+					)codeQueue.push(lineObj);
+					if(lineObj instanceof FunctionScope)continue;//lineObj=lineObj.label;
 					if(lineObj instanceof Variable){
 						this.collectCode(lineObj,codeQueue)
 					}
@@ -1006,7 +994,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				"use strict";
 				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
 				if(!(label instanceof Variable))throw Error("compiler type error");
-				let lastFails=codeQueue.length+1;//loga([codeQueue])
+				let lastFails=codeQueue.length+1;
 				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
 				const assemblyCode=new MachineCode();
@@ -1466,28 +1454,28 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(this.isSearched)return;
 				this.isSearched=true;
 				let codeObj=this.code[this.code.length-1];
-				if(codeObj instanceof Scope)codeObj=codeObj.label;
+				if(codeObj instanceof FunctionScope)codeObj=codeObj.label;
 				///codeObj:Variable|CodeLine
 				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber:codeObj.lineNumber;
 				this.isSearched=false;
 				return lineNumber;
 			}
 			getCode(TESTlevel=0){//: SourceCodeTree
-				const codeBlock=new bracketClassMap["{"];
+				let codeBlock=[];//new bracketClassMap["{"];
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
 				if(this.scope){///this.scope:Scope|Scope.CodeObj;
-					if(this.scope instanceof Scope.CodeObj)codeBlock.push(this.scope.code);
-					else if(this.scope instanceof Scope)codeBlock.push(...this.scope.code);
-					else throw Error("compiler type error:");
+					if(this.scope instanceof Scope.CodeObj)codeBlock=[this.scope.code];
+					else if(this.scope instanceof FunctionScope)codeBlock=[this.scope];
+					else if(this.scope instanceof Scope)codeBlock = this.scope.code;
+					else {console.error(this.scope?.constructor);throw Error("compiler type error:");}
 				}
 				else codeBlock.push(
 					...this.code.reduce((s,v)=>{
-						let code=v.getCode?.(TESTlevel+1);
-						if(code instanceof Array){
-							s.push(["{",code,"}"]);
-						}
-						;
+						///code: Variable ?? CodeLine|FunctionScope
+						if(v instanceof FunctionScope)s.push(v);
+						//else if(v instanceof Variable)s.push(["{",v.getCode?.(TESTlevel+1),"}"]);//NEEDSTESTING
+						//else if(v instanceof CodeLine)s.push(v.code);
 						return s;
 					},[])
 				);
@@ -1753,6 +1741,11 @@ const oxminCompiler=async function(inputFile,fileName){
 		class BlockScope extends Scope{
 			label=new Variable({scope:this});
 			let=this;
+		}
+		class FunctionScope extends Scope{
+			//label;
+			//code;
+			//parent;
 		}
 	//----
 	{
