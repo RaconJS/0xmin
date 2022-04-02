@@ -207,6 +207,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
+			///statement:code tree|Scope;
+			if(statement instanceof Scope){await evalBlock(statement.code,statement,scope.label);}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
@@ -1766,8 +1768,14 @@ const oxminCompiler=async function(inputFile,fileName){
 	let globalScope;
 	async function evalBlock(block,parentScope=undefined,scope=undefined){
 		//does not include brackets
+		///scope:Scope|Variable
+		///block:code tree|Scope[]
 		const includeBrackets=false;
 		if(includeBrackets)throw Error("compiler error: not evalBlock does not support including brackets");
+		let label;
+		if(scope instanceof Variable){//used in function calls
+			label=scope;scope=undefined;
+		}
 		if(!scope){
 			if(!parentScope){
 				scope=new GlobalScope({code:block});
@@ -1775,9 +1783,10 @@ const oxminCompiler=async function(inputFile,fileName){
 			}else{
 				scope=new BlockScope({parent:parentScope,code:block});
 			}
+			if(label)scope.label=label;
 		}
 		for(let i=0;i<block.length;i++){
-			const statement=block[i];
+			let statement=block[i];
 			await contexts.main({statement,scope});
 		}
 		return scope;

@@ -22,6 +22,4 @@
 	#int(1);#int(124);
 };
 #let foo()={};//calling `foo.code[0]:MacroFunction` type functions does not work properly
-debugger: foo"label";
-//debugger: Struct()"2";
 //{}(){}{}{}(){}(){}{}{}()()();
