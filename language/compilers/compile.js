@@ -208,7 +208,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			///statement:code tree|Scope;
-			if(statement instanceof FunctionScope){await evalBlock(statement.code,statement,scope.label);return;}
+			if(statement instanceof Scope){await evalBlock(statement.code,statement,scope.label);return;}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
@@ -983,7 +983,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						lineObj instanceof HiddenLine||
 						lineObj instanceof AssemblyLine
 					)codeQueue.push(lineObj);
-					if(lineObj instanceof FunctionScope)continue;//lineObj=lineObj.label;
+					if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
 					if(lineObj instanceof Variable){
 						this.collectCode(lineObj,codeQueue)
 					}
@@ -1028,7 +1028,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {assemblyCode};
 			},
 			//assembly compiling
-			async compileAssemblyLine({instruction,cpuState,assemblyCode}){
+			async compileAssemblyLine({instruction,cpuState,assemblyCode}){///:{failed:bool};
 				Object.getPrototypeOf;
 				if(!(instruction instanceof AssemblyLine))throw Error("compiler error: type error;");
 				//const cpuState=instruction.cpuState;
@@ -1450,35 +1450,33 @@ const oxminCompiler=async function(inputFile,fileName){
 				return address==undefined?undefined:address+this.relAddress;
 			}
 			isSearched=false;
-			get returnLineNumber(){
+			returnLineNumber(){//:number
 				if(this.isSearched)return;
 				this.isSearched=true;
 				let codeObj=this.code[this.code.length-1];
-				if(codeObj instanceof FunctionScope)codeObj=codeObj.label;
+				if(codeObj instanceof Scope)codeObj=codeObj.label;
 				///codeObj:Variable|CodeLine
-				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber:codeObj.lineNumber;
+				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber():codeObj.cpuState?.lineNumber;
 				this.isSearched=false;
 				return lineNumber;
 			}
-			getCode(TESTlevel=0){//: SourceCodeTree
-				let codeBlock=[];//new bracketClassMap["{"];
+			getCode(n=0){//: SourceCodeTree
+				let codeBlock=new bracketClassMap["{"];
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
 				if(this.scope){///this.scope:Scope|Scope.CodeObj;
 					if(this.scope instanceof Scope.CodeObj)codeBlock=[this.scope.code];
 					else if(this.scope instanceof FunctionScope)codeBlock=[this.scope];
-					else if(this.scope instanceof Scope)codeBlock = this.scope.code;
+					else if(this.scope instanceof Scope)codeBlock = [this.scope];// this.scope.code
 					else {console.error(this.scope?.constructor);throw Error("compiler type error:");}
 				}
-				else codeBlock.push(
-					...this.code.reduce((s,v)=>{
-						///code: Variable ?? CodeLine|FunctionScope
-						if(v instanceof FunctionScope)s.push(v);
-						//else if(v instanceof Variable)s.push(["{",v.getCode?.(TESTlevel+1),"}"]);//NEEDSTESTING
-						//else if(v instanceof CodeLine)s.push(v.code);
-						return s;
-					},[])
-				);
+				this.code.reduce((s,v)=>{
+					///code: Variable ?? CodeLine|FunctionScope
+					if(v instanceof Scope)s.push(v);//pushes :FunctionScope
+					else if(v instanceof Variable)s.push(...v.getCode?.(n+1));//pushes :...FunctionScope|code tree
+					//else if(v instanceof CodeLine)s.push(v.code);
+					return s;
+				},codeBlock);
 				this.isSearched=false;
 				return codeBlock;
 			}
@@ -1626,6 +1624,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
 					"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
 					"this":async({label})=>label.toValue("label"),
+					"return":async({label})=>new Return(label).toValue("label"),
 					//from this object
 					"prototype":async({label})=>label.prototype.toValue("label"),
 					"supertype":async({label})=>label.supertype.toValue("label"),
@@ -1635,7 +1634,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					"proto":async({label})=>label.functionPrototype.toValue("label"),
 				};
 			});
-		//--
+		//----
 		function getInternals(value,{index,scope,statement}){//:Variable
 			return new Variable(Internal);
 		}
@@ -1650,6 +1649,16 @@ const oxminCompiler=async function(inputFile,fileName){
 					scope,
 				}))
 			});
+		}
+		class Return extends Variable{
+			constructor(label,data={}){
+				super(data);
+				this.label=label;
+				delete this.lineNumber;
+			}
+			label;
+			//BODGED: need to try to avoid using getters as a proxy property
+			get lineNumber(){return this.label.returnLineNumber();}
 		}
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
