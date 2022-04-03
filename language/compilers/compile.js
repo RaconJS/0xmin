@@ -224,13 +224,13 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index];
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
-					case"void":{
+					case"void":{//does not add code to block
 						state.void=true;index++;
 					}break;
-					case"static":{
-						state.phase="void";index++;
+					case"static":{//UNUSED; does not add code to function; Allows code to be run in function block
+						state.void=true;index++;
 					}break;
-					case"virtual":{
+					case"virtual":{//
 						state.virtual=true;index++;
 					}case":":{index++;
 						break loop;
@@ -314,7 +314,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						let value;
 						if(state.phase==""){//auto detect phase
 							word=statement[index];
-							if(["let", "set", "def"].includes(word))
+							if(["let", "def"].includes(word))
 								state.phase="#";
 							else if(word&&(["def", "ram", "void", "virtual"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet)))
 								state.phase="$";
@@ -985,7 +985,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					)codeQueue.push(lineObj);
 					if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
 					if(lineObj instanceof Variable){
-						this.collectCode(lineObj,codeQueue)
+						this.collectCode(lineObj,codeQueue);
+						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj}));
 					}
 				}
 				return codeQueue;
@@ -1317,6 +1318,15 @@ const oxminCompiler=async function(inputFile,fileName){
 					return{failed:false,relAddress:this.label.lineNumber};
 				}
 			}
+			static DefineReturn=
+			class DefineReturn extends HiddenLine{//'$def a;'
+				constructor(data){super();Object.assign(this,data??{})}
+				label=null;///:Variable
+				run({cpuState}){//nextlineNumber
+					this.label.returnLineNumber=cpuState.lineNumber;
+					return{failed:false,relAddress:this.label.returnLineNumber};
+				}
+			}
 			static RelocateCurrentLineNumber=
 			class RelocateCurrentLineNumber extends HiddenLine{//'$ram 10;'
 				constructor(data){super();Object.assign(this,data??{})}
@@ -1440,6 +1450,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				functionPrototype;//:Variable
 				functionSupertype;//:Variable
 			//as assembly
+				returnLineNumber;//:number; defined in collectCode
 				relAddress=0;//number UNUSED
 				lineNumber=undefined;
 				defs=[];//UNUSED;//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
@@ -1450,16 +1461,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				return address==undefined?undefined:address+this.relAddress;
 			}
 			isSearched=false;
-			returnLineNumber(){//:number
-				if(this.isSearched)return;
-				this.isSearched=true;
-				let codeObj=this.code[this.code.length-1];
-				if(codeObj instanceof Scope)codeObj=codeObj.label;
-				///codeObj:Variable|CodeLine
-				const lineNumber = codeObj instanceof Variable?codeObj.returnLineNumber():codeObj.cpuState?.lineNumber;
-				this.isSearched=false;
-				return lineNumber;
-			}
 			getCode(n=0){//: SourceCodeTree
 				let codeBlock=new bracketClassMap["{"];
 				if(this.isSearched)return codeBlock;
@@ -1652,13 +1653,11 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 		class Return extends Variable{
 			constructor(label,data={}){
-				super(data);
-				this.label=label;
+				super(data);this.label=label;
 				delete this.lineNumber;
 			}
-			label;
-			//BODGED: need to try to avoid using getters as a proxy property
-			get lineNumber(){return this.label.returnLineNumber();}
+			label;//:Variable
+			get lineNumber(){return this.label.returnLineNumber;}
 		}
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable

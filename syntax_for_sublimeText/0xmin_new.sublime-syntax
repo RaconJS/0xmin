@@ -72,15 +72,15 @@ contexts:
     - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
       scope: 'keyword.declaration.functionCall.0xmin'
 
-    - match: '\b(?:static|void)\b'
+    - match: '\b(?:static|void)\b' #1st part of line along with '@$#'
       scope: keyword.control
-    - match: '\b(?:recur|repeat|virtual)\b'
+    - match: '(?:\b(?:recur|repeat|virtual)\b\s*)+' #2nd part of line
       scope: keyword.control
-    - match: '\b(?:import|debugger|delete)\b'
+    - match: '\b(?:import|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
     - match: '\b(?:var|let|def|set)\b'
       scope: keyword.declaration.meta.0xmin
-    - match: '\b(?:this|constructor|return|arguments)\b'
+    - match: '\b(?:this|constructor|return|arguments|continue|break)\b'
       scope: variable.parameter
     - match: '{{assembly_commands}}'
       scope: support.constant
