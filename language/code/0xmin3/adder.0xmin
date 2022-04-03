@@ -1,0 +1,74 @@
+#let call(block){
+	#let return;
+	jump->block;
+	move->block;//move move->block;
+	move<-block;//move block->move;
+	#def return;
+};
+#let: Struct(){
+	#let: int(val)={
+		void #set: int.block{
+			$def set: val;
+		};
+		#set: return = val;
+	};
+	#let: int.block{};
+	#let: return = int;
+};
+//main
+import lib "io.0xmin";
+#def let: adder{
+	#let input={
+		#let a,b;
+	};
+	//$set move=>..this;
+	#let int=Struct();
+	jump->int.block..return;
+	$def set int.block;
+	#let a=int(0),b=int(0);
+	#set input.a=a,input.b=b;
+	move->0xmin;
+}{//main
+	#let const_2=int(1<<1);
+	let halfAdder={
+		let carry=int(0);
+		move=>a;get;
+		move=>carry;set;//carry=a;
+		move=>b;get;
+		move=>a;xor;set;//a=a^b;
+		move=>carry;get;
+		move=>b;and;
+		move=>const_2;red;
+		move=>b;set;//b=(carry&b)<<1;
+	};
+	let i;
+	def let loop30=#(block)={//assert loop30 == ..this;
+		let startI=int(1<<29);
+		#set i=int(0);
+		move=>startI;get;
+		move=>i;set;//i=1<<29; repeats 30 times
+		let startState;
+		#delete startI;
+		let continue;
+		let break=..return;
+		$set startState=>move;
+		$set continue;
+		{
+			//def block;
+			#delete block;//dont need halfAdder anymore
+			{//next i
+				move=>i;get;$debugger i"label.lineNumber,cpuState.move";jump 0;
+				if;null;
+				move=>const_2;blue;
+				/*move=>i;set;//i = i>>1;
+				move=>startState;
+				if;{//if( i == 0 )break;
+					jump->continue;
+					jump->break;
+				}*/
+			};
+		};
+		$set move=>startState;
+		#delete startState,break,continue;
+	}(halfAdder);
+};

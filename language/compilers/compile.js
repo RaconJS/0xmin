@@ -42,10 +42,14 @@ const oxminCompiler=async function(inputFile,fileName){
 	//----
 	//inputFile -> code tree
 		//(long string,string) => (array of words)
-		function parseFile(inputFile,fileName){
+		const mainFolder=fileName.match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
+		const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
+		const files={};///:{[filePath]:code tree};
+		function parseFile(inputFile,filePath,fileName){
 			"use strict";
 			let words=inputFile.match(wordsRegex)??[];
 			words.fileName=fileName;
+			words.filePath=filePath;
 			//remove comments
 			for(let i=0;i<words.length;i++){
 				if(words[i].match(/^\/[\/*]|^\s/)){
@@ -79,7 +83,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			let brackets=0;
 			for(let i=words.i,len=words.length;i<len+4&&words.i<words.length;i++){
 				let word=words[words.i];
-				let TEST=words.i==words.length-1;
 				if(word in bracketMap){//handle brackets '{...}' ==> ['{',[...],'}'];
 					words.i++;
 					statement??=[];
@@ -116,6 +119,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(words[words.i]!=bracketMap[type])throw Error("unballanced "+type+" brackets");
 				block.push(words[words.i]);
 				words.i++;
+			}
+			if(stackLevel==0){//note: causes mutation
+				files[words.filePath]=block;
 			}
 			return block;
 		}
@@ -214,11 +220,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			codeObj.scope=newScope;
 			let state={void:false,static:false,virtual:false,phase:""};
 			statement.maxRecur;
-			statement.recur??=0;
-			statement.recur++;
-			let word=statement[index];let asd=2;
-			if(index>=statement.length)return{index,value:newScope};
-			if(statement.recur<=(statement.maxRecur??1))
+			if(index==0){
+				statement.recur??=0;
+				statement.recur++;
+			}else statement.recur??=1;
+			let word=statement[index];
+			if(index>=statement.length
+				||statement.recur>(statement.maxRecur??1)
+			)return{index,value:newScope};
 			if(["void", "static", "virtual", "#", "$", "@"].includes(word))
 			loop:for(let i=index;i<statement.length;i++){
 				let word=statement[index];
@@ -266,19 +275,23 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			}
 			//'keyword : arg' or 'keyword arg'
-			else if(["debugger", "import", "delete", "..."].includes(word)&&["","#"].includes(state.phase)){
-				if(word=="debugger"){//debugger name "label";
-					index++;
-					if(statement[index]==":")index++;
+			else if(["debugger", "import", "delete", "..."].includes(word)){
+				if(word=="debugger"
+					&&["","$","#"].includes(state.phase)
+				){//debugger name "label";
 					if(state.phase=="$"){
 						scope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
 						index=statement.length;
 					}
 					else{
+						//index++;
+						//if(statement[index]==":")index++;
 						({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
 					}
 				}
-				else if(word=="delete"){
+				else if(word=="delete"//'delete a,b;' from any scope
+					&&["","#"].includes(state.phase)
+				){
 					index++;
 					if(statement[index]==":")index++;
 					for(let i=0;i<statement.length&&index<statement.length;i++){
@@ -300,8 +313,57 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 					}
 				}
-				else if(word=="..."){
+				else if(word=="..."
+					&&["","#"].includes(state.phase)
+				){
 					({index}=await contexts.main_injectCode({index,statement,scope}));
+				}
+				else if(word=="import"
+					&&["","@","$","#"].includes(state.phase)
+				){
+					index++;
+					({index}=await (async function main_importFile({statement,index,scope,phase="#"}){
+						if((oxminCompiler.TEST??0)>4){throw Error("too much import recursion")}
+						else{oxminCompiler.TEST??=0;
+							oxminCompiler.TEST++;
+						}
+						//phase is used to get the file type
+						let word;
+						let filePath="";//:string;
+						let fileName="";//:string; for debugging only
+						getFilePath:{
+							const fromTypes={
+								"lib":compilerFolder+"../include/",
+								"main":mainFolder,
+								"this":statement.file??mainFolder,
+								"compiler":compilerFolder,
+							};
+							word=statement[index];
+							if(word in fromTypes){
+								filePath=fromTypes[word];
+								index++;
+							}else filePath=fromTypes["this"];
+							({index,value:fileName}=contexts.string({statement,index,scope}));
+							if(fileName==undefined||fileName==""){//silent error
+								return {index};
+							}
+							filePath+=fileName;
+						}
+						if(phase=="")phase="#";
+						if(phase=="#"){//open as 0xmin file
+							let fileData;//:code tree;
+							if(filePath in files){
+								fileData=files[filePath];//if file already exists, use it
+							}else {
+								let fileString=await oxminCompiler.fileLoader(filePath);
+								fileData=bracketPass(parseFile(fileString,filePath,fileName));
+							}
+							if(statement[index]==":")index++;
+							await evalBlock(fileData,undefined,scope);
+						}
+						index=statement.length;
+						return {index};
+					})({statement,index,scope,phase:state.phase}));
 				}
 			}{
 				let virtualLine;
@@ -313,14 +375,14 @@ const oxminCompiler=async function(inputFile,fileName){
 					);
 					index++;
 				}
-				else if(statement[index]!=";"){
+				else if(statement[index]!=";"&&index<statement.length){
 					assemblyPart:{
 						let value;
 						if(state.phase==""){//auto detect phase
 							word=statement[index];
 							if(["let", "def"].includes(word))
 								state.phase="#";
-							else if(word&&(["ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet)))
+							else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet)))
 								state.phase="$";
 							else state.phase="@";
 						}
@@ -406,8 +468,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					let value;
 					({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
 					foundExpression||=!!value;
-					if(metaState["def"]){
+					if(metaState["def"]){//same as '$undef def set: obj;' ==> redefines and inserts code block;
 						if(value instanceof Value && value.type=="label"){//for '@null $def: label'
+							value.label.unDefine();
 							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
 							scope.label.code.push(value.label);
 						}
@@ -435,15 +498,23 @@ const oxminCompiler=async function(inputFile,fileName){
 			},
 			async main_hidden({statement,index,scope}){
 				let value,word,found;
-				const state={"def":false,"set":false};
+				const state={"def":false,"set":false,"undef":false};
 				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
+				//note: '$def' is used instead of '$insert' to reduce number of keywords
+				state["insert"]=state["def"];
 				if(!found){//sets defaults
-					state["set"]=true;//$ inserts code block into assembly
-					state["def"]=true;//$ assigns line number to labels
+					state["undef"]=true;
+					state["set"]=true;//'$set label;' assigns line number to labels
+					state["insert"]=true;//'$def obj;' inserts code block into assembly
 				}
 				({value,index}=await contexts.expression_short({statement,index,scope}));
 				word=statement[index];
-				if(state["def"]){//'$def labelA;' or '$def labelA->labelB' ==> sets label address
+				if(state["undef"]){//remove all refrences of an object from the code
+					if(value.type=="label"&&value.label){
+						value.label.unDefine();
+					}
+				}
+				if(state["set"]){//'$set labelA;' or '$set labelA=>labelB' ==> sets label address
 					if(["->", "<-", "=>", "<="].includes(word)){
 						index++;
 						let isReversed=word[0]=="<"?1:0;
@@ -459,7 +530,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(value.label)value.label.defs.push(scope.label);
 					}
 				}
-				if(state["set"]){//'$set label;' => inserts contence of label
+				if(state["insert"]){//'$set label;' => inserts contence of label
 					scope.label.code.push(value.label);
 					if(value.label)value.label.defs.push(scope.label);
 				}
@@ -637,7 +708,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if("([{".includes(statement[index+1]))index++;
 				else failed=true;
 			}if(endingStringList.includes(statement[index]))failed=true;
-			return {index,failed:index>=statement.length};
+			return {index,failed:failed??index>=statement.length};
 		},
 		async arguments({index,statement,scope,functionType,includeBrackets=true}){
 			//'(a, b, c) ::{} ::{}'
@@ -707,8 +778,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//value=new Value();
 				if(!TESTING)return {index,value:undefined};
 			}
-			let asd=value;
-			for(let i=index;i<statement.length;i++){//'.asd'
+			for(let i=index;i<statement.length;i++){//'.property'
 				if(index>=statement.length)break;
 				let word=statement[index];
 				let oldIndex=index;
@@ -1545,6 +1615,16 @@ const oxminCompiler=async function(inputFile,fileName){
 					??this.prototype?.findLabel?.(name)
 				);
 			}
+			unDefine(){//'$undef label';
+				//defs:Variable[]
+				for(let i=0;i<this.defs.length;i++){
+					let code=this.defs[i].code;
+					let index=code.indexOf(this);
+					if(index!=-1)code.splice(index,1);
+				}
+				this.defs=[];
+				return this;
+			}
 			getNumber(){return this.lineNumber;}
 			getString(){return this.code.reduce((str,code)=>str+(code instanceof Variable)?code.getString():String.fromCharCode(+code.args[0])??"","")}
 			toValue(type="number"){//:string
@@ -1647,12 +1727,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			});
 		}
 		class Return extends Variable{
+			type="return";
 			constructor(label,data={}){
 				super(data);this.label=label;
 				delete this.lineNumber;
 			}
 			label;//:Variable
 			get lineNumber(){return this.label.returnLineNumber;}
+			set lineNumber(val){this.label.returnLineNumber=val;}
 		}
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
@@ -1800,8 +1882,12 @@ const oxminCompiler=async function(inputFile,fileName){
 	//
 	let outputFile=parts.asBinary();
 	let outputBinary=new Uint32Array(outputFile);
+	const hex30ToStr=v=>{v=v.toString(16);return "0".repeat(8-v.length)+v;};
 	const outputAsString=()=>outputFile.map(v=>v.toString(16)).map(v=>"0".repeat(8-v.length)+v);
-	loga("len("+outputFile.length+"):", ""+outputAsString());
+	loga("len("+outputFile.length+"):", ""
+		+outputAsString()
+		//+"\n"+parts.code.map(v=>v.cpuState.data().map(v=>hex30ToStr(v)).join(" ")+" "+hex30ToStr(v.binaryValue)).join("\n")
+	);
 	return outputBinary;
 };
 let buildSettings={makeFile:true}
@@ -1839,8 +1925,8 @@ let buildSettings={makeFile:true}
 		})});
 		let fileLoader=(async()=>{
 			let fileName=process.argv[2];//name
-			if(fileName.match(/compile.js$/)){
-				fileName="testCode.0xmin";
+			if(fileName.match(/compile\.js$/)||fileName=="testCode.0xmin"){
+				fileName=process.argv[1].replace("compile.js","testCode.0xmin");
 			}
 			let inputFile=await oxminCompiler.fileLoader(fileName);
 			return [inputFile,fileName];
