@@ -80,7 +80,7 @@ contexts:
       scope: keyword.control
     #- match: '(?=\b(?:let|def)\b)'
     #  push: main_meta
-    - match: '\b(?:var|let|def|set)\b'
+    - match: '\b(?:var|let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|continue|break)\b'
       scope: variable.parameter
@@ -113,7 +113,7 @@ contexts:
     - match: '(?=\S|$)'
       push: main_body
   main_hidden:
-    - match: '\b(?:def|set)\b'
+    - match: '\b(?:def|set|undef)\b'
       scope: keyword.declaration.hidden.0xmin
     - include: main_lineType
     - include: mainScope
