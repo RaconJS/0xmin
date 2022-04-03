@@ -16,10 +16,24 @@
 	#let: return = int;
 };
 #def let: adder{
+	#let input={
+		#let a,b;
+	};
 	$def move=>..this;
 	#let int=Struct();
-	jump=>int.block..return;
+	jump->int.block..return;
 	$def set int.block;
+	#let a=int(0),b=int(0);
+	#set input.a=a,input.b=b;
+}{//main
+	#let loopBody={
+		#let carry=int(0);
+		move=>a;get;
+		move=>carry;set;
+		move=>b;get;
+		move=>a;xor;set;
+		move=>carry;get;
+	};
 };
 //debugger a()"label.code[0]";
 //{}(){}{}{}(){}(){}{}{}()()();
