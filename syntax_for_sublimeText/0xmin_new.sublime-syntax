@@ -78,6 +78,8 @@ contexts:
       scope: keyword.control
     - match: '\b(?:import|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
+    #- match: '(?=\b(?:let|def)\b)'
+    #  push: main_meta
     - match: '\b(?:var|let|def|set)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|continue|break)\b'
@@ -87,9 +89,11 @@ contexts:
     - match: '{{assembly_registers}}'
       scope: keyword.control.register.0xmin
     - match: '#'
+    #  push: main_meta
       scope: support.constant.meta.0xmin
     - match: '\$' #(?:\s*\b(?:set|def)\b)*'
       scope: entity.name.hidden.0xmin
+    #  push: main_hidden
     - match: '@'
       scope: keyword.assembly.0xmin
     - match: '{{assembly_operators}}'
@@ -103,6 +107,25 @@ contexts:
       scope: 'support.function'
     - match: '(?=\S)'
       pop: true
+  main_lineType:
+    - match: ':'
+      push: main_body
+    - match: '(?=\S|$)'
+      push: main_body
+  main_hidden:
+    - match: '\b(?:def|set)\b'
+      scope: keyword.declaration.hidden.0xmin
+    - include: main_lineType
+    - include: mainScope
+  main_meta:
+    - match: '\b(?:let|set|def)\b'
+      scope: keyword.declaration.meta.0xmin
+    - include: main_lineType
+    - include: mainScope
+  main_body:
+    - match: ';'
+      pop: 2
+    - include: mainScope
   potentialFunctionDeclaration: #'foo = ()=>{}' function declaration
     - match: '\s*(?:{{functionCallSymbols}})\s*(?={)'
       scope: 'keyword.declaration.functionSymbol.0xmin'
