@@ -224,17 +224,15 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index];
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				switch(word){
-					case"void":{//does not add code to block
-						state.void=true;index++;
-					}break;
-					case"static":{//UNUSED; does not add code to function; Allows code to be run in function block
-						state.void=true;index++;
-					}break;
-					case"virtual":{//
-						state.virtual=true;index++;
-					}case":":{index++;
-						break loop;
-					}break;
+					case"void"://does not add code to block
+						state.void=true;index++;break;
+					case"static"://UNUSED; does not add code to function; Allows code to be run in function block
+						state.static=true;index++;break;
+					case"virtual":
+						state.virtual=true;index++;break;
+					case":":
+						index++;break loop;
+					break;
 					default:{
 						break loop;
 					}
@@ -272,7 +270,13 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(word=="debugger"){//debugger name "label";
 					index++;
 					if(statement[index]==":")index++;
-					({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
+					if(state.phase=="$"){
+						scope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
+						index=statement.length;
+					}
+					else{
+						({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
+					}
 				}
 				else if(word=="delete"){
 					index++;
@@ -316,7 +320,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							word=statement[index];
 							if(["let", "def"].includes(word))
 								state.phase="#";
-							else if(word&&(["def", "ram", "void", "virtual"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet)))
+							else if(word&&(["ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!(word in assemblyCompiler.assembly.instructionSet)))
 								state.phase="$";
 							else state.phase="@";
 						}
@@ -353,15 +357,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				return{index};
 			},
 			keyWordList({statement,index,scope,keywords}){//'let set:'
-				//keywords: interface{[key:string]:false}
+				///keywords: interface{[key:string]:bool}
 				let word,found=false;
-				//["let", "set", "def"]
 				while((word=statement[index]) in keywords){
 					keywords[word]=true;
 					index++;
 					found=true;
 				}
-				if(statement[index]==":")index++;
+				if(word==":")index++;
 				return {index,found,keywords};
 			},
 			async main_meta({statement,index,scope}){//'#' ==> '# let set a;'
@@ -431,22 +434,15 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {index};
 			},
 			async main_hidden({statement,index,scope}){
-				let value;
-				let word;
-				const state={"def":false,"set":false,"debugger":false};
-				let found;
+				let value,word,found;
+				const state={"def":false,"set":false};
 				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
-				if(state["debugger"]){
-					scope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
-					index=statement.length;
-					return {index};
+				if(!found){//sets defaults
+					state["set"]=true;//$ inserts code block into assembly
+					state["def"]=true;//$ assigns line number to labels
 				}
 				({value,index}=await contexts.expression_short({statement,index,scope}));
 				word=statement[index];
-				if(!found){
-					state["set"]=true;
-					state["def"]=true;
-				}
 				if(state["def"]){//'$def labelA;' or '$def labelA->labelB' ==> sets label address
 					if(["->", "<-", "=>", "<="].includes(word)){
 						index++;
@@ -1402,7 +1398,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					constructor(linkedLine){super();this.linkedLine=linkedLine;}
 					run({cpuState}){
 						cpuState.setValues(this.linkedLine.cpuState);
-						cpuState.virtualLevel--;
 						return{failed:false,relAddress:0};
 					}
 				}

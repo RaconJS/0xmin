@@ -26,13 +26,29 @@
 	#let a=int(0),b=int(0);
 	#set input.a=a,input.b=b;
 }{//main
-	#let loopBody={
-		#let carry=int(0);
+	let halfAdder={
+		let carry=int(0);
 		move=>a;get;
-		move=>carry;set;
+		move=>carry;set;//carry=a;
 		move=>b;get;
-		move=>a;xor;set;
+		move=>a;xor;set;//a=a^b;
 		move=>carry;get;
+		move=>b;and;
+		move=>int(1<<1);red;
+		move=>b;set;//b=(carry&b)<<1;
+	};
+	let loop30={//assert loop30 == ..this;
+		let continue;
+		let startI=int(1<<29);
+		let i=int(0);
+		move=>startI;get;
+		move=>i;set;//i=1<<29; repeats 30 times
+		virtual:{
+			def halfAdder;
+			def let nextI={
+
+			};delete nextI;
+		};
 	};
 };
 //debugger a()"label.code[0]";
