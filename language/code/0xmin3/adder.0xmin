@@ -17,7 +17,7 @@
 };
 //main
 import lib "io.0xmin";
-#def let: adder{
+#let: adder{
 	#let input={
 		#let a,b;
 	};
@@ -27,15 +27,33 @@ import lib "io.0xmin";
 	$def set int.block;
 	#let a=int(0),b=int(0);
 	#set input.a=a,input.b=b;
-	move->0xmin;
-}{//main
+};
+#let int=Struct();
+jump=>int.block..return;
+$def set int.block;
+move=>int(0x35);get;
+move=>adder.a;set;
+move=>int(0x45);get;
+move=>adder.b;set;
+#def set: adder{//main
 	#let const_2=int(1<<1);
+	#let const_zero=int(0x20000000);
+	let else0(code)={//lazy fail safe
+		if;null;
+		#def code;
+		#let state;debugger"scope==scope.var";
+		$set state=>move;
+		if;jump->..return;
+		//move=>const_zero;get;
+		//move=>state;
+		//$set move=>state;
+	};
 	let halfAdder={
 		let carry=int(0);
 		move=>a;get;
 		move=>carry;set;//carry=a;
 		move=>b;get;
-		move=>a;xor;set;//a=a^b;
+		move=>a;#def else0=()::{xor};set;//a=a^b;
 		move=>carry;get;
 		move=>b;and;
 		move=>const_2;red;
@@ -43,7 +61,7 @@ import lib "io.0xmin";
 	};
 	let i;
 	def let loop30=#(block)={//assert loop30 == ..this;
-		let startI=int(1<<29);
+		let startI=int(1<<(1-1));
 		#set i=int(0);
 		move=>startI;get;
 		move=>i;set;//i=1<<29; repeats 30 times
@@ -54,21 +72,28 @@ import lib "io.0xmin";
 		$set startState=>move;
 		$set continue;
 		{
-			//def block;
+			#def block;
 			#delete block;//dont need halfAdder anymore
 			{//next i
-				move=>i;get;$debugger i"label.lineNumber,cpuState.move";jump 0;
+				move=>i;get;
 				if;null;
 				move=>const_2;blue;
-				/*move=>i;set;//i = i>>1;
+				move=>i;set;//i = i>>1;
 				move=>startState;
 				if;{//if( i == 0 )break;
 					jump->continue;
-					jump->break;
-				}*/
+					jump->break;0x3fffffff;
+				};
 			};
 		};
 		$set move=>startState;
 		#delete startState,break,continue;
 	}(halfAdder);
+	move=>a;get;
+};
+move=>io.output;set;
+jump 0;
+#set adder.halfAdder{
+	move=>adder.a;get;
+	move=>io.output;set;
 };

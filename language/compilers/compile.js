@@ -5,7 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: fix getCode()
+//TODO: fix getCode() NEEDSTESTING
 //TODO: javascript-like bool operators e.g.'a && b' ==> `eval's b if a`
 //TODO: bugcheck: add line/column numbers
 //TODO: bugcheck: add state checking for jump command. e.g. prevent 'jump+2;move+2;null;'
@@ -32,7 +32,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -47,17 +47,31 @@ const oxminCompiler=async function(inputFile,fileName){
 		const files={};///:{[filePath]:code tree};
 		function parseFile(inputFile,filePath,fileName){
 			"use strict";
-			let words=inputFile.match(wordsRegex)??[];
+			let wordsRaw=inputFile.match(wordsRegex)??[];
+			let words=[];
+			let wordsData=[];
+			let data={line:0,column:0,file:fileName,i:0};
 			words.fileName=fileName;
 			words.filePath=filePath;
 			//remove comments
-			for(let i=0;i<words.length;i++){
-				if(words[i].match(/^\/[\/*]|^\s/)){
-					words.splice(i,1);
-					i--;
+			for(let i=0;i<wordsRaw.length;i++){
+				let n;
+				data.i=i;
+				if(n=wordsRaw[i].match(/\n/g)){
+					data.line+=n?.length??0;
+					if(n)data.column=0;
+				}
+				data.column+=wordsRaw[i].match(/[^\n]*$/)[0].length;
+				if(wordsRaw[i].match(/^\/[\/*]|^\s/)){
+					//remove comments
+				}
+				else{
+					words.push(wordsRaw[i]);
+					wordsData.push({...data});
 				}
 			}
 			words.i=0;
+			words.data=wordsData;
 			return words;
 		}
 		const bracketMap=Object.freeze({
@@ -65,16 +79,23 @@ const oxminCompiler=async function(inputFile,fileName){
 			"[":"]",
 			"(":")",
 		});
+		class Statement extends Array{
+			constructor(words,arry=[]){
+				super(...arry);
+				this.data=words instanceof Array?words.data[words.i]:words;
+			}
+			data;//:{line:number;column:number;file:string;};
+		};
 		const bracketClassMap=Object.freeze({//this object is for debugging
-			"{":({"{ }":class extends Array{recur;maxRecur;}})["{ }"],
-			"[":({"[ ]":class extends Array{}})["[ ]"],
-			"(":({"( )":class extends Array{}})["( )"],
+			"{":({"{ }":class extends Statement{recur;maxRecur;}})["{ }"],
+			"[":({"[ ]":class extends Statement{}})["[ ]"],
+			"(":({"( )":class extends Statement{}})["( )"],
 		});
 		function bracketPass(words,type="{",includeBrackets=false,stackLevel=0){
 			//stackLevel is for debugging only
 			words.i??=0;
-			let block=new bracketClassMap[type]??[];//the current container: {...} or [...] or (...)
-			let statement=[];//the current item: '...;' or '...,'
+			let block=new bracketClassMap[type](words)??new Statement(words);//the current container: {...} or [...] or (...)
+			let statement=new Statement(words);//the current item: '...;' or '...,'
 			if(includeBrackets){//[...] => ['{',...,'}']
 				if(words[words.i]!=type)throw Error("compiler error");
 				block.push(words[words.i]);
@@ -85,14 +106,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=words[words.i];
 				if(word in bracketMap){//handle brackets '{...}' ==> ['{',[...],'}'];
 					words.i++;
-					statement??=[];
+					statement??=new Statement(words);
 					statement.push(word,//{
 						bracketPass(words,word,false,stackLevel+1)//...
 					,bracketMap[word]);//}
 					words.i++;
 				}
 				else if((word=="," && type!="{")||((word == ";") && type=="{")){//then: new statement
-					statement??=[];
+					statement??=new Statement(words);
 					//';' only belongs to codeObjs, and not expressions
 					statement.push(word);
 					words.i++;
@@ -109,7 +130,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					;
 				}
 				else{
-					statement??=[];
+					statement??=new Statement(words);
 					statement.push(word);
 					words.i++;
 				}
@@ -202,19 +223,28 @@ const oxminCompiler=async function(inputFile,fileName){
 					return {index,value:undefined};
 				}
 			},
+			number_signs:{"+":v=>+v,"-":v=>-v,"*":v=>1*v,"/":v=>1/v},
 			number({index,statement,scope}){//number is optional
-				let number=+statement[index];
+				let sign="+";
+				let oldIndex=index;
+				let word=statement[index];
+				if(word in contexts.number_signs){sign=word;index++;}
+				let number=contexts.number_signs[sign](+statement[index]);
 				if(!isNaN(number)){
 					index++;
-					return {index,value:number};
+					return {index,value:number,sign};
 				}else{
-					return {index,value:undefined};
+					return {index:oldIndex,value:undefined};
 				}
 			},
 		//----
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			///statement:code tree|Scope;
-			if(statement instanceof Scope){await evalBlock(statement.code,statement,scope.label);return;}
+			if(statement instanceof Scope){
+				scope.parent=statement;
+				await evalBlock(statement.code,undefined,scope);
+				return;
+			}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
@@ -322,52 +352,11 @@ const oxminCompiler=async function(inputFile,fileName){
 					&&["","@","$","#"].includes(state.phase)
 				){
 					index++;
-					({index}=await (async function main_importFile({statement,index,scope,phase="#"}){
-						if((oxminCompiler.TEST??0)>4){throw Error("too much import recursion")}
-						else{oxminCompiler.TEST??=0;
-							oxminCompiler.TEST++;
-						}
-						//phase is used to get the file type
-						let word;
-						let filePath="";//:string;
-						let fileName="";//:string; for debugging only
-						getFilePath:{
-							const fromTypes={
-								"lib":compilerFolder+"../include/",
-								"main":mainFolder,
-								"this":statement.file??mainFolder,
-								"compiler":compilerFolder,
-							};
-							word=statement[index];
-							if(word in fromTypes){
-								filePath=fromTypes[word];
-								index++;
-							}else filePath=fromTypes["this"];
-							({index,value:fileName}=contexts.string({statement,index,scope}));
-							if(fileName==undefined||fileName==""){//silent error
-								return {index};
-							}
-							filePath+=fileName;
-						}
-						if(phase=="")phase="#";
-						if(phase=="#"){//open as 0xmin file
-							let fileData;//:code tree;
-							if(filePath in files){
-								fileData=files[filePath];//if file already exists, use it
-							}else {
-								let fileString=await oxminCompiler.fileLoader(filePath);
-								fileData=bracketPass(parseFile(fileString,filePath,fileName));
-							}
-							if(statement[index]==":")index++;
-							await evalBlock(fileData,undefined,scope);
-						}
-						index=statement.length;
-						return {index};
-					})({statement,index,scope,phase:state.phase}));
+					({index}=await contexts.main_importFile({statement,index,scope,phase:state.phase}));
 				}
 			}{
 				let virtualLine;
-				if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual());
+				if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
 				if(statement[index]=="{"){
 					index++;
 					newScope.label.code.push(
@@ -397,7 +386,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						;
 					}
 				}
-				if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine));
+				if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
 			}
 			statement.recur--;
 			if(statement.recur==0){
@@ -485,14 +474,9 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index];
 				if(!(value instanceof Value))throw Error("compiler type error");
 				if(value.type=="label"){
-					let sign=0;
-					if("+-".includes(word)){//'$jump->label+10'; UNUSED
-						index++;
-						sign=+("-"==word);
-					}
-					let number;
+					let number,sign;
 					({value:number,index}=contexts.number({statement,index,scope}));
-					value.number=number*[1,-1][sign]??0;
+					value.number=number;
 				}
 				return {index};
 			},
@@ -519,11 +503,12 @@ const oxminCompiler=async function(inputFile,fileName){
 						index++;
 						let isReversed=word[0]=="<"?1:0;
 						let operator=new Operator(word.match(/[\-=]/)[0]+">");
+						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
 						operator[isReversed]=value;
 						({value,index}=await contexts.expression_short({statement,index,scope}));
-						operator[1-isReversed]=value;
 						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
-						let newLine=new HiddenLine.SetLabelOrPointer({operator});
+						operator[1-isReversed]=value;
+						let newLine=new HiddenLine.SetLabelOrPointer({operator,scope});
 						scope.label.code.push(newLine);
 					}else{
 						contexts.meta_defineLabelToNextLine(value.label,scope,value);
@@ -547,24 +532,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				///@mutates: instruction,index;
 				let word=statement[index];
 				let value;
-				if(({index,value}=contexts.number({index,statement,scope})).value!=undefined){//'2'
-					instruction.args.push(new Value.Number(value));
-				}
-				else if(word.match(nameRegex)){//'command' or 'label'
-					let value;
-					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
-					instruction.args.push(value);
-				}
-				else if(["("].includes(word)){
-					let value;
-					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:true}));
-					instruction.args.push(value);
-				}
-				else if(["->", "<-", "=>", "<="].includes(word)){
+				if(["->", "<-", "=>", "<="].includes(word)){
 					index++;
 					({index}=await contexts.main_assembly_argument({statement,index,scope,instruction}));
 					let operator=new Operator(word,[instruction.args[instruction.args.length-2],instruction.args.pop()]);
-					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator});
+					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator,scope});
 					instruction.args.push(hiddenLine);
 					//'[a, -> [], b]' => '[a, -> [b]]'
 				}
@@ -576,8 +548,16 @@ const oxminCompiler=async function(inputFile,fileName){
 					instruction.args.push(value);
 					index++;
 				}
+				else if(({index,value}=contexts.number({index,statement,scope})).value!=undefined){//'2'
+					instruction.args.push(new Value.Number(value));
+				}
+				//else if(word.match(nameRegex)){//'command' or 'label'
+				//else if(["("].includes(word)){
 				else{
-					instruction.args.push(word);
+					let value;
+					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
+					({index}=contexts.labelToRelLabel({statement,index,scope,value}));
+					instruction.args.push(value);
 				}
 				return{index};
 			},
@@ -600,7 +580,6 @@ const oxminCompiler=async function(inputFile,fileName){
 					let instruction;
 					let useInstruction=false;//use 'instruction' in the codeObj, false => meta only code.
 					({value,index}=await contexts.expression_short({statement,index,scope}));
-					;
 					if(!value){//';'undefined value
 						useInstruction=false;
 					}
@@ -644,6 +623,48 @@ const oxminCompiler=async function(inputFile,fileName){
 						codeObj.code.push(instruction);
 					}
 				}
+				return {index};
+			},
+			async main_importFile({statement,index,scope,phase="#"}){
+				if((oxminCompiler.TEST??0)>4){throw Error("too much import recursion")}
+				else{oxminCompiler.TEST??=0;
+					oxminCompiler.TEST++;
+				}
+				//phase is used to get the file type
+				let word;
+				let filePath="";//:string;
+				let fileName="";//:string; for debugging only
+				getFilePath:{
+					const fromTypes={
+						"lib":compilerFolder+"../include/",
+						"main":mainFolder,
+						"this":statement.file??mainFolder,
+						"compiler":compilerFolder,
+					};
+					word=statement[index];
+					if(word in fromTypes){
+						filePath=fromTypes[word];
+						index++;
+					}else filePath=fromTypes["this"];
+					({index,value:fileName}=contexts.string({statement,index,scope}));
+					if(fileName==undefined||fileName==""){//silent error
+						return {index};
+					}
+					filePath+=fileName;
+				}
+				if(phase=="")phase="#";
+				if(phase=="#"){//open as 0xmin file
+					let fileData;//:code tree;
+					if(filePath in files){
+						fileData=files[filePath];//if file already exists, use it
+					}else {
+						let fileString=await oxminCompiler.fileLoader(filePath);
+						fileData=bracketPass(parseFile(fileString,filePath,fileName));
+					}
+					if(statement[index]==":")index++;
+					await evalBlock(fileData,undefined,scope);
+				}
+				index=statement.length;
 				return {index};
 			},
 		//----
@@ -754,8 +775,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index};
 			word=statement[index];
 			if(word instanceof Array)throw Error ("compiler type error???: do not know how 'let word:Array;' is handled by the code");
-			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {
-				//'12'
+			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {//'+123' or '-123'
 				let number=value;
 				if(shouldEval)value=new Value({number,type:"number",bool:!!number});
 			}else if(({index,value,array}=await contexts.string({index,statement,scope})).value!=undefined) {
@@ -973,6 +993,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 					let value;//don't need to do `index++` here
 					({value,index}=await contexts.expression({statement,index,scope,includeBrackets:false}));
+					//value??=new Value();
 					if(firstArg instanceof Value && firstArg.type=="label"){
 						if(assignmentType==undefined&&word=="="){//evals 'a = b'
 							//let doAssignMent=0||(firstArg.name in firstArg.parent.labels);
@@ -1052,7 +1073,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
 					if(lineObj instanceof Variable){
 						this.collectCode(lineObj,codeQueue);
-						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj}));
+						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj,scope:lineObj.scope}));
 					}
 				}
 				return codeQueue;
@@ -1115,7 +1136,8 @@ const oxminCompiler=async function(inputFile,fileName){
 						if(typeof arg=="number"){
 							if(i==1&&instruction.type=="command"&&this.assembly.language=="0xmin"){
 								//compile address; handles 0xmin quirks
-								binaryArg=arg<0?(((2*(arg&1)-arg)&0xff)*0x10)|0x1000:(arg&0xff)*0x10;
+								let isJump=binaryValue&0xf==this.assembly.instructionSet["jump"];
+								binaryArg=arg<0?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
 								binaryValue|=binaryArg;
 							}
 							else switch(instruction.type){
@@ -1190,12 +1212,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				],//[starting bit number,length of argument (in bits)]
 			},
 			nullValue:null,//will be defined later
-			findPointerOrLabel(value,cpuState){//:Pointer|Variable
+			findPointerOrLabel(value,cpuState,scope=undefined){//:HiddenLine|Pointer|Variable
 				if(value instanceof HiddenLine){return value;}
 				if(!(value instanceof Value))throw Error("compiler type error:");
 				/// value:number|Value
 				if(value.type=="number")
-					return new Variable({lineNumber:value.number});
+					return new Variable.fromValue(value,scope);
 				else if(value.type=="label")return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
 				else throw Error("0xmin type error: $: value must be a label or a number.");
 			},
@@ -1405,7 +1427,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			static SetLabelOrPointer=
 			class SetLabelOrPointer extends HiddenLine{//'$ram 10;'
 				constructor(data){super();Object.assign(this,data??{})}
-				operator=null;///:Variable
+				operator=null;///:Operator, Value[]
 				isSearched=false;
 				run({cpuState}){///: {failed:boolean;relAddress:number}
 					let returnValue=0;
@@ -1421,7 +1443,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						//true ==> mutates cpuState or label-lineNumbers
 						const isAssigning = this.operator.operator=="=>";
 						const args=[
-							assemblyCompiler.findPointerOrLabel(this.operator[0],cpuState),
+							assemblyCompiler.findPointerOrLabel(this.operator[0],cpuState,this.scope),
 							this.operator[1]
 						];
 						if(this.operator[1] instanceof HiddenLine||this.operator[0] instanceof HiddenLine){
@@ -1441,15 +1463,17 @@ const oxminCompiler=async function(inputFile,fileName){
 								if(isAssigning)args[0].lineNumber=this.operator[1].number;
 							}
 							else{//'$jump->label;' or '$label->jump'
-								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState);
-								if(!args[1])throw Error("compiler error: args[1] is not defined");
+								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState,this.scope);
+								if(!args[1]){throw Error("compiler error: args[1] is not defined");}
 								returnValue=args[1].lineNumber-args[0].lineNumber;
 								failed||=isNaN(returnValue);
 								if(isAssigning)args[0].lineNumber=args[1].lineNumber;
 							}
-						}else throw Error("compiler type error: $:");
+						}else {console.error("Error, type:",this.operator[1]?.constructor)
+							throw Error("compiler type error: $: this.operator[1] is the wrong type");
+						}
 					}
-					return{failed,relAddress:returnValue};
+					return{failed,relAddress:returnValue|0};
 				}
 			}
 			//'virual {...};'
@@ -1465,7 +1489,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				static Void=//'$void;' ends virtual scope
 				class Void extends HiddenLine{
 					linkedLine;//:private Virtual|CodeLine
-					constructor(linkedLine){super();this.linkedLine=linkedLine;}
+					constructor(linkedLine,data){super(data);this.linkedLine=linkedLine;}
 					run({cpuState}){
 						cpuState.setValues(this.linkedLine.cpuState);
 						return{failed:false,relAddress:0};
@@ -1527,13 +1551,13 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			isSearched=false;
 			getCode(n=0){//: SourceCodeTree
-				let codeBlock=new bracketClassMap["{"];
+				let codeBlock;
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
 				if(this.scope){///this.scope:Scope|Scope.CodeObj;
-					if(this.scope instanceof Scope.CodeObj)codeBlock=[this.scope.code];
-					else if(this.scope instanceof FunctionScope)codeBlock=[this.scope];
-					else if(this.scope instanceof Scope)codeBlock = [this.scope];// this.scope.code
+					if(this.scope instanceof Scope.CodeObj)codeBlock = new bracketClassMap["{"](this.scope.code.data,[this.scope.code]);
+					else if(this.scope instanceof FunctionScope)codeBlock = new bracketClassMap["{"](this.scope.code.data,[this.scope]);
+					else if(this.scope instanceof Scope)codeBlock = new bracketClassMap["{"](this.scope.code.data,[this.scope]);// this.scope.code
 					else {console.error(this.scope?.constructor);throw Error("compiler type error:");}
 				}
 				this.code.reduce((s,v)=>{
@@ -1542,7 +1566,8 @@ const oxminCompiler=async function(inputFile,fileName){
 					else if(v instanceof Variable)s.push(...v.getCode?.(n+1));//pushes :...FunctionScope|code tree
 					//else if(v instanceof CodeLine)s.push(v.code);
 					return s;
-				},codeBlock);
+				},codeBlock=new bracketClassMap["{"]());
+				if(codeBlock.length>0)codeBlock.data=codeBlock[0].data;
 				this.isSearched=false;
 				return codeBlock;
 			}
@@ -1838,6 +1863,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			type:"undefined",
 			args:[new Value({type:"label",name:"null",})],
 			binaryValue:0,
+			scope:"null's scope",
 		});
 		Object.doubleFreeze(nullValue);
 		assemblyCompiler.assembly.init();
@@ -1857,7 +1883,9 @@ const oxminCompiler=async function(inputFile,fileName){
 		if(!scope){
 			if(!parentScope){
 				scope=new GlobalScope({code:block});
-				if(!globalScope)globalScope=scope;
+				if(!globalScope){
+					globalScope=scope;
+				}
 			}else{
 				scope=new BlockScope({parent:parentScope,code:block});
 			}
