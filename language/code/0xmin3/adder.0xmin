@@ -41,12 +41,12 @@ move=>adder.b;set;
 	let else0(code)={//lazy fail safe
 		if;null;
 		#def code;
-		#let state;debugger"scope==scope.var";
+		#let state;
 		$set state=>move;
 		if;jump->..return;
-		//move=>const_zero;get;
-		//move=>state;
-		//$set move=>state;
+		move=>const_zero;get;
+		move=>state;
+		$set move=>state;
 	};
 	let halfAdder={
 		let carry=int(0);
@@ -72,7 +72,7 @@ move=>adder.b;set;
 		$set startState=>move;
 		$set continue;
 		{
-			#def block;
+			//#def block;
 			#delete block;//dont need halfAdder anymore
 			{//next i
 				move=>i;get;
