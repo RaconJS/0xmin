@@ -1,1 +1,3 @@
-jump jump->-2;
+//import "../code/0xmin3/adder.0xmin";
+let a={1;2;3;};
+debugger a.(5)"value";

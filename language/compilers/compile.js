@@ -5,6 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
+//TODO: add array support
 //TODO: fix getCode() NEEDSTESTING
 //TODO: javascript-like bool operators e.g.'a && b' ==> `eval's b if a`
 //TODO: bugcheck: add line/column numbers
@@ -45,6 +46,10 @@ const oxminCompiler=async function(inputFile,fileName){
 		const mainFolder=fileName.match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const files={};///:{[filePath]:code tree};
+		const throwError=({statement,index,scope=undefined},errorType,msg)=>{
+			let data=scope?scope.code.data:statement
+			return "0xmin "+errorType+" error: "+msg+" ; line:"+statement.line;
+		}
 		function parseFile(inputFile,filePath,fileName){
 			"use strict";
 			let wordsRaw=inputFile.match(wordsRegex)??[];
@@ -283,7 +288,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let calcReps=async()=>{
 					let value;
 					({index,value}=await contexts.expression_short({statement,index:repeatingIndex_number,scope}));
-					return value.number;
+					return value?.number-value?.number!==0?0:value.number|0;
 				}
 				if(word=="repeat"){
 					let maxReps=await calcReps();
@@ -376,12 +381,9 @@ const oxminCompiler=async function(inputFile,fileName){
 							else state.phase="@";
 						}
 						if(state.phase=="@")({index}=await contexts.main_assembly({statement,index,scope:newScope}));
-						else if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
-						word=statement[index];
-						if(word=="#"){
-							state.phase="#"
-							index++;
-						}
+						if(statement[index]=="$"){state.phase="$";index++;}
+						if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
+						if(statement[index]=="#"){state.phase="#";index++;}
 						if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
 						;
 					}
@@ -499,17 +501,10 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 				if(state["set"]){//'$set labelA;' or '$set labelA=>labelB' ==> sets label address
-					if(["->", "<-", "=>", "<="].includes(word)){
-						index++;
-						let isReversed=word[0]=="<"?1:0;
-						let operator=new Operator(word.match(/[\-=]/)[0]+">");
-						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
-						operator[isReversed]=value;
-						({value,index}=await contexts.expression_short({statement,index,scope}));
-						({index}=contexts.labelToRelLabel({statement,index,scope,value}));
-						operator[1-isReversed]=value;
-						let newLine=new HiddenLine.SetLabelOrPointer({operator,scope});
-						scope.label.code.push(newLine);
+					let arg1;
+					({value:arg1,index}=await contexts.main_assembly_expression_short({statement,index,scope,startValue:value}));
+					if(arg1){
+						scope.label.code.push(arg1);
 					}else{
 						contexts.meta_defineLabelToNextLine(value.label,scope,value);
 						if(value.label)value.label.defs.push(scope.label);
@@ -528,40 +523,48 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(useUnshift)scope.label.code.unshift(newLineObj);
 				else scope.label.code.push(newLineObj);
 			},
-			async main_assembly_argument({statement,index,scope,instruction}){
-				///@mutates: instruction,index;
-				let word=statement[index];
+			//short expression
+			async main_assembly_expression_short({statement,index,scope,startValue=undefined}){//Value=>Value|HiddenLine
+				let word=statement[index];//'label' ==> 'label+1' or 'label => label+2'
 				let value;
-				if(["->", "<-", "=>", "<="].includes(word)){
-					index++;
-					({index}=await contexts.main_assembly_argument({statement,index,scope,instruction}));
-					let operator=new Operator(word,[instruction.args[instruction.args.length-2],instruction.args.pop()]);
-					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator,scope});
-					instruction.args.push(hiddenLine);
-					//'[a, -> [], b]' => '[a, -> [b]]'
-				}
-				else if(word=="["){
+				let hadStartValue=!!startValue;
+				if(word=="["){//UNFINISHED: needs to be redone
 					index++;
 					let newScope=new Scope({fromName:"main_assembly_argument",parent:scope,code:statement[index]});
 					newScope.label=new Variable({scope:newScope});
 					value=new Value({type:"scope",name:"[",label:newScope});
-					instruction.args.push(value);
 					index++;
-				}
-				else if(({index,value}=contexts.number({index,statement,scope})).value!=undefined){//'2'
-					instruction.args.push(new Value.Number(value));
-				}
-				//else if(word.match(nameRegex)){//'command' or 'label'
-				//else if(["("].includes(word)){
-				else{
-					let value;
+				}else{
 					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
-					({index}=contexts.labelToRelLabel({statement,index,scope,value}));
-					instruction.args.push(value);
 				}
+				startValue=value??startValue;
+				word=statement[index];
+				if(["->", "<-", "=>", "<="].includes(word)){
+					index++;
+					({value,index}=await contexts.expression_short({statement,index,scope,startValue}));
+					let operator=new Operator(word,[startValue,value]);
+					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator,scope});
+					value=hiddenLine;
+					//'[a, -> [], b]' => '[a, -> [b]]'
+				}
+				else{
+				}
+				return{index,value};//:Value|HiddenLine
+			},
+			async main_assembly_argument({statement,index,scope,instruction}){
+				///@mutates: instruction,index;
+				let word=statement[index];
+				let value;
+				let startValue=instruction.args[instruction.args.length-1];//:Value|HiddenLine
+				({value,index}=await contexts.main_assembly_expression_short({statement,index,scope,startValue}));
+				if(value)instruction.args.push(value);
 				return{index};
 			},
-			async main_assembly_arguments({statement,index,scope,instruction}){//'get' 
+			async main_assembly_arguments({statement,index,scope,instruction}){//'get'
+				let startValue=instruction.args[instruction.args.length-1];//:Value|HiddenLine
+				if(startValue instanceof Value && startValue.type=="label"){
+					startValue.number=0;
+				}
 				for(let i=index;i<statement.length;i++){//returns a list of Value's/strings/numbers 
 					let word=statement[index],failed;
 					if(index>=statement.length)break;
@@ -812,9 +815,9 @@ const oxminCompiler=async function(inputFile,fileName){
 		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent
 		//expression_short:
 			async extend_value({index,statement,scope,value,shouldEval=true}){//.b or [] or ()
-				if(value==undefined||value.type=="undefined")value=scope.var.label.toValue("label");//'(.b)' == 'b'
 				let word=statement[index];
 				if([".", ".."].includes(word)){// 'a.' or 'a..'
+					if(value==undefined||value.type=="undefined")value=scope.var.label.toValue("label");//'(.b)' == 'b'
 					let isInternal=word=="..";
 					let parent=value.label;
 					value.parent=parent;
@@ -832,7 +835,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					}if(!nameFound){//'a.123' ?
 						({index,value}=await contexts.number({index,statement,scope}));
 						if(value)nameFound=true;
-					}if(!nameFound){//'a.("b")' ?
+					}if(!nameFound&&word=="("){//'a.("b")' ?
 						({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true}));
 						name=value?.string;
 						if(value)nameFound=true;
@@ -1217,7 +1220,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(!(value instanceof Value))throw Error("compiler type error:");
 				/// value:number|Value
 				if(value.type=="number")
-					return new Variable.fromValue(value,scope);
+					return Variable.fromValue(value,scope);
 				else if(value.type=="label")return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
 				else throw Error("0xmin type error: $: value must be a label or a number.");
 			},
@@ -1316,7 +1319,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//constructor(data){Object.assign(this,data??{})}
 		}
 		class Brackets extends Array{
-
+			;
 		}
 		class Value extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -1648,6 +1651,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					if(index!=-1)code.splice(index,1);
 				}
 				this.defs=[];
+				this.lineNumber=undefined;
 				return this;
 			}
 			getNumber(){return this.lineNumber;}
