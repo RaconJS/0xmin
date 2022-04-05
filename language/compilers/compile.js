@@ -616,7 +616,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							useInstruction=true;
 						}
 						if(instruction.args.length==1&&typeof instruction.args[0]=="number"){
-							instruction.binaryValue=instruction.args[0];
+							instruction.binaryValue=codeObj.lineNumber=instruction.args[0];
 							instruction.type="data";
 						}else{
 							instruction.type="command";
@@ -826,30 +826,36 @@ const oxminCompiler=async function(inputFile,fileName){
 					let name,nameFound=false;
 					word=statement[index];
 					//optional expression
-					if(name==undefined){
-						if(word.match(nameRegex)){//'a.b' ?
-							name=word;
-							nameFound=true;
-							index++;
-						}
+					if(word.match(nameRegex)){//'a.b' ?
+						name=word;
+						nameFound=true;
+						index++;
 					}if(!nameFound){//'a.123' ?
-						({index,value}=await contexts.number({index,statement,scope}));
-						if(value)nameFound=true;
+						({index,value:name}=await contexts.number({index,statement,scope}));
+						if(name!==undefined)nameFound=true;
 					}if(!nameFound&&word=="("){//'a.("b")' ?
-						({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true}));
-						name=value?.string;
-						if(value)nameFound=true;
-					}if(!nameFound){
-						throw Error("0xmin error: "+"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name");
+						({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
+						if(name){
+							nameFound=true;
+							if(name.type=="label")name=name.label?.symbol??undefined;
+							else if(name.type=="number")name=name.number;
+							else if(name.type=="string")name=name.string;
+						}
 					}
-					value.name=name;
-
+					if(!nameFound){
+						throw Error("0xmin error: "+"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name");
+					}else{
+						value.name=name;
+					}
 					if(shouldEval)if(parent){
 						if(isInternal){//'a..b';
 							const label=getInternals(value,{index,statement,scope}).labels[name];//internal object
 							if(label)({value}=await label.callFunction(undefined,value,scope));
 						}//'a.b'
-						else value.label=parent.labels[name];
+						else {
+							if(typeof name=="string")value.label=parent.labels[name];
+							if(typeof name=="number")value.label=parent.code[name] instanceof Variable?parent.code[name]:undefined;
+						}
 					}
 					return {index,value};
 				}else if("("==word&&//'foo()'; parses: 'foo=>()=>{}' ==> 'foo=>() => {}'; 'foo()=>{}' ==> 'foo ()=>{}'
@@ -1531,6 +1537,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant}
 				name=undefined;///@string
 				labels={};//aka properties
+				static objectNum=0;
+				symbol=Symbol(Variable.objectNum++);
 				prototype=null;///instanceof Variable
 				supertype=null;///instanceof Variable
 			//as array
