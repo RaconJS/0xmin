@@ -102,8 +102,27 @@ contexts:
       scope: support.constant.operator.0xmin
     - match: '{{operators}}'
       scope: keyword.operator
+    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:{{functionCallSymbols}}\s*)?{)' # foo(param1,param2){}
+      push: parameters
   line_start_1:
     - include: line_start_1_base
+  brackets_expression:
+    - match: '\('
+      push: brackets_expression
+    - match: '\)'
+      pop: true
+  parameters:
+    - match: '{{labelName}}'
+      scope: variable.parameter
+    - match: '\)'
+      pop: true
+      push: functionType
+    - include: brackets_expression
+    - include: mainScope
+  functionType:
+    - match: '{{functionCallSymbols}}|'
+      scope: 'keyword.declaration.functionCall.0xmin'
+      pop: true
   internalScope:
     - match: '\b(?:length|compile|array|code|labels|this|seal|freeze)\b'
       scope: 'support.function'
