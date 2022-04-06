@@ -46,6 +46,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		const mainFolder=fileName.match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const files={};///:{[filePath]:code tree};
+		const isStrict=true;
 		const throwError=({statement,index,scope=undefined},errorType,msg)=>{
 			let data=scope?scope.code.data:statement;
 			return "0xmin "+errorType+" error: "+msg+"; line "+statement.data.line+":'"+statement.data.getLines()[statement.data.line]+"'";
@@ -316,7 +317,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					&&["","$","#"].includes(state.phase)
 				){//debugger name "label";
 					if(state.phase=="$"){
-						scope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
+						newScope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
 						index=statement.length;
 					}
 					else{
@@ -461,10 +462,13 @@ const oxminCompiler=async function(inputFile,fileName){
 					({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
 					foundExpression||=!!value;
 					if(metaState["def"]){//same as '$undef def set: obj;' ==> redefines and inserts code block;
-						if(value instanceof Value && value.type=="label"){//for '@null $def: label'
+						if(value instanceof Value && value.type=="label")
+						if(value.label){//for '@null $def: label'
 							value.label.unDefine();
 							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
 							scope.label.code.push(value.label);
+						}else{
+							if(isStrict)throw Error(throwError({statement,index,scope},"Type","label '"+value.name+"' is undefined"));
 						}
 					}
 					word=statement[index];
@@ -769,7 +773,6 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			return {index,argsObj};
 		},
-
 		async expression_short({index,statement,scope,shouldEval=true,includeBrackets=false}){//a().b or (1+1)
 			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 			if(!statement[index])return{index};
@@ -802,30 +805,42 @@ const oxminCompiler=async function(inputFile,fileName){
 				//value=new Value();
 				if(!TESTING)return {index,value:undefined};
 			}
-			for(let i=index;i<statement.length;i++){//'.property'
-				if(index>=statement.length)break;
-				let word=statement[index];
-				let oldIndex=index;
-				({value,index}=await contexts.extend_value({index,statement,scope,value,shouldEval}));
-				if(index==oldIndex)break;
-			}
-			return {value,index};
+			return await contexts.expression_fullExtend({value,index,statement,scope,shouldEval});
 		},
 		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
 		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
 		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent
 		//expression_short:
+			async getIndexedPropertyName({index,statement,scope}){
+				let name,failed=false;
+				({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
+				if(name){
+					if(name.type=="label")name=name.label?.symbol??undefined;
+					else if(name.type=="number")name=name.number;
+					else if(name.type=="string")name=name.string;
+				}else failed=true;
+				return {index,name,failed};
+			},
+			async expression_fullExtend({value,index,statement,scope,shouldEval=true}){
+				for(let i=index;i<statement.length;i++){//'.property'
+					if(index>=statement.length)break;
+					let word=statement[index];
+					let oldIndex=index;
+					({value,index}=await contexts.extend_value({index,statement,scope,value,shouldEval}));
+					if(index==oldIndex)break;
+				}
+				return{value,index};
+			},
 			async extend_value({index,statement,scope,value,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
-				if([".", ".."].includes(word)){// 'a.' or 'a..'
+				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
 					if(value==undefined||value.type=="undefined")value=scope.var.label.toValue("label");//'(.b)' == 'b'
 					let isInternal=word=="..";
 					let parent=value.label;
-					value.parent=parent;
+					value=new Value({parent});
 					let oldIndex=index;
-					index++;
 					let name,nameFound=false;
-					word=statement[index];
+					if(word!="["){index++;word=statement[index];}
 					//optional expression
 					if(word.match(nameRegex)){//'a.b' ?
 						name=word;
@@ -834,14 +849,9 @@ const oxminCompiler=async function(inputFile,fileName){
 					}if(!nameFound){//'a.123' ?
 						({index,value:name}=await contexts.number({index,statement,scope}));
 						if(name!==undefined)nameFound=true;
-					}if(!nameFound&&word=="("){//'a.("b")' ?
-						({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
-						if(name){
-							nameFound=true;
-							if(name.type=="label")name=name.label?.symbol??undefined;
-							else if(name.type=="number")name=name.number;
-							else if(name.type=="string")name=name.string;
-						}
+					}if(!nameFound&&["(", "["].includes(word)){//'a.("b")' or 'a["b"]' ?
+						({index,name,failed:nameFound}=await contexts.getIndexedPropertyName({index,statement,scope}));
+						nameFound=!nameFound;
 					}
 					if(!nameFound){
 						throw Error("0xmin error: "+"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name");
@@ -854,8 +864,16 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(label)({value}=await label.callFunction(undefined,value,scope));
 						}//'a.b'
 						else {
-							if(typeof name=="string")value.label=parent.labels[name];
-							if(typeof name=="number")value.label=parent.code[name] instanceof Variable?parent.code[name]:undefined;
+							if(typeof name=="string")value.label=value.parent.findLabel(name)?.label;
+							if(typeof name=="number"){
+								value.refType="array";
+								value.number=name;
+								value.label=
+									parent.code[name] instanceof Variable?parent.code[name]:
+									parent.code[name] instanceof Scope?parent.code[name].label:
+									parent.code[name] instanceof CodeLine?undefined
+								:undefined;
+							}
 						}
 					}
 					return {index,value};
@@ -910,16 +928,23 @@ const oxminCompiler=async function(inputFile,fileName){
 					value=functionObj.toValue("label");
 					index+=3;//skip '(' '...' ')' in '(...){}'
 					word=statement[index];
+					let callType="";
 					if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
-						functionObj.callType=word;
+						functionObj.callType=callType=word;
 						index++;
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
-					functionObj.code.push(new FunctionScope({fromName:"delcareFunctionOrObject/function",
+					let functionScope=new FunctionScope({fromName:"delcareFunctionOrObject/function",
 						label:new Variable({name:"(scope function)"}),
 						parent:scope,
 						code:word,
-					}));
+					});
+					switch(callType){
+						case"":functionScope.let=functionScope;break;
+						case"=":functionScope.let=functionScope;functionScope.var=functionScope;break;
+						case"=>":break;
+					}
+					functionObj.code.push(functionScope);
 					functionObj.functionPrototype??=new Variable({name:"(prototype)"});
 					functionObj.functionSupertype??=new Variable({name:"(supertype)"});
 					index+=3;
@@ -1013,8 +1038,10 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
-								firstArg.parent.labels[firstArg.name]=newLabel;
-								value.label=newLabel;
+								//refType:'property'|'array'
+								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;
+								else firstArg.parent.labels[firstArg.name]=newLabel;
+								value=newLabel?.toValue?.("label")??new Value();
 							}else{
 								//sets properties of existing variable
 								if(firstArg.type=="label"){
@@ -1035,6 +1062,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				//'foo(){}' or 'obj{}' extend function or object
 				else if(args.length>0&&!({index,value}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
 					;
+				}else if(word=="¬"){//extend value 'a+1¬.b'==> '(a+1).b'
+					index++;let value=args.pop();
+					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
+					args.push(value);
 				}else if(word in contexts.operators){//'+-*/'
 					index++;
 					let hasEquals;
@@ -1147,7 +1178,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							if(i==1&&instruction.type=="command"&&this.assembly.language=="0xmin"){
 								//compile address; handles 0xmin quirks
 								let isJump=binaryValue&0xf==this.assembly.instructionSet["jump"];
-								binaryArg=arg<0?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
+								binaryArg=(arg<0||1/arg==-Infinity)?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
 								binaryValue|=binaryArg;
 							}
 							else switch(instruction.type){
@@ -1336,7 +1367,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				this.number=label.lineNumber;
 			}
 			parent;//'parent.name' ==> label
-			refType;//'a.b','a[b]','set a {b}';
+			refType="property";//:'property'|'array'; 'a.b','a[b]','set a {b}';
 			label;//label Object
 			name;//label name (from parent.labels)
 			string;
@@ -1562,7 +1593,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				return address==undefined?undefined:address+this.relAddress;
 			}
 			isSearched=false;
-			getCode(n=0){//: SourceCodeTree
+			getCode(n=0){//: SourceCodeTree; can contain Scope
 				let codeBlock;
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
@@ -1645,7 +1676,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 				return {value:new Value({type:"label",label:newReturnObj})};
 			}
-			findLabel(name){//'a.b'
+			findLabel(name){//'a.b' string=>{parent:Variable,label:Variable}
 				return (
 					this.supertype?.findLabel?.(name)
 					??(this.labels[name]?{label:this.labels[name],parent:this}:undefined)
@@ -1740,12 +1771,14 @@ const oxminCompiler=async function(inputFile,fileName){
 					"this":async({label})=>label.toValue("label"),
 					"return":async({label})=>new Return(label).toValue("label"),
 					//from this object
+					//`obj.prototype`
 					"prototype":async({label})=>label.prototype.toValue("label"),
 					"supertype":async({label})=>label.supertype.toValue("label"),
 					//from parent function
+					//`obj.constructor`
 					//"constructor":async({label})=>label.constructor.toValue("label"),
-					"super":async({label})=>label.functionSupertype.toValue("label"),
 					"proto":async({label})=>label.functionPrototype.toValue("label"),
+					"super":async({label})=>label.functionSupertype.toValue("label"),
 				};
 			});
 		//----
@@ -1821,6 +1854,14 @@ const oxminCompiler=async function(inputFile,fileName){
 			//----
 			isSearched=false;
 			code;//: bracketClassMap["{"];
+			getStack(stack=[]){
+				if(this.isSearched)return stack;
+				this.isSearched=true;
+				stack.push(this.label.name);
+				this.parent.getStack(stack);
+				this.isSearched=false;
+				return stack;
+			}
 			findLabel(name){
 				const parent=this.findLabelParent(name);//:Variable
 				if(parent)return {parent,label:parent.labels[name]}

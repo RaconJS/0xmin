@@ -413,6 +413,8 @@ class NumberDisplay{
 		filt30 get_jump;
 		u32 set_jump;
 		u32 set_bray;
+		public://debugger pause
+		bool wasInputDown=false;
 		void onUpdate();
 	}cpu;
 	class Display{
@@ -473,7 +475,7 @@ class NumberDisplay{
 		}
 		private:
 	}cpuDisplay;
-	void CPU0xmin3::onUpdate(){
+	void CPU0xmin3::onUpdate(){//main emulator
 		//pointers
 			filt30 get_jump=ram[jump];//for 'get jump -1;'
 			jump+=jump_next;
@@ -504,12 +506,15 @@ class NumberDisplay{
 					jump_next=((address&~1)*(int[2]){1,-1}[address_sign])+(address&1);
 					if(address==0){
 						if(!address_sign)hasHault=true;//'jump 0;' => 'hault;'
-						else if(inputWasPressed){//jump -0;' => 'wait for input';
-							jump++;
-							inputWasPressed=false;
-						};
+						else {
+							if(!inputWasPressed&&wasInputDown){//jump -0;' => 'wait for input'; for debugging
+								jump++;//on falling rising
+								//inputWasPressed=false;
+								wasInputDown=true;
+							}
+							wasInputDown=inputWasPressed;
+						}
 					}
-					
 					break;
 				case 2:ans=~(a|b);break;//'nor'
 				case 3:ans=a*(b&-b);break;//'red'
