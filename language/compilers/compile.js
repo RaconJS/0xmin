@@ -47,15 +47,16 @@ const oxminCompiler=async function(inputFile,fileName){
 		const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const files={};///:{[filePath]:code tree};
 		const throwError=({statement,index,scope=undefined},errorType,msg)=>{
-			let data=scope?scope.code.data:statement
-			return "0xmin "+errorType+" error: "+msg+" ; line:"+statement.line;
+			let data=scope?scope.code.data:statement;
+			return "0xmin "+errorType+" error: "+msg+"; line "+statement.data.line+":'"+statement.data.getLines()[statement.data.line]+"'";
 		}
 		function parseFile(inputFile,filePath,fileName){
 			"use strict";
 			let wordsRaw=inputFile.match(wordsRegex)??[];
 			let words=[];
 			let wordsData=[];
-			let data={line:0,column:0,file:fileName,i:0};
+			let lines=inputFile.split(/\n\s*/);
+			let data={line:0,column:0,file:fileName,i:0,getLines(){return lines;}};
 			words.fileName=fileName;
 			words.filePath=filePath;
 			//remove comments
@@ -247,7 +248,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			///statement:code tree|Scope;
 			if(statement instanceof Scope){
 				scope.parent=statement;
-				await evalBlock(statement.code,undefined,scope);
+				await evalBlock(statement.code,undefined,statement);
 				return;
 			}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
