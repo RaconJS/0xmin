@@ -1,21 +1,27 @@
 //import "../code/0xmin3/adder.0xmin";
 //import lib"io.0xmin";
-//"hello world";//main
-//jump +0;//hault
-let foo{//function structure explained
-	def let functionScope{
-		1;2;3;
-		void let scope_function{};//this is returned by foo[0];
+let Data()={
+	#let def: consts;
+	#let def: vars;
+	void:{
+		#let: var(val)={
+			#set: vars{
+				#def: val;
+			};
+			#set: return=val;
+		};
+		#let: const(val)={
+			#set: vars{
+				#def: val;
+			};
+			#set: return=val;
+		};
+		#let: remove(label){
+			#set: ..this{
+				$ram=>label;
+			};
+		};
 	};
 };
-let obj{
-	//debugger"scope.var.getStack()";
-	#set: (){
-		#set ..this{2};
-	}();
-};
-1;//1
-#def obj;//2
-#def:{4;3;2}[1];//3
-#def:{{1;2};def let a=4;}[1];//4
-#def:(){1;2;3;}{5}¬[1];//5
+#set {}.a=2;
+debugger :a"value";

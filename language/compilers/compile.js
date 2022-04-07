@@ -5,9 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: add array support
-//TODO: fix getCode() NEEDSTESTING
-//TODO: javascript-like bool operators e.g.'a && b' ==> `eval's b if a`
+//TODO: prevent 'set a.b=b' from creating new labels
 //TODO: bugcheck: add line/column numbers
 //TODO: bugcheck: add state checking for jump command. e.g. prevent 'jump+2;move+2;null;'
 let TESTING=1;
@@ -33,7 +31,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+\b|0b[01]+|[1-9][0-9]+|[\w_]+|[=-]>|::|\.{1,3}|[&|\^]{1,2}|[><!]=|={1,3}|>{1,3}|<{1,2}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -158,23 +156,24 @@ const oxminCompiler=async function(inputFile,fileName){
 		class Operator_numeric{
 			//numOfArgs: 1|2;
 			///operation: () => number;
-			operation;
-			leftArgOnly;
-			rightArgOnly;
+			operation;//:(any,any)=>any;
+			leftArgOnly;//:(any)=>any;
+			rightArgOnly;//:(any)=>any;
 			constructor(operation_2Args=0,leftArgOnly=0,rightArgOnly=0){//(a+b,a+,+b)
 				if(leftArgOnly)throw Error("compiler error: operator form: 'a +' is not supported");
 				this.operation=operation_2Args;
 				this.leftArgOnly=leftArgOnly;
 				this.rightArgOnly=rightArgOnly;
 			}
-			do({args,hasEquals}){
+			do({args,hasEquals}){//nextArgData:{statement;scope;index;etc...} 
 				///ans:number;
 				let ans,arg0=args.pop(),arg1,fistArg;
+				let number0=arg0?arg0.toNumber().number:undefined;
 				let do1Arg=true;//true=> does 1 arguments operation instead.
 				if(args.length>0&&this.operation){
 					arg1=args.pop();
 					if(arg1 instanceof Value){
-						ans=this.operation((fistArg=arg1).toNumber().number,arg0.toNumber().number);
+						ans=this.operation((fistArg=arg1).toNumber().number,number0);
 						do1Arg=false;
 						if(hasEquals){if(fistArg.type=="label"&&fistArg.parent&&fistArg.parent.labels[fistArg.name]){
 							fistArg.label.lineNumber=ans;
@@ -185,22 +184,33 @@ const oxminCompiler=async function(inputFile,fileName){
 					}
 				}
 				if(do1Arg){
-					if(this.rightArgOnly)ans=this.rightArgOnly(arg0.toNumber().number);
-					else if(this.leftArgOnly)ans=this.leftArgOnly(arg0.toNumber().number);
+					if(this.rightArgOnly)ans=this.rightArgOnly(number0);
+					else if(this.leftArgOnly)ans=this.leftArgOnly(number0);
 					args.push(new Value.Number(ans));
 				}
 			}
 		};
 		class Operator_bool{//UNFINISHED
-			operation;
-			constructor(operation){
-				this.operation=operation;
+			needsSecondArg;//bool=>bool;//true => will evaluate the second argument
+			operator;//(a:bool,b:bool,a:Value,b:Value)=>Value;//returns the value of the operator
+			constructor(needsSecondArg,operator,is2Args=true){
+				this.needsSecondArg=needsSecondArg;
+				this.operator=operator;
+				this.is2Args=is2Args;
 			}
-			next(){//next Arg
-
+			static equality(value1,value2){//:bool
+				value1=value1.toType(value2.type);
+				return this.strictEquality(value1,value2);
 			}
-			do({args}){//only first arg
-
+			static strictEquality(value1,value2){//:bool
+				if(value1.type!=value2.type)return false;
+				switch(value1.type){
+					case"number":return value1.number===value2.number;break;
+					case"string":return value1.string=value2.string;break;
+					case"label":return value1.label=value2.label;break;
+					case"array":return value1.array=value2.array;break;
+					default: return false;
+				}
 			}
 		}
 	//----
@@ -248,8 +258,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			///statement:code tree|Scope;
 			if(statement instanceof Scope){
-				scope.parent=statement;
-				await evalBlock(statement.code,undefined,statement);
+				await evalBlock(statement.code,statement,scope.label);
 				return;
 			}
 			let codeObj=new Variable({name:"(code line)",type:"array"});
@@ -701,7 +710,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			({index,value}=await contexts.expression_short({statement,index,scope}));
 			const label=Variable.fromValue(value);
 			if(label){
-				if(state["let"])Object.assign(scope.labels,label.labels);
+				if(state["let"])Object.assign(scope.let.label.labels,label.labels);
 				if(state["set"])scope.code.push(...label.code);
 				if(state["def"])await evalBlock(label.getCode(),undefined,scope);
 			}
@@ -865,8 +874,9 @@ const oxminCompiler=async function(inputFile,fileName){
 						}//'a.b'
 						else {
 							if(typeof name=="string")value.label=value.parent.findLabel(name)?.label;
-							if(typeof name=="number"){
+							if(typeof name=="number"){//'a[b]'
 								value.refType="array";
+								if(name<0)name=name+(parent.code?.length??0);//a[]
 								value.number=name;
 								value.label=
 									parent.code[name] instanceof Variable?parent.code[name]:
@@ -983,8 +993,29 @@ const oxminCompiler=async function(inputFile,fileName){
 			"^":new Operator_numeric((a,b)=>a^b),
 			"&":new Operator_numeric((a,b)=>a&b),
 			"~":new Operator_numeric((a,b)=>~(a|b),0,a=>~a),
-			//
-			"!":new Operator_numeric(0,0,a=>+!a),
+
+			">=":new Operator_numeric((a,b)=>a>=b),
+			"<=":new Operator_numeric((a,b)=>a<=b),
+			">":new Operator_numeric((a,b)=>a>b),
+			"<":new Operator_numeric((a,b)=>a<b),
+
+			"==":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.equality(v1,v2))),
+			"!=":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
+			"===":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
+			"!==":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
+			"!":new Operator_bool(v=>false,(b1,b2,v1,v2)=>!b1,false),
+
+			"&&":new Operator_bool(v=>v,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
+			"||":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v1:v2),
+			"^^":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v2:b2?new Value.Number(0):v2),//xor
+		},
+		truthy(value){//(Value)=>bool
+			if(!(value instanceof Value))return false;
+			if(value.type=="number")return !!value.number;
+			else if(value.type=="label")return !!value.label;
+			else if(value.type=="string")return !!value.string;
+			else if(value.type=="array")return !!value.array;
+			else return false;
 		},
 		async expression({index,statement,scope,startValue=undefined,includeBrackets=true,shouldEval=true}){//a + b
 			let value=new Value();
@@ -1019,7 +1050,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					index++;
 					let firstArg=args.pop();
 					let assignmentType;
-					if(firstArg instanceof Operator){
+					if(firstArg instanceof Operator){//'a += b'
 						assignmentType=firstArg;
 						firstArg=args.pop();
 						if(!(firstArg instanceof Value))throw Error("0xmin type error:"+
@@ -1029,12 +1060,12 @@ const oxminCompiler=async function(inputFile,fileName){
 					let value;//don't need to do `index++` here
 					({value,index}=await contexts.expression({statement,index,scope,includeBrackets:false}));
 					//value??=new Value();
-					if(firstArg instanceof Value && firstArg.type=="label"){
+					if(firstArg instanceof Value){
 						if(assignmentType==undefined&&word=="="){//evals 'a = b'
 							//let doAssignMent=0||(firstArg.name in firstArg.parent.labels);
 							let newLabel;{
 								//mutation
-								newLabel=Variable.fromValue(new Value(value))
+								newLabel=Variable.fromValue(new Value(value));
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
@@ -1068,13 +1099,28 @@ const oxminCompiler=async function(inputFile,fileName){
 					args.push(value);
 				}else if(word in contexts.operators){//'+-*/'
 					index++;
-					let hasEquals;
-					if(statement[index]=="="){hasEquals=true;index++}
-					let value;{//get second arg
-						({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
-						args.push(value);
+					if(shouldEval){
+						let hasEquals,value;
+						//get second arg
+						const operator=contexts.operators[word];//:Operator_bool|Operator_numeric
+						if(statement[index]=="="){hasEquals=true;index++}
+						if(operator instanceof Operator_bool){
+							let arg1=args.pop(value),bool1=contexts.truthy(arg1);
+							if(operator.is2Args){
+								let shouldEval=operator.needsSecondArg(bool1);
+								({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
+								value=operator.operator(bool1,contexts.truthy(value),arg1,value);
+							}else value=operator.operator(bool1,null,arg1,null);
+							args.push(value);
+						}
+						else {//operator:Operator_numeric
+							({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
+							args.push(value);
+							operator.do({args,hasEquals});
+						}
+					}else{
+						({index}=await contexts.expression_short({index,statement,scope,shouldEval}));
 					}
-					contexts.operators[word].do({args,hasEquals});
 				}
 				else if(!nameLast){//not: 'name name'
 					if(!endingStringList.includes(word)){//word.match(nameRegex)||["(", "[", "{"].includes(word)){
@@ -1386,6 +1432,27 @@ const oxminCompiler=async function(inputFile,fileName){
 				else if(value.type=="string")number=value.string[0]?.charCodeAt?.();
 				else if(value.type=="array")throw Error("0xmin type error: the array  Value type is not fully supported yet.")
 				return new Value.Number(number);
+			}
+			toString(value=this){
+				let string;//:number
+				if(value.type=="number"){string=""+value.number}
+				else if(value.type=="label"){if(value.label)string=value.label.code.reduce((s,v)=>{
+					if(v instanceof AssemblyLine)
+					if(v.dataType=="char")s+=String.fromCharCode(+v.args[1]);
+					else if(v.dataType=="number")s+=String.fromCharCode(+v.args[0])
+					return s;
+				},"");}
+				else if(value.type=="string")string=value.string;
+				else if(value.type=="array")throw Error("0xmin type error: the array  Value type is not fully supported yet.")
+				return new Value({type:"string",string});
+			}
+			toType(type){
+				switch(type){
+					case"number":return this.toNumber();break;
+					case"string":return this.toString();break;
+					//case"array":return this.array;break;
+					case"label":return Variable.fromValue(this).toValue("label");break;
+				}
 			}
 			toJS(){//UNUSED
 				switch(this.type){
@@ -1759,6 +1826,15 @@ const oxminCompiler=async function(inputFile,fileName){
 					"code":async({label})=>new Variable({name:"(..code)",//BODGED
 						code:label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""}))),
 					}).toValue("label"),
+					"splice":async({label,args})=>{
+						args[0]??=new Value.Number(0);
+						args[1]??=new Value.Number(0);
+						args[2]??=new Variable().toValue("label");
+						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
+						if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
+						label.code.splice(args[0],args[1],...args[2]);
+						return label;
+					},
 					"array":async({label})=>new Variable({name:"(..array)",code:label.code}).toValue("label"),
 					"labels":async({label})=>{
 						let list=[];
@@ -1911,6 +1987,9 @@ const oxminCompiler=async function(inputFile,fileName){
 			//code;
 			//parent;
 		}
+	//----
+	//functions
+
 	//----
 	{
 		const nullValue=assemblyCompiler.nullValue=new AssemblyLine({
