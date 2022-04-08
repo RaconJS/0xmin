@@ -1,0 +1,31 @@
+//import "adder.0xmin";
+//import lib"io.0xmin";
+let Data()={
+	jump->..this..return;
+	#let def: consts;
+	#let def: vars;
+	#let: var(val)={
+		#set: vars{
+			#def: val;
+		};
+		#set: return=val;
+	};
+	#let: const(val)={
+		#set: vars{
+			#def: val;
+		};
+		#set: return=val;
+	};
+	#let: remove(label){
+		#set: ..this{
+			$ram=>label;
+		};
+	};
+};
+let loop(times){
+	def let data=Data();
+	let i=data.var(0);
+	let times=data.const(times);
+	move=>times;
+};
+loop(10);

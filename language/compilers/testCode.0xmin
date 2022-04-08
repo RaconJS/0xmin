@@ -1,27 +1,3 @@
-//import "../code/0xmin3/adder.0xmin";
-//import lib"io.0xmin";
-let Data()={
-	#let def: consts;
-	#let def: vars;
-	void:{
-		#let: var(val)={
-			#set: vars{
-				#def: val;
-			};
-			#set: return=val;
-		};
-		#let: const(val)={
-			#set: vars{
-				#def: val;
-			};
-			#set: return=val;
-		};
-		#let: remove(label){
-			#set: ..this{
-				$ram=>label;
-			};
-		};
-	};
-};
-#set {}.a=2;
-debugger :a"value";
+#()={
+	debugger"scope.getStack((s,n)=>[n,s.made,s.var==s])";
+}();
