@@ -1,3 +1,4 @@
 #()={
-	debugger"scope.getStack((s,n)=>[n,s.made,s.var==s])";
+	debugger"scope.getStack((s,n)=>[n,s.var==s])";
 }();
+debugger #{}()"";
