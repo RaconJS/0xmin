@@ -10,8 +10,8 @@ let Data()={
 		};
 		#set: return=val;
 	};
-	#let: const(val)={
-		#set: vars{
+	#let: const(val)={;
+		#set: consts{
 			#def: val;
 		};
 		#set: return=val;
@@ -23,9 +23,17 @@ let Data()={
 	};
 };
 let loop(times){
+	let temp;
 	def let data=Data();
+	...let data;
 	let i=data.var(0);
-	let times=data.const(times);
-	move=>times;
+	#times=data.const(1<<times);
+	move=>times;get;
+	move=>i;set;
+	delete times;
+	#def:{}{//main loop; has this
+		move=>i;get;
+		move=>data
+	}
 };
 loop(10);
