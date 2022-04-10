@@ -1,2 +1,4 @@
-#import this "../code/0xmin3/code.0xmin";
-let foo(){#{1};3};
+//#import this "../code/0xmin3/code.0xmin";
+debugger#()={
+	#set ..return =3;
+}()"label.name";

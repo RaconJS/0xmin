@@ -469,6 +469,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							value.label.unDefine();
 							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
 							scope.label.code.push(value.label);
+							value.label.defs.push(scope.label);
 						}else{
 							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name+"' is undefined"));
 						}
@@ -514,7 +515,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						scope.label.code.push(arg1);
 					}else{
 						contexts.meta_defineLabelToNextLine(value.label,scope,value);
-						if(value.label)value.label.defs.push(scope.label);
+						if(value?.label)value.label.defs.push(scope.label);
 					}
 				}
 				if(state["insert"]){//'$set label;' => inserts contence of label
@@ -554,7 +555,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				if(["->", "<-", "=>", "<="].includes(word)){
 					index++;
 					({value,index}=await contexts.expression_short({statement,index,scope,startValue}));
-					let operator=new Operator(word,[startValue,value]);
+					let operator=new Operator(word,[startValue,value]);//:value[]
 					word=statement[index];
 					if(word&&("+-".includes(word)||word[0].match(/[0-9]/))){//'move->label+1;' or 'move->label 5;'
 						({value,index}=await contexts.expression_short({statement,index,scope,startValue}));
@@ -1444,14 +1445,14 @@ const oxminCompiler=async function(inputFile,fileName){
 				this.type="label";
 				this.number=label.lineNumber;
 			}
-			parent;//'parent.name' ==> label
-			refType="property";//:'property'|'array'; 'a.b','a[b]','set a {b}';
-			label;//label Object
-			name;//label name (from parent.labels)
-			string;
 			type="label";//label|number|array|string; label == array == function
-			bool=false;
+			label;//label Object
+				name;//label name (from parent.labels)
+				parent;//'parent.name' ==> label
+				refType="property";//:'property'|'array'|'return'; 'a.b','a[b]','set a {b}';
+			string;
 			number=0;//relAddress
+			bool=false;//OBSILETE
 			get array(){return this.label?.code;}//code ///arry: Variable|CodeLine; from: Variable.prototype.code
 			set array(val){(this.label??=new Variable()).code=val;}
 			static Number=
