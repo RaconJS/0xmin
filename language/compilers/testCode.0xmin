@@ -1,4 +1,1 @@
-//#import this "../code/0xmin3/code.0xmin";
-debugger#()={
-	#set ..return =3;
-}()"label.name";
+#import this "../code/0xmin3/code.0xmin";
