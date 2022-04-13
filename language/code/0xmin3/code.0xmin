@@ -1,6 +1,7 @@
 //import "adder.0xmin";
-//import lib"io.0xmin";
-let Data()={
+import lib"io.0xmin";
+let Data()={//debugger ..this..return"label";
+	delete;
 	jump->..this..return;
 	#let def: consts;
 	#let def: vars;
@@ -11,9 +12,17 @@ let Data()={
 		#set: return=val;
 	};
 	#let: const(val)={;
-		#set: consts{
-			#def: val;
+		let isFound=0;//false
+		#let i=0;
+		repeat (consts..length*(+isFound==0)):{
+			#set isFound = #((+consts[+i][1]) == (+val));
+			#set i=i+1;
 		};
+		repeat (+isFound==0):
+		#set: consts{
+			$def set: val;
+		};
+		repeat (+isFound==1):#set val=consts[i-1][1];
 		#set: return=val;
 	};
 	#let: remove(label){
@@ -22,18 +31,68 @@ let Data()={
 		};
 	};
 };
-let loop(times){
+let loop(times,do){
 	let temp;
 	def let data=Data();
-	...let data;
-	let i=data.var(0);
-	#times=data.const(1<<times);
+	...let data;//var,const; import*;
+	let i=var(0);
+	#times=const(1<<times);
 	move=>times;get;
 	move=>i;set;
 	delete times;
 	#def:{}{//main loop; has this
-		move=>i;get;
-		move=>data
-	}
+		#let state;
+		$set state=>move;
+		#def do;
+		move=>i;
+		get;
+		move=>const(2);
+		if;null;
+		blue;
+		move=>i;set;
+		move=>state;
+		if;
+		jump->..this;
+		jump->..return;
+	};
 };
-loop(10);
+def let data=Data();
+let last=data.var(0);
+let default0(condition){
+	if;null;
+	#def condition;
+	move=>data.const(0x20000000);
+	if;jump+2;get;
+};
+#def: loop(2)::{
+	//:
+		let a=data.var(0);
+		move=>last;get;
+		move=>data.const(2);red;
+		move=>a;set;
+		let b=data.var(0);
+		move=>last;get;
+		move=>b;set;
+		let c=data.var(0);
+		move=>last;get;
+		if;null;
+		move=>data.const(2);
+		def default0({blue});
+		move=>c;set;
+	//:
+		move=>c;get;
+		move=>b;def default0({and});
+		let bc=data.var(0);
+		move=>bc;set;
+		;
+		move=>a;get;def default0({nor});
+		move=>c;def default0({and});
+		let ac=data.var(0);
+		move=>ac;set;
+		;
+	//----
+};
+jump 0;
+// 00 01 11 10
+//0 0  1  1  0
+//1 1  1  0  1
