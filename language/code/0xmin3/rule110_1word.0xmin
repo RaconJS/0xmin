@@ -1,0 +1,184 @@
+//import "adder.0xmin";
+import lib "io.0xmin";//spares 4 words of memory for us used by periferals e.g. keyboard and screen.
+"hello world\n";//print("hello world");
+let Data()={
+	delete;
+	jump->..this..return;
+	#let def: consts;
+	#let def: vars;
+	#let: var(val)={
+		#set: vars{
+			#def: val;
+		};
+		#set: return=val;
+	};
+	#let: const(val)={;
+		let isFound=0;//false
+		#let i=0;
+		repeat (consts..length*(+isFound==0)):{
+			#set isFound = #((+consts[+i][1]) == (+val));
+			#set i=i+1;
+		};
+		repeat (+isFound==0):
+		#set: consts{
+			$set def: val;
+		};
+		repeat (+isFound==1):#set val=consts[i-1][1];
+		#set: return=val;
+	};
+	#let: remove(label){
+		#set: ..this{
+			$ram=>label;
+		};
+	};
+};
+let loop(times,do){
+	let temp;
+	def let data=Data();
+	...let data;//var,const; import*;
+	let i=var(0);
+	#set times=const(1<<(times-1));
+	move=>times;get;
+	move=>i;set;
+	delete times;
+	#def:{}{//main loop; has this
+		#let state;
+		$set state=>move;
+		#def do;
+		move=>i;
+		get;
+		move=>const(2);
+		if;null;
+		blue;
+		move=>i;set;
+		move=>state;
+		if;
+		jump->..this;
+		jump->..return;
+	};
+};
+def let data=Data();
+let last=data.var(1);//last value of rule 110
+//the number '0' is not possible in 0xmin which is used for condision statements
+//default0 is a lazy way to work round this.
+let doStep={
+	let default0(condition,default){
+		//repeat (!!default)
+		if;null;
+		#def condition;
+		move=>data.const(1);//0x20000000);
+		if;jump+2;get;
+	};
+	let next=data.var(0);
+	//: load a,b,c
+		let a=data.var(0);
+			move=>last;get;
+			if;null;
+			move=>data.const(2);
+			def default0({blue});
+			move=>a;set;
+		let b=data.var(0);
+			move=>last;get;
+			move=>b;set;
+		let c=data.var(0);
+			move=>last;get;
+			move=>data.const(2);red;//is never 0
+			move=>c;set;
+	//:
+	let update;{
+		//move=>c;get;
+		move=>b;def default0({xor});
+		move=>next;set;//next = b^c;
+		let when011=data.var(0);
+		move=>a;get;if 1;//if true
+		nor;//~a
+		let breakTester(){
+			move=>next;
+			if;
+			jump+2;
+			jump->update;
+		};
+		def breakTester();
+		move=>b;and;//~a&b
+		def breakTester();
+		move=>c;and;//~a&b&c
+		def breakTester();
+		move=>next;or;set;//next|= ~a&b&c;
+		//jump+2;
+	};
+	move=>next;
+	def update{
+		get;
+		move=>last;set;
+	};
+	delete update;
+	//----
+};
+let displayBits(value){
+	let temp=data.var(0);
+	move=>value;get;
+	delete value;
+	let length=16;
+	{//splice
+		if 1;
+		move=>data.const(1<<(30-length));
+		red;
+		move=>data.const(1);
+		if;jump+2;get;
+	};
+	move=>temp;set;
+	#def let:loop1=loop(length)::{
+		move=>data.const(0x20000000);get;if 1;
+		move=>temp;and;
+		def let drawBit{
+			if;
+			let then{"#"};
+			let else{"."};
+			jump->then;
+			def else;
+			jump->then..return;
+			def then;
+		};
+		get;if 1;
+		move=>data.const(2);
+		{//default0
+			red;
+			move=>data.const(1);
+			if;jump+2;get;
+		};//assert if == false
+		move=>temp;set;
+	};
+	"\n";
+};
+let show=displayBits(last);
+let forever(do)={
+	let state;
+	$set state=>move;
+	def do;
+	move=>state;
+	jump->..this;
+};
+def main;
+def forever()::{
+	move=>last;get;
+	move=>io.output;set;
+	def show;
+	def doStep;
+};
+jump 0;
+//rule110
+// 00 01 11 10 AC
+//0 0  1  1  0
+//1 1  1  0  1
+//B
+//
+//B xor C
+// 00 01 11 10 AC
+//0 0  1  1  0
+//1 1  0  0  1
+//B
+//  ~B&C ==> B~~C
+//| B&~A
+//| B&~C
+//(~B & C) | (B & ~(A&C) )
+//== b^c | ~a&b&c
