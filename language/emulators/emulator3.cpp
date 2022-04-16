@@ -507,9 +507,9 @@ class NumberDisplay{
 					if(address==0){
 						if(!address_sign)hasHault=true;//'jump 0;' => 'hault;'
 						else {
-							if(!inputWasPressed&&wasInputDown){//jump -0;' => 'wait for input'; for debugging
-								jump++;//on falling rising
-								//inputWasPressed=false;
+							if(inputWasPressed&&wasInputDown){//jump -0;' => 'wait for input'; for debugging
+								jump++;//on rising rising
+								inputWasPressed=false;
 								wasInputDown=true;
 							}
 							wasInputDown=inputWasPressed;
