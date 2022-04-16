@@ -31,7 +31,7 @@ variables:
   equalSigns: '<=>|<=|=>|=|==|<->|<-|->'
   assembly_operators: '<->|<-|->'
   operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?¬]'
-  assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if)\b'
+  assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump)\b'
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|log.code|log.table)'
   functionCallSymbols: '(?!\=)=>|->|<-|(?!\=)='
@@ -50,17 +50,17 @@ contexts:
     #- include: baseMain
   global:
     - match: '}|\]|\)'
-      #scope: invalid.illegal
+      scope: invalid.illegal
     - match: ''
       push: line_start
   line_start: #new parser
     - include: baseMain
-    - match: '}'
-      pop: true
+    - match: '\}'
+      #pop: true
     - match: '\)|\]'
       scope: invalid.illegal
     - match: '\s*'
-      set: line_start_1
+      set: line_start_1_default
   line_start_1_main:
     - match: '\b(?:void|static|virtual)\b'
       scope: keyword.statementType.0xmin
@@ -80,18 +80,56 @@ contexts:
   line_start_3_main:
     - match: '\b(?:recur|repeat)\b'
       scope: keyword.controll.0xmin
+  line_start_3_getDefaultPhase:
+    - match: '(?=\b(let|def)\b)'
+      set: meta_macro
+    - match: '(?=\b(undef|ram)\b)'
+      set: meta_hidden
+    - match: ''
+      set: meta_assembly
+  function:
+    - include: baseMain
+    - match: '\('
+      set: #parameters
+        - include: baseMain
+        - match: '\)'
+          set: 
+            - match: '{{functionCallSymbols}}?'
+              scope: support.constant.functionType.0xmin
+              set:
+                - match: '\{'
+                  set: line_start
+                - match: '(?=\S)'
+                  fail: bracket
+        - match: '(?=\S)'
+          push: expression_short
+  expression_short_bracket:
+    - match: '\('
+      push: expression_normal
+      set: expression_extends
+  expression_end:
+    - match: '(?=\;|\})'
+      pop: true
   expression_short:
     - meta_scope: short.TEST
     - include: baseMain
+    - include: expression_end
     - match: '{{signedNumber}}'
       scope: constant.numeric
       set: expression_extends
-    - match: '\s*\('
-      push: expression_normal
-    - match: '\s*\['
-      set: expression_square
-    - match: '\s*\{'
-      set: line_start
+    - match: '(?=\()'
+      #push: expression_normal
+      #set: expression_extends
+      branch_point: bracket
+      branch:
+        - function
+        - expression_short_bracket
+    - match: '\['
+      push: expression_square
+      set: expression_extends
+    - match: '\{'
+      push: line_start
+      set: expression_extends
     - match: '\b\w+\b'
       set: expression_extends
     - match: '(?=\S)'
@@ -99,10 +137,15 @@ contexts:
   expression_extends:
     - meta_scope: extend.TEST
     - include: baseMain
+    - include: expression_end
     - match: '\.\.'
       push:
+      - include: baseMain
       - match: '\b(?:length|compile|array|code|labels|seal|freeze|this|return)\b'
         scope: support.function.internalScope.0xmin
+        pop: true
+      - match: '(?=\S)'
+        pop: true
     - match: '\.'
       push:
       - match: '\b\w+\b'
@@ -121,8 +164,11 @@ contexts:
     - match: '\{'
       set: line_start
     - match: '\b\w+\b'
+    - match: '(?=\S)'
+      pop: true
   expression:
     - include: baseMain
+    - include: expression_end
     - match: '(?:[+\-*/%]|\*\*)|(?:^^|&&|\|\|)|(?:)'
       scope: keyword.operator.0xmin
       #push: expression_short
@@ -130,7 +176,7 @@ contexts:
       scope: keyword.assignment.0xmin
     - match: '=|=>'
       scope: keyword.assignment.0xmin
-    - match: '(?=[{\(\w])'
+    - match: '(?=[{\(\w\.])'
       push: expression_short
     - match: '(?=\S)'
       pop: true
@@ -139,9 +185,9 @@ contexts:
     - include: baseMain
     - match: '\)'
       pop: true
+    - include: expression
     - match: '\]|\}'
       scope: invalid.illegal
-    - include: expression
   expression_square:
     - include: baseMain
     - match: '\]'
@@ -149,16 +195,56 @@ contexts:
     - match: '\)'
       scope: error
       pop: true
+    - include: expression
     - match: '\)|\}'
       scope: invalid.illegal
-    - include: expression
+  endLine:
+    - match: ';|(?=}|$)'
+      pop: true
   meta_assembly:
+    - meta_scope: '@'
     - include: baseMain
+    - include: endLine
+    - match: '{{assembly_registers}}'
+      scope: keyword.register.0xmin
+      push: meta_assembly_args
+    - match: '{{assembly_commands}}'
+      scope: keyword.assembly.0xmin #support.constant
+      push: meta_assembly_args
+    - match: ','
+    - match: ''
+      pop: true
+  meta_assembly_args:
+    - include: baseMain
+    - include: endLine
+    - match: '{{assembly_registers}}'
+      scope: keyword.register.0xmin
+    - match: '{{assembly_operators}}'
+      scope: support.constant.operator.0xmin
+    - match: ''
+      push: expression_short
   meta_hidden:
+    - meta_scope: '$'
     - include: baseMain
+    - include: endLine
+    - match: '((?:\b(?:let|set|def)\b\s*)*):?'
+      captures:
+        1: entity.name.hidden.0xmin
+      push: expression
+    - match: ','
+    - match: ''
+      pop: true
   meta_macro:
+    - meta_scope: '#'
     - include: baseMain
-
+    - include: endLine
+    - match: '((?:\b(?:let|set|def)\b\s*)*):?'
+      captures:
+        1: keyword.declaration
+      push: expression
+    - match: ','
+    - match: ''
+      pop: true
   line_start_1: #new parser
     - include: baseMain
     - include: line_start_1_main
@@ -171,6 +257,10 @@ contexts:
     - match: '@'
       scope: keyword.assembly.0xmin
       set: line_start_1_assembly
+  line_start_1_default:
+    - include: line_start_1
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_2_default
   line_start_1_meta:
     - include: line_start_1
     - match: '{{line_start_endLinePart}}'
@@ -198,6 +288,10 @@ contexts:
     - match: '@'
       scope: keyword.assembly.0xmin
       set: line_start_2_assembly
+  line_start_2_default:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_default
   line_start_2_meta:
     - include: line_start_2
     - match: '{{line_start_endLinePart}}'
@@ -225,6 +319,10 @@ contexts:
     - match: '@'
       scope: keyword.assembly.0xmin
       set: line_start_3_assembly
+  line_start_3_default:
+    - include: line_start_3
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_getDefaultPhase
   line_start_3_meta:
     - include: line_start_2
     - match: '{{line_start_endLinePart}}'
@@ -239,6 +337,17 @@ contexts:
     - match: '{{line_start_endLinePart}}'
       set: meta_assembly
     - include: line_start_endLinePart
+
+
+
+
+
+
+
+
+
+
+
 
 #old simple parser
   mainScope:
@@ -279,10 +388,10 @@ contexts:
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|continue|break)\b'
       scope: variable.parameter
-    - match: '{{assembly_commands}}'
-      scope: support.constant
     - match: '{{assembly_registers}}'
       scope: keyword.control.register.0xmin
+    - match: '{{assembly_commands}}'
+      scope: support.constant
     - match: '#'
     #  push: main_meta
       scope: support.constant.meta.0xmin
