@@ -823,7 +823,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		},
 		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
 		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
-		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent
+		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent this
 		//expression_short:
 			async getIndexedPropertyName({index,statement,scope}){
 				let name,failed=false;
@@ -1045,7 +1045,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let word=statement[index],value,failed;
 				//ignore '#' in '#(' or '#{'
 				if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
-				else if(["=", "=>"].includes(word)){
+				else if(["=", "<=>"].includes(word)){
 					index++;
 					let firstArg=args.pop();
 					let assignmentType;
@@ -1064,7 +1064,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							//let doAssignMent=0||(firstArg.name in firstArg.parent.labels);
 							let newLabel;{
 								//mutation
-								newLabel=Variable.fromValue(new Value(value));
+								newLabel=Variable.fromValue(value);
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
@@ -1082,7 +1082,7 @@ const oxminCompiler=async function(inputFile,fileName){
 							}
 							args.push(value);
 						}
-						else if(word=="=>"){
+						else if(word=="<=>"){
 							//UNFINISHED: needs code for array assignment
 							args.push(firstArg);
 						}
