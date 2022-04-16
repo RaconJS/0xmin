@@ -1,0 +1,66 @@
+def let os={
+	...{
+		let LinkedList()={
+
+		};
+		let Data()={
+			delete;
+			jump->..this..return;
+			#let def: consts;
+			#let def: vars;
+			#let: var(val)={
+				#set: vars{
+					#def: val;
+				};
+				#set: return=val;
+			};
+			#let: const(val)={;
+				let isFound=0;//false
+				#let i=0;
+				repeat (consts..length*(+isFound==0)):{
+					#set isFound = #((+consts[+i][1]) == (+val));
+					#set i=i+1;
+				};
+				repeat (+isFound==0):
+				#set: consts{
+					$set def: val;
+				};
+				repeat (+isFound==1):#set val=consts[i-1][1];
+				#set: return=val;
+			};
+			#let: remove(label){
+				#set: ..this{
+					$ram=>label;
+				};
+			};
+		};
+		let loop(times,do){
+			let temp;
+			def let data=Data();
+			...let data;//var,const; import*;
+			let i=var(0);
+			#set times=const(1<<(times-1));
+			move=>times;get;
+			move=>i;set;
+			delete times;
+			#def:{}{//main loop; has this
+				#let state;
+				$set state=>move;
+				#def do;
+				move=>i;
+				get;
+				move=>const(2);
+				if;null;
+				blue;
+				move=>i;set;
+				move=>state;
+				if;
+				jump->..this;
+				jump->..return;
+			};
+		};
+	};
+	debugger Data"label"; 
+	import lib "io.0xmin";
+	let pages;//:linkedList
+};
