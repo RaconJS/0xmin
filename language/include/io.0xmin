@@ -8,11 +8,11 @@
 #def set: io{
 	#let def: input{
 		null ;//move;get;
-		0x20000000;#def: terminal.input;
+		0x20000000 #def: terminal.input;
 	};
 	#let def: output{
 		null;
-		0x20000000;#def: terminal.output;
+		0x20000000 #def: terminal.output;
 	}
 
 };

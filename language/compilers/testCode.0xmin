@@ -1,4 +1,1 @@
-//#import this "../code/0xmin3/code.0xmin";
-#import lib "io.0xmin";
-"hello\nworld";
-jump->0xmin 1;//return
+#import this "../code/0xmin3/operatingSystem.0xmin";

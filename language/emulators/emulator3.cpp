@@ -194,10 +194,10 @@ class R2Terminal{
 		}
 	}
 	filt30* input;//from keyboard
-	filt30* output;//to screen
-	filt30 filtObj;
+	filt30* output;//ramCoord to screen
+	filt30 filtObj;//
 	filt30 redFilt =0x20000000;
-	filt30 data    =0x00020000; 
+	filt30 data    =0x00020000;//char
 	filt30 _char   =0x00000000;//0x10??,
 	filt30 _pos    =0x00001000;//0x1???, //0x1yyx
 	filt30 _col    =0x00002000;//0x20??,
@@ -248,8 +248,8 @@ class R2Terminal{
 	void onUpdate(){
 		//*input=redFilt;
 		handle_output:{
-			filt30 filtObj=getCPU_currentWord();
-			filtObj = !(filtObj&redFilt)?*output:filtObj;
+			filt30 currentWord=getCPU_currentWord();//auto print
+			filtObj = !(currentWord&redFilt)?*output:currentWord;
 			if(filtObj&redFilt){
 				if(filtObj&data){
 					switch((u32)filtObj&0x0000f000){
@@ -286,37 +286,40 @@ class R2KeyBoard{
 	int mode=0;//sleep,hasInput,
 	short int dims[2]={4,1};
 	short int offset_x,offset_y;
+	int coolDown=0;
 	void onUpdate(){//called every frame
-		u32 returnVal;
+		u32 returnVal=0;
 		int latencyFrames=0;
-		if(mode==0){//default idle state
-			if(inputWasPressed){//onKeyDown("go to next stage");
-				latencyFrames=14;
-				returnVal=attensionRequest;
-				mode=1;
+		if(coolDown==0){
+			if(mode==0){//default idle state
+				if(inputWasPressed){//onKeyDown("go to next stage");
+					latencyFrames=14;
+					returnVal=attensionRequest;
+					mode=1;
+				}
+				else if(*output==attensionRequest){
+					returnVal=0x20028000;//failed request
+				}
+				else returnVal=0x20000000;
 			}
-			else if(*output==attensionRequest){
-				returnVal=0x20028000;//failed request
-			}
-			else returnVal=0x20000000;
-		}
-		else if(mode==1){//ready for attension request
-			if(*output==attensionRequest){
-				if(inputWasPressed){
-					latencyFrames=5;
-					returnVal=inputChar;
-					mode=2;
+			else if(mode==1){//ready for attension request
+				if(*output==attensionRequest){
+					if(inputWasPressed){
+						latencyFrames=5;
+						coolDown=5;
+						returnVal=inputChar|terminal._confirm|terminal.data;
+						mode=2;
+					}
+				}
+				else {
+					latencyFrames=0;
+					returnVal=attensionRequest;
 				}
 			}
-			else {
-				latencyFrames=0;
-				returnVal=attensionRequest;
+			else if(mode==2){//sends the charactor for a second time.
+				inputWasPressed=false;
+				mode=0;
 			}
-		}
-		else if(mode==2){//sends the charactor for a second time.
-			returnVal=inputChar;
-			inputWasPressed=false;
-			mode=0;
 		}
 		int pos[2]={offset_x+3,offset_y};
 		cout<<ctx.moveTo(pos[0],pos[1])
@@ -337,12 +340,13 @@ class R2KeyBoard{
 		if(returnVal!=0){
 			bufferToinput[latencyFrames]=returnVal;
 		}
+		if(coolDown>0)coolDown--;
 		if(bufferToinput[0]!=0){
 			*input=bufferToinput[0];
 		}
-		bufferToinput[16-1]=0;
-		for(int i=16-1;i>0;i--){
-			bufferToinput[i-1]=bufferToinput[i];
+		bufferToinput[16-1]=0x20000000;
+		for(int i=0;i<16-1;i++){
+			bufferToinput[i]=bufferToinput[i+1];
 		}
 	}
 	static void inputListener();
@@ -354,7 +358,7 @@ class R2KeyBoard{
 			<<ctx.moveTo(offset_x,offset_y)<<"( )"
 		;
 		input=terminal.input;
-		output=terminal.output;
+		output=&terminal.filtObj;//output;
 	}
 	bool isRunning=true;
 }keyboard;
