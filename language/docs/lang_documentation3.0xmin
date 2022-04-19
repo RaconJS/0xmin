@@ -1,0 +1,227 @@
+//keywords
+void;
+static;
+virtual;
+recur;
+repeat;
+import;
+delete;
+#let;
+#set;
+#def;
+$undef;
+import lib;
+import this;
+import main;
+...;
+//reserved words
+
+//[there are none]
+
+//symbols
+@ $ #
++ - * / ** % ^ & ~ ¬
+! ^^ || &&
+= <=> <->//operator
+-> <- => <=//assembly operator
+=> = -> <- //function types
+... //concat
+( ) [ ] { } //brackets
+"" '' ``; //strings
+//function delcarations
+(){}
+#(){}
+()={}//class
+#()={}//etc...
+()=>{}//arrow function
+()<={}//reverse arrow function
+//can also do '#(){}' to avoid confusion with 'foo=() {}' => 'foo = #(){}' or 'foo=() #{}'
+//function extensions for existing variables
+foo (){}
+foo ()={}
+foo ()=>{}
+foo ()<={}
+//function calls
+foo()
+foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
+foo(a,b) ::c ::{...d} ::e ::f //same function call, just with some external arguments
+//object declarations
+{}
+#{}
+//object extensions
+obj{}
+//@ / $ expressions
+//number can be any of: +123,-123,*123,/123
+label;
+label +123;
+label label;
+label -> +123;
+label -> label;
+label label -> +123;
+label label -> label;
+//line structure
+//formal
+@ $ # void virtual://start of line
+	recur: 2 //allows for this line to be run 2 times
+		@ $ #//choses phase to start at.
+		repeat: 3
+			repeat: 4//3 * 4 = 12 iterations
+				://assembly,hidden,meta phases: have to be done in that order; starts with the phase chosen previously
+					jump label1 => label2//assembly phase; '=>' sets value, '->' just evaluates it.
+					$undef set def://hidden/secret phase;
+						label from => to
+					#let set def://meta phase; '#def x;' == '$undef def set x;'
+						label=foo({})+4
+;
+//note: ':'s,'@$#'s are optional but are recomended as a best practice.
+//Phases symbols can be infered, prioritising the '@' phase over '#' where possible.
+//It is highly recommended to use phase symbols for consistancy.
+// ':' can be used to allow keywords to be seen as variable names
+//e.g.
+#let: let=2;//makes a variable called 'let';
+//instead of
+#let let;//which does nothing; 
+
+//change the default phase
+@; $; #;
+{//e.g.
+	#;//void #;
+	let a;//#let: a;
+	a=2;//#def set: a = 2;
+	@;//void @;
+	a;//@a;
+}//the default phase affects the nearest scope (weak scope).
+
+{//basics
+	//0xmin compatibillity version 3
+	//aka 0xmin V3;
+	0xmin 3;
+	//aka ZASM
+	//aka 0xmin Assembly Small Macro language
+	//aka 0@$#;
+	0@$#;
+	//0xmin is a C-like language. i.e. '//' == comment, {} == block of code
+	//is more similar to javascript in terms of flexibility
+	//zasm uses
+	{};//everything even block scopes MUST end with a ';'.
+	{1;2}//The only exeption is at the last line of code
+};
+0xmin;{//machine code
+	//can write numbers
+	0x123;
+	123;
+	0b1001;
+	//can instead use number arguments for assembly code.
+	//0xmin uses the form:
+	//instuction(4bit) relativeAddress(8bit) sign(1bit)
+	//e.g.
+	//jump -5;//note: singed numbers are not yet supported can use 'jump -> label instead'
+	//can be writen as:
+	1 5 1;//=>'jump -5;'=>[jump,5,-]
+	1 5 0;//=>'jump +5;'=>[jump,5,+]
+	//strings
+	"hello world";
+	//special charactors
+	"\p00";//set curser posision
+	"\h";//hault. compiles to 'jump 0;'
+	"\a";//accept input from terminal
+	"\x00";//ASCII charactor
+	"\u0000";//unicode charactor
+};
+@;{//assembly code
+	{//basics:
+		//commands;
+		//pointer commands
+			move;jump;
+		//misc commands
+			set;if;
+		//alu commands
+			get;nor;red;blue;and;or;xor;
+		
+		//e.g.
+		jump 4 0;
+		//compiles to:
+		1 4 0;
+		//compiles to:
+		0x0041;
+	};
+	//can also use 'a to b' aka 'a -> b' syntax
+	{
+		#let labelName;//created a variable/label called 'labelName' in the 'meta' ('#') phase;
+		$def labelName->0xmin 5;//then in the memory assignment ('$') phase it sets labelName's memory address to 5;
+		//labels can be 
+		jump->labelName;//jumps to labelName
+		move=>labelName;//moves to labelName
+		//'=>' is just like '->' execept at has changes the assosiated pointer compile time
+		//so repeating using '->' :
+			move->labelName; //move #(+labelName);
+			move->labelName; //move #(+labelName);
+		//would compile to the same result each time
+		//but repeating  using '=>' :
+			move=>labelName; //move #(+labelName);
+			move=>labelName; //move 0;
+		//
+	};
+};
+$;{
+
+};
+#;{
+
+};
+import;{
+	//import opens a file and runs it in the current scope
+	//use form
+	import lib "libraryFile.0xmin";//imports a standard library. aka the include folder
+	import this "subFile.0xmin";//imports relative to the current file
+	import main "projectFile.0xmin";//import relative to the first file.
+	import "file.0xmin";//default setting: 'import "";' ==> 'import this "";' 
+};
+...;{
+	...//injects parts of a label into the current scope's label (scope.label)
+	...let: {let a,b,c;};...let object;//properties
+	...set: {1;2;3;};...set array;//code
+	...def: (){1;2;3};...def function;//runs code in scope
+	//these can be combined;
+	... let set def: label;
+};
+delete;{
+
+};
+virtual;{
+	used for struct pointers;
+	e.g.:{
+		let SomeStructure(){
+			def let char2;
+			"ab";
+			def let intA;
+			1;
+			def let intB;
+			4;
+		};
+		def let someCode{//some code with the same structure as 
+			"a";"b";
+			1;2;
+		}
+		let pointer=SomeStructure=();
+		virtual def pointer;
+		//We want 'pointer' and it's properties to have the same cpuStates as 'someCode'
+		//without using 'virtual' we could use ..compile() and 
+	};
+};
+//design notes:
+//function code is imutable
+//cpuState checking
+//with
+jump -> 2;
+jump -> label;
+jump 2;
+jump label;
+//without
+jump -> jump 2;
+jump -> ram 2;
+jump ->jump label;
+
+
+move 2;/*is the same as:*/move=>move 2;
+move->move 2;//does not change
