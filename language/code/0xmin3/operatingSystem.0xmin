@@ -1,7 +1,220 @@
-def let os={
-	...{
-		let LinkedList()={
-
+#def let: os={{
+	#let mainPart(){
+		$set main;
+		jump -> titleScreen;
+		//last
+		def clearScreen;//: {}
+		def terminal;//: {clearScreen}
+		def getWord30;
+		def titleScreen;//: {}->terminal
+		def let morros=terminal.Executable()::{
+			"hello world";
+		}
+		jump 0;
+	};
+	let loadMenus(){;
+		let clearScreen=Function(0)::{
+			"\p00"
+			repeat 0 #def loop(24)::{
+				"        ";
+			};
+			"asd\n";
+		};
+		let getWord30=Function(1)::{
+			//#def getInput.setWait(1);
+			def let data=Data();
+			let ans=data.var(1);
+			let i=data.var(1);
+			let startVal=data.var(1);
+			let input{
+			};
+			//assert alu = startVal
+			move=>i;set;
+			move=>ans;set;
+			#let endLoopState,endLoop;
+			#def let loop=forever()::{
+				#let end,endState;
+				let continueIf(condision){
+					def condision;
+					move=>endState;
+					if;jump +2;jump->end;
+				};let continueElse(condision){
+					def condision;
+					move=>endState;
+					if;jump->end;
+				};
+				#def getInput;
+				let inputChar=data.var(0);
+				move=>inputChar;set;
+				{//test for string
+					if;null;
+					move=>data.var(~0b111);
+					#def continueIf({and});
+					move=>data.var(0b110000);
+					#def continueElse({xor});
+				};
+				{//update ans
+					//0x30 -> 0x38 0b11000 0b11111
+					//assert 'inputChar' is octal 0-7
+					move=>ans;get;
+					move=>data.const(8);red;
+					move=>ans;set;
+					move=>inputChar;get;
+					if 1;
+					move=>data.const(0b111);
+					and;
+					move=>ans;
+					#def: {}{
+						let then;
+						if;
+						jump -> then;
+						jump -> ..return;
+						#def: then{
+							or;//if (inputChar in range[1-7])
+							set;
+						};
+					};
+				};
+				{//terminal
+					move=>inputChar;get;
+					move=>data.const("\x00");or;
+					move=>keyboard.output;set;//"()";
+				};
+				{//i= i<<3;
+					move=>i;get;if;
+					move=>data.const(8);red;
+					move=>endLoopState;
+					{if;jump+2;jump->endLoop;};
+					move=>i;set;
+				};
+				$set end;
+				$set endState=>move;
+			};
+			$set endLoopState=>move;
+			$set endLoop;
+			move=>ans;get;
+		}{
+			1 #def let defaultInput;
+			let baseCall=call;
+			#set call=#(len){
+				def let data=Data();
+				#def baseCall(data.const(1<<(30-(len*3))));
+			};
+		};
+		let terminal=Menu({},{jump 0})::{
+			#def let: data=Data();
+			#def clearScreen.call();
+			"run program:";
+			#let returner{let state,startState,endState;};
+			#def let loop=forever()::{
+				"\njump 0";
+				{//jump command
+					#def getWord30.call(3);//9 bit jump
+					move=>data.const({0 1}..compile[0]);
+					red;
+					move=>data.const({jump}..compile[0]);
+					or;
+				};
+				let progAddress=data.var(0);
+				move=>progAddress;set;
+				{//command type
+					#def getWord30.call(3);//9 bit jump
+					move=>data.const({0 1}..compile[0]);
+					red;
+					move=>data.const({jump}..compile[0]);
+					or;
+				};
+				//assert alu = {jump address};
+				{//execute
+					let statement;
+					move=>statement;
+					set;
+					null;//jump.reads before move.write happens.
+					//jump->statement;
+					null #def statement;//0 #def statement;
+					$set returner=>statement;
+					$set returner.state=>move;
+					$set returner.startState=>move;
+					$set returner.endState=>move;
+				};
+				";";
+			};
+		}{
+			let returner=..this.main.returner;
+			let Executable(block){//
+				#;
+				let exe_address;
+				#set: return = Menu({
+					//def exe_address{virtual jump -> returner;};
+					$set move=>returner.state;
+				},{
+					move=>returner.state;
+					jump->returner;
+				},block)#{let address=exe_address;};
+			}
+		};
+		let titleScreen=Menu=({},{})::{
+			let a=2;
+			"\p00";
+			"\c0f-\c050\c04@\c0a$\c0b#\c0f-\n";
+			"\c0f-\c05Z\c04A\c0aS\c0bM\c0f-\n";
+			//ZeroXMin (0xmin)
+			//Assembly
+			//Small
+			//Macro
+			;
+			//language
+			//repeat 60 null;
+			repeat 0 #def loop(4)::{
+				repeat 8 null;
+			};
+		};
+		#set terminal.enterState{$set move=>titleScreen.exit.state};
+		#set titleScreen.exit{Menu.goto(terminal)};
+	};
+	import lib "io.0xmin";
+	let keyboard=terminal;
+	#let: types(){
+		#let: Type(size,otherProperties){
+			#set: return(val){
+				#set: return = val;
+			};
+			#set: return{
+				...let set: otherProperties;//...labels code
+			};
+			#let: return.size = size;
+		};
+		let int30 = Type(1)::(){};
+		let pointer = Type(1)::(){};
+	};...def types;
+	#let: macros(){
+		let ifDef(condision,then,else){//: {#}
+			let bool=condision;
+			#let callers;
+			repeat (!(!(!(!(+bool))&&then))): #set caller{
+				...set then();
+			};
+			repeat (!(!(!(+bool)&&else))): #set caller{
+				...set else();
+			};
+		};
+		let if(condision,then,else)={//: {@}
+			#let state;
+			let bool=condision;
+			if;null;
+			def condision;
+			$set state=>move;
+			if;
+			jump->then;
+			def else;
+			#def ifDef(else)::(){jump->..return;};
+			$set move=>state;
+			def then;
+		};
+	};...def macros;
+	#let: classes(){
+		let LinkedList(itemSize)={
+			1 #def let tail;//node*
 		};
 		let Data()={
 			delete;
@@ -14,7 +227,7 @@ def let os={
 				};
 				#set: return=val;
 			};
-			#let: const(val)={;
+			#let: const(val)={
 				let isFound=0;//false
 				#let i=0;
 				repeat (consts..length*(+isFound==0)):{
@@ -34,8 +247,18 @@ def let os={
 				};
 			};
 		};
+		let forever(do)={
+			#let state,endState;
+			$set state=>move;
+			#def do;
+			move=>state;
+			jump->this;
+			$set endState=>move;
+		};
+		let min(a,b){//: (#number,#number) -> #number
+			#return=#(a<b) * a + ((a>=b) *b);
+		};
 		let loop(times,do){
-			let temp;
 			def let data=Data();
 			...let data;//var,const; import*;
 			let i=var(0);
@@ -58,9 +281,142 @@ def let os={
 				jump->..this;
 				jump->..return;
 			};
+		}; 
+		#let: Function(inputLength,block)={//:{@}
+			let enterState,exitState;
+			$set enterState=>move;
+			def block;
+			$set exitState=>move;
+			jump 0#def let returnStart;
+			let self=this;
+			let call(){//:{#/@}
+				//call.call();
+				let doReturn=!(!(1));//:bool
+				let returnStatement,returnEnd;
+				#ifDef(doReturn)::(){
+					move=>returnStatement;get;
+					move=>returnStart;set;
+				};
+				let args=arguments;
+				let len=min(inputLength,args..length);
+				#ifDef(len)::(){
+					#let i=0;
+					repeat (len-1) #{
+						move=>args[+i];
+						get;
+						move=>block.input[+i][0];
+						set;
+						#i=i+1;
+					};
+					move=> args[+i];get;
+				};
+				{
+					move=>enterState;
+					jump->block;
+					$move=>exitState;
+					jump returnStart->returnEnd#def returnStatement;
+					#def returnEnd;
+				};
+				//call.return();
+			}{
+				let goto()=>{
+				};
+				let sendInputs()=>{
+					;
+				};
+				let return()=>{
+					let returnTo=#{jump jump<-block};
+					move=>returnTo;get;
+					move=>returnPoint;set;
+				};
+			};
+		}{
+		};
+		def let hault(){
+			let hault={jump 0;};
+			move=>hault;get;
+			move -> 0xmin 0;set;
+			"\c0f\n";
+			jump -> 0xmin 0;
+			def hault;
+		};
+		let Menu(enter,exit,main)={
+			#;
+			let enter=enter,exit=exit,main=main;
+			let enter.state;
+			let exit.state;
+			let a2=2;
+			$set enter.state=>move;
+			@;
+			#def enter;
+			#def main;//code of
+			#def exit;
+			$set exit.state=>move;
+		}{
+			let goto(menu){
+				move=>menu.enter.state;
+				jump->menu.main;
+				"1234";
+			};
+		};
+	};...def classes;
+	#let call(shouldWait)={
+		#static let this.block=block1;
+		if(1 == shouldWait)::{
+			move->block.shouldWait;get;
+			move->block.waitLine;set;
+		}::else()::if(0 == shouldWait)::{
+			move->block.shouldWait;get;
+			move->block.waitLine;set;
+		};
+		#let ret;
+		move->ret;
+		get;
+		move->constructor.block.return;
+		set;
+		jump->constructor.block;
+		jump constructor.block.return->1 def ret;
+		$move->constructor.block.return;
+	};
+	#let getInput{
+		let setWait(bool){
+			repeat(+bool):{
+				move=>isWait;get;
+				move=>waitLine;set;
+			};
+			repeat(1-bool):{
+				move=>isNotWait;get;
+				move=>waitLine;set;
+			};
+		};
+		let waitLine;
+		let confirm;
+		let isWait,isNotWait;
+		#def set checkResponse{
+			let start,end;
+			$start=>move;
+			move=>confirm;
+			get;if 1;
+			move=>keyboard.input;
+			xor;
+			move=>start;
+			if;
+			jump->..this#def waitLine;
+			$end=>move;
+		};
+		delete checkResponse;
+		def let recieveInput{
+			move=>keyboard.input;
+			"\a" #def confirm;
+			repeat 8 or;
+		};//len=17
+		def let cleanInput{
+			def let data=Data();
+			let chars=#{"\a\x00"}..compile;
+			let keyboard.inputTag=data.const(chars[0]|chars[1]);
+			move=>keyboard.inputTag;xor;
 		};
 	};
-	debugger Data"label"; 
-	import lib "io.0xmin";
-	let pages;//:linkedList
+	...loadMenus;
+	def mainPart();
 };
