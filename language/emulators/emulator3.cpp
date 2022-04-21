@@ -555,7 +555,7 @@ void doStep(int i){
 std::thread inputThread;
 void mainThread(){
 	int num=0;
-	for(int i=0;i<40000&&!cpu.hasHault;i++,num++){
+	for(int i=0;i<40000||true&&!cpu.hasHault;i++,num++){
 		//for(int i=0;i<1&&!cpu.hasHault;i++,num++){
 			doStep(i);
 		//}
