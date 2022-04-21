@@ -5,9 +5,11 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: prevent '#set: a.b=b' from creating new labels
-//TODO: add '$void'
-//TODO: fix booleans
+//TODO: #prevent '#set: a.b=b' from creating new labels
+//TODO: #add '$void'
+//TODO: #fix booleans
+//TODO: #allow '+!!a'. aka mid_expression
+//TODO: $detect circular label definisions
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -222,20 +224,23 @@ const oxminCompiler=async function(inputFile,fileName){
 					let rawString=word
 					let includeAllWhiteSpace=word[0]=="`";
 					let array=rawString.substr(1,rawString.length-2)
-						.replace("\\t", "\t")
-						.replace("\\n", "\n")
-						.replace("\\r", "\r")
-						.replace(/\\u(....)/,(v,v1)=>String.fromCharCode(+v1||0))
-						.replace(/\\x(..)/,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
+						.replaceAll("\\t", "\t")
+						.replaceAll("\\n", "\n")
+						.replaceAll("\\r", "\r")
+						.replaceAll(/\\u(....)/g,(v,v1)=>String.fromCharCode(+v1||0))
+						.replaceAll(/\\x(..)/g,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
 						.match(/\\[cp][\s\S]{2}|\\[ha]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
 					;
-					let string=JSON.parse(rawString
+					let string=rawString
+						.replaceAll(/(?<!^|\\)(["'`])(?!$)/g,"\\$1")
+						.replaceAll(/^["'`]|["'`]$/g,"\"")
 						.replaceAll(/\\[cp]/g, "\\x")
 						.replaceAll(/\\[ha]/g,"\n")
 						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
 						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
 						.replaceAll(/\t/g,includeAllWhiteSpace?"\\t": "")
-					);
+					;
+					string=JSON.parse(string);
 					index++;
 					return {index,value:string,array};
 				}else{
@@ -358,8 +363,10 @@ const oxminCompiler=async function(inputFile,fileName){
 									if(labels.hasOwnProperty(i))delete labels[i];
 								}
 							}
-							if(word!=","){//delete a,b,c ;
+							if(statement[index]!=","){//delete a,b,c ;
 								break;
+							}else{
+								index++;
 							}
 						}
 					}
@@ -1189,6 +1196,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
 				const assemblyCode=new MachineCode();
+				let passed=0;
 				for(let i=0;i<codeQueue.length;i++){
 					let fails=0;
 					let failList=[];//{i;instruction;failed}[]
@@ -1207,21 +1215,24 @@ const oxminCompiler=async function(inputFile,fileName){
 							({failed}=await this.compileAssemblyLine({instruction,assemblyCode,cpuState,code:codeQueue}));
 							instruction.cpuStateAfter=new CpuState(cpuState);
 						}
+						//if(isNaN(cpuState.move+cpuState.jump)){fails??=Error("cpuState is NaN");break;}
 						if(failed){
 							fails++;
 							failList.push({i,instruction,failed});
 						}
 						if(this.assembly.language=="0xmin"){
+							//if(isNaN(cpuState.move)){loga(instruction.scope.code.map(v=>v),i);throw Error("move is NaN")}
 							cpuState.move=Math.max(0,cpuState.move);
 							cpuState.jump=Math.max(0,cpuState.jump);
 						}
 					}
-					if(fails==0&&i>0)break;
-					if(fails>=lastFails){
+					if(fails==0&&i>0&&passed>0)break;
+					else if(fails==0)passed++;
+					else if(fails>=lastFails){
 						let instruction=failList[0].instruction;
 						let failed=failList[0].failed;
 						let reason=typeof failed== "boolean"?"unspecified reason":failed;
-						console.error("",reason);
+						console.error("",reason,instruction.scope.getStack());
 						throw Error(throwError({scope:instruction.scope}, "@", ": possibly uncomputable;"
 							+"got: fails:"+fails+", i:"+i+";"
 							+"reason: \""+reason+"\""
@@ -2081,7 +2092,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			code;//: bracketClassMap["{"];
 			//temp variables
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
-			getStack(getdata=(s)=>s.label.name,stack=[]){
+			getStack(getdata=(s)=>[s.code.data?.line+1,s.label.name],stack=[]){
 				if(this.isSearched)return stack;
 				this.isSearched=true;
 				stack.push(getdata(this,this.label.name));
@@ -2199,7 +2210,7 @@ const oxminCompiler=async function(inputFile,fileName){
 	const hex30ToStr=v=>{v=v.toString(16);return "0".repeat(8-v.length)+v;};
 	const outputAsString=()=>outputFile.map(v=>v.toString(16)).map(v=>"0".repeat(8-v.length)+v);
 	loga("len("+outputFile.length+"):", ""
-		+outputAsString()
+		//+outputAsString()
 		//+"\n"+parts.code.map(v=>v.cpuState.data().map(v=>hex30ToStr(v)).join(" ")+" "+hex30ToStr(v.binaryValue)).join("\n")
 	);
 	return outputBinary;

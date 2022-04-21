@@ -222,6 +222,15 @@ jump -> jump 2;
 jump -> ram 2;
 jump ->jump label;
 
+//can use '!command;' to ignore state checking
+//can be used for variables.
+!jump -> 2;
+{//example of use
+	$jump=> a;
+	$jump->b;//state check a->b
+	$jump=> 0;
+	!jump a->b;
+};
 
 move 2;/*is the same as:*/move=>move 2;
 move->move 2;//does not change

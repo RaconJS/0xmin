@@ -1,24 +1,46 @@
-#def let: os={{
+#def let: os={
 	#let mainPart(){
 		$set main;
+		move=>0xmin 1;
 		jump -> titleScreen;
 		//last
-		def clearScreen;//: {}
-		def terminal;//: {clearScreen}
-		def getWord30;
 		def titleScreen;//: {}->terminal
+		def terminal;//: {clearScreen}
+		def clearScreen;//: {}
+		def getWord30;
 		def let morros=terminal.Executable()::{
 			"hello world";
-		}
+		};
 		jump 0;
 	};
 	let loadMenus(){;
+		#let foo=Function(0)::{
+			"hello";move=>0xmin 1;jump 0;
+		};
 		let clearScreen=Function(0)::{
-			"\p00"
-			repeat 0 #def loop(24)::{
+			"\p00";
+			repeat 1 #def loop(12)::{
 				"        ";
 			};
+			"\p00";
 			"asd\n";
+			"\p00";
+		};
+		let titleScreen=Menu=({},{})::{
+			let a=2;
+			"\p00";
+			"\c0f-\c050\c04@\c0a$\c0b#\c0f-\n";
+			"\c0f-\c05Z\c04A\c0aS\c0bM\c0f-\n";
+			//ZeroXMin (0xmin)
+			//Assembly
+			//Small
+			//Macro
+			;
+			//language
+			//repeat 60 null;
+			//"press any key\n";
+			//"to continue\n";
+			#def getInput.call();
 		};
 		let getWord30=Function(1)::{
 			//#def getInput.setWait(1);
@@ -43,6 +65,8 @@
 					move=>endState;
 					if;jump->end;
 				};
+				move=>data.const({!jump +1;});get;
+				move=>getInput.returnStart;set;
 				#def getInput;
 				let inputChar=data.var(0);
 				move=>inputChar;set;
@@ -118,13 +142,18 @@
 				let progAddress=data.var(0);
 				move=>progAddress;set;
 				{//command type
-					#def getWord30.call(3);//9 bit jump
+					"\n";
+					"1: ";"\n";
+					"2: ";"\n";
+					"0";
+					#def getWord30.call(1);//9 bit jump
 					move=>data.const({0 1}..compile[0]);
 					red;
 					move=>data.const({jump}..compile[0]);
 					or;
 				};
 				//assert alu = {jump address};
+				move=>progAddress;get;
 				{//execute
 					let statement;
 					move=>statement;
@@ -141,7 +170,7 @@
 			};
 		}{
 			let returner=..this.main.returner;
-			let Executable(block){//
+			let Executable(block){//: extends Menu
 				#;
 				let exe_address;
 				#set: return = Menu({
@@ -153,23 +182,6 @@
 				},block)#{let address=exe_address;};
 			}
 		};
-		let titleScreen=Menu=({},{})::{
-			let a=2;
-			"\p00";
-			"\c0f-\c050\c04@\c0a$\c0b#\c0f-\n";
-			"\c0f-\c05Z\c04A\c0aS\c0bM\c0f-\n";
-			//ZeroXMin (0xmin)
-			//Assembly
-			//Small
-			//Macro
-			;
-			//language
-			//repeat 60 null;
-			repeat 0 #def loop(4)::{
-				repeat 8 null;
-			};
-		};
-		#set terminal.enterState{$set move=>titleScreen.exit.state};
 		#set titleScreen.exit{Menu.goto(terminal)};
 	};
 	import lib "io.0xmin";
@@ -214,7 +226,18 @@
 	};...def macros;
 	#let: classes(){
 		let LinkedList(itemSize)={
-			1 #def let tail;//node*
+			1 #def let tail;
+			let base()={
+				#def let last{1};
+				#def let first{1};
+			};
+			let item()={
+				!move base-> this;
+				#def let last{!move->lastItem;!jump->lastItem+1;};//:node*
+				#def let next{!move->firstItem;!jump->firstItem+1;};//:node*
+				#def let portal{move->;jump->data;};
+				#def let data{};//any
+			};
 		};
 		let Data()={
 			delete;
@@ -247,7 +270,7 @@
 				};
 			};
 		};
-		let forever(do)={
+		let forever(do)={//length: 2 + do..length
 			#let state,endState;
 			$set state=>move;
 			#def do;
@@ -257,6 +280,9 @@
 		};
 		let min(a,b){//: (#number,#number) -> #number
 			#return=#(a<b) * a + ((a>=b) *b);
+		};
+		let max(a,b){//: (#number,#number) -> #number
+			#return=#(a>b) * a + ((a<=b) *b);
 		};
 		let loop(times,do){
 			def let data=Data();
@@ -286,11 +312,11 @@
 			let enterState,exitState;
 			$set enterState=>move;
 			def block;
+			move=>ram;
 			$set exitState=>move;
 			jump 0#def let returnStart;
 			let self=this;
 			let call(){//:{#/@}
-				//call.call();
 				let doReturn=!(!(1));//:bool
 				let returnStatement,returnEnd;
 				#ifDef(doReturn)::(){
@@ -314,23 +340,15 @@
 					move=>enterState;
 					jump->block;
 					$move=>exitState;
-					jump returnStart->returnEnd#def returnStatement;
+					repeat 0 {//state check
+						$jump=>returnStart;
+						$jump->returnEnd;
+						$jump=>0;
+					};
+					!jump returnStart->returnEnd#def returnStatement;
 					#def returnEnd;
 				};
-				//call.return();
-			}{
-				let goto()=>{
-				};
-				let sendInputs()=>{
-					;
-				};
-				let return()=>{
-					let returnTo=#{jump jump<-block};
-					move=>returnTo;get;
-					move=>returnPoint;set;
-				};
-			};
-		}{
+			}
 		};
 		def let hault(){
 			let hault={jump 0;};
@@ -348,37 +366,19 @@
 			let a2=2;
 			$set enter.state=>move;
 			@;
-			#def enter;
-			#def main;//code of
-			#def exit;
+				#def enter;
+				#def main;//code of
+				#def exit;
+				move=>ram;
 			$set exit.state=>move;
 		}{
 			let goto(menu){
 				move=>menu.enter.state;
 				jump->menu.main;
-				"1234";
 			};
 		};
 	};...def classes;
-	#let call(shouldWait)={
-		#static let this.block=block1;
-		if(1 == shouldWait)::{
-			move->block.shouldWait;get;
-			move->block.waitLine;set;
-		}::else()::if(0 == shouldWait)::{
-			move->block.shouldWait;get;
-			move->block.waitLine;set;
-		};
-		#let ret;
-		move->ret;
-		get;
-		move->constructor.block.return;
-		set;
-		jump->constructor.block;
-		jump constructor.block.return->1 def ret;
-		$move->constructor.block.return;
-	};
-	#let getInput{
+	#let getInput=Function(0)::{
 		let setWait(bool){
 			repeat(+bool):{
 				move=>isWait;get;
