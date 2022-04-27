@@ -4,7 +4,7 @@
 	jump->main;
 	jump 0;
 };
-#set: terminal{#let: input,output;};
+#def set: terminal{#let: input,output;};
 #def set: io{
 	#let def: input{
 		null ;//move;get;
@@ -13,8 +13,7 @@
 	#let def: output{
 		null;
 		0x20000000 #def: terminal.output;
-	}
-
+	};
 };
 #def set: main{
 	$move=>0xmin;

@@ -1,6 +1,7 @@
 //g++ -pthread emulator3.cpp -o emulator3;
 //do ctrl+f "commands" to find the main emulator.
 float runSpeed=60;//fps
+//ctrl-f's line: 522 `switch(command)` for the actual commands
 /*0xmin dev:
 	I cant work out how to use the monitor, (with my own cpu). 
 	I tried sending ascii codes for 1 frame 
@@ -217,7 +218,23 @@ class R2Terminal{
 			cout
 				<<ctx.col(fgColor,bgColor)
 				<<ctx.pos(y+offset_y,x+offset_x)//data.value=0x00020000;
-				<<charOut;
+			;
+			//"┘└┐┌┴├┬"
+			int charAsInt = charOut&0xff;
+			if(0){}
+			else if(charAsInt==0xd9)cout<<"─";
+			else if(charAsInt==0xda)cout<<"│";
+			else if(charAsInt==0xdf)cout<<"┘";
+			else if(charAsInt==0xe0)cout<<"└";
+			else if(charAsInt==0xe1)cout<<"┐";
+			else if(charAsInt==0xe2)cout<<"┌";
+
+			else if(charAsInt==0xe3)cout<<"┴";
+			else if(charAsInt==0xe4)cout<<"├";
+			else if(charAsInt==0xe5)cout<<"┬";
+			else if(charAsInt==0xe6)cout<<"┤";
+			else if(charAsInt==0xe7)cout<<"┼";
+			else cout<<charOut;
 		}
 	}
 	void nextX(){
@@ -489,12 +506,12 @@ class NumberDisplay{
 			}
 			move=max(0l,((long)move)+move_next);
 			if(set_jump!=0){ram[jump+2]=set_jump;set_jump=0;}
-			if(set_bray!=0){ram[move]=alu;set_bray=0;}
 			filt30 dataFromMove=ram[move];
 		//read input
 			if(!blocker){
 				currentWord=ram[jump];
 			}
+			if(set_bray!=0){ram[move]=set_bray;set_bray=0;}//'set' is done after instruction is read
 			int command=currentWord&0x3000f;
 			short int address=(currentWord&0x0ff0)/0x10;
 			short int address_sign=(currentWord&0x1000)/0x1000;
@@ -555,7 +572,7 @@ void doStep(int i){
 std::thread inputThread;
 void mainThread(){
 	int num=0;
-	for(int i=0;i<40000||true&&!cpu.hasHault;i++,num++){
+	for(int i=0;(i<40000||true)&&!cpu.hasHault;i++,num++){
 		//for(int i=0;i<1&&!cpu.hasHault;i++,num++){
 			doStep(i);
 		//}
@@ -611,6 +628,7 @@ int main(int argc, char const *argv[]){
 			//cout<<(void*)(long)ram[n]<<" ";
 		}
 		buffer.clear();//free memory "hopefully"
+		inputFile.close();
 	}
 	{
 		cout<<ctx.clear();
