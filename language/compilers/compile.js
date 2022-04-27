@@ -91,7 +91,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				super(...arry);
 				this.data=words instanceof Array?words.data[words.i]:words;
 			}
-			data;//:{line:number;column:number;file:string;};
+			data;//:{line:number;column:number;file:string;getLines:getter=>string[];};
 		};
 		const bracketClassMap=Object.freeze({//this object is for debugging
 			"{":({"{ }":class extends Statement{recur;maxRecur;}})["{ }"],
@@ -218,34 +218,23 @@ const oxminCompiler=async function(inputFile,fileName){
 	//----
 	const contexts={
 		//simple
+			charSetMap:{
+				"┘":0xdf,
+				"└":0xe0,
+				"┐":0xe1,
+				"┌":0xe2,
+				"─":0xd9,
+				"│":0xda,
+			},
+			charSet:new Array(0x7f).fill().map((v,i)=>String.fromCharCode(i))+"█",
 			string({index,statement,scope}){//is optional
 				let word=statement[index];
-				if(word&&"\"'`".includes(word[0])){
-					let rawString=word
-					let includeAllWhiteSpace=word[0]=="`";
-					let array=rawString.substr(1,rawString.length-2)
-						.replaceAll("\\t", "\t")
-						.replaceAll("\\n", "\n")
-						.replaceAll("\\r", "\r")
-						.replaceAll(/\\u(....)/g,(v,v1)=>String.fromCharCode(+v1||0))
-						.replaceAll(/\\x(..)/g,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
-						.match(/\\[cp][\s\S]{2}|\\[ha]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
-					;
-					let string=rawString
-						.replaceAll(/(?<!^|\\)(["'`])(?!$)/g,"\\$1")
-						.replaceAll(/^["'`]|["'`]$/g,"\"")
-						.replaceAll(/\\[cp]/g, "\\x")
-						.replaceAll(/\\[ha]/g,"\n")
-						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
-						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
-						.replaceAll(/\t/g,includeAllWhiteSpace?"\\t": "")
-					;
-					string=JSON.parse(string);
+				let value=Value.String(word);
+				if(value){
 					index++;
-					return {index,value:string,array};
-				}else{
-					return {index,value:undefined};
+					return{index,value:value.string,array:value.array};
 				}
+				else return{index};
 			},
 			number_signs:{"+":v=>+v,"-":v=>-v,"*":v=>1*v,"/":v=>1/v},
 			number({index,statement,scope}){//number is optional
@@ -456,7 +445,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				({index,found}=contexts.keyWordList({statement,index,scope,keywords:metaState}));
 				let word=statement[index];
 				let startValue;//:Value
-				if(!found)metaState["set"]=true;
+				if(!found)metaState["set"]=metaState["def"]=true;//'#: a=b;' ==> '#def set: a=b;'
 				for(let i=0;i<statement.length&&index<statement.length;i++){//'#let a,b,c;'
 					let foundExpression=false;
 					let word;
@@ -674,10 +663,6 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {index};
 			},
 			async main_importFile({statement,index,scope,phase="#"}){
-				if((oxminCompiler.TEST??0)>4){throw Error("too much import recursion")}
-				else{oxminCompiler.TEST??=0;
-					oxminCompiler.TEST++;
-				}
 				//phase is used to get the file type
 				let word;
 				let filePath="";//:string;
@@ -690,7 +675,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						"compiler":compilerFolder,
 					};
 					word=statement[index];
-					if(word in fromTypes){
+					if(fromTypes.hasOwnProperty(word)){
 						filePath=fromTypes[word];
 						index++;
 					}else filePath=fromTypes["this"];
@@ -811,7 +796,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
 			let word=statement[index];
 			let value,array,failed;
-			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index};
+			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index,failed};
 			word=statement[index];
 			if(word instanceof Array)throw Error ("compiler type error???: do not know how 'let word:Array;' is handled by the code");
 			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {//'+123' or '-123'
@@ -824,6 +809,12 @@ const oxminCompiler=async function(inputFile,fileName){
 			}else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
 			else if("([".includes(word)){//'(label)'
 				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
+			}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
+				const operator=contexts.operators_Left[word];//:function (Value) => Value
+				index++;
+				({index,value}=await contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false}));
+				if(shouldEval)value=operator(value);
+				return {index,value};
 			}else if(word.match(nameRegex)){//'label'
 				if(shouldEval){
 					value=new Value();
@@ -1001,7 +992,14 @@ const oxminCompiler=async function(inputFile,fileName){
 					return {index,value,failed:true};
 				}
 			},
-		//----
+		//---
+		operators_Left:{
+			"+":(value)=>value?value.toType("number"):new Value.Number(NaN),
+			"-":(value)=>value?-value.toType("number"):new Value.Number(NaN),
+			"~":(v)=>new Value.Number(~v?.number),
+			"!":(v)=>{v??=new Value();let ans=v.toBool();ans.number=!ans.number;return ans;},
+			//"...":(v)=>new Value.Number(~v.number),
+		},
 		operators:{
 			"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
 			"-":new Operator_numeric((a,b)=>a-b,0,a=>-a),
@@ -1026,7 +1024,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			"!=":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
 			"===":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
 			"!==":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
-			"!":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!b2)),
+			//"!":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!b2)),
 
 			"&&":new Operator_bool(v=>v,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
 			"||":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v1:v2),
@@ -1120,7 +1118,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					index++;let value=args.pop();
 					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
 					args.push(value);
-				}else if(word in contexts.operators){//'+-*/'
+				}else if(contexts.operators.hasOwnProperty(word)){//'+-*/'
 					index++;
 					if(shouldEval){
 						let hasEquals,value;
@@ -1221,7 +1219,6 @@ const oxminCompiler=async function(inputFile,fileName){
 							failList.push({i,instruction,failed});
 						}
 						if(this.assembly.language=="0xmin"){
-							//if(isNaN(cpuState.move)){loga(instruction.scope.code.map(v=>v),i);throw Error("move is NaN")}
 							cpuState.move=Math.max(0,cpuState.move);
 							cpuState.jump=Math.max(0,cpuState.jump);
 						}
@@ -1269,7 +1266,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								let isJump=instruction.args[0]?.name=="jump";
 								binaryArg=(arg<0||1/arg==-Infinity)?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
 								binaryValue|=binaryArg;
-								instruction.moveBy=Math.min(Math.max(arg|0??0,-0xff),0xff);
+								instruction.moveBy=arg|0;//Math.min(Math.max(arg|0??0,-0xff),0xff);
 								if(instruction.args[0]?.name=="move"){//'move+5;' ==> 'move=>move+5';
 									if(!(instruction.args[1] instanceof HiddenLine)){
 										cpuState.move+=instruction.moveBy;
@@ -1375,11 +1372,17 @@ const oxminCompiler=async function(inputFile,fileName){
 						let address2=instruction.moveBy+instruction.cpuState.jump;
 						let cpuState2=assemblyCode.code[address2]?.cpuState;
 						if(!cpuState2){//allows jumping to unknown cpuStates
-							if(0)return {failed:[Error(),"could not find cpuState of location:"+address2]};
+							if(0)return {failed:Error("could not find cpuState of location:"+address2)};
 							else return {failed:false};
 						}
 						if(cpuState2&&cpuState2.move!=cpuState.move){
-							return {failed:[Error(),"cpuState miss-match, missing: 'move "+cpuState.move+" -> "+cpuState2.move+";'"]};
+							return {failed:Error("cpuState miss-match, missing: 'move "+cpuState.move+" -> "+cpuState2.move+";'")};
+						}
+					}
+					if(instruction.type=="command"
+					){
+						if(Math.abs(instruction.moveBy)>0xff){
+							return {failed:Error("over jump. Attempting to moves by: "+instruction.moveBy)};
 						}
 					}
 				}
@@ -1445,10 +1448,17 @@ const oxminCompiler=async function(inputFile,fileName){
 				if((string??=({value,index}=contexts.string({index,statement,scope})).value)!=undefined){
 					const str = value;
 					const vm=require("vm");
-					const sandbox = {log:"no log;",...{index,statement,scope,value:inputValue,label:inputValue?.label,cpuState,Variable,Value,BlockScope,ObjectScope,Scope}};
+					const sandbox = {log:"no log;",...{
+						index,statement,scope,value:inputValue,label:inputValue?.label,cpuState,
+						Value,
+						Variable,MacroFunction,
+						Scope,BlockScope,ObjectScope,MachineCode,
+						CodeLine,AssemblyLine,HiddenLine,
+						Internal,
+					}};
 					vm.createContext(sandbox);
-					const code = "log = ["+str+"\n]";
-					try{vm.runInContext(code, sandbox);}catch(error){
+					const code = "(async()=>log = ["+str+"\n])()";
+					try{await vm.runInContext(code, sandbox);}catch(error){
 						console.warn(error);
 						throw Error(", Could not run the javascript. threw:{{'"+error+"'}}");
 					}
@@ -1500,6 +1510,40 @@ const oxminCompiler=async function(inputFile,fileName){
 			set array(val){(this.label??=new Variable()).code=val;}
 			static Number=
 			class Number extends Value{constructor(number,data={}){super({number,type:"number",...data});}}
+			static String=
+			function Value_String(rawString){//:Value.String?
+				if(rawString&&"\"'`".includes(rawString[0])){
+					let includeAllWhiteSpace=rawString[0]=="`";
+					let array=rawString.substr(1,rawString.length-2)
+						.replaceAll("\\t", "\t")
+						.replaceAll("\\n", "\n")
+						.replaceAll("\\r", "\r")
+						.replaceAll(/\\u(....)/g,(v,v1)=>String.fromCharCode(+v1||0))
+						.replaceAll(/\\x(..)/g,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
+						.replaceAll(/\\([^cpha])/g,"$1")
+						.match(/\\[cp][\s\S]{2}|\\[ha]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
+					;
+					array=(array??[])
+						.map(v=>v in contexts.charSetMap?String.fromCharCode(contexts.charSetMap[v]):v)
+					;
+					let string=rawString
+						.replaceAll(/(?<!^|\\)["](?!$)/g,"\\\"")
+						.replaceAll(/\\(['`])(?!$)/g,"$1")
+						.replaceAll(/^["'`]|["'`]$/g,"\"")
+						.replaceAll(/\\[cp]/g, "\\x")
+						.replaceAll(/\\[ha]/g,"\n")
+						.replaceAll(/\\([^cpha])/g,"$1")
+						.replaceAll(/\\ /g," ")
+						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
+						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
+						.replaceAll(/\t/g,includeAllWhiteSpace?"\\t": "")
+					;
+					string=JSON.parse(string);
+					return new Value({type:"string",string,array});
+				}else{
+					return undefined;
+				}
+			}
 			//Value.prototype.toNumber
 			toNumber(value=this){//to number type
 				let number;//:number
@@ -1509,7 +1553,18 @@ const oxminCompiler=async function(inputFile,fileName){
 				else if(value.type=="array")throw Error("compiler error: the array Value-type is not fully supported yet.");
 				return new Value.Number(number);
 			}
-			toValueString(value=this){
+			toBool(value=this){
+				let bool;
+				switch(value?.type){
+					case"number":bool=!!value.number;break;
+					case"string":bool=!!value.toType("number").number;break;
+					case"label":bool=!!value.label;break;
+					case"array":bool=!!value.toType("number").number;break;
+					default:bool=false;
+				}
+				return new Value.Number(bool);
+			}
+			toValueString(value=this){//:Value
 				let string;//:number
 				if(value.type=="number"){string=""+value.number}
 				else if(value.type=="label"){if(value.label)string=value.label.code.reduce((s,v)=>{
@@ -1556,6 +1611,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			jump=0;//:int ; line pointer
 			move=0;//:int ; data pointer
 			lineNumber=0;//:int
+			get ram(){return this.lineNumber};//only for '$debugger "cpuState.ram";'
 			getData(){return {l:this.lineNumber,j:this.jump,m:this.move,v:this.virtualLevel};}
 			data(){return [this.lineNumber,this.jump,this.move,this.virtualLevel];}
 		}
@@ -1567,16 +1623,22 @@ const oxminCompiler=async function(inputFile,fileName){
 		}
 		class AssemblyLine extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
+			static Number=class Number extends AssemblyLine{
+				constructor(number) {
+					super({args:[number],binaryValue:number});
+				}
+				type="data";
+			}
 			//binaryValue is the final value of this line of code.
 			//also used in meta (#) phase represent the value.
-			type="number";///number,string,command
-			args=[];///(Value|HiddenLine|number)[];
+			type="data";//: 'data' | 'command'
+			args=[];//:(Value|HiddenLine|number)[];
 			binaryValue=undefined;
-			dataType=undefined;//optional used with e.g.'String.char(5)' in '"text";'
-			command;
-			data;
-			cpuStateAfter;//the cpuState after this line is run;
-			moveBy;//:number relAddress part of instruction. used for state checking
+			dataType=undefined;//?: 'number' | 'char'; optional used with e.g.'String.char(5)' in '"text";'
+			get command(){throw Error("compiler error:@ command is obsilete")};//
+			get data(){throw Error("compiler error:@ data is obsilete")};
+			cpuStateAfter;//:CpuState; the cpuState after this line is run;
+			moveBy;//:number; relAddress part of instruction. used for state checking
 			hasChecks=true;
 		}
 		;
@@ -1585,20 +1647,22 @@ const oxminCompiler=async function(inputFile,fileName){
 			//contains
 			run({lineNumber,scope,cpuState}){return {lineNumber,failed:false};}
 			static Define=
-			class Define extends HiddenLine{//'$def a;'
+			class Define extends HiddenLine{//'$set a;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
 				run({cpuState}){//nextlineNumber
 					this.label.lineNumber=cpuState.lineNumber;
+					this.label.cpuState=new CpuState(cpuState);
 					return{failed:false,relAddress:this.label.lineNumber};
 				}
 			}
 			static DefineReturn=
-			class DefineReturn extends HiddenLine{//'$def a;'
+			class DefineReturn extends HiddenLine{//'$set return;' done when a scope ends 
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
 				run({cpuState}){//nextlineNumber
 					this.label.returnLineNumber=cpuState.lineNumber;
+					this.label.returnCpuState=new CpuState(cpuState);
 					return{failed:false,relAddress:this.label.returnLineNumber};
 				}
 			}
@@ -1646,8 +1710,7 @@ const oxminCompiler=async function(inputFile,fileName){
 						else if(this.operator[1] instanceof Value){
 							let newLineNumber;
 							if(this.operator[1].type=="number"){//'$jump->5;'
-								returnValue=this.operator[1].number+cpuState.lineNumber-args[0].lineNumber;
-								newLineNumber=this.operator[1].number;
+								newLineNumber=this.operator[1].number+cpuState.lineNumber;
 							}
 							else{//'$jump->label;' or '$label->jump'
 								args[1]=assemblyCompiler.findPointerOrLabel(this.operator[1],cpuState,this.scope);
@@ -1657,9 +1720,9 @@ const oxminCompiler=async function(inputFile,fileName){
 									args[2]=assemblyCompiler.findPointerOrLabel(this.operator[2],cpuState,this.scope);
 									addAddress=args[2]?.lineNumber??0;
 								}
-								returnValue=args[1].lineNumber-args[0].lineNumber+addAddress;
 								newLineNumber=args[1].lineNumber+addAddress;
 							}
+							returnValue=newLineNumber-args[0].lineNumber;
 							if(isAssigning)args[0].lineNumber=newLineNumber;
 							failed||=isNaN(returnValue)?Error("$: relative address is NaN"):false;
 						}else {console.error("Error, type:",this.operator[1]?.constructor);
@@ -1736,8 +1799,10 @@ const oxminCompiler=async function(inputFile,fileName){
 				functionConstructor;
 			//as assembly
 				returnLineNumber;//:number; defined in collectCode
+				returnCpuState;//:CpuState
 				relAddress=0;//number UNUSED
 				lineNumber=undefined;
+				cpuState;//:CpuState
 				defs=[];//UNUSED;//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
 			//----
@@ -1947,7 +2012,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				}
 			}
 			class InternalValue extends Value{
-				constructor({parent,name},propertyName){
+				constructor(data,propertyName){
+					//parent,name
 					super({parent,name});
 					this.propertyName=propertyName;
 				}
@@ -1963,7 +2029,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					super();
 					for(let i in this.labels)
 						if(this.labels.hasOwnProperty(i))
-						this.labels[i]=new BuiltinFuntion(this.labels[i],i);
+							this.labels[i]=new BuiltinFuntion(this.labels[i],i);
 					this.splice=new BuiltinFuntion(async({label,args,value})=>{
 						args[0]??=new Value.Number(0);
 						args[1]??=new Value.Number(0);
@@ -1991,20 +2057,23 @@ const oxminCompiler=async function(inputFile,fileName){
 						let list=Object.getOwnPropertyNames(label.labels);
 						return new Value({type:"array",array:list,number:list.length});
 					},
-					"compile":async({label})=>(await assemblyCompiler.main(label)).toValue("label"),
+					"compile":async({label})=>{
+						try {return (await assemblyCompiler.main(label)).toValue("label");}
+						catch(e){return new Value.String(e);}
+					},
 					"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
 					"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
 					"this":async({label})=>label.toValue("label"),
 					"return":async({label})=>(label.returnLabel??=new Return(label)).toValue("label"),
 					//from this object
 					//`obj.prototype`
-					"prototype":async({label})=>label.prototype?.toValue?.("label")??new Value({type:"label"}),
-					"supertype":async({label})=>label.supertype?.toValue?.("label")??new Value({type:"label"}),
+					"proto":async({label})=>new InternalValue({type:"label",label:label.prototype},"prototype"),
+					"super":async({label})=>new InternalValue({type:"label",label:label.supertype},"supertype"),
 					//from parent function
 					//`obj.constructor`
 					"construtor":async({label})=>label.functionConstructor.toValue("label"),
-					"proto":async({label})=>label.functionPrototype.toValue("label"),
-					"super":async({label})=>label.functionSupertype.toValue("label"),
+					"prototype":async({label})=>label.functionPrototype.toValue("label"),
+					"supertype":async({label})=>label.functionSupertype.toValue("label"),
 				};
 			});
 		//----
@@ -2041,6 +2110,8 @@ const oxminCompiler=async function(inputFile,fileName){
 			label;//:Variable
 			get lineNumber(){return this.label.returnLineNumber;}
 			set lineNumber(val){this.label.returnLineNumber=val;}
+			get cpuState(){return this.label.returnCpuState;}
+			set cpuState(val){this.label.returnCpuState=val;}
 		}
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
@@ -2080,7 +2151,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				else if(!(this instanceof GlobalScope)){throw Error("needs parent")}
 				if(!(this.code instanceof Array))throw Error("compiler type error: Scope class requires `this.code` to be a source code tree;");
 			}//requires: label,parent,code
-			made=Error();
+			made=Error();//for debugging
 			fromName;//for TESTING only
 			label=null;//label that owns this scope, label contains properties.
 			//scopes
@@ -2091,6 +2162,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			isSearched=false;
 			code;//: bracketClassMap["{"];
 			//temp variables
+				//settings={banJS:false,banInfiniteLoops:false,};
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
 			getStack(getdata=(s)=>[s.code.data?.line+1,s.label.name],stack=[]){
 				if(this.isSearched)return stack;
@@ -2123,11 +2195,22 @@ const oxminCompiler=async function(inputFile,fileName){
 		class GlobalScope extends Scope{
 			constructor(data){
 				super(data);
-				const mainObject=this.label.prototype=new Variable({name:["0xmin"],lineNumber:0,labels:{
-					"null":Object.freeze(Object.assign(Variable.fromValue(new Value.Number(0),this),assemblyCompiler.nullValue)),
-				}});
+				const mainObject=this.label.prototype=new Variable({name:["0xmin"],lineNumber:0,labels:Object.freeze({
+					"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0),this),assemblyCompiler.nullValue)),
+					"settings":Object.seal(new Variable({
+						name:"settings",
+						labels:Object.seal({
+							"log_code":new Variable({name:"log_code",lineNumber:0}),
+							"log_table":new Variable({name:"log_table",lineNumber:0}),
+						}),
+					})),
+				})});
+				mainObject
+				this.mainObject=mainObject;
+
 				this.label.labels={"0xmin":mainObject};
 			}
+			mainObject;
 			label=new Variable({
 				scope:this,
 				name:["GlobalObject"],
@@ -2207,11 +2290,31 @@ const oxminCompiler=async function(inputFile,fileName){
 	//
 	let outputFile=parts.asBinary();
 	let outputBinary=new Uint32Array(outputFile);
-	const hex30ToStr=v=>{v=v.toString(16);return "0".repeat(8-v.length)+v;};
-	const outputAsString=()=>outputFile.map(v=>v.toString(16)).map(v=>"0".repeat(8-v.length)+v);
+	const hex30ToStr=(v,len=8)=>{v=v.toString(16);return "0".repeat(len-v.length)+v;};
+	const decToStr=(v,len=3)=>{v=""+v;return " ".repeat(len-v.length)+v;};
+	const outputAsString=()=>outputFile.map(v=>(((1<<31)-1)&v).toString(16)).map(v=>"0".repeat(8-v.length)+v);
+	const outputLogTable=()=>
+		parts.code.map((v,i)=>({//v:AssemblyLine
+			cpu:v.cpuState.data().map(v=>hex30ToStr(v)),
+			data:hex30ToStr(v.binaryValue),
+			lineNumber:i,
+			sourceLineNumber:1+v.scope?.code?.data?.line,
+			line:(v.scope?.code?.data?.getLines()[v.scope?.code?.data?.line]??"")
+		}))
+		.map(v=>""
+			+"line:"+hex30ToStr(v.lineNumber,Math.ceil(Math.log2(parts.code.length)/4))
+			+" data:"+v.data
+			//+"  ram:"+v.cpu[0]
+			+" jump:"+v.cpu[1]
+			+" move:"+v.cpu[2]
+			+" cmd:"+null
+			+";"
+			+" src:"+decToStr(v.sourceLineNumber,4)+"| "+v.line
+		).join("\n");
+	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
 	loga("len("+outputFile.length+"):", ""
-		//+outputAsString()
-		//+"\n"+parts.code.map(v=>v.cpuState.data().map(v=>hex30ToStr(v)).join(" ")+" "+hex30ToStr(v.binaryValue)).join("\n")
+		+(settingsObj["log_code"].lineNumber?outputAsString():"")
+		+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():0)
 	);
 	return outputBinary;
 };
@@ -2261,7 +2364,7 @@ let buildSettings={makeFile:true}
 			let newFileName=process.argv[3];
 			if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
 			else{console.log("made file")}
-			newFileName??="minFilt.lua";//??"a.filt"??"minFilt.lua";
+			newFileName??="minFilt.lua";//?? "a.filt" ?? "minFilt.lua";
 			let fileType=newFileName.match(/(?<=\.)[^.]*$/)?.[0]??"filt";
 			let content=outputFile;
 			if(fileType=="lua"){

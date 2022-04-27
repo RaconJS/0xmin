@@ -1,48 +1,146 @@
+//(?<!:)({|;)\s*#(?!set|let|def|;|})
 #def let: os={
 	#let mainPart(){
-		$set main;
-		move=>0xmin 1;
-		jump -> titleScreen;
-		//last
-		def titleScreen;//: {}->terminal
-		def terminal;//: {clearScreen}
-		def clearScreen;//: {}
-		def getWord30;
-		def let morros=terminal.Executable()::{
-			"hello world";
+		{//shell
+			$set main;
+			move=>0xmin 1;
+			jump->titleScreen;
+			def getOctal;
+			def terminal;//: {clearScreen}
+			$move=>0xmin 1;
+			def titleScreen;//: {}->terminal
+			def fileSystem;
+		};
+		//def getOctal_dist1;
+		def getInput_dist1;
+		def clearScreen;
+		{//exe's
+			def restart;//1
+			def hello;//2
+			def morros;//3
+			def hi;//4
+			def clearScreenProgram;//2
+			def addStuff;//5
+			//def Executable.hault_mid;
+			//def Executable()::{};//7
+			//def Executable()::{};//8
+		};
+		{//extra foo's
+			def addStuff.main.stringData;
 		};
 		jump 0;
 	};
-	let loadMenus(){;
-		#let foo=Function(0)::{
-			"hello";move=>0xmin 1;jump 0;
+	let loadExecutables(){
+		#let addStuff=Executable()::{
+			#let endState;
+			#let endTest;
+			def let data=Data();
+			#let stringData;
+			{//load input
+				def let mainLoop_state,mainLoop_state.line;
+				#set stringData=Menu()::{}::{
+					move=>mainLoop_state;
+					jump->mainLoop_state.line;
+				}::{
+					"input\n";
+					":";
+					//"press 'h' to exit\n";
+				};
+				#def Menu.goto(stringData);
+				$mainLoop_state=>move;
+				#def mainLoop_state.line;
+				delete mainLoop_state;
+			};
+			def let mainLoop=forever()::{
+				getInput_dist1.call();
+				move=>data.const("\x00");or;
+				{move=> 3;set;null;null};
+				def endTest;
+			};
+			$move=>endState;
+			#set endTest{
+				move=>data.const("h");
+				#def if({xor})::{
+				}::{//else -> return
+					$endState=>move;
+					jump ->mainLoop..return;
+				};
+			};
 		};
-		let clearScreen=Function(0)::{
-			"\p00";
-			repeat 1 #def loop(12)::{
+		#let restart=Executable()::{
+			"\p00restarting...   ";
+			#def clearScreen.call(24);//"\p05        ";
+			move-0xff;
+			move-0xff;
+			move-0xff;
+			move 1;
+			$move=>0xmin 1;
+			jump -> titleScreen;
+		};
+		repeat 0 def let Executable.hault_mid{
+			#let self=..this;
+			#let state;
+			$state=>move;
+			def Executable.hault();
+			#let Executable.hault(){
+				move=>state;
+				jump->self;
+			};
+		};
+		let clearScreenProgram=Executable()::{
+			"clearScreen";
+			def clearScreen.call(24);
+		};
+		#let hello=Executable()::{
+			"Hello World!";
+		};
+		#let morros=Executable()::{
+			"Morros Maulmn!";
+		};
+		#let hi=Executable()::{
+			"Hi mom!";
+		};
+	};
+	let loadMenus(){;
+		#let clearScreen=Function(1)::{
+			#let mainLoop=loop(1)::{
 				"        ";
 			};
+			move=>mainLoop.times;
+			set;
 			"\p00";
-			"asd\n";
-			"\p00";
+			#def mainLoop;
+			//repeat (16*12):" ";
+			"\pff";
+		}{
+			let callBase=call;
+			let call(reps){
+				def let data=Data();
+				#set reps=data.const(1<<(reps-1));
+				#def callBase(reps);
+			};
 		};
 		let titleScreen=Menu=({},{})::{
 			let a=2;
-			"\p00";
-			"\c0f-\c050\c04@\c0a$\c0b#\c0f-\n";
-			"\c0f-\c05Z\c04A\c0aS\c0bM\c0f-\n";
+			"\p00\c0f";
+			def let logoString={
+				// /0@$#\
+				// \ZASM/
+				"\c0f\/\c050\c04@\c0a$\c0b#\c0f\\\n";
+				"\c0f\\\c05Z\c04A\c0aS\c0bM\c0f\/\n";
+			};
 			//ZeroXMin (0xmin)
 			//Assembly
 			//Small
 			//Macro
 			;
 			//language
-			//repeat 60 null;
-			//"press any key\n";
-			//"to continue\n";
+			"press any key\n";
+			"to continue;\n\n";
 			#def getInput.call();
+			//#def clearScreen.call(4*2);
 		};
-		let getWord30=Function(1)::{
+		let getOctal=Function(1)::{
 			//#def getInput.setWait(1);
 			def let data=Data();
 			let ans=data.var(1);
@@ -54,7 +152,7 @@
 			move=>i;set;
 			move=>ans;set;
 			#let endLoopState,endLoop;
-			#def let loop=forever()::{
+			#def let mainLoop=forever()::{
 				#let end,endState;
 				let continueIf(condision){
 					def condision;
@@ -125,62 +223,97 @@
 				#def baseCall(data.const(1<<(30-(len*3))));
 			};
 		};
+		let getInput_dist1=Function(0)::{
+
+			getInput.call();
+		};
+		let getOctal_dist1=Function(1)::{
+			def let data=Data();
+			let length=data.var(0);
+			move=>length;set;
+			getOctal.call(length);
+		};
+		let Folder(size)={//:(Folder|Executable)[]
+			#;
+			#def ifDef(!size)::{
+				#set size=8;
+			};
+			#let files;
+			$move=>terminal.returner.startState;
+			@!jump +1 #def let fileSwitch;
+			#let addFile(program){
+				let fileList=arguments;
+				//let i=0;
+				//repeat fileList..length: void:{
+				#set files{
+					jump->program;
+				};
+				//	#set i=i+1;
+				//}
+			};
+			#def files;
+			#set this(){
+
+			};
+		};
 		let terminal=Menu({},{jump 0})::{
 			#def let: data=Data();
-			#def clearScreen.call();
 			"run program:";
-			#let returner{let state,startState,endState;};
-			#def let loop=forever()::{
-				"\njump 0";
+			#let returner{let startState,endState;};
+			#let Folder_enterState;
+			#let Folder_enterState;
+			let fileSystem;
+			#def let mainLoop=forever()::{
+				"\n";
+				//..............."
+				"file num 0-7 :";
 				{//jump command
-					#def getWord30.call(3);//9 bit jump
+					//3*3=9
+					#def getOctal.call(1);//9 bit jump
 					move=>data.const({0 1}..compile[0]);
 					red;
 					move=>data.const({jump}..compile[0]);
 					or;
 				};
+				"\n";
 				let progAddress=data.var(0);
 				move=>progAddress;set;
-				{//command type
-					"\n";
-					"1: ";"\n";
-					"2: ";"\n";
-					"0";
-					#def getWord30.call(1);//9 bit jump
-					move=>data.const({0 1}..compile[0]);
-					red;
-					move=>data.const({jump}..compile[0]);
-					or;
-				};
 				//assert alu = {jump address};
 				move=>progAddress;get;
 				{//execute
-					let statement;
+					let statement=Folder_enterState;
 					move=>statement;
 					set;
 					null;//jump.reads before move.write happens.
-					//jump->statement;
-					null #def statement;//0 #def statement;
-					$set returner=>statement;
-					$set returner.state=>move;
+					jump->Folder_enterState;
+					$set returner;
 					$set returner.startState=>move;
 					$set returner.endState=>move;
 				};
-				";";
+				//"\n";
 			};
-		}{
+		}#{
+			let Folder_enterState=..this.main.Folder_enterState;
 			let returner=..this.main.returner;
-			let Executable(block){//: extends Menu
-				#;
-				let exe_address;
-				#set: return = Menu({
-					//def exe_address{virtual jump -> returner;};
-					$set move=>returner.state;
-				},{
-					move=>returner.state;
-					jump->returner;
-				},block)#{let address=exe_address;};
-			}
+		};
+		let Executable(block)={//: extends Menu
+			#;
+			let exe_address;
+			#set: return = Menu({
+				//def exe_address{virtual jump -> returner;};
+				$set move=>Executable.returner.startState;
+			},Executable.hault(),block)#{let address=exe_address;};
+			#set fileSystem.addFile(block);
+		}{
+			let hault(){
+				move=>Executable.returner.startState;
+				jump->Executable.returner;
+			};
+			let returner=terminal.returner;
+			let fileSystem;
+		};
+		let fileSystem=Folder(4)#{
+			$set terminal.Folder_enterState=>..this;
 		};
 		#set titleScreen.exit{Menu.goto(terminal)};
 	};
@@ -271,28 +404,40 @@
 			};
 		};
 		let forever(do)={//length: 2 + do..length
-			#let state,endState;
+			#let state,endState,endLoopState;
 			$set state=>move;
 			#def do;
+			$endLoopState=>move;
 			move=>state;
 			jump->this;
 			$set endState=>move;
 		};
 		let min(a,b){//: (#number,#number) -> #number
-			#return=#(a<b) * a + ((a>=b) *b);
+			#set return=#(a<b) * a + ((a>=b) *b);
 		};
 		let max(a,b){//: (#number,#number) -> #number
-			#return=#(a>b) * a + ((a<=b) *b);
+			#set return=#(a>b) * a + ((a<=b) *b);
+		};
+		let sleep(time){//rough time
+			let minLen=wait.loopLen;
+			let innerLoopLen=wait.innerLen;
+			repeat time null;
+			repeat 0: def defIf(time>minLen)::{
+				def loop()
+			};
+		}{
+			let emptyLoop=loop(1,"");
+			let innerLen=emptyLoop.mainLoop..length;
+			let loopLen=..length;
 		};
 		let loop(times,do){
 			def let data=Data();
 			...let data;//var,const; import*;
 			let i=var(0);
-			#set times=const(1<<(times-1));
+			#let times=const(1<<(times-1));
 			move=>times;get;
 			move=>i;set;
-			delete times;
-			#def:{}{//main loop; has this
+			#def let:mainLoop{//main loop; has this
 				#let state;
 				$set state=>move;
 				#def do;
@@ -319,20 +464,20 @@
 			let call(){//:{#/@}
 				let doReturn=!(!(1));//:bool
 				let returnStatement,returnEnd;
-				#ifDef(doReturn)::(){
+				#set ifDef(doReturn)::(){
 					move=>returnStatement;get;
 					move=>returnStart;set;
 				};
 				let args=arguments;
 				let len=min(inputLength,args..length);
-				#ifDef(len)::(){
+				#set ifDef(len)::(){
 					#let i=0;
 					repeat (len-1) #{
 						move=>args[+i];
 						get;
 						move=>block.input[+i][0];
 						set;
-						#i=i+1;
+						#set i=i+1;
 					};
 					move=> args[+i];get;
 				};
@@ -418,5 +563,6 @@
 		};
 	};
 	...loadMenus;
+	...loadExecutables;
 	def mainPart();
 };
