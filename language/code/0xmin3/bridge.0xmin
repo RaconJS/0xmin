@@ -1,0 +1,35 @@
+let for(start,condision,next,do){
+	#let return;
+	def start;
+	def condision;
+	jump->return if alu==0;
+	def do;
+	def next;
+	jump->condision;
+	def return;
+
+};
+let heap=0xmin();
+let heap={
+	let allocate(){
+
+	};
+};
+let code={
+	let allocate(){
+
+	};
+};
+let stack{
+	let allocate(){//static allocate
+
+	};
+};
+let linkedList()={
+	let class=..this;
+	let baseSize=4;
+	let new(size){
+		let dataPointer=stack.allocate(class.baseSize+size);
+		//dataPointer:struct
+	};
+};

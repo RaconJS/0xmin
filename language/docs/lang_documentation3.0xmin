@@ -1,67 +1,85 @@
 //keywords
-void;
-static;
-virtual;
-recur;
-repeat;
-import;
-delete;
-#let;
-#set;
-#def;
-$undef;
-import lib;
-import this;
-import main;
-...;
-//reserved words
+	void;
+	static;//static is not used yet
+	virtual;
+	recur;
+	repeat;
+	import;
+	delete;
+	import lib;
+	import this;
+	import main;
+	...let;
+	...set;
+	...def;
+	#let;
+	#set;
+	#def;
+	$undef;
+	$def;
+	$set;
+	$jump;
+	$move;
+	$ram;
+	$alu;//unused
+	@move;
+	@jump;
+	@set;
+	@if;
+	@nor;
+	@red;
+	@blue;
+	@and;
+	@or;
+	@xor;
+//words that can't be used for variables
 
-//[there are none]
-
+	//[there are none]
 //symbols
-@ $ #
-+ - * / ** % ^ & ~ ¬
-! ^^ || &&
-= <=> <->//operator
--> <- => <=//assembly operator
-=> = -> <- //function types
-... //concat
-( ) [ ] { } //brackets
-"" '' ``; //strings
+	@ $ #
+	+ - * / ** % ^ & ~ ¬
+	! ^^ || &&
+	= <=> <->//operator
+	-> <- => <=//assembly operator
+	=> = -> <- //function types
+	... //concat
+	( ) [ ] { } //brackets
+	"" '' ``; //strings
 //function delcarations
-(){}
-#(){}
-()={}//class
-#()={}//etc...
-()=>{}//arrow function
-()<={}//reverse arrow function
-//can also do '#(){}' to avoid confusion with 'foo=() {}' => 'foo = #(){}' or 'foo=() #{}'
+`note: can also do`#(){}`to avoid confusion with`foo = (){}` => `(foo=())#{}` or `foo = #(){}` => `foo = #((){})``
+	(){}
+	#(){}
+	()={}//class
+	#()={}//etc... can put '#' infront of a shortExpression to separate it from others
+	()=>{}//arrow function
+	()<={}//reverse arrow function
 //function extensions for existing variables
-foo (){}
-foo ()={}
-foo ()=>{}
-foo ()<={}
+	foo (){}
+	foo ()={}
+	foo ()=>{}
+	foo ()<={}
 //function calls
-foo()
-foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
-foo(a,b) ::c ::{...d} ::e ::f //same function call, just with some external arguments
+	foo()
+	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
+	foo(a,b) ::c ::{...d} ::e ::f //same function call, just with some external arguments
+	foo(bar(baz)); or 
 //object declarations
-{}
-#{}
+	{}
+	#{}
 //object extensions
-obj{}
+	obj{}
 //@ / $ expressions
 //number can be any of: +123,-123,*123,/123
-label;
-label +123;
-label label;
-label -> +123;
-label -> label;
-label label -> +123;
-label label -> label;
+	label;
+	label +123;
+	label label;
+	label -> +123;
+	label -> label;
+	label label -> +123;
+	label label -> label;
 //line structure
 //formal
-@ $ # void virtual://start of line
+@ $ # void virtual static://start of line
 	recur: 2 //allows for this line to be run 2 times
 		@ $ #//choses phase to start at.
 		repeat: 3
@@ -78,12 +96,12 @@ label label -> label;
 //It is highly recommended to use phase symbols for consistancy.
 // ':' can be used to allow keywords to be seen as variable names
 //e.g.
-#let: let=2;//makes a variable called 'let';
+	#let: let=2;//makes a variable called 'let';
 //instead of
-#let let;//which does nothing; 
+	#let let;//which does nothing; 
 
 //change the default phase
-@; $; #;
+	@; $; #;
 {//e.g.
 	#;//void #;
 	let a;//#let: a;
@@ -97,6 +115,7 @@ label label -> label;
 	//aka 0xmin V3;
 	0xmin 3;
 	//aka ZASM
+	ZASM;
 	//aka 0xmin Assembly Small Macro language
 	//aka 0@$#;
 	0@$#;
@@ -116,17 +135,23 @@ label label -> label;
 	//instuction(4bit) relativeAddress(8bit) sign(1bit)
 	//e.g.
 	//jump -5;//note: singed numbers are not yet supported can use 'jump -> label instead'
-	//can be writen as:
+	//can be writen as a list of assembly parts:
+	//in order: 
+	@command address isNegative;
 	1 5 1;//=>'jump -5;'=>[jump,5,-]
 	1 5 0;//=>'jump +5;'=>[jump,5,+]
-	//strings
-	"hello world";
 	//special charactors
+	//char's
 	"\p00";//set curser posision
 	"\h";//hault. compiles to 'jump 0;'
 	"\a";//accept input from terminal
 	"\x00";//ASCII charactor
 	"\u0000";//unicode charactor
+	//char's compile to: 'print char'
+	//strings
+	"hello world";
+	//compiles to
+	"h";"e";"l";"l";"o";" ";"w";"o";"r";"l";"d";
 };
 @;{//assembly code
 	{//basics:
@@ -135,6 +160,7 @@ label label -> label;
 			move;jump;
 		//misc commands
 			set;if;
+	
 		//alu commands
 			get;nor;red;blue;and;or;xor;
 		
@@ -164,10 +190,32 @@ label label -> label;
 	};
 };
 $;{
-
+	$undef:label;
+	$set:label; 
+	$def:array;
 };
 #;{
+	#let set def;//are executed in that order
+	#let: label;/*creates a label. Can add this to the block scope e.g.*/ let label=0; /* or to the parent object e.g.*/ let object.label=2;
+	//if a label exists it will replace it. labels can not be created through expressions like in javascript*/
+	/*e.g.*/#set: object.newProperty=2;/*will not do anything*/  
+		
 
+	intended use:
+	#let: a;
+	#set: a=2;
+	#def a;
+	#set: 1 + 2 * 4;//evaluates an expression operators are done in order exept for the assignment operators: '=', '<=>' and '<->'
+	#def: label;/*inserts label into the scope's code array;*/
+
+	/*note: at the moment:*/ #def: /*is syntactic sugar for:*/ $set label;$def label;//in that order
+	expressions;(
+		//value types:
+		1,//number
+		"string",
+		label,//label,
+		,//array: not used
+	);
 };
 import;{
 	//import opens a file and runs it in the current scope
@@ -179,16 +227,26 @@ import;{
 };
 ...;{
 	...//injects parts of a label into the current scope's label (scope.label)
-	...let: {let a,b,c;};...let object;//properties
-	...set: {1;2;3;};...set array;//code
+	...let: {let a,b,c;};...let object;//properties (namespace)
+	...set: {1;2;3;};...set array;//code (array)
 	...def: (){1;2;3};...def function;//runs code in scope
 	//these can be combined;
 	... let set def: label;
 };
 delete;{
-
+	removes properties from an object.
+	delete;//delete all labels in block scope
+	delete label;//deletes label from 
+	intended use:{
+		#let bar;
+		#def bar;
+		move=>bar;
+		delete bar;
+		//ensures that 'bar' cannot be used beyond this point
+	}
 };
 virtual;{
+	allows for running code in different places
 	used for struct pointers;
 	e.g.:{
 		let SomeStructure(){
@@ -212,17 +270,12 @@ virtual;{
 //design notes:
 //function code is imutable
 //cpuState checking
-//with
-jump -> 2;
-jump -> label;
-jump 2;
-jump label;
-//without
-jump -> jump 2;
-jump -> ram 2;
-jump ->jump label;
-
-//can use '!command;' to ignore state checking
+{//e.g.
+	$move=>0xmin;
+	jump -> 2;//throws a cpuState error as move is not the same on lines 2 and 4
+	move +2; //move => move+2;
+	null;
+}//can use '@!command;' to ignore state checking
 //can be used for variables.
 !jump -> 2;
 {//example of use
@@ -231,6 +284,94 @@ jump ->jump label;
 	$jump=> 0;
 	!jump a->b;
 };
-
+{//e.g.
+	$move=>0xmin;
+	!jump -> 2;//ignores state checking and compiles as normal
+	move +2; //move => move+2;
+	null;
+};
+$set foo->bar;//'->', aka the `to` operator, returns 'bar - foo'.
+$set move=>label;//'=>', aka the `set to` operator, is similar to '->' exept it sets the memory location of  foo to bar, at ($) compile time
 move 2;/*is the same as:*/move=>move 2;
+move=>move 2;/*is the same as:*/move->move 2;$set move=>move 2;
 move->move 2;//does not change
+{//un implemented future potential features
+	static;{
+		let foo(){
+			static ..this.bar=2;
+		};
+		foo.bar;
+	};
+	types;{
+		':' operator;
+		'foo : bar' operator would enforce the restriction 'bar' onto 'foo';
+		where: foo is any Value and bar is a function or just a value;
+		syntacticly: foo is a long expression and bar is a expression that matches up to a '¬' or '='
+		1+1:2+2 ¬# = 2; compiles to: (((1+1) : (2+2)) ¬) = 2;
+		e.g.
+		let label:condisions=2;//spl
+		can make "type" objects
+		e.g.
+		let Int(){
+			???//not sure how this would work yet
+		};
+		let foo:Int = 2;
+		let bar:Int = "a";//throws error
+	};
+	pipeLine;{
+		':>' operator
+		let foo(a,b,c){
+			;
+		};
+		let a,b,c;
+		a:>b:>foo(c);
+	}
+	new,var,const;{
+		new, var, const would be an inbuilt version of the Data object;
+		{
+			#let: Data()={
+				#let: varList{};
+				#let: constList{};
+				#let: var(data){
+					#set: varList{
+						$def: data;
+					};
+				};
+				#let: const(data){
+					#set: constList{
+						$def: data;
+					};
+				};
+				#let: new{//:data*
+					void #let: var(condision){#;
+						#let: item;
+						#let: isDone=0;
+						repeat: (varList..length&&isDone) {
+							find a block of memory that meets the condision;
+						};
+						return = item;
+					};
+					void #let: const(data){#;
+						insert new.var code but with varlist
+					};
+				};
+			}
+		};
+		the original documentation mentioned these 3;
+		new is a type of $set;
+		'var': marks a piece of code or assembly line as variable #(not constant);
+		'const': marks a piece of code or assembly line as constant;
+		'var' and 'const' add code onto a JS array of free code;
+		'new': assigns memory locations;
+		new searches through the avalable variableList or constantList and assigns the found memory location
+		examples;{
+			{
+				@const nor;
+				@const move=>10;
+				@var null;
+				let new var: a;
+				@move=>10#const;
+			};
+		};
+	}
+}
