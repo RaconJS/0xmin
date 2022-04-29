@@ -508,6 +508,8 @@ const oxminCompiler=async function(inputFile,fileName){
 				const state={"def":false,"set":false,"undef":false};
 				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
 				//note: '$def' is used instead of '$insert' to reduce number of keywords
+				//state["undef"]=state["let"];
+				//state["assign"]=state["let"];
 				state["insert"]=state["def"];
 				if(!found){//sets defaults
 					state["undef"]=true;
@@ -515,25 +517,27 @@ const oxminCompiler=async function(inputFile,fileName){
 					state["insert"]=true;//'$def obj;' inserts code block into assembly
 				}
 				({value,index}=await contexts.expression_short({statement,index,scope}));
-				word=statement[index];
-				if(state["undef"]){//remove all refrences of an object from the code
-					if(value?.type=="label"&&value.label){
-						value.label.unDefine();
+				if(value){
+					word=statement[index];
+					if(state["undef"]){//remove all refrences of an object from the code
+						if(value?.type=="label"&&value.label){
+							value.label.unDefine();
+						}
 					}
-				}
-				if(state["set"]){//'$set labelA;' or '$set labelA=>labelB' ==> sets label address
-					let arg1;
-					({value:arg1,index}=await contexts.main_assembly_expression_short({statement,index,scope,startValue:value}));
-					if(arg1){
-						scope.label.code.push(arg1);
-					}else{
-						contexts.meta_defineLabelToNextLine(value.label,scope,value);
+					if(state["set"]){//'$set labelA;' or '$set labelA=>labelB' ==> sets label address
+						let arg1;
+						({value:arg1,index}=await contexts.main_assembly_expression_short({statement,index,scope,startValue:value}));
+						if(arg1){
+							scope.label.code.push(arg1);
+						}else{
+							contexts.meta_defineLabelToNextLine(value.label,scope,value);
+							if(value?.label)value.label.defs.push(scope.label);
+						}
+					}
+					if(state["insert"]){//'$def label;' => inserts contence of label
+						scope.label.code.push(value.label);
 						if(value?.label)value.label.defs.push(scope.label);
 					}
-				}
-				if(state["insert"]){//'$def label;' => inserts contence of label
-					scope.label.code.push(value.label);
-					if(value?.label)value.label.defs.push(scope.label);
 				}
 				return{index};
 			},
@@ -958,7 +962,7 @@ const oxminCompiler=async function(inputFile,fileName){
 					index+=3;//skip '(' '...' ')' in '(...){}'
 					word=statement[index];
 					if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
-						functionObj.callType=word||functionObj.callType;//'(){} ()={}' ==> '()={}' but '()={} (){}' ==> '()={}'
+						functionObj.callType=word||functionObj.callType;//'(){} ()={}' ==> '()={}? ? ?' but '()={} (){}' ==> '()={}'
 						index++;
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
@@ -1092,7 +1096,7 @@ const oxminCompiler=async function(inputFile,fileName){
 								//overwrites variable 'a.b=2;' or 'a=2;'
 								//refType:'property'|'array'|'name'
 								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;
-								else firstArg.parent.labels[firstArg.name]=newLabel;
+								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel;
 								value=newLabel?.toValue?.("label")??new Value();
 							}else{
 								//sets properties of existing variable
