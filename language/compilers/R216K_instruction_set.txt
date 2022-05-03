@@ -1,3 +1,4 @@
+//comments use "//" and "/**/" just like a C-like language
 mov  a->b;//a->b;
 db a;//+a;
 and  a->b !store;
@@ -14,12 +15,12 @@ hault;//hlt
 jump->a if!=0||carry;
 null;//nop
 
-a>>b +carry;//blue
-a<<b +carry;//red
-a>>>b +carry;//shift and include the last result
-a<<<b +carry;
+a>>=b +carry;//blue; unsigned '+carry' adds the internal registor to the result
+a<<=b +carry;//red; unsigned
+a<<<=b;//rotate bits
+a<<<=b;
 rotate a->b;
-
+rotate a<-b
 bump a;//'\a'; request data
 wait a;//recieves data
 send a->b;//
@@ -43,46 +44,86 @@ carry
 !carry
 if 0||carry
 !(if==0||carry)
-
-a;
-a=b;
-a&=b !store;
-a|=b !store;
-a^=b !store;
-a+=b !store !carry;
-a-=b +carry !store;
-mask=a;
-hault;
-jump->a if>=0;
+//instruction set (2nd attempt)
+a;//db a
+a=b;//mov a,b
+a&=b !store;//and/ands a,b ;note: the '!store, +carry etc..' bits are optional
+a|=b !store;//or/ors a,b
+a^=b !store;//xor/xors
+a+=b !store !carry;//add/adds/addc/addcs
+a-=b +carry !store;//sub/sbb/subs/sbbs
+mask=a;//swm a
+hault;//hlt
+jump -> a if>0;//ja a; all 28 jump commands; I have a list of all the conditions later;
 null;
 a>>=b;
 a<<=b;
-a>>-=b;
+a>>-=b;//chain shift
 a-<<=b;
 a>>>=b;
-a -> bump;
-wait -> a;
+a <- bump; port a -> "\a";//
+wait a; port a <- "\a";
 a = port b;//recv
 port a = b;//send
 push a;
 a = pop;
 call a;
 return;
-
-
+//
+if true;//'jump -> x if true;' ==> 'jump -> x;'
+if false;
+if 0;//same as 'if==0'
+if !0;
+if carry;
+if !carry;
+if sign;
+if !sign;
+if overflow;
+if !overflow;
+if == 0;
+if != 0;
+if > 0;
+if < 0;
+if >= 0;
+if <= 0;
+//jump types;
+jump -> a if > 0;
+if > 0 jump -> a;
+//litteral
+a;
+//register; I have chosen '%' over '¬' because '%' is easier to type;
+%a;
+//pointer
+[a]
+[%a]
+[%a + b]
+[%a + %b]
+[%a - b]
+[%a - %b]
 //classes
-oper = a;//class 1*
-a = oper;//class 1
-//class 2
-[a] += b;
-a += [b+c];
-[¬a] += [¬b];
-
+	//class 1*
+		oper = a;
+		oper -> a;
+		oper a;
+	//class 1
+		a = oper;
+		a -> oper;
+		oper a;//this one might not be needed.
+	//class 2
+		oper a b;
+		oper a->b;
+		a oper b;//no output register
+		a oper= b;//with output register
+	//----
+//can use ","s to for multi-instruction assembly lines. e.g. 'move->10,get,nor,set;'
+//----
 getInput{
 	let inPort,outPort,dataOut,dataIn;
 	wait inPort;
-	if;
+	if 0;
 	bump inPort;
-	send outPort->dataOut;
-	recv inPort<-dataIn
+	recv inPort<-dataIn;
+	sendOutput{
+		send outPort->dataOut;
+	};
 }
