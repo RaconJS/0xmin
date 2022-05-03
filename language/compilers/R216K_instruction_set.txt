@@ -1,0 +1,88 @@
+mov  a->b;//a->b;
+db a;//+a;
+and  a->b !store;
+or   a->b !store;
+xor a->b !store;
+
+add  a->b !store !carry;
+sub  a->b +carry !store;//-carry == borrow
+
+mask->a;//swm->a;stores 13blue bits in WriteMask
+
+hault;//hlt
+
+jump->a if!=0||carry;
+null;//nop
+
+a>>b +carry;//blue
+a<<b +carry;//red
+a>>>b +carry;//shift and include the last result
+a<<<b +carry;
+rotate a->b;
+
+bump a;//'\a'; request data
+wait a;//recieves data
+send a->b;//
+recv a<-b;
+
+push->a;
+pop<-a;
+
+call->a;
+return;
+
+!=0
+>=0
+>0
+<0
+<=0
+==0
+true
+false
+carry
+!carry
+if 0||carry
+!(if==0||carry)
+
+a;
+a=b;
+a&=b !store;
+a|=b !store;
+a^=b !store;
+a+=b !store !carry;
+a-=b +carry !store;
+mask=a;
+hault;
+jump->a if>=0;
+null;
+a>>=b;
+a<<=b;
+a>>-=b;
+a-<<=b;
+a>>>=b;
+a -> bump;
+wait -> a;
+a = port b;//recv
+port a = b;//send
+push a;
+a = pop;
+call a;
+return;
+
+
+//classes
+oper = a;//class 1*
+a = oper;//class 1
+//class 2
+[a] += b;
+a += [b+c];
+[¬a] += [¬b];
+
+getInput{
+	let inPort,outPort,dataOut,dataIn;
+	wait inPort;
+	if;
+	bump inPort;
+	send outPort->dataOut;
+	recv inPort<-dataIn
+}
