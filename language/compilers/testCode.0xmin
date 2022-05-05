@@ -1,3 +1,13 @@
 //import this "../code/0xmin3/operatingSystem.0xmin";
 //#set 0xmin.settings.log_code=1;
-//#set 0xmin.settings.log_table=1;
+#set 0xmin.settings.log_table=1;
+#let str="hello world";
+#let i=0;
+%0=0;
+send %0 "\p00";
+send %0 "\c0f";
+repeat str..length{
+	send %0 str[+i];
+	#set i=i+1;
+};
+hault;
