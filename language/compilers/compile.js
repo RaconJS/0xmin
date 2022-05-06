@@ -1112,7 +1112,9 @@ const oxminCompiler=async function(inputFile,fileName){
 								}
 								else if(parent.code[name] instanceof CodeLine){
 									let code=parent.code[name];
-									value=new Value.Number(code.dataType=="char"?code.args[1]:code.args[0]);
+									let number=(code.dataType=="char"?code.args[1]:code.args[0])|0;
+									value=new Value({type:"label",label:new Variable({lineNumber:number,name:"["+name+"]",code:[code]})})
+									//
 								}
 								else value.label=
 									parent.code[name] instanceof Variable?parent.code[name]:
