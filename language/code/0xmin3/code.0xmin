@@ -1,11 +1,15 @@
-import lib "io.0xmin";
-let Bridge()={
-	let Node()={$move=>0;
-		jump 1#let def chooser;
-		move->-0xf0#def backward;
-		jump->-0xfe;
-		move->+0xf0#def forward;
-		jump->+0xfe;
+//#set 0xmin.settings.log_code=1;
+//#set 0xmin.settings.log_table=1;
+#let str="hello world";
+{
+	send %0 "\p00";//send r0 0x1000
+	send %0 "\c0f";//send r0 0x200f
+}
+let autoPrint(string){
+	#let i=0;
+	repeat string..length{
+		send %0 #(str[+i]);
+		#set i=i+1;
 	};
-};
-let bridge=Bridge();
+}
+hault;

@@ -10,6 +10,7 @@
 //TODO: #fix booleans
 //TODO: #allow '+!!a'. aka mid_expression
 //TODO: $detect circular label definisions
+//TODO: #@make language defenitions less BODGED and more formal
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -226,29 +227,74 @@ const oxminCompiler=async function(inputFile,fileName){
 			keywordsRegex=/^(?:%|(?:[&|^+\-]|>>[>\-]?|[<\-]?<<)?=|->|hault|jump|if|null|store|carry|sign|overflow|0|\+|-|[!><=]=?|port|bump|wait|push|pop|call|return)$/;
 			registerSymbol="%";
 			ifParts=[];
-			operators={//name:{map:default name
-				"+":{map:"add",},
-				"-":{map:"sub",},
-				"=":{map:"mov",},
-				"&":{map:"and",},
-				"|":{map:"or",},
-				"^":{map:"xor",},
-				"mask":{map:"swm",},
-				"hault":{map:"hlt",},
-				"jump":{map:"jmp",},
-				"null":{map:"nop",},
-				">>":{map:"shl",},//scl
-				"<<":{map:"shr",},//scr
-				">>>":{map:"ror",},
-				"<<<":{map:"rol",},
-				"port":{map:"send",},"send":{map:"send"},"recv":{map:"recv"},
-				"wait":{map:"wait"},//
-				"push":{map:"push",},
-				"pop":{map:"pop",},
-				"call":{map:"call",},
-				"return":{map:"ret",},
-				"[db]":{map:"db",},
-			};
+			operators=Object.freeze({//name:{map:default name
+				"+":"add",
+				"-":"sub",
+				"=":"mov",
+				"&":"and",
+				"|":"or",
+				"^":"xor",
+				"mask":"swm",
+				"hault":"hlt",
+				"jump":"jmp",
+				"null":"nop",
+				">>":"shl",//scl with +chain
+				"<<":"shr",//scr
+				">>>":"ror",
+				"<<<":"rol",
+				"port":"send",
+				"push":"push",
+				"pop":"pop",
+				"call":"call",
+				"return":"ret",
+				"if":"??",//used to help the autophase-detector
+
+				//old instruction set
+				"send":"send",
+				"recv":"recv",
+				"wait":"wait",
+				"mov":"mov",
+				"db":"db",
+				"dw":"dw",
+				"and":"and",
+				"or":"or",
+				"xor":"xor",
+				"add":"add",
+				"adds":"adds",
+				"addcs":"addcs",
+				"sub":"sub",
+				"subs":"subs",
+				"sbb":"sbb",
+				"sbbs":"sbbs",
+				"shl":"shl",
+				"shr":"shr",
+				"ror":"ror",
+				"rol":"rol",
+				"scl":"scl",
+				"scr":"scr",
+				"push":"push",
+				"pop":"pop",
+				"call":"call",
+				"ret":"ret",
+				"hlt":"hlt",
+				"jmp":"jmp",
+				"nop":"nop",
+				"jz":"jz",
+				"jnz":"jnz",
+				"jc":"jc",
+				"jnc":"jnc",
+				"jo":"jo",
+				"jno":"jno",
+				"js":"js",
+				"jns":"jns",
+				"jge":"jge",
+				"jle":"jle",
+				"je":"je",
+				"jne":"jne",
+				"jg":"jg",
+				"jl":"jl",
+				"swm":"swm",
+			});
 			flags={
 				"0"       :{map:"ZF",jumpMap:["jnz","jz"]},
 				"carry"   :{map:"CF",jumpMap:["jc","jnc"]},
@@ -261,7 +307,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				">=":"jge",
 				"<=":"jle",
 				"==":"je",
-				"!=":"je",
+				"!=":"jne",
 				">":"jg",
 				"<":"jl",
 			}
@@ -270,10 +316,11 @@ const oxminCompiler=async function(inputFile,fileName){
 				"carry":{},
 				"chain":{},
 			}
-			asm_ifStatement({statement,index,scope}){//#:string?
+			asm_ifStatement({statement,index,scope,operator,hasIf}){//#:string?
 				let jumpType;
-				if(statement[index]=="if")block:{
+				if(statement[index]=="if"&&!hasIf)block:{
 					index++;
+					hasIf=true;
 					let ifData={type:null,flag:null};
 					if(statement[index].match(/[!><=]=/)){//'if >= x'
 						ifData.type=statement[index++];
@@ -288,14 +335,16 @@ const oxminCompiler=async function(inputFile,fileName){
 						}
 						if(this.flags.hasOwnProperty(statement[index])){//'if sign'
 							ifData.flag=statement[index++];
-							jumpType=this.flags[ifData.flag].jumpMap[ifData.type!="!"];
+							jumpType=this.flags[ifData.flag].jumpMap[+(ifData.type!="!")];
 						}
 						else{//'if;' or 'if !;'
 							jumpType=this.ifOperations[""+(ifData.type!="!")];
 						}
 					}
+					jumpType||=this.operators["null"];
+					operator=jumpType;
 				}
-				return {index,arg:jumpType};
+				return {index,operator,hasIf};
 			}
 			async asm_NumberOrRegister({statement,index,scope},{arg}){//#:
 				if(statement[index]==this.registerSymbol){
@@ -303,23 +352,22 @@ const oxminCompiler=async function(inputFile,fileName){
 					arg.push("r");
 				}
 				let value;
-				({index,value}=await contexts.expression_short({statement,index,scope}));
+				({index,value}=await contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
 				if(value){arg.push(value);}
 				return {index};
 			}
-			asm_operator({statement,index,scope}){//#:string|undefined
-				let arg;
+			asm_operator({statement,index,scope,operator}){//#:string|undefined
 				let word=statement[index];
-				if(word=="if")return this.asm_ifStatement({statement,index,scope});
-				if(this.operators.hasOwnProperty(word)){
+				if(word=="if")return this.asm_ifStatement({statement,index,scope,operator});
+				if(!operator&&this.operators.hasOwnProperty(word)){
 					let oper1=word;
 					index++;
-					if((oper1.match(/^\W+$/)||1)&&statement[index]=="="){//'a + = b' ==> 'a + b'
+					if((oper1.match(/^\W+$/)||1)&&["=","->"].includes(statement[index])){//'a + = b' ==> 'a + b'
 						index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
 					}
-					arg=this.operators[oper1].map;
+					operator=this.operators[oper1];
 				}
-				return {index,arg};
+				return {index,operator};
 			}
 			async asm_arg({statement,index,scope}){//#:(string|Value)[]
 				let word=statement[index];
@@ -329,14 +377,15 @@ const oxminCompiler=async function(inputFile,fileName){
 					index++;
 					word=statement[index];
 					arg.push("[");
-					{
-						let statement=word,index=0;
+					for(let i=0;i<word.length&&i<1;i++){
+						let statement=word[i],index=0;
 						({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
 						if("+-".includes(statement[index])){
 							arg.push(statement[index++]);
 							({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
 						}
 					}
+					index+=2;
 					arg.push("]");
 				}
 				else{
@@ -345,45 +394,47 @@ const oxminCompiler=async function(inputFile,fileName){
 				return {index,arg};
 			}
 			async generateAssemblyLine({statement,index,scope}){//:void & mutates scope
-				let instruction=new AssemblyLine({scope});
+				const instruction=new AssemblyLine({scope});
 				let argsList=[];
-				let operator,args=[];
-				let arg
-				;({index,arg}=this.asm_operator({statement,index,scope}));
-				if(arg){operator=arg;};
-				;({index,arg}=await this.asm_arg({statement,index,scope}));//arg1
-				if(arg?.length>0){args.push(arg);}
-				if(!operator){
-					;({index,arg}=this.asm_operator({statement,index,scope}));
-					if(arg){operator=arg};
+				let operator,args=[],hasIf=false;
+				;({index,operator}=this.asm_operator({statement,index,scope,operator}));
+				for(let i=0;i<9;i++){
+					let arg;
+					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
+					if(!operator)({index,operator}=this.asm_operator({statement,index,scope,operator}));
+					if(args.length<2){
+						;({index,arg}=await this.asm_arg({statement,index,scope}));
+						if(arg?.length>0){args.push(arg);}
+					}
+					let word=statement[index],failed;
+					if(({index}=contexts.endingSymbol({index,statement})).failed){break;}
 				}
-				;({index,arg}=await this.asm_arg({statement,index,scope}));//arg2
-				if(arg?.length>0)args.push(arg);
 				if(args.length>1){args.splice(1,0,",");}
 				if(!operator){
 					let dataMask=0xffff;
 					operator="dw";
 					if(args.length==1&&args[0][0].type=="string"&&args[0][0].array.length>0){
-						instruction=new Variable({name:"(string)"});
+						let instruction=[];//new Variable({name:"(string)"});
 						for(let char of args[0][0].array){
-							instruction.code.push(new AssemblyLine({scope,args:[operator," ",(valueCharToNumber(char,true)&dataMask)+""]}));
-							;
+							instruction.push(new AssemblyLine({scope,args:[operator,(valueCharToNumber(char,true)&dataMask)+""]}));
 						}
-						return {index,instruction};
+						return {index,instruction,isArray:true};
 					}
 					else{
 					}
 				}
 				{
-					argsList=[operator," ",...args.flat()];
+					argsList=[operator,...args.flat()];
 					instruction.args=argsList;
 				}
 				return {index,instruction};
 			}
 			async main_assembly({statement,index,scope}){//#
-				let instruction;
-				({instruction,index}=await this.generateAssemblyLine({statement,index,scope}));
-				scope.label.code.push(instruction);
+				let instruction,isArray;
+				({instruction,isArray,index}=await this.generateAssemblyLine({statement,index,scope}));
+				if(isArray){
+					scope.label.code.push(...instruction);
+				}
 				return {index};
 			};
 			async getLabel({statement,index,scope}){//#
@@ -406,7 +457,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				let tptasmString;
 				{
 					tptasmString=args
-						.map(v=>this.getArg(v))
+						.map((v,i)=>{v=this.getArg(v);failed||=(v!==v);return v+[""," "][+(i==0)]})
 						.flat()
 						.join("")
 						//.map(v=>v==","?"":v)
@@ -673,7 +724,7 @@ const oxminCompiler=async function(inputFile,fileName){
 									labelParent.labels[value.name]=newLabel;
 								}
 							}
-							labelParent.labels[newLabel.name]=undefined;//allow writing to this new label;
+							else labelParent.labels[newLabel.name]=undefined;//allow writing to this new label;
 							startValue=new Value({
 								type:"label",
 								label:newLabel,
@@ -1003,7 +1054,7 @@ const oxminCompiler=async function(inputFile,fileName){
 			}
 			return {index,argsObj};
 		},
-		async expression_short({index,statement,scope,shouldEval=true,includeBrackets=false}){//a().b or (1+1)
+		async expression_short({index,statement,scope,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
 			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
@@ -1042,7 +1093,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				//value=new Value();
 				if(!TESTING)return {index,value:undefined};
 			}
-			return await contexts.expression_fullExtend({value,index,statement,scope,shouldEval});
+			return await contexts.expression_fullExtend({value,index,statement,scope,shouldEval,noSquaredBrackets});
 		},
 		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
 		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
@@ -1058,11 +1109,12 @@ const oxminCompiler=async function(inputFile,fileName){
 				}else failed=true;
 				return {index,name,failed};
 			},
-			async expression_fullExtend({value,index,statement,scope,shouldEval=true}){
+			async expression_fullExtend({value,index,statement,scope,shouldEval=true,noSquaredBrackets=false}){
 				for(let i=index;i<statement.length;i++){//'.property'
 					if(index>=statement.length)break;
 					let word=statement[index];
 					let oldIndex=index;
+					if(word=="["&&noSquaredBrackets)break;
 					({value,index}=await contexts.extend_value({index,statement,scope,value,shouldEval}));
 					if(index==oldIndex)break;
 				}
@@ -2330,7 +2382,7 @@ const oxminCompiler=async function(inputFile,fileName){
 				:0,
 				v.length==1?v.charCodeAt(0):+("0x"+v.substr(2))||0,
 			];
-			return join?ary[0]|ary[1]:ary;
+			return join?ary[0]|ary[1]:outputAsBinary?ary:["dw",ary[1]+""];
 		}
 		function valueStringToArray(value,scope){
 			if(value?.type=="string")
@@ -2526,6 +2578,7 @@ const oxminCompiler=async function(inputFile,fileName){
 		let assemblyCode=await assemblyCompiler.main(scope.label);
 		return assemblyCode;
 	}
+	const outputAsBinary=assemblyCompiler.assembly.language=="0xmin";
 	let parts=inputFile;
 	parts=parseFile(parts,fileName);
 	parts=bracketPass(parts);
@@ -2533,7 +2586,6 @@ const oxminCompiler=async function(inputFile,fileName){
 	parts=await evalAssembly(parts);
 	//chars->words->expression->statement->codeObj->block
 	//
-	const outputAsBinary=assemblyCompiler.assembly.language=="0xmin";
 	let outputFile=outputAsBinary?parts.asBinary():parts.asAssembly();
 	let outputBinary=outputAsBinary?new Uint32Array(outputFile):
 		"_Model \"R216K2A\"\n"
