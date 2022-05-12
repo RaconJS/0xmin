@@ -1,0 +1,132 @@
+#set 0xmin.settings.language("tptasm");#set 0xmin.settings.log_table=1;
+def let a=1,b=2,oper;//a:%,b:%,c:%
+//instruction set (2nd attempt)
+a;//db a
+a = b;//mov a,b
+a &= b !store;//and/ands a,b ;note: the '!store, +carry etc..' bits are optional
+a |= b !store;//or/ors a,b
+a ^= b !store;//xor/xors
+a += b !store !carry;//add/adds/addc/addcs
+a -= b +carry !store;//sub/sbb/subs/sbbs
+mask = a;//swm a
+hault;//hlt
+jump -> a if>0;//ja a; all 28 jump commands; I have a list of all the conditions later;
+null;//nop;
+a >>= b +internal;//chain shift or shift
+a <<= b +internal;//shl/scl
+a >>>= b;//ror; circular shift:
+a <<<= b;//rol; 
+bump a; port a?; port a -> "\a";//'\a'; //note: 'bump' can't use litteral Uint in bump comand because of hardware limitations
+wait a; port a;  port a <- "\a";//if terminal.input == "\a";
+a = port b;//recv
+port a = b;//send
+push a;
+a = pop;
+call a;
+return;
+//
+if true;//'jump -> x if true;' ==> 'jump -> x;'
+if false;
+if 0;//same as 'if==0'
+if !0;
+if carry;
+if !carry;
+if sign;
+if !sign;
+if overflow;
+if !overflow;
+if == 0;
+if != 0;
+if > 0;
+if < 0;
+if >= 0;
+if <= 0;
+//jump types;
+jump -> a if > 0;
+if > 0 jump -> a;
+//litteral
+a;
+//register; I have chosen '%' over '¬' because '%' is easier to type;
+%a;//compiles to 'r1'
+//pointer addressing is the same as in tptasm;
+[a]
+[%a]
+[%a + b]
+[%a + %b]
+[%a - b]
+[%a - %b]
+//classes
+	//class 1*
+		oper = a;
+		oper -> a;
+		oper a;
+	//class 1
+		a = oper;
+		a -> oper;
+		oper a;//this one might not be needed.
+	//class 2
+		oper a b;
+		oper a->b;
+		a oper b;//no output register
+		a oper= b;//with output register
+	//----
+//can use ","s to for multi-instruction assembly lines. e.g. 'move->10,get,nor,set;'
+//----
+getInput{
+	let inPort,outPort,dataOut,dataIn;
+	wait inPort;
+	if 0;
+	bump inPort;
+	recv inPort<-dataIn;
+	sendOutput{
+		send outPort->dataOut;
+	};
+}
+examples:{
+	forLoop_example:{
+		//0xmin ZASM
+		let loop(reps){
+			let return,i,max,const_2;
+			#set: max=#(1<<reps);
+			move=>max;
+			get;
+			move=>i;
+			set;//%i = (1<<reps);
+			def let loop{
+				if;
+				jump->..return;//jump -> return if == 0;
+				//assert alu==i;
+				move=>const_2;
+				blue;
+				move=>i;
+				set;//%i>>=1;
+				jump->loop;
+			};
+			jump->data.return;
+			def i;
+			def max;
+			def const_2;
+			def return;
+		};//15 lines
+		//R2 RASM
+		let loop(reps){//(%)=>void //stackless
+			let i = 0,return;//i=r0
+			%i = @(1<<reps);
+			def let main{
+				jump -> return if == 0;//if i==0
+				%i >>= 1;
+				jump -> main;
+			};
+			def return;
+		};//4 lines
+		//R2 tptasm roughly im not 100% with my asm
+		.loop:
+			mov r0 reps
+		.main:
+			jz return
+			shl r0 1
+			jmp main
+		.return
+	};
+
+};

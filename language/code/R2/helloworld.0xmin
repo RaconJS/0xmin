@@ -1,0 +1,20 @@
+//import this "../code/0xmin3/operatingSystem.0xmin";
+//#set 0xmin.settings.log_code=1;
+void #set 0xmin.settings{
+	#;
+	//log_code=1;
+	//log_table=1;
+	language("tptasm");
+};
+//R2 RASM compiler
+let fastPrint(str){//#
+	let i=0,port0=0;
+	%port0=0;//mov r0 0;
+	repeat str..length{
+		send %port0 #(str[+i]);//send r0 (each letter in str);
+		#set i+=1;
+	};
+};
+fastPrint("hello world");
+send %0 0x1010;
+fastPrint("0@$#");

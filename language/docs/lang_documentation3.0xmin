@@ -217,6 +217,36 @@ $;{
 		,//array: not used
 	);
 };
+starter line:{
+	void;{
+		does not add this line of code to the parent scope_object;
+		usefull for mutating arrays without leaving a trace;
+		note: it is pointless to use '$' and '@' type code on void lines as they cannot be found in the assembly/hidden phases.
+		//lets say we want an #array with 4 items and a property pointing to the last one
+		e.g. 1
+		let array5{
+			1;
+			2;
+			3;
+			let item4=0;//this line is included in the array
+			4 #def item 4;
+		};//array5..length=5
+		e.g. 2
+		let array4{
+			1;
+			2;
+			3;
+			void let item4=0;//this line is NOT included in the array
+			4 #def item 4;
+		};//array4..length=4
+	};
+	static;{
+		not supported yet; might allow running code in function scopes.
+	};
+	repeat;{
+		repeat expression
+	}
+};
 import;{
 	//import opens a file and runs it in the current scope
 	//use form
@@ -275,8 +305,9 @@ virtual;{
 	jump -> 2;//throws a cpuState error as move is not the same on lines 2 and 4
 	move +2; //move => move+2;
 	null;
-}//can use '@!command;' to ignore state checking
-//can be used for variables.
+}
+//can use '@: !command;' to ignore state checking
+//'!command;' can be used for variables/constants e.g. can be used in function calls
 !jump -> 2;
 {//example of use
 	$jump=> a;

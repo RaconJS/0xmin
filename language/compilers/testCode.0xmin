@@ -1,34 +1,23 @@
-//import this "../code/0xmin3/operatingSystem.0xmin";
-//#set 0xmin.settings.log_code=1;
-#set 0xmin.settings.log_table=1;
+void #set 0xmin.settings.language("tptasm");
+//void #set 0xmin.settings.log_table=1;
+let heap{import lib "heap.0xmin";};
+...let heap;
+%0=10;
+call malloc;
+%1=0x0f00;//high
+%2=0xffff;//low
+memset.call(0,1,2);
+let a;
+jump->a #def a;
+def free;
+def clear;
+def memset;
+def heap;
 /*
-#let i=0;//:@%
-%0=0;
-send %0 "\c0f";
-send %0 "\p00";
-send %0 "h";
-let printStr(str){//2
-	let portNum=1;
-	%portNum=0;
-	%i=str;
-	let spair=2;
-	let main;
-	let return;
-	def main{
-		%spair=[%i];
-		jump->return if==0;
-		send %portNum %spair;
-		%i+=1;
-		jump->main;
-	};
-	#def return;
-};
-let str={
-	"hello world\x00";
-};
-printStr(str);
-hault;
-def str;*/
-let b="34";
-let a={$def b;};//a[l0[b[3,4]]]
-debugger a[0][0]"label";
+%10=%0;
+%1=0x1234;
+%2=0x5678;
+heap.memset.call(0,1,2);
+%0=%10;
+heap.clear.call(0);
+hault;*/
