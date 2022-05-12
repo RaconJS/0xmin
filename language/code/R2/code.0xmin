@@ -1,0 +1,117 @@
+void #set 0xmin.settings{
+	#;
+	//log_code=1;
+	set log_table=1;
+	set language("tptasm");
+};
+let data;
+let port0=0;
+let getInput{//:@function pure void=>out
+	let out=1;
+	#def let start;
+		check %port0;
+		jump -> start if sign;
+		delete start;
+	bump %port0;
+	#def let start;
+		recv %out %port0;
+		jump -> start if !carry;
+		delete start;
+	return;
+};
+let textEditer{//:@function()=>void
+	let getChar{//:@function()=>char
+		;
+	};
+	return;
+	{
+		def getChar;
+	};
+};
+let inputUint4{
+	let self=..this;
+	let call(val){//#[val]
+		%location=val;
+		call self;
+	};
+	let input=1;
+	let temp=2;
+	def let start;
+	call getInput;
+	def let decodeInput{
+		let try(letter,next,shift){//letter:#char,next:@ memory location,shift:#number
+			%temp=%input;
+			%temp-=#(+letter[0]);
+			jump -> next if < 0;
+			%temp+=shift;
+			%input=%temp;
+			jump->end;
+		};
+		let try09,tryaf,tryAF,end;
+		def try09{
+			#try("0",tryAF,0);
+		};
+		def tryaf{
+			#try("a",tryAF,0);
+		};
+		def tryAF{
+			#try("A",end,0);
+		};
+		def end;
+	};
+	jump->start if<0;
+	send %0 "y";
+};
+let printMemUint16{//:@function([%location])=>%out
+	let self=..this;
+	let call(val){//#[val]
+		%location=val;
+		call self;
+	};
+	let location=1,out=1;
+	let charSet={
+		let i=+"0";
+		repeat 10{(i);#set i=i+1;};
+		let i=+"A";
+		repeat 6{(i);#set i=i+1;};
+	};
+	let data=location;
+	let i=4;
+	let 4bit=3;
+	%i=16;
+	%data=[%location];
+	def let start;//do while
+	{
+		%4bit=%data;
+		%4bit>>=#(4*3);
+		%4bit&=0xf;
+		send %port0 [%4bit+charSet];
+	};
+	%data<<=4;
+	%i-=4;
+	jump->start if>0;
+	return;
+	def charSet;
+};
+let 0xminEmulator{
+	let move=0,jump;
+};
+let struct(block)={//new class
+	void #set: ..this()={//new instance
+		//dont need the voids
+		void #set return=block();//C structs
+		void #set labels=return..labels;
+		void #let i=0;
+		void #let self=..this;
+		void repeat:labels..length #{#;
+			self.[labels[i]]=arguments[i];
+			i=i+1;
+		};
+	};
+};
+let vec2=struct()::(){
+	#def let a{0};
+	#def let b{0};
+};
+let a=vec2(0,1);
+def a;

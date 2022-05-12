@@ -1,0 +1,264 @@
+//heap
+void #set:(){//documentation
+	heap{
+		#type Function={
+			@(...%[])=>%[];
+			call:#()=>@{};
+		};
+		#type Page{
+			next;
+			last;
+			isUsed;
+		};
+		malloc:Function(%int length)=>%Page*;
+		free:Function(%Page*)=>void;
+		clear:Function(%Page*[1])=>void;
+		memset:Function(%Page*,%int16,%int13)=>void;
+	};
+};
+void #set: 0xmin.settings.language("tptasm");
+void #let set: heap{
+	#let: free,malloc,clear,memset;//@functions
+	//each of the functions has a '.call(...args)' method
+	#let: call;
+	#let set: memoryData(){
+		#def: malloc;
+		//#def: free;
+		//#def:{
+		//	#def: clear;
+		//	#def: memset;
+		//};
+		#def: page0;
+		0x1fffffff;
+	};
+	#;
+	#set: call(foo){//call functionName,args
+		#let: args={void...set arguments;};
+		#set: args..splice(0,1);//remove foo
+		#let: i=0;
+		repeat foo.nextReg.n:{
+			@push %i;
+			#set: i+=1;
+		};
+		{//set inputs
+			#let: i=0;
+			repeat args..length:{//assume {def a}[0] == {$def a;$set a}
+				repeat #(+args[+i]!=+foo.inputs[+i][1])
+					@ %(foo.inputs[+i][1])=%(args[+i]);
+				#set: i+=1;
+			};
+		};
+		call foo;
+		repeat foo.nextReg.n:{
+			repeat (+i>foo.outputs..length):@pop %i;
+			#set: i-=1;
+		};
+		#let: startI=0;
+		//UNFINNISHED
+	}{
+		#let: addCaller(foo,len){
+			//repeat (len==1)
+			#let: foo.call=2;
+			#let: heap_Call=call;
+			#let: foo.call(x){
+				...let set: heap_Call(foo,x);
+			};
+			repeat (len==2)
+			#let set: foo.call(x,y){
+				...let set: heap_Call(foo,x,y);
+			};
+			repeat (len==3)
+			#let set: foo.call(x,y,z){
+				...let set: heap_Call(foo,x,y,z);
+			};
+		};
+	};
+	#let: Page()={
+		#def let: next{0};//:@* //pointer
+		#def let: last{0};//:@* //pointer
+		#def let: isUsed{0};//@bool
+		#def let: data;//:@[] //array
+	}{
+		#let: prototype=..this();
+		#let: size=prototype..compile..length;
+		#let: pointer()={
+			...set let prototype;
+		};
+	};
+	#let: page0=Page();//:@
+	#set: page0{//start of the heap
+		#set: next..splice(0,1,{0x7fff});
+		#set: last..splice(0,1,{(page0);});
+	};
+	#let: enum(start)={
+		#let: newObj={};
+		#set: newObj(){
+			#set: return =+newObj.n;
+			#set: newObj.n=newObj.n+1;
+		}{#let: n=start;};
+		#set: return = newObj;
+	};
+	//
+	//%:weak,@:let,$:break,#:this
+	#set: malloc{
+		#let: nextReg=enum(0);
+		#let: inputs{//:#
+			#def let: words=nextReg();//:%
+		};
+		#let: data{
+			(page0) #def let: startPage;//:Page*
+		};
+		#let: outputs{//:#
+			#def let: pointer=0;//:%
+		};
+		...let inputs;
+		...let data;
+		...let outputs;
+		#let: page=nextReg();//:%Page*
+		#set: page..splice(0,page..length);
+		#set: page{...let set Page();};
+		#let: compiledPage=#(page..compile);
+		#let: pageSize=nextReg();//:%int
+		#let: remainder=pageSize;
+		%page=[startPage];//Page* = [Page**]
+		//%page=[%page];//Page = [Page*]
+
+		#let: whenFound;
+		#def let: loop{
+			#let: failed;
+			{//isUsed==0?
+				#let: isUsed=pageSize;//:%Page*
+				%isUsed=[%page+page.isUsed];
+				jump failed if !=0;
+			};
+			{//hasEnoughSpace?
+				%pageSize=[%page+page.next];
+				%pageSize-=%page;
+				%remainder-=%words;
+				jump failed if<0;
+			};
+			jump whenFound;
+			#def: failed{
+				%page=[%page+page.next];
+				jump->loop;
+			};
+		};
+		#def: whenFound{
+			#let: extraSpace=5;//miminum page size
+			[%page+page.isUsed]=1;
+			%remainder-=extraSpace;
+			jump ..return if==0;//if no space, dont need
+			//%remainder+=extraSpace;
+			delete remainder;
+			//find location for nextPage
+			#let: newPage=nextReg();//:%Page*
+			#let: nextPage=nextReg();
+			%nextPage=[%page+page.next];
+			%newPage=%page;
+			%newPage+=%words;
+			%newPage+=extraSpace;//extra space
+			{//setUp page pointers;
+				//a<-->c
+				//a<->b<->c
+				//a=r2,b=r4,c=r5
+				#let: a=page,b=newPage,c=nextPage;
+				[%b+page.next]=%c;//b->c
+				[%c+page.last]=%b;//b<-c
+				[%b+page.last]=%a;//a<-b aka: b.<- = a
+				[%a+page.next]=%b;//a->b aka: a.-> = b
+			};
+			//setOutput
+			%pointer=%page;
+			%pointer+=compiledPage..length;
+		};
+		return;
+		#def: data;
+	}{void #set: call.addCaller(..this,1);};
+	#set: free{
+		#let: nextReg=enum(0);//get next free register
+		#let: inputs{//:#
+			#def let: pointer=nextReg();//:%Page*
+		};
+		#let: data{};
+		#let: outputs{};
+		#let: page=inputs.pointer;//:%Page*
+		#set: page..splice(0,page..length);
+		#set: page{...let set Page();};
+		#let: compiledPage=#(page..compile);
+		%page-=compiledPage..length;
+		#let: nextPage=nextReg(),lastPage=nextPage;
+		#let: newAddress=nextPage;
+		#let: isUsed=nextReg();
+		#let: joinIfFree(lowPage,highPage,condisionPage){//:#(%newAddress,%isUsed)=> @(%Page*,%Page*)=>void
+			//extends low_address_page into high_address_page
+			#let: end;
+			%isUsed=[%condisionPage+page.isUsed];
+			jump->end if!=0;
+			//if free then join
+			%newAddress=[%highPage+page.next];
+			[%lowPage+page.next]=%newAddress;
+			#def: end;
+		};
+		%nextPage=[%page+page.next];
+		#def: joinIfFree(page,nextPage,nextPage);
+		delete nextPage;
+		%lastPage=[%page+page.last];
+		#def: joinIfFree(lastPage,page,lastPage);
+		delete lastPage;
+		[%page+page.isUsed]=0;
+		return;
+		#def: data;
+	}{void #set: call.addCaller(..this,1);};
+	#set: clear{//aka fill memory
+		#let: nextReg=enum(0);
+		#let: self=..this;
+		#let: inputs{
+			#def let: page=nextReg();//input, page data
+		};
+		...let inputs;
+		delete self;
+		#let: data{
+			#def let: redHalf{0};
+			#def let: blueHalf{0};
+		};
+		#let offset;
+		$offset=>Page.prototype.data;
+		#let: address=nextReg();
+		%address=%page;
+		%page-=offset;
+		mask = [data.redHalf];
+		#let: fillData=nextReg();
+		%fillData=[data.blueHalf];
+		#def let: for{
+			#let: i=nextReg();
+			%i=[%page+Page.prototype.next];
+			jump->..return if<=0;
+			%i-=%address;
+			#def let: loop{
+				[%address]=%fillData;
+				%address+=1;
+				%i-=1;
+				jump->..this if>0;
+			};
+		};
+		return;
+		#def: data;
+	}{void #set: call.addCaller(..this,1);};
+	#set: memset{
+		#let: nextReg=enum(0);
+		#let: inputs{
+			#def let: page=nextReg();//input
+			#def let: high=nextReg();
+			#def let: low=nextReg();
+		};
+		...let inputs;
+		[clear.data.redHalf]=%high;
+		[clear.data.blueHalf]=%low;
+		call clear;//clear.call(inputs.page);
+		[clear.data.redHalf]=0;
+		[clear.data.blueHalf]=0;
+		return;
+	}{void #call.addCaller(..this,3);};
+	#def: memoryData();
+};
+...let set heap;
