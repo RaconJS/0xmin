@@ -15,12 +15,12 @@
 		def getInput_dist1;
 		def clearScreen;
 		{//exe's
-			def restart;//1
-			def hello;//2
-			def morros;//3
-			def hi;//4
-			def clearScreenProgram;//2
-			def addStuff;//5
+			def restart;//2
+			def hello;//4
+			def morros;//5
+			def hi;//6
+			def clearScreenProgram;//3
+			def addStuff;//1
 			//def Executable.hault_mid;
 			//def Executable()::{};//7
 			//def Executable()::{};//8
