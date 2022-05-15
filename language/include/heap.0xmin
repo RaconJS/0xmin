@@ -28,30 +28,31 @@ void #let set: heap{
 		//	#def: clear;
 		//	#def: memset;
 		//};
-		#def: page0;
 		0x1fffffff;
+		#def: page0;
 	};
 	#;
 	#set: call(foo){//call functionName,args
 		#let: args={void...set arguments;};
 		#set: args..splice(0,1);//remove foo
-		#let: i=0;
-		repeat foo.nextReg.n:{
+		#let: outputSize=foo.outputs..length;
+		#let: i=outputSize;
+		repeat (foo.nextReg.n-outputSize):{
 			@push %i;
-			#set: i+=1;
+			#set: i=i+1;
 		};
 		{//set inputs
 			#let: i=0;
 			repeat args..length:{//assume {def a}[0] == {$def a;$set a}
-				repeat #(+args[+i]!=+foo.inputs[+i][1])
-					@ %(foo.inputs[+i][1])=%(args[+i]);
-				#set: i+=1;
+				repeat #(+args[+i]!=+foo.inputs[+i])
+					@ %(foo.inputs[+i])=%(args[+i]);
+				#set: i=i+1;
 			};
 		};
 		call foo;
-		repeat foo.nextReg.n:{
-			repeat (+i>foo.outputs..length):@pop %i;
-			#set: i-=1;
+		repeat (foo.nextReg.n-outputSize):{
+			#set: i=i-1;
+			repeat (+i>=foo.outputs..length):@pop %i;
 		};
 		#let: startI=0;
 		//UNFINNISHED
@@ -90,12 +91,21 @@ void #let set: heap{
 		#set: next..splice(0,1,{0x7fff});
 		#set: last..splice(0,1,{(page0);});
 	};
-	#let: enum(start)={
+	#let: enum(start,inputsLen)={
+		repeat !inputsLen #set: inputsLen=1;
 		#let: newObj={};
 		#set: newObj(){
 			#set: return =+newObj.n;
+			repeat #(newObj.n>=inputsLen):{
+				#set: newObj.push{push newObj.n;};
+				#set: newObj.pop..splice(0,0,{pop newObj.n;});
+			};
 			#set: newObj.n=newObj.n+1;
-		}{#let: n=start;};
+		}{
+			#let: n=start;
+			#let: push{};
+			#let: pop{};
+		};
 		#set: return = newObj;
 	};
 	//
@@ -144,10 +154,10 @@ void #let set: heap{
 			};
 		};
 		#def: whenFound{
-			#let: extraSpace=5;//miminum page size
+			#let: extraSpace=compiledPage..length;//miminum page size
 			[%page+page.isUsed]=1;
 			%remainder-=extraSpace;
-			jump ..return if==0;//if no space, dont need
+			jump ..return if==0;//if no space => dont need to rewire page pointers
 			//%remainder+=extraSpace;
 			delete remainder;
 			//find location for nextPage
@@ -162,15 +172,16 @@ void #let set: heap{
 				//a<->b<->c
 				//a=r2,b=r4,c=r5
 				#let: a=page,b=newPage,c=nextPage;
+				[%b+page.isUsed]=0;
 				[%b+page.next]=%c;//b->c
 				[%c+page.last]=%b;//b<-c
 				[%b+page.last]=%a;//a<-b aka: b.<- = a
 				[%a+page.next]=%b;//a->b aka: a.-> = b
 			};
 			//setOutput
-			%pointer=%page;
-			%pointer+=compiledPage..length;
 		};
+		%pointer=%page;
+		%pointer+=compiledPage..length;
 		return;
 		#def: data;
 	}{void #set: call.addCaller(..this,1);};
@@ -232,8 +243,22 @@ void #let set: heap{
 		#def let: for{
 			#let: i=nextReg();
 			%i=[%page+Page.prototype.next];
-			jump->..return if<=0;
 			%i-=%address;
+			#let: Loop(n)={
+				let end;
+				%i-=n;
+				jump->end if<0;
+				#def let: start;
+				repeat n:{
+					[%address]=%fillData;
+					%address+=1;
+				};
+				%i-=n;
+				jump->start if>0#def end;
+				%i+=n;
+			};
+			#def: Loop(8);
+			jump->..return if<=0;
 			#def let: loop{
 				[%address]=%fillData;
 				%address+=1;
@@ -241,6 +266,7 @@ void #let set: heap{
 				jump->..this if>0;
 			};
 		};
+		%page+=offset;
 		return;
 		#def: data;
 	}{void #set: call.addCaller(..this,1);};
