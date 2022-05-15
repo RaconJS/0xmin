@@ -743,7 +743,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				statement.maxRecur=undefined;
 			}
 			if(!state.void){
-				scope.label.code.push(codeObj);
+				scope.label.code.push(...codeObj.code);//(codeObj);
 			}
 			return {index,value:newScope};
 		},
@@ -814,9 +814,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
 							value.label.unDefine();
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
-							scope.label.code.push(value.label);
-							value.label.defs.push(scope.label);
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true},true);
+							//scope.label.code.push(value.label);
+							value.label.defs.push(scope.parent.label);
 						}else{
 							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name+"' is undefined"));
 						}
@@ -864,7 +864,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(arg1){
 							scope.label.code.push(arg1);
 						}else{
-							contexts.meta_defineLabelToNextLine(value.label,scope,value);
+							let hasInsert=state["insert"];
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:hasInsert});
+							state["insert"]=false;
 							if(value?.label)value.label.defs.push(scope.label);
 						}
 					}
@@ -875,10 +877,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return{index};
 			},
-			meta_defineLabelToNextLine(label,scope,value,useUnshift=false){
+			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true}={},useUnshift=false){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name+"' is not declared"));
-				let newLineObj=new HiddenLine.Define({label,scope});
+				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
 				if(useUnshift)scope.label.code.unshift(newLineObj);
 				else scope.label.code.push(newLineObj);
 			},
@@ -974,7 +976,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						useInstruction=true;
 					}
 					else if(value.type=="string"){
-						codeObj.code.push(Variable.fromValue(value));
+						codeObj.code.push(...Variable.fromValue(value).code);
 						useInstruction=false;
 					}
 					else if(value.type=="array"){
@@ -1250,6 +1252,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									//
 								}
 								else value.label=
+									parent.code[name] instanceof HiddenLine.Define&&parent.code[name].insert?parent.code[name].label:
 									parent.code[name] instanceof Variable?parent.code[name]:
 									parent.code[name] instanceof Scope?parent.code[name].label:
 									parent.code[name] instanceof CodeLine?undefined:
@@ -1541,14 +1544,18 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"use strict";
 				let code=variable.code;
 				codeQueue??=[];
-				for(const lineObj of code){//lineObj instanceof AssemblyLine
+				for(let lineObj of code){//lineObj instanceof AssemblyLine
 					///lineObj:CodeLine|Variable|Scope
+					if(lineObj instanceof HiddenLine.Define){
+						codeQueue.push(lineObj);
+						lineObj=lineObj.label;
+					}
 					if(
 						lineObj instanceof HiddenLine||
 						lineObj instanceof AssemblyLine
 					)codeQueue.push(lineObj);
-					if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
-					if(lineObj instanceof Variable){
+					else if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
+					else if(lineObj instanceof Variable){
 						this.collectCode(lineObj,codeQueue);
 						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj,scope:lineObj.scope}));
 					}
@@ -1675,7 +1682,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//----
 		//@ phase : (binary phase)
 			assembly:{//0xmin assembly language
-				language:"0xmin",//"0xmin"|"tptasm"
+				language:"tptasm",//"0xmin"|"tptasm"
 				instructionSet:{
 					"null":0,
 					"move":0,
@@ -2043,6 +2050,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			class Define extends HiddenLine{//'$set a;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
+				setAddress=true;
+				insert=false;
 				run({cpuState}){//nextlineNumber
 					this.label.lineNumber=cpuState.lineNumber;
 					this.label.cpuState=new CpuState(cpuState);
@@ -2333,7 +2342,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				for(let i=0;i<this.defs.length;i++){
 					let code=this.defs[i].code;
 					let index=code.indexOf(this);
+					if(index==-1)
+						for(let i=0;i<code.length;i++)
+						if(code[i] instanceof HiddenLine.Define&&code[i].label==this)index=i;
+					;
 					if(index!=-1)code.splice(index,1);
+
 				}
 				this.defs=[];
 				//this.lineNumber=undefined;

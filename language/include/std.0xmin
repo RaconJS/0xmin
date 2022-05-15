@@ -1,3 +1,11 @@
-0x61;1;0;0x20000000;0;0x20000000;
-let io=2,io.input=io[0]=2,io.output=io[1]=4;
-let terminal=3,terminal.input=terminal[0]=3,terminal.output=terminal[1]=5;
+...(){//0xmin
+//import lib "io.0xmin";
+};
+...let set:{//tptasm/R2
+	let main{};
+	jump->main;
+	let Function(block)={
+
+	};
+	def main;
+};
