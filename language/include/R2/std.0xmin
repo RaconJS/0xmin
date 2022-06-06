@@ -1,0 +1,16 @@
+//tptasm/R2
+let main{};//the {} does nothing, i just use it to denote Objects instead of labels.
+jump->main;
+...let:{import this "heap.0xmin";};
+let Function(block)={
+	let function={...set block};
+	let call(){
+		call function;
+	};
+	def function;
+};
+def malloc;
+def free;
+def memFill;
+def main;
+def heap;

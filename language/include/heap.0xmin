@@ -1,35 +1,47 @@
 //heap
 void #set:(){//documentation
 	heap{
-		#type Function={
-			@(...%[])=>%[];
-			call:#()=>@{};
+		#type int{i29};
+		#type Function{
+			@(...%[])->%[];    //non-macro(#) function(->) that takes in a list(...) of register names(%) that store memory addresses([]) and outputs it to a single output register(%) that stores a memory location([]).
+			call:#()->@{};     //property 'call' is a macro function that takes in no arguments
 		};
 		#type Page{
-			next;
-			last;
-			isUsed;
+			next:@Page*;
+			last:@Page*;
+			isUsed:@bool;
 		};
-		malloc:Function(%int length)=>%Page*;
-		free:Function(%Page*)=>void;
-		clear:Function(%Page*[1])=>void;
-		memset:Function(%Page*,%int16,%int13)=>void;
+		malloc:Function(%int length)->%Page*;
+		free:Function(%Page*)->void;
+		clear:Function(%Page*[1])->void;
+		memset:Function(%Page*,%int16,%int13)->void;
+		memory{
+			@Page;//start page
+			#list of intended actions{
+				#def: this;
+				$undef: this;
+				$def set: this;
+			};
+		};
 	};
 };
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{
 	#let: free,malloc,clear,memset;//@functions
+	#let: memory;
 	//each of the functions has a '.call(...args)' method
 	#let: call;
 	#let set: memoryData(){
 		#def: malloc;
-		//#def: free;
+		#def: free;
 		//#def:{
 		//	#def: clear;
 		//	#def: memset;
 		//};
-		0x1fffffff;
-		#def: page0;
+		#def set: memory{
+			0x1fffffff;
+			#def: page0;
+		};
 	};
 	#;
 	#set: call(foo){//call functionName,args
@@ -220,6 +232,11 @@ void #let set: heap{
 		return;
 		#def: data;
 	}{void #set: call.addCaller(..this,1);};
+	#set: sizeOf(pageInput){
+		#let: lengthOutput=pageInput;
+		//%pageInput=%lengthOutput;
+		%lengthOutput-=[%page-(Page.prototype..length-Page.prototype.next)];
+	};
 	#set: clear{//aka fill memory
 		#let: nextReg=enum(0);
 		#let: self=..this;

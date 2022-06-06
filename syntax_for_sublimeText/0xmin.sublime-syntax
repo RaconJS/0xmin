@@ -1,34 +1,496 @@
 %YAML 1.2
 ---
-#pls_fix_this_spaghetti_
+#useful: https://www.sublimetext.com/docs/scope_naming.html
 # See http://www.sublimetext.com/docs/syntax.html
 name:
   0xmin
 file_extensions:
-  - 0xmin1 #ec
-  - 0xmin2 #ec
+  - 0xmin #ec
+  - zasm
 scope: source.0xmin
+# const wordsRegex=/
+# [#${}()]
+# |::?
+# |\.+
+# |([_\w]+\s*\.\s*)*[_\w]+
+# |,
+# |[\[\]]
+# |(<[-=]>|-?->|<--?|<==?|=?=>|=?=?=)
+# |[><\!]=?
+# |[+-]?(0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)
+# |(\+\+?(?![0-9])|--?|\*\*?|\/)
+# |(&&?|\|\|?|!|\^\^?|~|[£%@?¬])
+# |[^\s]
+# /g;
+#
+#
 variables:
-  number: '(?:\b|[\+\-])(?:0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?|0b[0-1]+(?:\.[0-1]+)?|[0-9]+(?:\.[0-9]+)?)\b' #'((?<!\w)\b[\+\-]?|[\+\-])((0b[0-1]+)|(0x[0-9a-fA-F]+)|([0-9]+))\b'
-  labelName: '([\w]+)(?!\.)(?!\w)'
+  baseNumber: '\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b'
+  number: '\b(?:undefined|null)\b|{{baseNumber}}' #\b(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
+  signedNumber: '(?:\b|[+\-*/]\s*){{baseNumber}}' #(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
+  labelName: '\b\w+\b'
   buildSettingWords: '\!?(make file|log.table|log.code)'
-  equalSigns: '<[=-]>?|[=-]>|=' #{}=|={}
-  commands: 'nor|red|blue|get|set|if'
+  equalSigns: '<=>|<=|=>|=|==|<->|<-|->'
+  assembly_operators: '<->|<-|->'
+  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?¬]'
+  operators_functionCallArgs: '::|:>|<:'
+  assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump)\b'
+  assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
+  startFile: '!?(make file|log.code|log.table)'
+  functionCallSymbols: '(?<!<)(?:=>|->|<-|=)'
+
+
+  line_start_endLinePart: ':|(?=\S)'
 contexts:
-  display_0xmin_1:
-    - include: mainScope
-    - match: ;}
+  main:
+    - match: '^'
+      push: startFile
+  startFile:
+    - match: ^\s*#?(\s*(["'`])\s*{{startFile}}\s*\2\s*|\/\/\s*{{startFile}}\b|\/\*{{startFile}};?\*\/)\s*
+      scope: keyword.declaration.fileSetting.0xmin
+    - match: '(?=\S)' #(?!^\s*#?(\s*(["'`])\s*{{startFile}}\s*\2\s*|\/\/\s*{{startFile}}\b|\/\*{{startFile}};?\*\/))
+      set: mainScope #global #
+    #- include: baseMain
+  global:
+    - match: '}|\]|\)'
+      scope: invalid.illegal
+    - match: ''
+      push: line_start
+  line_start: #new parser
+    - include: baseMain
+    - match: '\}'
+      #pop: true
+    - match: '\)|\]'
+      scope: invalid.illegal
+    - match: '\s*'
+      set: line_start_1_default
+  line_start_1_main:
+    - match: '\b(?:void|static|virtual)\b'
+      scope: keyword.statementType.0xmin
+  line_start_2_main:
+    - match: '\b(?:recur|repeat)\b'
+      scope: keyword.statementType.0xmin
       pop: true
-  display_0xmin:
-    - match: '[0x,0b]'
-      scope: variable.parameter #variable.function #constant.numeric.example-c
-    - match: min
+      push: [keyword_1arg_2,keyword_1arg_1]
+  keyword_1arg_1:
+    - match: ''
+      pop: true
+      push: expression_short
+  keyword_1arg_2:
+    - include: baseMain
+    - match: '{{line_start_endLinePart}}'
+      set: line_start
+  line_start_3_main:
+    - match: '\b(?:recur|repeat)\b'
+      scope: keyword.controll.0xmin
+  line_start_3_getDefaultPhase:
+    - match: '(?=\b(let|def)\b)'
+      set: meta_macro
+    - match: '(?=\b(undef|ram)\b)'
+      set: meta_hidden
+    - match: ''
+      set: meta_assembly
+  function:
+    - include: baseMain
+    - match: '\('
+      set: #parameters
+        - include: baseMain
+        - match: '\)'
+          set: 
+            - match: '{{functionCallSymbols}}?'
+              scope: support.constant.functionType.0xmin
+              set:
+                - match: '\{'
+                  set: line_start
+                - match: '(?=\S)'
+                  fail: bracket
+        - match: '(?=\S)'
+          push: expression_short
+  expression_short_bracket:
+    - match: '\('
+      push: expression_normal
+      set: expression_extends
+  expression_end:
+    - match: '(?=\;|\})'
+      pop: true
+  expression_short:
+    - meta_scope: short.TEST
+    - include: baseMain
+    - include: expression_end
+    - match: '{{signedNumber}}'
+      scope: constant.numeric
+      set: expression_extends
+    - match: '(?=\()'
+      #push: expression_normal
+      #set: expression_extends
+      branch_point: bracket
+      branch:
+        - function
+        - expression_short_bracket
+    - match: '\['
+      push: expression_square
+      set: expression_extends
+    - match: '\{'
+      push: line_start
+      set: expression_extends
+    - match: '\b\w+\b'
+      set: expression_extends
+    - match: '(?=\S)'
+      set: expression_extends
+  expression_extends:
+    - meta_scope: extend.TEST
+    - include: baseMain
+    - include: expression_end
+    - match: '\.\.'
+      push:
+      - include: baseMain
+      - match: '\b(?:length|compile|array|code|labels|seal|freeze|this|return)\b'
+        scope: support.function.internalScope.0xmin
+        pop: true
+      - match: '(?=\S)'
+        pop: true
+    - match: '\.'
+      push:
+      - match: '\b\w+\b'
+        pop: true
+      - match: '(?=\()'
+        push: expression
+      - match: ''
+        pop: true
+    - match: '{{signedNumber}}'
+      scope: constant.numeric.0xmin
+      pop: true
+    - match: '\('
+      set: expression_normal
+    - match: '\['
+      set: expression_square
+    - match: '\{'
+      set: line_start
+    - match: '\b\w+\b'
+    - match: '(?=\S)'
+      pop: true
+  expression:
+    - include: baseMain
+    - include: expression_end
+    - match: '(?:[+\-*/%]|\*\*)|(?:^^|&&|\|\|)|(?:)'
+      scope: keyword.operator.0xmin
+      #push: expression_short
+    - match: '=|=>'
+      scope: keyword.assignment.0xmin
+    - match: '=|=>'
+      scope: keyword.assignment.0xmin
+    - match: '(?=[{\(\w\.])'
+      push: expression_short
+    - match: '(?=\S)'
+      pop: true
+  expression_normal:
+    - meta_scope: normal.TEST
+    - include: baseMain
+    - match: '\)'
+      pop: true
+    - include: expression
+    - match: '\]|\}'
+      scope: invalid.illegal
+  expression_square:
+    - include: baseMain
+    - match: '\]'
+      pop: true
+    - match: '\)'
+      scope: error
+      pop: true
+    - include: expression
+    - match: '\)|\}'
+      scope: invalid.illegal
+  endLine:
+    - match: ';|(?=}|$)'
+      pop: true
+  meta_assembly:
+    - meta_scope: '@'
+    - include: baseMain
+    - include: endLine
+    - match: '{{assembly_registers}}'
+      scope: keyword.register.0xmin
+      push: meta_assembly_args
+    - match: '{{assembly_commands}}'
+      scope: keyword.assembly.0xmin #support.constant
+      push: meta_assembly_args
+    - match: ','
+    - match: ''
+      pop: true
+  meta_assembly_args:
+    - include: baseMain
+    - include: endLine
+    - match: '{{assembly_registers}}'
+      scope: keyword.register.0xmin
+    - match: '{{assembly_operators}}'
+      scope: support.constant.operator.0xmin
+    - match: ''
+      push: expression_short
+  meta_hidden:
+    - meta_scope: '$'
+    - include: baseMain
+    - include: endLine
+    - match: '((?:\b(?:let|set|def)\b\s*)*):?'
+      captures:
+        1: entity.name.hidden.0xmin
+      push: expression
+    - match: ','
+    - match: ''
+      pop: true
+  meta_macro:
+    - meta_scope: '#'
+    - include: baseMain
+    - include: endLine
+    - match: '((?:\b(?:let|set|def)\b\s*)*):?'
+      captures:
+        1: keyword.declaration
+      push: expression
+    - match: ','
+    - match: ''
+      pop: true
+  line_start_1: #new parser
+    - include: baseMain
+    - include: line_start_1_main
+    - match: '#'
+      scope: support.constant.meta.0xmin
+      set: line_start_1_meta
+    - match: '\$' #(?:\s*\b(?:set|def)\b)*'
+      scope: entity.name.hidden.0xmin
+      set: line_start_1_hidden
+    - match: '@'
+      scope: keyword.assembly.0xmin
+      set: line_start_1_assembly
+  line_start_1_default:
+    - include: line_start_1
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_2_default
+  line_start_1_meta:
+    - include: line_start_1
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_2_meta
+  line_start_1_hidden:
+    - include: line_start_1
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_2_hidden
+    - include: line_start_endLinePart
+  line_start_1_assembly:
+    - include: line_start_1
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_2_assembly
+    - include: line_start_endLinePart
+
+  line_start_2: #new parser
+    - include: baseMain
+    - include: line_start_2_main
+    - match: '#'
+      scope: support.constant.meta.0xmin
+      set: line_start_2_meta
+    - match: '\$' #(?:\s*\b(?:set|def)\b)*'
+      scope: entity.name.hidden.0xmin
+      set: line_start_2_hidden
+    - match: '@'
+      scope: keyword.assembly.0xmin
+      set: line_start_2_assembly
+  line_start_2_default:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_default
+  line_start_2_meta:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_meta
+  line_start_2_hidden:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_hidden
+    - include: line_start_endLinePart
+  line_start_2_assembly:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_assembly
+    - include: line_start_endLinePart
+
+  line_start_3: #new parser
+    - include: baseMain
+    - include: line_start_3_main
+    - match: '#'
+      scope: support.constant.meta.0xmin
+      set: line_start_3_meta
+    - match: '\$' #(?:\s*\b(?:set|def)\b)*'
+      scope: entity.name.hidden.0xmin
+      set: line_start_3_hidden
+    - match: '@'
+      scope: keyword.assembly.0xmin
+      set: line_start_3_assembly
+  line_start_3_default:
+    - include: line_start_3
+    - match: '{{line_start_endLinePart}}'
+      set: line_start_3_getDefaultPhase
+  line_start_3_meta:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: meta_macro
+  line_start_3_hidden:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: meta_hidden
+    - include: line_start_endLinePart
+  line_start_3_assembly:
+    - include: line_start_2
+    - match: '{{line_start_endLinePart}}'
+      set: meta_assembly
+    - include: line_start_endLinePart
+
+
+
+
+
+
+
+
+
+
+
+
+#old simple parser
+  mainScope:
+    - include: baseMain
+    - match: \b(0xmin|0bmin)\b
+      scope: variable.language.0xminObject.0xmin
+    - match: '(\.\.\.)((?:\s*\b(?:let|set|def|codeof|labelsof|run)\b)*)'
+      captures:
+        1: keyword.inject.0xmin
+        2: keyword.declaration.inject.0xmin
+    - match: '\.\.'
+      push: internalScope
+    - match: \.
+      scope: dotOperator.0xmin
+    - match: '{{labelName}}\s*(?=(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
+      scope: entity.name.function
+    - match: '{{labelName}}\s*(?={)' #'foo(){}'
+      scope: entity.name.namespace
+    - match: '\)' #'foo = ()=>{}' function declaration
+      push: potentialFunctionDeclaration
+    - match: '{{labelName}}\s*(?=(?:{{functionCallSymbols}})?\s*\()'
+      scope: variable.function.0xmin
+      push: functionCall_1
+    - match: '(?<=\))\s*(?=(?:{{functionCallSymbols}})?\s*\()'
+      push: functionCall_1
+    - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
+      scope: 'keyword.declaration.functionCall.0xmin'
+
+    - match: '\b(?:static|void)\b' #1st part of line along with '@$#'
+      scope: keyword.control
+    - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
+      scope: keyword.control
+      push:
+        - include: brackets_expression
+    - match: '(?:\b(?:virtual)\b\s*)+' #2nd part of line
+      scope: keyword.control
+    - match: '\b(?:import|debugger|delete)\b' #3rd part of line along with
+      scope: keyword.control
+    - match: '(?<=\bimport)\s+(?:lib|this|main)\b'
+      scope: support.constant.import.0xmin
+    #- match: '(?=\b(?:let|def)\b)'
+    #  push: main_meta
+    - match: '\b(?:var|const|let|def|set|undef)\b'
+      scope: keyword.declaration.meta.0xmin
+    - match: '\b(?:this|constructor|return|arguments|caller|continue|break)\b'
       scope: variable.parameter
+    - match: '{{assembly_registers}}'
+      scope: keyword.control.register.0xmin
+    - match: '{{assembly_commands}}'
+      scope: support.constant
+    - match: '(?<=\n|^)\#;|#'
+    #  push: main_meta
+      scope: support.constant.meta.0xmin
+    - match: '(?<=\n|^)\$;|\$' #(?:\s*\b(?:set|def)\b)*'
+      scope: entity.name.hidden.0xmin
+    #  push: main_hidden
+    - match: '(?<=\n|^)\@;|@'
+      scope: keyword.assembly.0xmin
+    - match: '{{assembly_operators}}'
+      scope: support.constant.operator.0xmin
+    - match: '{{operators_functionCallArgs}}'
+      scope: keyword.argumentJoiner.0xmin
+    - match: '{{operators}}'
+      scope: keyword.operator
+    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:{{functionCallSymbols}}\s*)?{)' # foo(param1,param2){}
+      push: parameters
+  brackets_expression:
+    - include: baseMain
+    - match: '\('
+      push: brackets_expression
+    - match: '\)'
       pop: true
-      #push: display_0xmin_1
-  
+    - include: mainScope
+  parameters:
+    - match: '{{labelName}}'
+      scope: variable.parameter
+    - match: '\)'
+      pop: true
+      push: functionType
+    - include: brackets_expression
+    - include: mainScope
+  functionType:
+    - match: '{{functionCallSymbols}}|'
+      scope: 'keyword.declaration.functionCall.0xmin'
+      pop: true
+  internalScope:
+    - match: '\b(?:length|compile|array|code|labels|seal|freeze|this|return)\b'
+      scope: 'support.function'
+    - match: '(?=\S)'
+      pop: true
+  main_lineType:
+    - match: ':'
+      push: main_body
+    - match: '(?=\S|$)'
+      push: main_body
+  main_hidden:
+    - match: '\b(?:def|set|undef)\b'
+      scope: keyword.declaration.hidden.0xmin
+    - include: main_lineType
+    - include: mainScope
+  main_meta:
+    - match: '\b(?:let|set|def)\b'
+      scope: keyword.declaration.meta.0xmin
+    - include: main_lineType
+    - include: mainScope
+  main_body:
+    - match: ';'
+      pop: 2
+    - include: mainScope
+  potentialFunctionDeclaration: #'foo = ()=>{}' function declaration
+    - match: '\s*(?:{{functionCallSymbols}})\s*(?={)'
+      scope: 'keyword.declaration.functionSymbol.0xmin'
+      pop: true
+    - match: '(?=[\S])'
+      pop: true
+    #- include: mainScope
+  functionCall_1:
+    - match: '\('
+      push: functionCall_2
+    - include: mainScope
+  functionCall_2:
+    - match: '\('
+      push: functionCall_normalBrackets
+    - match: '\)'
+      pop: 2
+    - include: mainScope
+  functionCall_normalBrackets:
+    - match: '\)'
+      pop: true
+    - include: mainScope
   baseMain:
     - meta_scope: source.0xmin
+    - match: \b(Z)(A)(S)(M)\b
+      captures:
+        1: constant.numeric.ZASM_Z.0xmin
+        2: keyword.ZASM_A.0xmin
+        3: entity.name.hidden.ZASM_S.0xmin
+        4: support.constant.ZASM_M.0xmin
+    - match: \b(0xmin|0bmin)\b
+      scope: variable.language.0xminObject.0xmin
     #- match: ()["'`]
     #  scope: punctuation.definition.string.begin.0xmin
     - match: \"
@@ -48,155 +510,8 @@ contexts:
       push: multiple_lines_comment
     - match: '{{number}}'
       scope: constant.numeric
-  mainScope:
-    # Strings begin and end with quotes, and use backslashes as an escape
-    # character
-    - include: baseMain
-
-    # Keywords are if, else for and while.
-    # Note that blackslashes don't need to be escaped within single quoted
-    # strings in YAML. When using single quoted strings, only single quotes
-    # need to be escaped: this is done by using two single quotes next to each
-    # other.
-
-    #basic commands
-    - match: '\b0[xb]min\b' #'\b(?=0[xb]min)\b'
-      #push: display_0xmin
-      scope: variable.parameter
-
-    - match: '\b(def)\b'
-      scope: keyword.declaration
-      push: define_command
-
-    - match: '(#\s*set\b)'
-      scope: keyword.declaration #variable.function
-      push: set_statement
-
-    - match: '\b(let|var)\b|\bset\b(?=[\s\S]*?{)'
-      scope: keyword.declaration
-      push: let_statement
-
-    - match: \b((else\s+)?if|repeat)\b(?!\s*\.)(?=\([^;}]*?\){) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
-      scope: keyword.control
-      push: if_statement
-    - match: \b(else|repeat)\b(?!\s*\.)\s*(?={) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
-      scope: keyword.control
-    - match: '\b(nor|red|blue|get|set|if|and|or|xor)\b' #'\b(if|else|for|while)\b'
-      scope: support.constant #keyword.control.example-c
-    
-    - match: '\b(String|Number)\b' #'\b(if|else|for|while)\b'
-      scope: support.class #keyword.declaration #keyword.control
-      push: string_parse
-
-    - match: '\b(move|jump|alu|ram)\b'
-      scope: keyword.control #entity.name.type
-    - match: '\b(this|constructor|continue|return|break)\b'
-      scope: variable.language
-    - match: \b(prototype|supertype)\b
-      scope: support.constant
-
-    - match: '\bdebugger(\s*.\s*((labels|type|code)[oO]f|log))?\b'
-      scope: keyword.control
-
-    - match: '\bimport\b(?!\s*\.)'
-      scope: keyword.control
-      push: import_statement
-    - match: '\bimport\b'
-      scope: keyword.control
-    - match: '(?<=[@$#;{}]|^)\s*\bstatic\b' #
-      scope: keyword.control
-    - match: '((?<=[@$#])\s*|\s*)\b(?:assert|delete)\b' #'(?<=^|[;{}])\s*\bassert\b'
-      scope: keyword.control
-    - match: '\.\.\.(?!\s*{)'
-      scope: keyword.control
-      push: deRefference
-    
-    - match: '(?<=[^.]\.\.|^\.\.)\s*(?:prototype|supertype|parameters|code|length|array|splice|compile|labels)\b'
-      scope: support.function.builtin
-    - match: '\b(var|let|const|set|def)\b'
-      scope: support.constant
-
-    - match: '<->'
-      scope: support.constant
-    
-    - match: '->|<-'
-      scope: support.constant
-
-    # Numbers
-    - match: '\b(true|false|NaN|undefined)\b'
-      scope: constant.numeric.example-c
-
-    - match: '{{number}}' #'((\b0b[0-1]+)|(\s(\+0x|\-0x|0x)[0-9a-fA-F]+)|(\b0[xb])|((\b|[+-](?=[0-9]))[0-9]+))' #'\b(-)?[0-9.]+\b'
-      scope: constant.numeric.example-c
-
-    - match: '\b(null)\b'
-      scope: constant.numeric.example-c
-
-
-
-    - match: '{{equalSigns}}'
-      scope: keyword.control
-      push: main_equalsSign
-
-    - match: '([+\-*/~&¬|^!]|<<|>>|>>>|>|<|&&|\|\||\^\^|%)|(!=|==|===)'
-      scope: keyword.control
-
-    - match: '\b(new|recur|repeat)\b'
-      scope: keyword.control
-
-
-    - match: (?:\bvoid\b)(?!\s*\.)(?=[^;}]*?{) #(?<=\bvoid\b(\s*{{labelName}})?)\s*(\([\s\S]*?\)\s*)?\{
-      scope: keyword.control
-      push: mainScope_void
-    - match: \bvoid\b(?!\s*\.)
-      scope: keyword.control
-
-
-    - match: '\#(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: support.constant.weakScope.0xmin
-      push: higher_code_brackets
-    - match: '\$(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: entity.name.weakScope.0xmin
-      push: hiddenCodeScope_brackets
-    - match: '\@(?!\s*(?:void|static))(?=[^;}]*?{)' #'#(?=\s*(\([\s\S]*?\)\s*)?{)'
-      scope: keyword.control.assemblyScope.0xmin #source.assemblyScope.0xmin
-      push: mainScope_void #mainScope
-
-    - match: '#(?:\s*;)?'
-      scope: support.constant.metaScope.0xmin
-      #push: higher_code_singleLine
-    - match: '\$(?:\s*;)?'
-      scope: entity.name.keyword.hiddenAssemblyScope.0xmin #support.constant
-    - match: '@(?:\s*;)?'
-      scope: keyword.control.assemblyScope.0xmin
-
-
-    - match: '\{'
-      push: mainScope
-    - match: '\}'
-      pop: true
-    #- match: '\['
-    #  push: indexBrackets
-    #- match: '\]'
-    #  pop: true
-    #end line ";"
-    
-    - include: function_call    
-
-  main: #build settings
-    #- meta_scope: keyword.declaration
-    - match: '^(?=[\s\S])'
-      scope: keyword.declaration
-      push: startFile
-  startFile:
-    - match: \#?\s*(["'`]){{buildSettingWords}}\1;?|\/\/{{buildSettingWords}}(\s|$)|\/\*{{buildSettingWords}}\*\/
-      scope: keyword.declaration
-    - match: '(?=[^\s])'
-      push: mainScope
-      pop: true
-
   double_quoted_string:
-    - match: \\(x([0-9]|[a-f]|[A-F]){2}|[\s\S])?
+    - match: \\(?:[xcp](?:[0-9]|[a-f]|[A-F]){2}|u[0-9]{4}|[\s\S])?
       scope: constant.character.escape.example-c
   double_quoted_":
     - meta_scope: string
@@ -217,210 +532,7 @@ contexts:
     - meta_scope: comment.line.example-c
     - match: $
       pop: true
-
   multiple_lines_comment:
     - meta_scope: comment.line.example-c
     - match: '\*\/'
       pop: true
-
-  higher_code:
-    - include: mainScope
-    - meta_scope: source
-
-  higher_code_brackets:
-    - match: '[()]'
-      scope: variable.function
-    - match: '{'
-      scope: variable.function
-      push: higher_code_brackets1
-      pop: true
-    - include: base_statement
-  higher_code_brackets1:
-    - match: '}'
-      scope: variable.function
-      pop: 1
-    - include: higher_code
-  hiddenCodeScope_brackets:
-    - match: '[()]'
-      scope: entity.name
-    - match: '{'
-      scope: entity.name
-      push: hiddenCodeScope_brackets1
-    - include: base_statement
-  hiddenCodeScope_brackets1:
-    - match: '}'
-      scope: entity.name
-      pop: 2
-    - include: higher_code
-  mainScope_void:
-    - match: '[()]'
-      scope: keyword.control
-    - match: '{'
-      scope: keyword.control
-      push: mainScope_void1
-      pop: true
-    - match: \b(let|var|set|def)\b
-      scope: keyword.declaration
-    - include: mainScope
-  mainScope_void1:
-    - match: '}'
-      scope: keyword.control
-      pop: true
-    - include: mainScope
-
-  higher_code_singleLine:
-    - match: ';|}'
-      pop: true
-    - match: '{'
-      pop: true
-      push: mainScope
-    - include: higher_code
-  base_statement:
-    - match: '{'
-      pop: true
-      push: mainScope
-    - match: '\b(let|var)\b'
-      scope: keyword.declaration
-      push: let_statement
-      pop: true
-    - match: '\b(def)\b'
-      scope: keyword.declaration
-      push: define_command
-    - match: '\b(set)\b'
-      scope: keyword.declaration
-      push: set_statement
-      pop: true
-    - include: mainScope
-    - include: function_call
-    - match: '(?=[;}]|:+\s*{)' #';|:'
-      pop: true
-    - match: '\s*(?<=\))\s*(=>|=)\s*(?={)' # '=>' or '=' in '() => {}'
-      scope: 'support.constant.0xmin.operator'
-    - match: '{{equalSigns}}'
-      push: main_equalsSign
-  define_command:
-    - include: base_statement
-    - match: ";}"
-      pop: true
-    - match: '{{labelName}}' # a.b.c.greenValue
-      scope: entity.name.type #label
-  set_statement:
-    - include: define_blocks
-    - include: function_call
-    - include: base_statement
-  let_statement:
-    - include: define_blocks
-    - include: function_call
-    - include: base_statement
-    - match: '{{labelName}}' #block_scope 
-      scope: variable.name
-  main_equalsSign:
-    - match: '{{number}}'
-      scope: constant.numeric
-    - match: '(?=[,;}{])'
-      pop: true
-    - include: function_call
-    - include: mainScope
-    - match: '{{labelName}}'
-      scope: variable
-      pop: true
-  function_call:
-    - match: '{{labelName}}\s*(?=(=>?)?\s*\()' #funciton call "foo();""
-      scope: variable.function
-      push: define_blocks_callFunctionEqualsBit
-    - match: '{{labelName}}\s*(?=((=>?|::|)\s*)?{)' #'{{labelName}}\s*(?=\{)' #block
-      scope: variable.function #entity.name.function'
-  define_blocks:
-    - match: (?<=\b(?:let|var|set|def)\b)\s*\b(?:def|set)\b
-      scope: keyword.declaration
-    #- match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
-    #  scope: entity.name.function #class
-    - match: '({{labelName}})?\s*(?=(=>?\s*)?\([^{]*?\)\s*(=>?)?\s*{)' # foo=> ()={ class_constructor
-      scope: entity.name.function #class
-      push: function_params
-    - match: '{{labelName}}\s*(?=((=>?|::|)\s*)?{)' #'{{labelName}}\s*(?=\{)' #block
-      scope: entity.name.namespace #entity.name.function'
-  define_blocks_callFunctionEqualsBit: #function call
-    - match: '\('
-      pop: true
-      push: evalBrackets
-    - match: '=>'
-      scope: keyword.declaration.arrowFunctionCall
-    - match: '='
-      scope: keyword.declaration.classCall
-  evalBrackets:
-    - include: mainScope
-    - match: \)
-      pop: true
-  #function_1:
-  #  - meta_scope: meta.function
-  #  - match: '[a-zA-Z0-9_]+'
-  #    scope: variable.function
-  #  - match: \(
-  #    scope: punctuation.section.group.begin
-  #    push: function_params
-  function_params:
-    - meta_scope: meta.function.params
-    - match: \)
-      scope: punctuation.section.group.end
-      pop: true
-      push: function_typeSign
-    - match: '[a-zA-Z0-9_]+'
-      scope: variable.parameter
-    - match: '{{equalSigns}}'
-      scope: keyword.control
-  function_typeSign:
-    - match: '\s*(=>|=|)\s*'
-      scope: 'support.constant.0xmin.operator'
-      pop: true
-  indexBrackets:
-    - include: mainScope
-
-  import_statement:
-    - match: '\b(this|lib|main)\b' #|caller|parent
-      scope: variable.function #variable.parameter
-      pop: true
-      push: import_statement1
-    - match: '[;}]'
-      pop: true
-    - include: mainScope
-  import_statement1:
-    - match: '[;}]'
-      pop: true
-    - include: mainScope
-  deRefference:
-    - match: '}'
-      pop: 2
-    #- match: 'var|let|set'
-    #  scope: keyword.control
-    - include: base_statement
-    - match: '{{labelName}}'
-      scope: entity.name.enum
-    - match: ';'
-      pop: true
-  string_parse:
-    - include: baseMain
-    - match: \(
-      pop: true
-      push: string_parse1
-    - match: '[^\s]'
-      pop: true
-  string_parse1: # String move(10,3),"dasda",
-    - include: baseMain
-    - match: (move|col) #\s*(?=[,;}])
-      scope: variable.parameter #variable.function #keyword.declaration
-    - match: \(
-      push: string_parse1
-    - match: '[);}]'
-      pop: true
-  if_statement:
-    - match: '(?={)'
-      pop: true
-    - include: baseMain
-    
-    - match: '{{equalSigns}}'
-      scope: keyword.control
-      push: main_equalsSign
-
-    - match: '([+\-*/~&|^!]|<<|>>|>>>|&&|\|\||\^\^|%)|(!=|==|===)'
-      scope: keyword.control

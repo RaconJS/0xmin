@@ -34,7 +34,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|[&|\^]{1,2}|[><!]=|={1,3}|>{1,3}|<{1,3}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|[=-]>|<[=-]|::|\.{1,3}|[&|\^]{1,2}|[><!]=|={1,3}|>{1,3}|<{1,3}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -238,7 +238,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			optionals=Object.freeze({
 				"carry":{
 					useArray:true,
-					map:{"add":["addc","!"],"adds":["addcs","!"],"sub":["sbb","+"],"subs":[,"+"]},
+					map:{"add":["addc","!"],"adds":["addcs","!"],"sub":["sbb","+"],"subs":[]},
 					defaultSymbols:[""],
 				},
 				"store":{
@@ -386,7 +386,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					index++;
 				}
 				else if(hasSymbol)index--;
-				return {index};
 			}
 			async asm_NumberOrRegister({statement,index,scope},{arg}){//#:
 				if(statement[index]==this.registerSymbol){
@@ -454,7 +453,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					let arg;
 					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
 					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator}));
-					({index}=this.asm_optionalStatement({statement,index,scope,optionals}));
+					this.asm_optionalStatement({statement,index,scope,optionals});
 					if(args.length<2){
 						;({index,arg}=await this.asm_arg({statement,index,scope}));
 						if(arg?.length>0){args.push(arg);}
@@ -483,10 +482,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(!optionals.hasOwnProperty(i))continue;
 						let optional=this.optionals[i];
 						let fail=true;
-						if(!optional){}
+						if(!optional)
 						if(optional&&(
 							optional.defaultSymbols.includes(optionals[i])||
-							(optional.useArray&&optional.map[operator][1]==optionals[i])
+							(useArray&&optional.map[operator][1]==optionals[i])
 						)){
 							if(optional.useArray)operator=optional.map[operator][0]??operator;
 							else operator=optional.map[operator]??operator;
@@ -502,7 +501,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return {index,instruction};
 			}
-			async main_assembly({statement,index,scope}){//# tptasm
+			async main_assembly({statement,index,scope}){//#
 				let instruction,isArray;
 				({instruction,isArray,index}=await this.generateAssemblyLine({statement,index,scope}));
 				if(isArray)//instruction:AssemblyLine[]
@@ -600,16 +599,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			if(index>=statement.length
 				||statement.recur>(statement.maxRecur??1)
 			)return{index,value:newScope};
-			//if(scope.label.code.length==0)
-			if(word==":"&&statement[index+1].match(/^\w+$/)&&(statement[index+2]??"").match(/^(;?)$/)){
-				//'{:label;}' similar to `label:{break label}` in JS
-				index++;//index => label name
-				let word=statement[index];
-				scope.label.labels[word]=scope.label;
-				state.void=true;
-				//TODO: add 'break', to be similar to the old compiler
-				return {index,value:newScope};
-			}
 			if(["void", "static", "virtual", "#", "$", "@"].includes(word))
 			loop:for(let i=index;i<statement.length;i++){
 				let word=statement[index];
@@ -754,7 +743,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				statement.maxRecur=undefined;
 			}
 			if(!state.void){
-				scope.label.code.push(...codeObj.code);//(codeObj);
+				scope.label.code.push(codeObj);
 			}
 			return {index,value:newScope};
 		},
@@ -825,9 +814,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
 							value.label.unDefine();
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true},true);
-							//scope.label.code.push(value.label);
-							value.label.defs.push(scope.parent.label);
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,true);
+							scope.label.code.push(value.label);
+							value.label.defs.push(scope.label);
 						}else{
 							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name+"' is undefined"));
 						}
@@ -875,9 +864,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(arg1){
 							scope.label.code.push(arg1);
 						}else{
-							let hasInsert=state["insert"];
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:hasInsert});
-							state["insert"]=false;
+							contexts.meta_defineLabelToNextLine(value.label,scope,value);
 							if(value?.label)value.label.defs.push(scope.label);
 						}
 					}
@@ -888,10 +875,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return{index};
 			},
-			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true}={},useUnshift=false){
+			meta_defineLabelToNextLine(label,scope,value,useUnshift=false){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name+"' is not declared"));
-				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
+				let newLineObj=new HiddenLine.Define({label,scope});
 				if(useUnshift)scope.label.code.unshift(newLineObj);
 				else scope.label.code.push(newLineObj);
 			},
@@ -962,8 +949,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return{index};
 			},
-			async main_assembly(...args){return await this.main_assembly_0xmin(...args)},
-			async main_assembly_0xmin({statement,index,scope}){//0xmin
+			async main_assembly({statement,index,scope}){
 				let ignoreChecker=false;//:bool
 				({index}=contexts.keyWordList({statement,index,scope,keywords:{}}));//'@: 123;' or '@ 123;'
 				if(statement[index]=="!"){ignoreChecker=true;index++;}//'!jump->10;' ignores cpuState checking
@@ -988,7 +974,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						useInstruction=true;
 					}
 					else if(value.type=="string"){
-						codeObj.code.push(...Variable.fromValue(value).code);
+						codeObj.code.push(Variable.fromValue(value));
 						useInstruction=false;
 					}
 					else if(value.type=="array"){
@@ -1076,7 +1062,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			const label=Variable.fromValue(value);
 			if(label){
 				if(state["let"]|state["labelsof"])Object.assign(scope.let.label.labels,label.labels);
-				if(state["set"]|state["codeof"])scope.label.code.push(...label.code);
+				if(state["set"]|state["code"])scope.label.code.push(...label.code);
 				if(state["def"]|state["run"]){
 					await evalBlock(label.getCode_source(),undefined,scope);
 				}
@@ -1137,7 +1123,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//'::{}' => block argument
 				for(let i=0;i<statement.length&&index<statement.length;i++){
 					if("@$#".includes(statement[index])){index++;break;}
-					if(!["::", "<:"].includes(statement[index]))break;
+					if(statement[index]!="::")break;
 					index++;
 					let value;
 					({value,index}=await contexts.expression_short({index,statement,scope}));
@@ -1264,7 +1250,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									//
 								}
 								else value.label=
-									parent.code[name] instanceof HiddenLine.Define&&parent.code[name].insert?parent.code[name].label:
 									parent.code[name] instanceof Variable?parent.code[name]:
 									parent.code[name] instanceof Scope?parent.code[name].label:
 									parent.code[name] instanceof CodeLine?undefined:
@@ -1556,18 +1541,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"use strict";
 				let code=variable.code;
 				codeQueue??=[];
-				for(let lineObj of code){//lineObj instanceof AssemblyLine
+				for(const lineObj of code){//lineObj instanceof AssemblyLine
 					///lineObj:CodeLine|Variable|Scope
-					if(lineObj instanceof HiddenLine.Define){
-						codeQueue.push(lineObj);
-						lineObj=lineObj.label;
-					}
 					if(
 						lineObj instanceof HiddenLine||
 						lineObj instanceof AssemblyLine
 					)codeQueue.push(lineObj);
-					else if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
-					else if(lineObj instanceof Variable){
+					if(lineObj instanceof Scope)continue;//lineObj=lineObj.label;
+					if(lineObj instanceof Variable){
 						this.collectCode(lineObj,codeQueue);
 						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj,scope:lineObj.scope}));
 					}
@@ -1632,7 +1613,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return {assemblyCode};
 			},
 			//assembly compiling
-			async compileAssemblyLine_0xmin({instruction,cpuState,assemblyCode}){///:{failed:bool};
+			async compileAssemblyLine({instruction,cpuState,assemblyCode}){///:{failed:bool};
 				Object.getPrototypeOf;
 				if(!(instruction instanceof AssemblyLine))throw Error("compiler error: type error;");
 				//const cpuState=instruction.cpuState;
@@ -1683,7 +1664,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return {failed};
 			},
-			async compileAssemblyLine(...args){return await this.compileAssemblyLine_0xmin(...args);},
 			async evalHiddenLine({instruction,cpuState,assemblyCode}){//shouldEval's $ or # code in the '$' phase
 				let relAddress,failed;
 				if(instruction.run[Symbol.toStringTag]=="AsyncFunction")
@@ -1696,7 +1676,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//@ phase : (binary phase)
 			assembly:{//0xmin assembly language
 				language:"0xmin",//"0xmin"|"tptasm"
-				instructionSet_0xmin:{
+				instructionSet:{
 					"null":0,
 					"move":0,
 					"jump":1,
@@ -1720,9 +1700,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						case"0xmin":
 						this.pointers[name="jump"]=new Pointer(name);//current instruction pointer
 						this.pointers[name="move"]=new Pointer(name);//data pointer
-						contexts.main_assembly=(...args)=>contexts.main_assembly_0xmin(...args);
-						assemblyCompiler.compileAssemblyLine=(...args)=>assemblyCompiler.compileAssemblyLine_0xmin(...args);
-						assemblyCompiler.assembly.instructionSet=assemblyCompiler.assembly.instructionSet_0xmin;
 						break;
 						case"tptasm":
 						{//use R2
@@ -2066,8 +2043,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			class Define extends HiddenLine{//'$set a;'
 				constructor(data){super();Object.assign(this,data??{})}
 				label=null;///:Variable
-				setAddress=true;
-				insert=false;
 				run({cpuState}){//nextlineNumber
 					this.label.lineNumber=cpuState.lineNumber;
 					this.label.cpuState=new CpuState(cpuState);
@@ -2358,12 +2333,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				for(let i=0;i<this.defs.length;i++){
 					let code=this.defs[i].code;
 					let index=code.indexOf(this);
-					if(index==-1)
-						for(let i=0;i<code.length;i++)
-						if(code[i] instanceof HiddenLine.Define&&code[i].label==this)index=i;
-					;
 					if(index!=-1)code.splice(index,1);
-
 				}
 				this.defs=[];
 				//this.lineNumber=undefined;

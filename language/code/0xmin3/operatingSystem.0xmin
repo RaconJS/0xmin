@@ -1,3 +1,4 @@
+#set 0xmin.settings.language("0xmin");
 //(?<!:)({|;)\s*#(?!set|let|def|;|})
 #def let: os={
 	#let mainPart(){
