@@ -8,9 +8,9 @@
 //TODO: #prevent '#set: a.b=b' from creating new labels
 //TODO: #add '$void'
 //TODO: #fix booleans
-//TODO: #allow '+!!a'. aka mid_expression
 //TODO: $detect circular label definisions
-//TODO: #@make language defenitions less BODGED and more formal
+//TODO: #@make language definitions less BODGED and more formal
+//TODO: organise asm types (tptasm,0xmin,asm etc...) into
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -2199,7 +2199,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//as value
 				type="label";
 			//as object
-				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant}
+				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},{pointer}*
 				name=undefined;///@string
 				labels={};//aka properties
 				static objectNum=0;
@@ -2426,21 +2426,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 			}
 			class BuiltinFunctionFunction extends BuiltinFuntion{//UNFINUSHED, UNUSED
-				async parameters({label}){//..splice(a,b,c);
-					let value=Internal.splice.toValue("label");
-					value.parent=label;
-					return value;
+				constructor(name,foo,data){//'a..b(1,2);'
+					super(name,()=>{},data);
+					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
+					this.#functionAsValue=new BuiltinFuntion(name,foo).toValue("label");
 				}
+				#currentLabel;//:Variable
+				#functionAsValue;//:const Value<label>
 				async callFunction({args={},value:callingValue,scope}){
-					//args: {obj;list}
-					//args.obj: {[key:"string"]:Value}
-					//args.list: Value[]
-					return {value:await this.parameters({
-						args:args.list,
-						label:callingValue.parent,
-						value:callingValue,
-						scope
-					})};
+					this.#currentLabel=callingValue.parent;
+					return {value:this.#functionAsValue};
 				}
 			}
 			class InternalValue extends Value{
@@ -2459,18 +2454,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			const Internal=new (class extends Variable{
 				constructor(){
 					super();
-					for(let i in this.labels)
-						if(this.labels.hasOwnProperty(i))
+					for(let i in this.labels){
+						if(this.labels.hasOwnProperty(i)&&!(this.labels[i] instanceof BuiltinFuntion))
 							this.labels[i]=new BuiltinFuntion(i,this.labels[i]);
-					this.splice=new BuiltinFuntion("splice",async({label,args,value})=>{
-						args[0]??=new Value.Number(0);
-						args[1]??=new Value.Number(0);
-						args[2]??=new Variable().toValue("label");
-						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
-						if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
-						label.code.splice(args[0],args[1],...args[2]);
-						return label.toValue("label");
-					});
+					}
 				};
 				labels={//'a..b'
 					///(Variable)=>Value
@@ -2479,11 +2466,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"code":async({label})=>new Variable({name:"(..code)",//BODGED
 						code:label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""}))),
 					}).toValue("label"),
-					"splice":async({label})=>{//..splice(a,b,c);
-						let value=Internal.splice.toValue("label");
-						value.parent=label;
-						return value;
-					},
+					"splice":new BuiltinFunctionFunction("splice",async({label,args,value})=>{
+						args[0]??=new Value.Number(0);
+						args[1]??=new Value.Number(0);
+						args[2]??=new Variable().toValue("label");
+						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
+						if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
+						label.code.splice(args[0],args[1],...args[2]);
+						return label.toValue("label");
+					}),
 					"array":async({label})=>new Variable({name:"(..array)",code:label.code}).toValue("label"),
 					"labels":async({label})=>{
 						let list=Object.getOwnPropertyNames(label.labels);
@@ -2495,6 +2486,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						catch(e){value= new Value.String(e);}
 						return value;
 					},
+					//note: name might change
+					"code_assembly":async({label})=>await assemblyCompiler.collectCode(label).toValue("label"),
 					"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
 					"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
 					"this":async({label})=>label.toValue("label"),
@@ -2508,6 +2501,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"construtor":async({label})=>label.functionConstructor.toValue("label"),
 					"prototype":async({label})=>label.functionPrototype.toValue("label"),
 					"supertype":async({label})=>label.functionSupertype.toValue("label"),
+					//other
+					"defs":async({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
+					"indexOf":new BuiltinFunctionFunction("indexOf",async({label,args})=>{
+						let ans;
+						if(!args[0].label)ans=-1;
+						else ans=label.code.indexOf(args[0].label);
+						return new Value.Number(ans);
+					}),
 				};
 			});
 		//----
@@ -2694,6 +2695,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 
 	//----
 	{
+		//0xmin label name conventions:
+		//info about Variable naming, can also be found in the variable class.
+		//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},{pointer}*
+		//{name}* ==> inbuilt function that returns another inbuilt object/function called 'name'
+		//<name> ==> instance of 'name'
+		//{name} ==> inbuilt object
+		//[name] ==> value, (normally a number i.e. `new Variable.fromValue(new Value.Number(name))` )
+		//name ==> normal variable
 		const nullValue=assemblyCompiler.nullValue=new AssemblyLine({
 			type:"undefined",
 			args:[new Value({type:"label",name:"null",})],
