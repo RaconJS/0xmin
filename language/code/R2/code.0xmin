@@ -1,20 +1,23 @@
 #set 0xmin.settings.language("tptasm");
 #set 0xmin.settings.log_table=1;
 //void #set 0xmin.settings.log_table=1;
+#let main;
+jump->main;
 let heap{import lib "heap.0xmin";};
-...let heap;
+...labelsof heap;//...let heap;
+...codeof heap;//...set heap;
 let fillMem(len,num,stop){
 	push %1;push %2;
 	%0=len;
 	repeat stop hault;
-	call malloc;//malloc.call(0);repeat +stop hault;
+	call malloc;//malloc.call(0);
 	%1=#(num>>16&0x1fff);//high
 	%2=#(num&0xffff);//low
 	memset.call(0,1,2);
 	pop %2;pop %1;//pop %0;
 	push %0;
 };
-def let test1{
+let test1{
 	fillMem(8, 0x1ffffff);
 	fillMem(12,0x1f0000f);
 	fillMem(5, 0x1ffffff);
@@ -30,20 +33,132 @@ def let test1{
 	//fillMem(15,0x00ff000);
 	//fillMem(8,0x00000ff);
 };
-def let test2{
-	fillMem(5,0x0000fff);
+def let sendUint16{
+	let input=5;
+	//%5=%0;
+	let charset={"0123456789ABCDEF"};
+	let port0=7;
+	let i=8;
+	%port0=0;
+	let step()={
+		%5<<<=4;//ror
+		%6=0xf;
+		%6&=%5;
+		send %port0 [%6+charset];
+	};
+	%i=#(4-1);
+	def let loop{
+		def step();
+		%i-=1;
+		jump->..this if>=0;
+	};
+	return;
+	def charset;
 };
-def let a{jump->a};
-hault;
-def free;
-def clear;
-def memset;
-def heap;
-/*
-%10=%0;
-%1=0x1234;
-%2=0x5678;
-heap.memset.call(0,1,2);
-%0=%10;
-heap.clear.call(0);
-hault;*/
+#def let mul{//%c=%a*%b;
+	let stacker{//push and pop from stack
+		let regLen=4;
+		let i=0;
+		let pushLen=regLen-1;
+		let push{
+			repeat (pushLen):{
+				push %i;#set: i=i+1;
+			};
+		};
+		let pop{
+			repeat (pushLen):{
+				pop %i;#set: i=i-1;
+			};
+		};
+	};
+	#set: ..this(a,b,c){//%a*=b
+		...let set call(a,b,c);
+	}
+	let self=..this;
+	let call(a,b,c){
+		stacker.push();
+		%0=%a;
+		%1=%b;
+		call self;
+		stacker.pop();
+		repeat !c:{
+			%0=%2;
+		};repeat !!c:{
+			%c=%2;
+		};
+	};
+	let a=0,b=1,c=2,temp=3;
+	%c=0;
+	let test{
+		%sendUint16.input=%c;
+		call sendUint16;
+		send %sendUint16.port0 "\n";
+	};
+	def let loop{
+		#let next;
+		%a&=1 !store;
+		jump->next if==0;
+		%c+=%b;
+		#def next;
+		%b<<=1;
+		%a>>=1;
+		jump->..this if!=0;
+	};
+	return;
+};
+def let sqrt{
+	//registers
+		let input=0;
+		let ans=1;
+	return;
+}
+def let exp{//Math.exp
+	//is correct to 3dp gives:0x2BA8 instead of: 0x2b7f, takes about 5*n seconds for
+	//registers
+		let input=0;//:%
+		let ans=1;//:%
+		let i=2;//:%
+		let shiftedAddVal=3;//:%
+	//----
+	let dxShift=6;//same as =log2(1/dx);
+	let midShift=12;//zero point = 1<<midShift
+	push %2;
+	push %3;
+	//{:main
+		%ans=1;
+		%ans<<=midShift;
+		%i=%input;
+		%i<<=dxShift;
+		let loop;
+		jump->loop..return if==0;
+		def set loop{
+			%shiftedAddVal=%ans;
+			%shiftedAddVal>>=dxShift;
+			%ans+=%shiftedAddVal;
+		}{
+			%i-=1;
+			jump->..this if>=0;
+		};
+		//%ans>>=midShift;
+	//}
+	pop %3;
+	pop %2;
+	return;
+};
+let a{
+};
+def main;
+let print(string){
+	%0=0;
+	let i=0;
+	repeat string..length:{
+		send %0 #(string[+i]);
+		#set: i=i+1;
+	};
+};
+def let test{
+	%sendUint16.input=%0;
+	call sendUint16;
+	hault;
+};
+def heap.memory;

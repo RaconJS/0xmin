@@ -1,1 +1,36 @@
-import this "../code/R2/code.0xmin";
+//#set 0xmin.settings.language("tptasm");
+//#set 0xmin.settings.log_table=1;
+//import this "../code/R2/code.0xmin";
+#set 0xmin.settings.language("0xmin");
+//{:lbl;} demo
+let data={};
+let var(){#data{#def return={0};}};
+let const(val){#data{#def return={val};}};
+let i=var();
+move=>const(1<<10);get;
+move=>i;set;
+let block{
+	"123";
+};
+def:{:for;
+	#let for.move;
+	$set for.move=>move;
+}{
+	...codeof block;
+}{
+	#let for..return.move;
+	move=>i;get;
+	move=>const(2);blue;
+	move=>for.move;
+	if;jump=>for;
+};//almost no side effects.
+#data..splice(0,0,{jump->data..return});
+def data;
+//<=> demo
+#;
+let a={1;2;3};
+let b={4;4};
+let c=b;
+set b<=>a;
+def c;//1;2;3;
+#let a={1;2};
