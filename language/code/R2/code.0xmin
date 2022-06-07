@@ -1,11 +1,28 @@
 #set 0xmin.settings.language("tptasm");
 #set 0xmin.settings.log_table=1;
 //void #set 0xmin.settings.log_table=1;
-#let main;
-#let data(){
-	
-}
+#def let main;
 let mainFoo(){
+	let main(){
+		print("this is the power of macro's")
+	};
+	let test{
+		%sendUint16.input=%0;
+		call sendUint16;
+		hault;
+	};
+	let print(str){
+		push %0;
+		%0=0;
+		let i=0;
+		repeat str..length: {
+
+			#set i=i+1;
+		};
+	};
+	#def main();
+};
+...(){
 	let print(string){
 		%0=0;
 		let i=0;
@@ -14,13 +31,8 @@ let mainFoo(){
 			#set: i=i+1;
 		};
 	};
-	def let test{
-		%sendUint16.input=%0;
-		call sendUint16;
-		hault;
-	};
 };
-{
+#(){
 	jump->main;
 	null;
 	let heap{import lib "heap.0xmin";};
@@ -54,6 +66,9 @@ let mainFoo(){
 		//fillMem(8,0x00000ff);
 	};
 	def let sendUint16{
+		let call(x){
+			;
+		};
 		let input=5;
 		//%5=%0;
 		let charset={"0123456789ABCDEF"};
@@ -165,8 +180,9 @@ let mainFoo(){
 		pop %2;
 		return;
 	};
-	def main{
-		mainFoo();
-	};
+	def main;
 	def heap.memory;
+};
+#set main{
+	mainFoo();
 };

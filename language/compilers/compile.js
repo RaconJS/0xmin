@@ -227,13 +227,21 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			keywordsRegex=/^(?:%|(?:[&|^+\-]|>>[>\-]?|[<\-]?<<)?=|->|hault|jump|if|null|store|carry|sign|overflow|0|\+|-|[!><=]=?|port|bump|wait|push|pop|call|return)$/;
 			registerSymbol="%";
 			ifParts=[];
-			otherKeywords=Object.freeze({
-				"if":"??",
+			registers={
 				"ip":"ip",
 				"sp":"sp",
-				"r":"r",
+				...(()=>{
+					let names={};
+					for(let i=0;i<16;i++)names["r"+i]="r"+i;
+					return names;
+				})(),
 				"stack":"sp",
 				"instruction":"ip",
+			};
+			otherKeywords=Object.freeze({
+				"if":"??",
+				"r":"r",
+				...this.registers,
 			});
 			optionals=Object.freeze({
 				"carry":{
@@ -312,6 +320,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"hlt":"hlt",
 				"jmp":"jmp",
 				"nop":"nop",
+				"jn":"jn",
 				"jz":"jz",
 				"jnz":"jnz",
 				"jc":"jc",
@@ -389,9 +398,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return {index};
 			}
 			async asm_NumberOrRegister({statement,index,scope},{arg}){//#:
-				if(statement[index]==this.registerSymbol){
+				if(statement[index]==this.registerSymbol||statement[index]=="r"){
 					index++;
 					arg.push("r");
+				}else if(this.registers.hasOwnProperty(statement[index])){
+					arg.push(statement[index++]);
+					return {index};
 				}
 				if(this.otherKeywords.hasOwnProperty(statement[index])){
 					arg.push(statement[index++]," ");
@@ -1729,7 +1741,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							this.pointers[name="jump"]=new Pointer(name);
 							contexts.main_assembly=(...args)=>assembler.tptasm.main_assembly(...args);
 							assemblyCompiler.compileAssemblyLine=(...args)=>assembler.tptasm.compileAssemblyLine(...args);
-							assemblyCompiler.assembly.instructionSet=assembler.tptasm.operators;
+							assemblyCompiler.assembly.instructionSet={...assembler.tptasm.operators,...assembler.tptasm.otherKeywords,};
 							//assemblyCompiler.nullValue.asmValue="dw 0";
 						}
 					}
@@ -2431,10 +2443,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
 					this.#functionAsValue=new BuiltinFuntion(name,foo).toValue("label");
 				}
-				#currentLabel;//:Variable
 				#functionAsValue;//:const Value<label>
 				async callFunction({args={},value:callingValue,scope}){
-					this.#currentLabel=callingValue.parent;
+					this.#functionAsValue.parent=callingValue.parent;
 					return {value:this.#functionAsValue};
 				}
 			}

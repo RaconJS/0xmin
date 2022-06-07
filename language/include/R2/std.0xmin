@@ -9,6 +9,24 @@ let Function(block)={
 	};
 	def function;
 };
+void #set:(){
+	Module{
+		isUsed:bool;
+	};
+};
+let modules{};
+let dynamic_std(code){
+	void:{#;
+		#let this=optimise;
+		#let i=0;
+		repeat modules..length:{
+			#i+=1;
+			repeat modules[i].isUsed:{
+				i
+			};
+		};
+	};
+}
 def malloc;
 def free;
 def memFill;
