@@ -808,7 +808,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let startValue;//:Value
 				if(!found)metaState["set"]=true;//'#: a=b;' ==> '#set: a=b;'
 				for(let i=0;i<statement.length&&index<statement.length;i++){//'#let a,b,c;'
-					let foundExpression=false;
 					let word;
 					word=statement[index];
 					if(endingStringList.includes(word)){break;}
@@ -816,28 +815,30 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						let value;
 						({value,index}=await contexts.expression_short({statement,index,scope}));
 						if(value){
-							foundExpression=true;
-							const newLabel=new Variable({name:value.name});
-							let labelParent=((value.refType!="name"&&value.parent)||scope.let.label);
-							if(statement[index]!="="){//'let a;' ==> makes default label;
-								if(metaState["set"]){
-									labelParent.labels[value.name]??=newLabel;
-								}else{
-									labelParent.labels[value.name]=newLabel;
+							if(["name","property"].includes(value.refType)){
+								const newLabel=new Variable({name:value.name});
+								let labelParent=value.refType=="name"?scope.let.label:value.parent;
+								if(statement[index]!="="){//'let a;' ==> makes default label;
+									if(metaState["set"]){
+										labelParent.labels[value.name]??=newLabel;
+									}else{
+										labelParent.labels[value.name]=newLabel;
+									}
 								}
+								else labelParent.labels[newLabel.name]=undefined;//allow writing to this new label;
+								startValue=new Value({
+									type:"label",
+									label:newLabel,
+									name:newLabel.name,
+									parent:labelParent,
+								});
+							}else{
+								startValue=value;
 							}
-							else labelParent.labels[newLabel.name]=undefined;//allow writing to this new label;
-							startValue=new Value({
-								type:"label",
-								label:newLabel,
-								name:newLabel.name,
-								parent:labelParent,
-							})
 						}
 					}
 					let value;
 					({index,value}=await contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
-					foundExpression||=!!value;
 					if(metaState["def"]){//same as '$undef def set: obj;' ==> redefines and inserts code block;
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
@@ -1965,7 +1966,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			label;//label Object
 				name;//label name (from parent.labels)
 				parent;//'parent.name' ==> label
-				refType="property";//:'property' | 'array' | 'name' | 'return'; 'a.b','a[b]','set a {b}';
+				refType="property";//:'property' | 'array' | 'name' | 'return' | 'internal' ; 'a.b','a[b]','set a {b}', 'a..proto';
 			string;
 			number=0;//relAddress
 			//for 'let value;'
