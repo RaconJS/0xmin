@@ -34,7 +34,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|[&|\^]{1,2}|[><!]=|={1,3}|>{1,3}|<{1,3}|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|[&|\^]{1,2}|[><!]=|={1,3}|>{1,3}|<{1,3}|\*\*|[!\$%*()-+=\[\]{};:@#~\\|,/?]|[\s\S]/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -515,6 +515,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return {index,instruction};
 			}
 			async main_assembly({statement,index,scope}){//# tptasm
+				({index}=contexts.keyWordList({statement,index,scope,keywords:{}}));
 				let instruction,isArray;
 				({instruction,isArray,index}=await this.generateAssemblyLine({statement,index,scope}));
 				if(isArray)//instruction:AssemblyLine[]
@@ -529,6 +530,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			getArg(value,level=0){//@:(string|Value|Operator)=>(string|Value)[]
 				if(level>4)return [];//only allow 4 levels of assembly recursion
 				return typeof value=="string"?value:
+				typeof value=="number"?""+value:
 				value instanceof Value?
 					isNaN(value=value.toType("number").number)?
 						NaN//Error("label is not assigned")
@@ -541,6 +543,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let args=instruction.args;//(string|Value|operator)[]
 				let failed=false;
 				let tptasmString;
+				if(args.length==1&& typeof args[0]=="number"){//for AssemblyLine<number> for: 'def let a=2;'
+					args=["dw",args[0]];
+				}
 				{
 					tptasmString=args
 						.map((v,i)=>{v=this.getArg(v);failed||=(v!==v);return v+[""," "][+(i==0)]})
@@ -801,7 +806,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				({index,found}=contexts.keyWordList({statement,index,scope,keywords:metaState}));
 				let word=statement[index];
 				let startValue;//:Value
-				if(!found)metaState["set"]=metaState["def"]=true;//'#: a=b;' ==> '#def set: a=b;'
+				if(!found)metaState["set"]=true;//'#: a=b;' ==> '#set: a=b;'
 				for(let i=0;i<statement.length&&index<statement.length;i++){//'#let a,b,c;'
 					let foundExpression=false;
 					let word;
@@ -1042,7 +1047,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					const fromTypes={
 						"lib":compilerFolder+"../include/",
 						"main":mainFolder,
-						"this":statement.file??mainFolder,
+						"this":mainFolder+(statement.data.file??"").match(/^[\s\S]*\/|/),
 						"compiler":compilerFolder,
 					};
 					word=statement[index];
@@ -1117,7 +1122,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			//UNFINISHED
 		},
-		endingSymbol({index,statement}){
+		endingSymbol({index,statement}){//failed==true if ending was found
 			//'#()' or '#{}' ==> '()' '{}'
 			//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
 			let failed=false;
@@ -1348,8 +1353,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					});
 					index+=3;
 					functionObj.code.push(functionScope);
-					functionObj.functionPrototype??=new Variable({name:"(prototype)"});
-					functionObj.functionSupertype??=new Variable({name:"(supertype)"});
+					functionObj.prototype??=new Variable({name:"(prototype)"});
+					functionObj.supertype??=new Variable({name:"(supertype)"});
 					return {index,value,failed:false};//isExtension&&!startValue};
 				}else if(word=="{"){//'{}' object declaration
 					contexts.delcare_typeChecks(isExtension,startValue);
@@ -1408,6 +1413,37 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"&&":new Operator_bool(v=>v,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
 			"||":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v1:v2),
 			"^^":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v2:b2?new Value.Number(0):v2),//xor
+
+			"...":{do({args,hasEquals}){//(args:mut Value[],bool)=>void, mutates args
+				//concat operator
+				let arg1=args.pop();
+				let arg0=args.pop();
+				if(arg0){//'a...b' 2 args
+					let ans;
+					switch(arg0.type){
+						case"string"://ans:Value<string>
+						arg1=arg1.toType("string");
+						ans=new Value({
+							type:"string",
+							array:[...arg0.array,...arg1.array],
+							string:arg0.string+arg1.string,
+						});
+						break;
+						default://ans:Value<label>
+						ans=new Variable({code:{
+							...(arg0.toType("label").label?.code??{}),
+							...(arg0.toType("label").label?.code??{}),
+						}});
+
+					}
+					args.push(ans);
+				}else if(arg1){//'...a' 1 arg
+					throw Error("compiler #operator error: '...a' aka spread operator is not supported yet");
+					//args.push(...arg1); UNFINISHED
+				}else{
+					//no args -> silent error
+				}
+			}},
 		},
 		truthy(value){//(Value)=>bool
 			if(!(value instanceof Value))return false;
@@ -1446,7 +1482,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let word=statement[index],value,failed;
 				//ignore '#' in '#(' or '#{'
 				if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
-				else if(["=", "<=>"].includes(word)){
+				else if(["=", "<=>", "<->"].includes(word)){
 					index++;
 					let firstArg=args.pop();
 					let assignmentType;
@@ -1470,7 +1506,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
 								//refType:'property'|'array'|'name'
-								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;
+								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;//
+								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
 								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel;
 								value=newLabel?.toValue?.("label")??new Value();
 							}else{
@@ -1483,22 +1520,27 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							}
 							args.push(value);
 						}
-						else if(word=="<=>"){
+						else if(word=="<=>"||word=="<->"){
 							let label=firstArg.parent.labels[firstArg.name];
 							if(label){//label:Variable
-								switch (value.type){
-									case"label"://object,array
-										if(value.label){
-											label.labels={...value.label.labels};
-											label.code=[...value.label.code];
-										}
-										else {
-											label.labels={};
-											label.code=[];
-										}
+								if(word=="<=>"){//set object
+									switch (value.type){
+										case"label"://object,array,function
+											label.labels={...(value.label?.labels??{})};
+											label.code=[...(value.label?.code??[])];
+											label.parameters=value.label?.parameters??[];
+											label.callType=value.label?.callType??"";
+											break;
+										case"array":
+										label.code=[...value.array];
 										break;
-									case"array":
-									case"string":
+										case"string":
+										label.code=[...value.array];
+										break;
+									}
+								}
+								else if(word=="<->"){//set number
+									label.lineNumber=value?value.toNumber().number:undefined;
 								}
 							}
 							//UNFINISHED: needs code for array assignment
@@ -1864,9 +1906,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(value)inputValue=value;
 					word=statement[index];
 				}
+				let value;
 				string??=({value,index}=contexts.string({index,statement,scope})).value??"label";
 				{
-					const str = value;
+					const str = value??"[[label]]";
 					const vm=require("vm");
 					const sandbox = {log:"no log;",...{
 						index,statement,scope,value:inputValue,label:inputValue?.label,cpuState,
@@ -2224,8 +2267,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				callType="";//:'' | '=>' | '=' | '->' | '<-' etc...
 				parameters=[];//:Parameter[]
 				scope=null;//the scope that the code should be called with. the scope contains the code
-				functionPrototype;//:Variable
-				functionSupertype;//:Variable
+				functionPrototype=null;//:Variable
+				functionSupertype=null;//:Variable
 				functionConstructor;
 			//as assembly
 				returnLineNumber;//:number; defined in collectCode
@@ -2309,13 +2352,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					case"="://class
 					instanceScope.let=instanceScope;
 					instanceScope.var=instanceScope;
-					newLabel.prototype=this.functionPrototype;
-					newLabel.supertype=this.functionSupertype;
+					newLabel.functionPrototype=this.prototype;
+					newLabel.functionSupertype=this.pupertype;
+					middleLabel.labels["this"]=newLabel;
+					middleLabel.labels["return"]=newLabel;
+					middleLabel.labels["arguments"]=argsObj;
+					middleLabel.labels["constructor"]=this;
 					Object.assign(middleLabel.labels,argsObj.labels);
-					middleLabel.labels["this"]??=newLabel;
-					middleLabel.labels["return"]??=newLabel;
-					middleLabel.labels["arguments"]??=argsObj;
-					middleLabel.labels["constructor"]??=argsObj;
 					break;//pure, unpure, 
 					case"=>"://arrow function
 					
@@ -2338,13 +2381,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					break;
 					default:
 					instanceScope.let=instanceScope;
+					middleLabel.labels["arguments"]=argsObj;
+					middleLabel.labels["constructor"]=argsObj;
+					middleLabel.labels[globalScope.symbol]=middleLabel;
 					Object.assign(middleLabel.labels,argsObj.labels);
 					middleLabel.labels["this"]=callingValue.parent??scope.var.label;
 					middleLabel.labels["return"]=returnObj;
-					middleLabel.labels["arguments"]??=argsObj;
-					middleLabel.labels["constructor"]??=argsObj;
 					newLabel.labels["caller"]??=scope.label;
-					middleLabel.labels[globalScope.symbol]??=middleLabel;
 				}
 				for(let codeScope of codeBlock){
 					if(callType!="<=")middleScope.parent=codeScope;
@@ -2360,9 +2403,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//Variable
 			findLabel(name){//'a.b' string=>{parent:Variable,label:Variable}
 				return (//null can be used for empty place-holder labels, undefined can be use for 'let' statements
-					this.supertype?.findLabel?.(name)
-					??(this.labels[name]!==undefined?{label:this.labels[name],parent:this}:undefined)
-					??this.prototype?.findLabel?.(name)
+					this.functionSupertype?.findLabel?.(name)
+					??(this.labels.hasOwnProperty(name)&&this.labels[name]!==undefined?{label:this.labels[name],parent:this}:undefined)
+					??this.functionPrototype?.findLabel?.(name)
 				);
 			}
 			unDefine(){//'$undef label'; done in '#' phase
@@ -2437,7 +2480,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					})};
 				}
 			}
-			class BuiltinFunctionFunction extends BuiltinFuntion{//UNFINUSHED, UNUSED
+			class BuiltinFunctionFunction extends BuiltinFuntion{
 				constructor(name,foo,data){//'a..b(1,2);'
 					super(name,()=>{},data);
 					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
@@ -2450,16 +2493,20 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 			}
 			class InternalValue extends Value{
-				constructor(data,propertyName){
-					//parent,name
-					super({parent,name});
-					this.propertyName=propertyName;
+				constructor({label,name},propertyName){
+					super({parent:label,label:label[propertyName],name});//{parent,name}
+					this.#propertyName=propertyName;
 				}
+				//parent;
+				//name;
 				type="label";//: const
 				refType="internal";//: const
-				propertyName;//: string
-				set(value){
-					value.toType("label");
+				#propertyName;//: string
+				get(){//UNUSED
+					return this.parent[this.#propertyName];
+				}
+				set(label){
+					this.parent[this.#propertyName]=label;
 				}
 			};
 			const Internal=new (class extends Variable{
@@ -2505,13 +2552,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"return":async({label})=>(label.returnLabel??=new Return(label)).toValue("label"),
 					//from this object
 					//`obj.prototype`
-					"proto":async({label})=>new InternalValue({type:"label",label:label.prototype},"prototype"),
-					"super":async({label})=>new InternalValue({type:"label",label:label.supertype},"supertype"),
+						"prototype":async({label})=>new InternalValue({label,name:"prototype"},"prototype"),
+						"supertype":async({label})=>new InternalValue({label,name:"supertype"},"supertype"),
 					//from parent function
 					//`obj.constructor`
-					"construtor":async({label})=>label.functionConstructor.toValue("label"),
-					"prototype":async({label})=>label.functionPrototype.toValue("label"),
-					"supertype":async({label})=>label.functionSupertype.toValue("label"),
+					"construtor":async({label})=>new InternalValue({label,name:"construtor"},"functionConstructor"),
+						"proto":async({label})=>new InternalValue({label,name:"proto"},"functionPrototype"),
+						"super":async({label})=>new InternalValue({label,name:"super"},"functionSupertype"),
 					//other
 					"defs":async({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
 					"indexOf":new BuiltinFunctionFunction("indexOf",async({label,args})=>{
@@ -2538,7 +2585,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				:0,
 				v.length==1?v.charCodeAt(0):+("0x"+v.substr(2))||0,
 			];
-			return join?ary[0]|ary[1]:outputAsBinary()?ary:["dw",ary[1]+""];
+			return join?ary[0]|ary[1]:outputAsBinary()?ary:["dw","0x"+((ary[0]|ary[1])&0xffff).toString(16)];
 		}
 		function valueStringToArray(value,scope){
 			if(value?.type=="string")
