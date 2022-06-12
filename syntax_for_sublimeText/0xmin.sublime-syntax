@@ -38,7 +38,7 @@ variables:
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|->|<-|=)'
-
+  inbuiltProperties: '\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf)\b'
 
   line_start_endLinePart: ':|(?=\S)'
 contexts:
@@ -144,7 +144,7 @@ contexts:
     - match: '\.\.'
       push:
       - include: baseMain
-      - match: '\b(?:length|compile|array|code|labels|seal|freeze|this|return)\b'
+      - match: '{{inbuiltProperties}}'
         scope: support.function.internalScope.0xmin
         pop: true
       - match: '(?=\S)'
@@ -383,8 +383,8 @@ contexts:
       scope: keyword.control
     - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
       scope: keyword.control
-      push:
-        - include: brackets_expression
+      #push:
+      #  - include: brackets_expression
     - match: '(?:\b(?:virtual)\b\s*)+' #2nd part of line
       scope: keyword.control
     - match: '\b(?:import|debugger|delete)\b' #3rd part of line along with
@@ -401,13 +401,13 @@ contexts:
       scope: keyword.control.register.0xmin
     - match: '{{assembly_commands}}'
       scope: support.constant
-    - match: '(?<=\n|^)\#;|#'
+    - match: '\#;|#'
     #  push: main_meta
       scope: support.constant.meta.0xmin
-    - match: '(?<=\n|^)\$;|\$' #(?:\s*\b(?:set|def)\b)*'
+    - match: '\$;|\$' #(?:\s*\b(?:set|def)\b)*'
       scope: entity.name.hidden.0xmin
     #  push: main_hidden
-    - match: '(?<=\n|^)\@;|@'
+    - match: '\@;|@'
       scope: keyword.assembly.0xmin
     - match: '{{assembly_operators}}'
       scope: support.constant.operator.0xmin
@@ -437,7 +437,7 @@ contexts:
       scope: 'keyword.declaration.functionCall.0xmin'
       pop: true
   internalScope:
-    - match: '\b(?:length|compile|array|code|labels|seal|freeze|this|return)\b'
+    - match: '{{inbuiltProperties}}'
       scope: 'support.function'
     - match: '(?=\S)'
       pop: true
