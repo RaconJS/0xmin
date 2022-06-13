@@ -1,3 +1,31 @@
 //#set 0xmin.settings.language("tptasm");
+//recursionLevel = Map(callerLines->repetisions)
 #set 0xmin.settings.log_table=1;
 //import this "../code/R2/code.0xmin"
+let doStuff{1};
+
+
+let x=2;
+let foo(callback){
+	debugger"'foo'";
+	recur 5 callback();
+};
+//stack[foo,c callback1,c foo,c callback2]
+//stack[foo,c bar,foo,c bar]
+let i=0;
+repeat 0 foo((){
+	foo((){
+		//...set doStuff;
+	});
+});
+repeat 0 foo((){:bar;
+	recur 1 foo(bar);
+});
+
+let foo1;
+let baz(){debugger foo1"label.symbol";
+	#foo1=#(){
+		...baz;
+	};
+	foo(foo1);
+}()
