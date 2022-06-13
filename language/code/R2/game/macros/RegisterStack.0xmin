@@ -1,0 +1,52 @@
+let var,const,blockScope,del;
+let registerStack{:this;#;
+	let dataLen=0;
+	let maxRegisters=14;
+	set var(value){:register;
+		void #let value=value;
+		void #let isConst=0;
+		void:{#;
+			let address<->dataLen%maxRegisters;
+			data[+dataLen]=register;
+			dataLen+=1;
+			if(dataLen==+maxRegisters)::(){
+				;
+			}::(){
+
+			};
+			#register<->address;
+		};
+		(+value||0);
+	};
+	set const(value){#;
+		let set return;
+		let found=undefined;
+		let i=0;
+		repeat #(!+found&&dataLen):{
+			#;
+			found = +data[+i].value==+value&&+data[+i].isConst;
+			i+=1;
+		};
+		if(+found)::(){
+			#return=data[i-1];
+		}::(){
+			#return=var(value);
+			#return.isConst=1;
+		};
+	};
+	let pop(n){#dataLen-=+n||1;};
+	set del=pop;
+	let lenSymbol;
+	set blockScope(block)=>{//def block();
+		#let lenStart<->dataLen;
+		...set block;
+		recur 100: ...set block();
+		#let lenEnd<->dataLen;
+		#(){//handle stackoverflow
+			repeat #(lenEnd-maxRegisters):{
+				;
+			};
+		};
+		#dataLen<->lenStart;
+	};
+};debugger:()=>{#def(a)={a();}(()={2});}()..compile..length"value.number";

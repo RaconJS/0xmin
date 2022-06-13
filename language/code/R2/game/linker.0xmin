@@ -1,0 +1,5 @@
+#set: 0xmin.settings.language("tptasm");
+//#set: 0xmin.settings.log_code=1;
+import "metaFunctions.0xmin";
+import "macros/macros.0xmin";
+//import "game.0xmin";

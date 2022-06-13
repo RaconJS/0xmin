@@ -1,0 +1,60 @@
+//#set: 0xmin.settings.log_table=1;
+import "linker.0xmin";
+//platformer
+let main(){
+	blockScope()::(){
+		let b=var();
+		let a=var();
+	};
+	player.movement();
+};
+let setUpMemory(){
+	jump->main;
+	def objects;
+	def player;
+	def main;
+};
+#..super={};
+#..super.undefined=#();
+let fixedPointNumber(val)={//fixedPoint number
+	#set return=val*(2**constructor.decimalPoint);
+	#set return<->undefined;
+}{
+	let decimalPoint=8;//0xabc.d;
+};
+let player{:this;
+	def let movement()=>{
+		blockScope()::()=>{
+			//let x=var();%x=[this.x];
+			//let y=var();%y=[this.y];
+			let dir;
+			blockScope()::()=>{1;
+				//let const_0=const(0);
+				//bump %const_0;
+				21;
+			};
+		}
+	};
+	def let x=fixedPointNumber(8);
+	def let y=fixedPointNumber(4);
+	def let inputDirection;
+};
+let Rect(x,y,x1,y1)={//x<x1
+	#def let x =fixedPointNumber(min(arguments.x,arguments.x1));
+	#def let y =fixedPointNumber(min(arguments.y,arguments.y1));
+	#def let x1=fixedPointNumber(max(arguments.x,arguments.x1));
+	#def let y1=fixedPointNumber(max(arguments.y,arguments.y1));
+	void this..compile;
+}{
+	let prototype={#;
+		null#def let x;//:fixed&f16
+		null#def let y;//:fixed&f16
+		null#def let x1;//:fixed&f16
+		null#def let y2;//:fixed&f16
+	}..compile;
+};
+let objects{//1 = 1px on screen
+	Rect(3,4,2,2);
+};
+#main=main();
+#def: setUpMemory();
