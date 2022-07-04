@@ -1,0 +1,12 @@
+let main(){
+	let tree=0;
+	heap.malloc.call();
+};
+#0xmin.settings.language("tptasm");
+let heap={import lib "heap.0xmin";};
+debugger heap..labels"value.array";
+def let start;
+def heap;
+def set:main=main();
+#set start{jump->main;}
+def heap.memory;

@@ -1,4 +1,5 @@
 #set 0xmin.settings.language("0xmin");
+#set 0xmin.settings.log_table=1;
 //(?<!:)({|;)\s*#(?!set|let|def|;|})
 #def let: os={
 	#let mainPart(){
