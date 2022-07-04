@@ -29,7 +29,7 @@ import lib "io.0xmin";
 	#set input.a=a,input.b=b;
 };
 #let int=Struct();
-jump=>int.block..return;
+jump->int.block..return;
 $def set int.block;
 move=>int(0x35);get;
 move=>adder.a;set;

@@ -1,7 +1,8 @@
-let var,const,blockScope,del;
+let var,const,blockScope,remove,getState,save,load,Function;
 let registerStack{:this;#;
 	let dataLen=0;
 	let maxRegisters=14;
+	let consts=[];
 	set var(value){:register;
 		void #let value=value;
 		void #let isConst=0;
@@ -18,26 +19,52 @@ let registerStack{:this;#;
 		};
 		(+value||0);
 	};
-	set const(value){#;
-		let set return;
+	set const(value)={#;
+		let newObj=return;
 		let found=undefined;
 		let i=0;
-		repeat #(!+found&&dataLen):{
+		repeat 0 repeat #(!+found&&dataLen):{
 			#;
-			found = +data[+i].value==+value&&+data[+i].isConst;
+			found = data[+i]&&(+data[+i].value==+value&&+data[+i].isConst);
 			i+=1;
 		};
-		if(+found)::(){
-			#return=data[i-1];
+		if(+found)::()=>{
+			#newObj=data[i-1];
 		}::(){
-			#return=var(value);
-			#return.isConst=1;
+			#newObj=var(value);
+			#newObj.isConst=1;
+		};
+		return=newObj;
+	};
+	set getState(){
+		#return=+dataLen;
+	};
+	set save(startReg){
+		let i=+startReg||0;
+		let len=dataLen;
+		repeat len:{
+			push = %i;
+			#i=i+1;
 		};
 	};
-	let pop(n){#dataLen-=+n||1;};
-	set del=pop;
-	let lenSymbol;
+	set load(endReg,startReg){
+		let i=+endReg;
+		#startReg=+startReg||0;
+		let len=dataLen;
+		repeat len:{
+			%i = pop;
+			#i=i-1;
+		};
+	};
+	set remove(n){#dataLen-=+n||1;};
+	set Function(foo){
+		//unfinished
+		//let args=foo..arguments;
+	}
 	set blockScope(block)=>{//def block();
+		#if(block==blockScope)::(){
+			#block={};
+		};//stop infinite recursion
 		#let lenStart<->dataLen;
 		...set block;
 		recur 100: ...set block();
@@ -49,4 +76,4 @@ let registerStack{:this;#;
 		};
 		#dataLen<->lenStart;
 	};
-};debugger:()=>{#def(a)={a();}(()={2});}()..compile..length"value.number";
+};

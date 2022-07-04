@@ -90,11 +90,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"(": ")",
 		});
 		class Statement extends Array{
+			static number=0;
 			constructor(words,arry=[]){
 				super(...arry);
+				this.symbol=Statement.number;
+				Statement.number++;
 				this.data=words instanceof Array?words.data[words.i]:words;
 			}
+			recur;
 			data;//:{line:number;column:number;file:string;getLines:getter=>string[];};
+			symbol;//:number|Symbol
 		};
 		const bracketClassMap=Object.freeze({//this object is for debugging
 			"{":({"{ }":class extends Statement{recur;maxRecur;}})["{ }"],
@@ -551,7 +556,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.map((v,i)=>{v=this.getArg(v);failed||=(v!==v);return v+[""," "][+(i==0)]})
 						.flat()
 						.join("")
-						.replaceAll(/\b([0-9]+)\b/g,(m)=>"0x"+(+m).toString(16))
+						.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
 						//.map(v=>v==","?"":v)
 						//.join(",")//:string
 						//.replaceAll("%,", "r")//registers
@@ -602,12 +607,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 			},
 		//----
-		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
+		async main({statement,index=0,scope,parentStatement},part=0){//codeObj; Bash-like statements
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
 			let state={void:false,static:false,virtual:false,phase:scope.defaultPhase};
 			let wasUsed=false;
+			//parentStatement is UNUSED except for debugging compiler
 			statement.maxRecur;
 			if(index==0){
 				statement.recur??=0;
@@ -617,156 +623,159 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			if(index>=statement.length
 				||statement.recur>(statement.maxRecur??1)
 			)return{index,value:newScope};
+			callStack.push(statement);
 			//if(scope.label.code.length==0)
-			if(word==":"&&statement[index+1].match(/^\w+$/)&&(statement[index+2]??"").match(/^(;?)$/)){
-				//'{:label;}' similar to `label:{break label}` in JS
-				index++;//index => label name
-				let word=statement[index];
-				scope.label.labels[word]=scope.label;
-				state.void=true;
-				//TODO: add 'break', to be similar to the old compiler
-				statement.recur--;
-				return {index,value:newScope};
-			}
-			if(["void", "static", "virtual", "#", "$", "@"].includes(word))
-			loop:for(let i=index;i<statement.length;i++){
-				let word=statement[index];
-				({index}=contexts.phaseSetter({index,statement,scope,state}));
-				switch(word){
-					case"void"://does not add code to block
-						state.void=true;index++;break;
-					case"static"://UNUSED; does not add code to function; Allows code to be run in function block
-						state.static=true;index++;break;
-					case"virtual":
-						state.virtual=true;index++;break;
-					case":":
-						index++;break loop;
-					break;
-					default:{
-						break loop;
+			parsing:{
+				if(word==":"&&statement[index+1].match(/^\w+$/)&&(statement[index+2]??"").match(/^(;?)$/)){
+					//'{:label;}' similar to `label:{break label}` in JS
+					index++;//index => label name
+					let word=statement[index];
+					scope.label.labels[word]=scope.label;
+					state.void=true;
+					//TODO: add 'break', to be similar to the old compiler
+					break parsing;
+				}
+				if(["void", "static", "virtual", "#", "$", "@"].includes(word))
+				loop:for(let i=index;i<statement.length;i++){
+					let word=statement[index];
+					({index}=contexts.phaseSetter({index,statement,scope,state}));
+					switch(word){
+						case"void"://does not add code to block
+							state.void=true;index++;break;
+						case"static"://UNUSED; does not add code to function; Allows code to be run in function block
+							state.static=true;index++;break;
+						case"virtual":
+							state.virtual=true;index++;break;
+						case":":
+							index++;break loop;
+						break;
+						default:{
+							break loop;
+						}
 					}
 				}
-			}
-			commands:{
-				word=statement[index];
-				if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
-					index++;
-					let repeatingIndex_number=index;
-					let calcReps=async()=>{
-						let value;
-						({index,value}=await contexts.expression_short({statement,index:repeatingIndex_number,scope}));
-						if(value)value=value.toType("number").number;
-						else value=0;
-						return value-value!==0?0:value|0;
-					}
-					if(word=="repeat"){
-						let maxReps=await calcReps();
-						if(statement[index]==":")index++;
-						let repeatingIndex=index;
-						for(let i=0;i<maxReps;i++){
-							maxReps=Math.min(maxReps,await calcReps());
-							await contexts.main({statement,index:repeatingIndex,scope});
-						}
-						break commands;
-					}
-					else if(word=="recur"){
-						let maxRecur=await calcReps();
-						if(statement.maxRecur==undefined||maxRecur<statement.maxRecur){
-							statement.maxRecur=maxRecur;
-						}
-						if(statement[index]==":")index++;
-						await contexts.main({statement,index,scope});
-						break commands;
-					}
-				}
-				//'keyword : arg' or 'keyword arg'
-				else if(["debugger", "import", "delete", "..."].includes(word)){
-					wasUsed=true;
-					if(word=="debugger"
-						&&["", "$", "#"].includes(state.phase)
-					){//debugger name "label";
-						if(state.phase=="$"){
-							newScope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
-							index=statement.length;
-						}
-						else{
-							//index++;
-							//if(statement[index]==":")index++;
-							({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
-						}
-					}
-					else if(word=="delete"//'delete a,b;' from any scope
-						&&["", "#"].includes(state.phase)
-					){
+				commands:{
+					word=statement[index];
+					if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
 						index++;
-						if(statement[index]==":")index++;
-						for(let i=0;i<statement.length&&index<statement.length;i++){
+						let repeatingIndex_number=index;
+						let calcReps=async()=>{
 							let value;
-							({value,index}=await contexts.expression_short({index,statement,scope}));
-							if(value){
-								if(value.parent&&value.label&&value.type=="label"){
-									delete value.parent.labels[value.name];
-								}
-							}else {
-								//delete all from let scope
-								const labels=newScope.let.label.labels;
-								for(let i in labels){
-									if(labels.hasOwnProperty(i))delete labels[i];
-								}
+							({index,value}=await contexts.expression_short({statement,index:repeatingIndex_number,scope}));
+							if(value)value=value.toType("number").number;
+							else value=0;
+							return value-value!==0?0:value|0;
+						}
+						if(word=="repeat"){
+							let maxReps=await calcReps();
+							if(statement[index]==":")index++;
+							let repeatingIndex=index;
+							for(let i=0;i<maxReps;i++){
+								maxReps=Math.min(maxReps,await calcReps());
+								await contexts.main({statement,index:repeatingIndex,scope,parentStatement});
 							}
-							if(statement[index]!=","){//delete a,b,c ;
-								break;
-							}else{
-								index++;
+							break commands;
+						}
+						else if(word=="recur"){
+							let maxRecur=await calcReps();
+							if(statement.maxRecur==undefined||maxRecur<statement.maxRecur){
+								statement.maxRecur=maxRecur;
 							}
+							if(statement[index]==":")index++;
+							await contexts.main({statement,index,scope,parentStatement});
+							break commands;
 						}
 					}
-					else if(word=="..."
-						&&["", "#"].includes(state.phase)
-					){
-						({index}=await contexts.main_injectCode({index,statement,scope}));
-					}
-					else if(word=="import"
-						&&["", "@", "$", "#"].includes(state.phase)
-					){
-						index++;
-						({index}=await contexts.main_importFile({statement,index,scope,phase:state.phase}));
-					}
-				}{
-					let virtualLine;
-					if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
-					if(statement[index]=="{"){
-						index++;
-						newScope.label.code.push(
-							(await evalBlock(statement[index++],scope)).label
-						);
-						index++;
-					}
-					else if(statement[index]!=";"&&index<statement.length){
-						assemblyPart:{
-							let value;
-							if(state.phase==""){//auto detect phase
-								word=statement[index];
-								if(["let", "def"].includes(word))
-									state.phase="#";
-								else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!assemblyCompiler.assembly.instructionSet.hasOwnProperty(word)))
-									state.phase="$";
-								else state.phase="@";
+					//'keyword : arg' or 'keyword arg'
+					else if(["debugger", "import", "delete", "..."].includes(word)){
+						wasUsed=true;
+						if(word=="debugger"
+							&&["", "$", "#"].includes(state.phase)
+						){//debugger name "label";
+							if(state.phase=="$"){
+								newScope.label.code.push(new HiddenLine.Debugger({index,statement,scope}));
+								index=statement.length;
 							}
-							if(state.phase=="@")({index}=await contexts.main_assembly({statement,index,scope:newScope}));
-							if(statement[index]=="$"){state.phase="$";index++;}
-							if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
-							if(statement[index]=="#"){state.phase="#";index++;}
-							if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
-							;
+							else{
+								//index++;
+								//if(statement[index]==":")index++;
+								({index}=await evalDebugger({index,statement,scope,parentStatement,word:"debugger"}));
+							}
 						}
+						else if(word=="delete"//'delete a,b;' from any scope
+							&&["", "#"].includes(state.phase)
+						){
+							index++;
+							if(statement[index]==":")index++;
+							for(let i=0;i<statement.length&&index<statement.length;i++){
+								let value;
+								({value,index}=await contexts.expression_short({index,statement,scope}));
+								if(value){
+									if(value.parent&&value.label&&value.type=="label"){
+										delete value.parent.labels[value.name];
+									}
+								}else {
+									//delete all from let scope
+									const labels=newScope.let.label.labels;
+									for(let i in labels){
+										if(labels.hasOwnProperty(i))delete labels[i];
+									}
+								}
+								if(statement[index]!=","){//delete a,b,c ;
+									break;
+								}else{
+									index++;
+								}
+							}
+						}
+						else if(word=="..."
+							&&["", "#"].includes(state.phase)
+						){
+							({index}=await contexts.main_injectCode({index,statement,scope}));
+						}
+						else if(word=="import"
+							&&["", "@", "$", "#"].includes(state.phase)
+						){
+							index++;
+							({index}=await contexts.main_importFile({statement,index,scope,phase:state.phase}));
+						}
+					}{
+						let virtualLine;
+						if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
+						if(statement[index]=="{"){
+							index++;
+							newScope.label.code.push(
+								(await evalBlock(statement[index++],scope)).label
+							);
+							index++;
+						}
+						else if(statement[index]!=";"&&index<statement.length){
+							assemblyPart:{
+								let value;
+								if(state.phase==""){//auto detect phase
+									word=statement[index];
+									if(["let", "def"].includes(word))
+										state.phase="#";
+									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!assemblyCompiler.assembly.instructionSet.hasOwnProperty(word)))
+										state.phase="$";
+									else state.phase="@";
+								}
+								if(state.phase=="@")({index}=await contexts.main_assembly({statement,index,scope:newScope}));
+								if(statement[index]=="$"){state.phase="$";index++;}
+								if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
+								if(statement[index]=="#"){state.phase="#";index++;}
+								if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
+								;
+							}
+						}
+						else if(!wasUsed&&state.phase||state.void){//set default phase '#;' '$;' '@;' 'void;'
+							scope.defaultPhase=state.phase;
+						}
+						if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
 					}
-					else if(!wasUsed&&state.phase||state.void){//set default phase '#;' '$;' '@;' 'void;'
-						scope.defaultPhase=state.phase;
-					}
-					if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
 				}
 			}
+			callStack.pop();
 			statement.recur--;
 			if(statement.recur==0){
 				statement.maxRecur=undefined;
@@ -1903,7 +1912,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//----
 	};
 	//classes
-		async function evalDebugger({statement,index,scope,word=undefined,inputValue=undefined,string=undefined,cpuState=undefined}){
+		async function evalDebugger({statement,index,scope,word=undefined,inputValue=undefined,string=undefined,cpuState=undefined,parentStatement}){
 			let failed=false;
 			word??=statement[index];
 			if(word=="debugger"){//debugger name "label";
@@ -1922,7 +1931,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					const str = value??"[[label]]";
 					const vm=require("vm");
 					const sandbox = {log:"no log;",...{
-						index,statement,scope,value:inputValue,label:inputValue?.label,cpuState,
+						index,statement,scope,
+						callStack,parentStatement,get stack(){return callStack.getData()},
+						value:inputValue,label:inputValue?.label,
+						cpuState,
 						Value,
 						Variable,MacroFunction,
 						Scope,BlockScope,ObjectScope,MachineCode,
@@ -2325,6 +2337,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.isSearched=false;
 				return codeBlock;
 			}
+			static middleScopeCode;
 			async callFunction({args,value:callingValue,callType,scope}){//:{value}
 				args??={obj:{},list:[]};
 				//args: {obj;list}
@@ -2348,7 +2361,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				const middleLabel=new Variable({name:"(function vars)"});
 				const middleScope=new Scope({//allows function to use arguments without them being part of the instance object
 					label:middleLabel,
-					code:new Statement(),
+					code:(Variable.middleScopeCode??=new Statement()),//:Statement 
 					parent:this.scope??globalScope
 				});
 				let instanceScope=new Scope({//weak scope
@@ -2677,12 +2690,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//settings={banJS:false,banInfiniteLoops:false,};
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
 			getStack(getdata=(s)=>[s.code.data?.line+1,s.label.name],stack=[]){
-				if(this.isSearched)return stack;
-				this.isSearched=true;
-				stack.push(getdata(this,this.label.name));
-				this.parent.getStack(getdata,stack);
-				this.isSearched=false;
-				return stack;
+				if(1){//OBSILETE
+					if(this.isSearched)return stack;
+					this.isSearched=true;
+					stack.push(getdata(this,this.label.name));
+					this.parent.getStack(getdata,stack);
+					this.isSearched=false;
+					return stack;
+				}
 			}
 			//scope
 			findLabel(name){
@@ -2733,6 +2748,20 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							}),//:1|0
 						}),
 					})),
+					"Math":Object.doubleFreeze(new class MathObj extends Variable{
+						constructor(){
+							super({name:"Math"});
+							for(let i in Math){
+								if(Math.hasOwnProperty(i)){
+									this[i]=new BuiltinFunctionFunction(i,
+										({args})=>new Value.Number(Math[i](...(args.map(v=>v.toType("number").number))))
+									,{});
+									Object.doubleFreeze(this[i]);
+								}
+							}
+							Object.doubleFreeze(this.labels);
+						}
+					})
 				})});
 				this.mainObject=mainObject;
 				this.label.labels={"0xmin":mainObject};
@@ -2785,6 +2814,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	//'{' ==> '{ ... }'
 	let globalScope;
 	let compileData={model:"R216K2A"};
+	const callStack=[];
+	callStack.getData=function(){
+		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
+	};
 	async function evalBlock(block,parentScope=undefined,scope=undefined){
 		//does not include brackets
 		///scope:Scope|Variable
@@ -2800,6 +2833,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				scope=new GlobalScope({code:block});
 				if(!globalScope){
 					globalScope=scope;
+					callStack[0]??=block;
 				}
 			}else{
 				scope=new BlockScope({fromName:"evalBlock",parent:parentScope,code:block});
@@ -2809,7 +2843,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		scope.defaultPhase="";
 		for(let i=0;i<block.length;i++){
 			let statement=block[i];
-			await contexts.main({statement,scope});
+			await contexts.main({statement,scope,parentStatement:block});
 		}
 		scope.defaultPhase="";
 		return scope;
