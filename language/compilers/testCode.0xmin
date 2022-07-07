@@ -1,15 +1,19 @@
-let foo(callback,arg){
-	repeat !callback:#callback=0;
-	debugger"parentStatement[2].symbol,parentStatement[2].recur";
-	recur 4: repeat#(callback!=foo):{
-	callback(arg,arg);debugger 0 "123";}
+let map(callBack){
+	let i=0,newObj;
+	repeat this..length {
+		callBack(this[+i]);
+		#i=i+1;
+	}
+	#return = newObj;
 };
-let foo1(callback,arg){
-	repeat !callback:#callback=0;
-	debugger"parentStatement[2].symbol,parentStatement[2].recur";
-	repeat#(callback!=foo1):
-	recur 4: 
-	callback(arg,arg);
+let a{
+	1;2;3;
+	void let map=map;
 };
-foo1(foo,foo);
-//foo->callback
+#a = a.map()<:(v){
+	a.map()<:(v){
+		(v+1)
+	};
+};
+a;
+void #0xmin.settings.log_table=1;
