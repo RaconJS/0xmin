@@ -1,19 +1,5 @@
-let map(callBack){
-	let i=0,newObj;
-	repeat this..length {
-		callBack(this[+i]);
-		#i=i+1;
-	}
-	#return = newObj;
-};
-let a{
-	1;2;3;
-	void let map=map;
-};
-#a = a.map()<:(v){
-	a.map()<:(v){
-		(v+1)
-	};
-};
-a;
-void #0xmin.settings.log_table=1;
+void #let main;
+@jump->main;
+repeat 5 @null;
+void #def main;
+@"hello world!\h";
