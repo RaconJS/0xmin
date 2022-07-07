@@ -865,7 +865,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							//scope.label.code.push(value.label);
 							value.label.defs.push(scope.parent.label);
 						}else{
-							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name+"' is undefined"));
+							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name?.toString?.()+"' is undefined"));
 						}
 					}
 					word=statement[index];
@@ -926,7 +926,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			},
 			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true}={},useUnshift=false){
 				//done in the line Assignment phase
-				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name+"' is not declared"));
+				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name?.toString?.()+"' is not declared"));
 				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
 				if(useUnshift)scope.label.code.unshift(newLineObj);
 				else scope.label.code.push(newLineObj);
@@ -1235,8 +1235,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let name,failed=false;
 				({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
 				if(name){
-					if(name.type=="label")name=name.label?.symbol??undefined;
-					else if(name.type=="number")name=name.number;
+					if(name.type=="label"){
+						if(name.refType=="symbol")name=name.label?.symbol??undefined;//'a[¬b]'
+						else name=name.label?.lineNumber;
+					}
+					if(name.type=="number")name=name.number;
 					else if(name.type=="string")name=name.string;
 				}else failed=true;
 				return {index,name,failed};
@@ -1285,7 +1288,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(label)({value}=await label.callFunction({args:undefined,value,scope,statement}));
 						}//'a.b'
 						else {
-							if(typeof name=="string")value.label=value.parent.findLabel(name)?.label;
+							if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
 							if(typeof name=="number"){//'a[b]'
 								value.refType="array";
 								if(name<0)name=name+(parent.code?.length??0);//a[]
@@ -1478,7 +1481,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"¬":{do({args,hasEquals}){//'¬a' to symbol/object UNFINISHED
 				//e.g. 'a[¬b]'
 				let rightArg=args.pop();//
-				if(arg){
+				if(rightArg){
 					rightArg.refType="symbol";//UNUSED
 					args.push(rightArg);
 				}
@@ -1545,7 +1548,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
-								//refType:'property'|'array'|'name'
+								//refType:'property' | 'array' | 'name' | 'internal' | 'symbol'
 								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;//
 								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
 								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel;
