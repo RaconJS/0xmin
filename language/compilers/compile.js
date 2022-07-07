@@ -5,12 +5,11 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: #prevent '#set: a.b=b' from creating new labels
+//TODO: add 'break.name'
 //TODO: #add '$void'
-//TODO: #fix booleans
-//TODO: $detect circular label definisions
+//TODO: $detect circular label definisions (more or less done done)
 //TODO: #@make language definitions less BODGED and more formal
-//TODO: organise asm types (tptasm,0xmin,asm etc...) into
+//TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -97,7 +96,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				Statement.number++;
 				this.data=words instanceof Array?words.data[words.i]:words;
 			}
-			recur;
+			recur={};//:{[Statement.symbol]:Number;}
 			data;//:{line:number;column:number;file:string;getLines:getter=>string[];};
 			symbol;//:number|Symbol
 		};
@@ -607,23 +606,30 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 			},
 		//----
-		async main({statement,index=0,scope,parentStatement},part=0){//codeObj; Bash-like statements
+
+		capToIterator(number){//ban Infinity,NaN etc... //UNUSED
+			if(number instanceof Value){
+				number=number.toType("number").number;
+			}
+			return value-value!==0?0:value|0;
+		},
+		async main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
 			let state={void:false,static:false,virtual:false,phase:scope.defaultPhase};
 			let wasUsed=false;
-			//parentStatement is UNUSED except for debugging compiler
 			statement.maxRecur;
-			if(index==0){
-				statement.recur??=0;
-				statement.recur++;
-			}else statement.recur??=1;
+			if(0){
+				if(index==0){
+					statement.recur??=0;
+					statement.recur++;
+				}else statement.recur??=1;
+			}
 			let word=statement[index];
 			if(index>=statement.length
-				||statement.recur>(statement.maxRecur??1)
+				 ||statement.recur>(statement.maxRecur??1)
 			)return{index,value:newScope};
-			callStack.push(statement);
 			//if(scope.label.code.length==0)
 			parsing:{
 				if(word==":"&&statement[index+1].match(/^\w+$/)&&(statement[index+2]??"").match(/^(;?)$/)){
@@ -658,8 +664,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					word=statement[index];
 					if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
 						index++;
-						let repeatingIndex_number=index;
-						let calcReps=async()=>{
+						const repeatingIndex_number=index;
+						const calcReps=async()=>{
 							let value;
 							({index,value}=await contexts.expression_short({statement,index:repeatingIndex_number,scope}));
 							if(value)value=value.toType("number").number;
@@ -672,22 +678,22 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							let repeatingIndex=index;
 							for(let i=0;i<maxReps;i++){
 								maxReps=Math.min(maxReps,await calcReps());
-								await contexts.main({statement,index:repeatingIndex,scope,parentStatement});
+								await contexts.main({statement,index:repeatingIndex,scope});
 							}
 							break commands;
 						}
 						else if(word=="recur"){
-							let maxRecur=await calcReps();
+							const maxRecur=await calcReps();
 							if(statement.maxRecur==undefined||maxRecur<statement.maxRecur){
 								statement.maxRecur=maxRecur;
 							}
 							if(statement[index]==":")index++;
-							await contexts.main({statement,index,scope,parentStatement});
-							break commands;
+							//await contexts.main({statement,index,scope});
+							//break commands;
 						}
 					}
 					//'keyword : arg' or 'keyword arg'
-					else if(["debugger", "import", "delete", "..."].includes(word)){
+					if(["debugger", "import", "delete", "..."].includes(word)){
 						wasUsed=true;
 						if(word=="debugger"
 							&&["", "$", "#"].includes(state.phase)
@@ -699,7 +705,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							else{
 								//index++;
 								//if(statement[index]==":")index++;
-								({index}=await evalDebugger({index,statement,scope,parentStatement,word:"debugger"}));
+								({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
 							}
 						}
 						else if(word=="delete"//'delete a,b;' from any scope
@@ -766,6 +772,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								if(statement[index]=="#"){state.phase="#";index++;}
 								if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
 								;
+								newScope.data_phase=state.phase;
 							}
 						}
 						else if(!wasUsed&&state.phase||state.void){//set default phase '#;' '$;' '@;' 'void;'
@@ -775,10 +782,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 				}
 			}
-			callStack.pop();
-			statement.recur--;
-			if(statement.recur==0){
-				statement.maxRecur=undefined;
+			if(0){
+				statement.recur--;
+				if(statement.recur==0){
+					statement.maxRecur=undefined;
+				}
 			}
 			if(!state.void){
 				scope.label.code.push(...codeObj.code);//(codeObj);
@@ -1082,7 +1090,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						fileData=bracketPass(parseFile(fileString,filePath,fileName));
 					}
 					if(statement[index]==":")index++;
-					await evalBlock(fileData,undefined,scope);
+					await evalBlock(fileData,undefined,scope,statement);
 				}
 				index=statement.length;
 				return {index};
@@ -1106,7 +1114,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(state["let"]|state["labelsof"])Object.assign(scope.let.label.labels,label.labels);
 				if(state["set"]|state["codeof"])scope.label.code.push(...label.code);
 				if(state["def"]|state["run"]){
-					await evalBlock(label.getCode_source(),undefined,scope);
+					const source=label.getCode_source();
+					await evalBlock(source,undefined,scope,statement);
 				}
 			}
 			return{index};
@@ -1143,12 +1152,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}if(endingStringList.includes(statement[index]))failed=true;
 			return {index,failed:failed??index>=statement.length};
 		},
-		async arguments({index,statement,scope,callType,includeBrackets=true}){
+		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined}){
 			//'(a, b, c) ::{} ::{}'
 			//always includes brackets
-			let argsObj={
-				obj:{},
-				list:[],
+			argsObj??={//:ArgsObj
+				obj:{},//:{[name:String]:Value}
+				list:[],//:Value[]
 			};
 			if(includeBrackets){
 				if(statement[index]=="("){
@@ -1177,7 +1186,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			return {index,argsObj};
 		},
-		async expression_short({index,statement,scope,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
+		async expression_short({index,statement,scope,argsObj=undefined,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
 			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 			if(!statement[index])return{index};
 			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
@@ -1216,7 +1225,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//value=new Value();
 				if(!TESTING)return {index,value:undefined};
 			}
-			return await contexts.expression_fullExtend({value,index,statement,scope,shouldEval,noSquaredBrackets});
+			return await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets});
 		},
 		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
 		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
@@ -1232,18 +1241,18 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}else failed=true;
 				return {index,name,failed};
 			},
-			async expression_fullExtend({value,index,statement,scope,shouldEval=true,noSquaredBrackets=false}){
+			async expression_fullExtend({value,index,statement,scope,argsObj=undefined,shouldEval=true,noSquaredBrackets=false}){
 				for(let i=index;i<statement.length;i++){//'.property'
 					if(index>=statement.length)break;
 					let word=statement[index];
 					let oldIndex=index;
 					if(word=="["&&noSquaredBrackets)break;
-					({value,index}=await contexts.extend_value({index,statement,scope,value,shouldEval}));
+					({value,index}=await contexts.extend_value({index,statement,scope,value,argsObj,shouldEval}));
 					if(index==oldIndex)break;
 				}
 				return{value,index};
 			},
-			async extend_value({index,statement,scope,value,shouldEval=true}){//.b or [] or ()
+			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
 				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
 					if(value==undefined||value.type=="undefined")value=scope.var.label.toValue("label");//'(.b)' == 'b'
@@ -1273,7 +1282,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(shouldEval)if(parent){
 						if(isInternal){//'a..b';
 							const label=getInternals(value,{index,statement,scope}).labels[name];//internal object
-							if(label)({value}=await label.callFunction({args:undefined,value,scope}));
+							if(label)({value}=await label.callFunction({args:undefined,value,scope,statement}));
 						}//'a.b'
 						else {
 							if(typeof name=="string")value.label=value.parent.findLabel(name)?.label;
@@ -1313,15 +1322,25 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						index++;
 					}
 					//'foo=>()=>{}' ==> 'foo => #()=>{}'let argsObj;
-					let argsObj;
-					({index,argsObj}=await contexts.arguments({index,statement,scope,callType}));
+					({index,argsObj}=await contexts.arguments({index,statement,scope,callType,argsObj}));
 					if(value.type=="label"&&value.label!=undefined){
-						({value}=await value.label.callFunction({args:argsObj,value,scope,callType}));
+						({value}=await value.label.callFunction({args:argsObj,value,scope,callType,statement}));
 					}
+					argsObj.obj={};
+					argsObj.list=[];
 					return {index,value};
-				}else{
-					return {index,value};
+				}else if(word==":>"){
+					argsObj??=new ArgsObj({obj:{},list:[]});
+					for(let i=index;i<statement.length;i++){
+						if(statement[index]==":>"){//pipeLine
+							index++;
+							argsObj.obj[value.name]=value;
+							argsObj.list.push(value);
+							({value,index}=await contexts.expression_short({index,statement,scope,argsObj}));
+						}else break;
+					}
 				}
+				return {index,value};
 			},
 			delcare_typeChecks(isExtension,startValue){
 				if(isExtension){//'obj{}'
@@ -1378,6 +1397,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							isExtension
 								?new ObjectScope({fromName:"delcareFunctionOrObject/object",parent:scope,label:startValue.label,code:statement[index]})
 								:undefined
+							,undefined//not recursive
 						);
 						value=startValue??new Value({type:"label",label:newScope.label});
 					}
@@ -1465,6 +1485,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}},
 		},
 		truthy(value){//(Value)=>bool
+			"use strict";
 			if(!(value instanceof Value))return false;
 			if(value.type=="number")return !!value.number;
 			else if(value.type=="label")return !!value.label;
@@ -1617,6 +1638,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	};
 	const assemblyCompiler={
 		async main(label){//(Variable) => Variable / MachineCode
+			"use strict";
 			const codeQueue=this.collectCode(label);//:CodeLine[]
 			const {assemblyCode}=await this.assignMemory(codeQueue,label);//:Variable
 			//(Variable) -> Variable
@@ -1626,9 +1648,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//$ phase
 			//code collection and memory assignment
 			collectCode(variable,codeQueue){//collects assembly code
-				"use strict";
-				let code=variable.code;
 				codeQueue??=[];
+				if(variable.isSearched){//silent error
+					//throw Error(throwError({},"$",""))
+					return codeQueue;
+				}
+				else variable.isSearched=true;
+				let code=variable.code;
 				for(let lineObj of code){//lineObj instanceof AssemblyLine
 					///lineObj:CodeLine|Variable|Scope
 					if(lineObj instanceof HiddenLine.Define){
@@ -1645,6 +1671,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj,scope:lineObj.scope}));
 					}
 				}
+				variable.isSearched=false;
 				return codeQueue;
 			},
 			async assignMemory(codeQueue,label){
@@ -1912,7 +1939,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//----
 	};
 	//classes
-		async function evalDebugger({statement,index,scope,word=undefined,inputValue=undefined,string=undefined,cpuState=undefined,parentStatement}){
+		async function evalDebugger({statement,index,scope,word=undefined,inputValue=undefined,string=undefined,cpuState=undefined}){
 			let failed=false;
 			word??=statement[index];
 			if(word=="debugger"){//debugger name "label";
@@ -1932,7 +1959,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					const vm=require("vm");
 					const sandbox = {log:"no log;",...{
 						index,statement,scope,
-						callStack,parentStatement,get stack(){return callStack.getData()},
+						callStack,get stack(){return callStack.getData()},
 						value:inputValue,label:inputValue?.label,
 						cpuState,
 						Value,
@@ -1975,6 +2002,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		}
 		class Brackets extends Array{
 			;
+		}
+		class ArgsObj extends DataClass{
+			constructor(data){super();Object.assign(this,data??{})}
+			list=[];//Value[]
+			obj=[];//{[String]:Value}
 		}
 		class Value extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -2298,7 +2330,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				relAddress=0;//number UNUSED
 				lineNumber=undefined;
 				cpuState;//:CpuState
-				defs=[];//UNUSED;//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
+				defs=[];//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
 			//----
 			get address(){//UNUSED
@@ -2306,7 +2338,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return address==undefined?undefined:address+this.relAddress;
 			}
 			isSearched=false;
-			getCode_source(){
+			getCode_source(){//:Statement
 				if(this.scope){///this.scope:Scope|Scope.CodeObj;
 					//this: 0xminObject
 					//this.scope comes from 'obj{}' with 'obj{}()'
@@ -2338,7 +2370,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return codeBlock;
 			}
 			static middleScopeCode;
-			async callFunction({args,value:callingValue,callType,scope}){//:{value}
+			async callFunction({args,value:callingValue,callType,scope,statement}){//:{value}
 				args??={obj:{},list:[]};
 				//args: {obj;list}
 				//args.obj: {[key:"string"]:Value}
@@ -2417,8 +2449,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(callType!="<=")middleScope.parent=codeScope;
 					if(codeScope instanceof Scope.CodeObj)
 						await contexts.main({statement:codeScope.code,scope:instanceScope});
-					else await evalBlock(codeScope.code,undefined,instanceScope);
-				}//await evalBlock(codeBlock,undefined,instanceScope);
+					else await evalBlock(codeScope.code,undefined,instanceScope,statement);
+				}//await evalBlock(codeBlock,undefined,instanceScope,statement);
 				//if no return label created, it returns the 
 				let newReturnObj=middleLabel.labels["return"];//by default, returns newLabel
 				if(newReturnObj===undefined)newReturnObj=newLabel;
@@ -2689,6 +2721,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//temp variables
 				//settings={banJS:false,banInfiniteLoops:false,};
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
+			//line data, for debugging code only
+				data_phase;//: "#" | "$" | "@";  main()
 			getStack(getdata=(s)=>[s.code.data?.line+1,s.label.name],stack=[]){
 				if(1){//OBSILETE
 					if(this.isSearched)return stack;
@@ -2734,7 +2768,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"settings":Object.seal(new Variable({
 						name:"settings",
 						labels:Object.seal({
-							"log_code":new Variable({name:"log_code",lineNumber:0}),//:1|0
+							"log_code":new Variable({name:"log_code",lineNumber:1}),//:1|0
 							"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
 							"model":new Variable({name:"log_code",lineNumber:0}),//:1|0
 							"language":new BuiltinFuntion("language",({args})=>{
@@ -2818,10 +2852,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	callStack.getData=function(){
 		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
 	};
-	async function evalBlock(block,parentScope=undefined,scope=undefined){
+	async function evalBlock(block,parentScope=undefined,scope=undefined,calledFrom=undefined){
 		//does not include brackets
-		///scope:Scope|Variable
 		///block:code tree|Scope[]
+		///parentScope?:Scope
+		///scope?:Scope|Variable
+		///calledFrom?:Statement, used to retect recursion
 		const includeBrackets=false;
 		if(includeBrackets)throw Error("compiler error: not evalBlock does not support including brackets");
 		let label;
@@ -2841,9 +2877,28 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			if(label)scope.label=label;
 		}
 		scope.defaultPhase="";
+		const symbol=calledFrom?.symbol;
 		for(let i=0;i<block.length;i++){
 			let statement=block[i];
-			await contexts.main({statement,scope,parentStatement:block});
+			const checkRecur=!!calledFrom&&calledFrom.symbol>=statement.symbol;
+			const recur=statement.recur;
+			handleRecursion:if(checkRecur){
+				///calledFrom:Statement
+				recur[symbol]??=0;
+				recur[symbol]++;
+				if(recur[symbol]>(statement.maxRecur??1)){
+					//reached recursion cap
+					loga(calledFrom.data.line+"->"+statement.data.line)
+					continue;
+				}
+				callStack.push(statement);
+			}
+			await contexts.main({statement,scope});
+			if(checkRecur){
+				recur[symbol]--;
+				if(recur[symbol]==0)delete recur[symbol];
+				callStack.pop();
+			}
 		}
 		scope.defaultPhase="";
 		return scope;
@@ -2898,10 +2953,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		).join("\n")
 	;
 	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
-	loga("len("+outputFile.length+"):", ""
-		+(settingsObj["log_code"].lineNumber?outputAsString():"")
-		+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():0)
-	);
+	if(settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber){
+		console.log("len("+outputFile.length+"):", ""
+			+(settingsObj["log_code"].lineNumber?outputAsString():"")
+			+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():"")
+		);
+	}
 	return outputBinary;
 };
 let buildSettings={makeFile:true}
