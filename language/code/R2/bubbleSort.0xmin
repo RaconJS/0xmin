@@ -1,0 +1,137 @@
+#"tptasm";
+//#"table";
+//compiles to the powder toy assembly language
+//specificly the assmbly used by the R216K2A virtual computer
+let forLoop(i,maxI,temp1,doStuff){//:macro
+	r i=0;
+	def:{:loop;
+		{//while (i < arrayLength)
+			let iIsMaximum=temp1;
+			r iIsMaximum=r i;
+			r iIsMaximum-=r maxI;
+			jump->loop..return if>=0;
+		};
+		//do
+		doStuff;
+		{//next i
+			r i += 1;
+			jump->loop;
+		};
+	};
+};
+//prints a constant string
+let print(string,registerIsZero){
+	repeat !+registerIsZero: {push r0;r0=0;};
+	let i=0;
+	//repeat is a macro that makes coppies of the source code
+	repeat string..length {
+ 		send r0 #(string[i]);
+ 		set i+=1;
+	};
+	repeat !+registerIsZero: {r0=pop;};
+};
+let printMyList;
+let bubbleSort{
+	//assume: stack = [array,arrayLength,return]
+	//set up registers
+		let array=0,arrayLength=1;
+		let i=2,currentAddress=3,temp1=4,temp2=5,const_0=6;
+	{//get arguments from call stack
+		let returnAddress=temp1;
+		r returnAddress=pop;
+		r arrayLength=pop;
+		r array=pop;
+		push r returnAddress;
+	};
+	//bubbleSort
+	//arrayLength is nolonger neaded
+	//so i reuse its register to save space
+	let maxI=arrayLength;
+	r maxI-=1;//maxI=arrayLength-1
+	r currentAddress=r array;
+	r const_0=0;
+	call printMyList;
+	def:{:whileLoop;
+		{//while (maxI>0)
+			r maxI=r maxI;
+			jump->whileLoop..return if<=0;
+		};
+		send r const_0 "\p00";
+		forLoop(i,maxI,temp1)<:{
+			r currentAddress=r array;
+			r currentAddress+=r i;
+			let carry=temp1;
+			let value=temp2;
+			let compair=temp2;
+			let swap;
+			{//if(array[i]>array[i+1])then swap
+				{//read and compair values from RAM
+					r carry = [r currentAddress];
+					r compair = r carry;
+					r compair -= [r currentAddress+1];
+				};
+				jump->swap if>0;
+				jump->swap..return;
+				def swap{
+					r value=[r currentAddress+1];
+					[r currentAddress]=r value;
+					[r currentAddress+1]=r carry;
+				};
+				send r const_0 [r currentAddress];
+				send r const_0 [r currentAddress+1];
+				let nextCurserPos=currentAddress;
+				r nextCurserPos=r i;
+				r nextCurserPos+=1;
+				r nextCurserPos|="\p00";
+				send r const_0 r nextCurserPos;
+			};
+		};
+		r maxI-=1;
+		jump->whileLoop;
+	};
+	send r const_0 "\p10";
+	return;
+};
+let printList(array){//macro
+	//to work out the true size of the array
+	//we use '..compile' to pre-compile it to pure assembly
+	//and then use '..length'.
+	r0=0;//
+	r1=array;
+	let i=0;
+	//repeat is a macro that makes coppies of the source code
+	repeat array..compile..length {
+ 		send r0 [r1+i];
+ 		set i=i+1;
+	};
+};
+let myList={"4321"};
+set printMyList{
+	push r0;
+	push r1;
+	print("\p00");
+	printList(myList);
+	r1=pop;
+	r0=pop;
+	return;
+};
+let main{
+	printList(myList);
+	print("\n");
+	{
+		push myList;
+		push myList..compile..length;
+		call bubbleSort;
+	};
+	printList(myList);
+	print("\ndone");
+	hault;
+};
+{//the actual program memory
+	jump->main;
+	//import lib "heap.0xmin";
+	def bubbleSort;
+	def myList;
+	def printMyList;
+	def main
+};

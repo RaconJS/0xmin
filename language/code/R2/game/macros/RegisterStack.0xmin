@@ -1,8 +1,16 @@
-let var,const,blockScope,remove,getState,save,load,Function;
+let var,const,remove,blockScope,getState,save,load,Function;
+#(){//ducumentation
+	var:#()->%;
+	const:#(int)->%;
+	remove:#()->@void;
+	blockScope:#(#()->{@})->{@};
+	Function:#(@(...%)->...%)->@(...%)->...%;
+}
 let registerStack{:this;#;
 	let dataLen=0;
 	let maxRegisters=14;
 	let consts=[];
+	let data;
 	set var(value){:register;
 		void #let value=value;
 		void #let isConst=0;

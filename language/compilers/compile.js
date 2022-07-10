@@ -40,6 +40,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		const openBracketRegex=/^[(\[{]/;
 		const endingStringList=":;])}";
 		const functionCallTypes=["=>", "=", "->"];
+		const settingsRegex=       /(?:\s*#\s*"[^"]*"\s*;)/g;
+		const startOfFileRegex=/^(?:(?:\s*#\s*"[^"]*"\s*;)|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*/;
 	//----
 	//inputFile -> code tree
 		//(long string,string) => (array of words)
@@ -53,7 +55,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		};
 		function parseFile(inputFile,filePath,fileName){
 			"use strict";
-			let wordsRaw=inputFile.match(wordsRegex)??[];
 			let words=[];
 			let wordsData=[];
 			let lines=inputFile.split(/\n[\t ]*/);//getLines is a function so that it doesn't show up in console logs
@@ -61,6 +62,36 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			let data={line:0,column:0,file:fileName,i:0,getLines(){return lines;}};
 			words.fileName=fileName;
 			words.filePath=filePath;
+			{//do settings
+				//#"make file";
+				let settings=inputFile.match(startOfFileRegex);
+				{
+					let comments=settings[0].replace(settingsRegex,m=>m.replaceAll(/\S/g," "))??"";
+					inputFile=comments+inputFile.substr(settings[0].length);
+					settings[0]=settings[0].replaceAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,"");
+				}
+				settings=(settings[0].match(/"([^"]+)"/g)??[]).map(v=>v.match(/(?<=")[\s\S]*?(?=")/));	
+				const labels=mainObject.labels.settings.labels;
+				const setLanguage=str=>assemblyCompiler.assembly.setLanguage(str)
+				const settingsList={
+					//v:bool
+					"make file"(v){buildSettings.makeFile=v},
+					"0xmin"(v){setLanguage("0xmin")},
+					"tptasm"(v){setLanguage("tptasm")},
+					"asm"(v){setLanguage("asm")},
+					"code"(v){labels["log_code"].lineNumber=v},
+					"table"(v){labels["log_table"].lineNumber=v},
+				}
+				settings.forEach(v=>{
+					let turnOn=true;
+					if(v[0]=="!"){
+						reversed=false;
+						v=v.substr(1);
+					}
+					settingsList[v]?.(turnOn);
+				})
+			}
+			let wordsRaw=inputFile.match(wordsRegex)??[];
 			//remove comments
 			for(let i=0;i<wordsRaw.length;i++){
 				let n;
@@ -157,6 +188,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			if(stackLevel==0){//note: causes mutation
 				files[words.filePath]=block;
+
 			}
 			return block;
 		}
@@ -474,6 +506,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(args.length<2){
 						;({index,arg}=await this.asm_arg({statement,index,scope}));
 						if(arg?.length>0){args.push(arg);}
+						if(statement[index]==","&&args.length==1)index++;//'mov a,b;'
 					}
 					let word=statement[index],failed;
 					if(({index}=contexts.endingSymbol({index,statement})).failed){break;}
@@ -692,6 +725,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							//break commands;
 						}
 					}
+					word=statement[index];
 					//'keyword : arg' or 'keyword arg'
 					if(["debugger", "import", "delete", "..."].includes(word)){
 						wasUsed=true;
@@ -760,9 +794,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								let value;
 								if(state.phase==""){//auto detect phase
 									word=statement[index];
-									if(["let", "def"].includes(word))
+									const isInInstructionSet=assemblyCompiler.assembly.instructionSet.hasOwnProperty(word);
+									if(["let", "def", "set"].includes(word)&&!isInInstructionSet)
 										state.phase="#";
-									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!assemblyCompiler.assembly.instructionSet.hasOwnProperty(word)))
+									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!isInInstructionSet))
 										state.phase="$";
 									else state.phase="@";
 								}
@@ -775,7 +810,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								newScope.data_phase=state.phase;
 							}
 						}
-						else if(!wasUsed&&state.phase||state.void){//set default phase '#;' '$;' '@;' 'void;'
+						else if(!wasUsed&&(state.phase||state.void)){//set default phase '#;' '$;' '@;' 'void;'
 							scope.defaultPhase=state.phase;
 						}
 						if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
@@ -1239,8 +1274,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(name.refType=="symbol")name=name.label?.symbol??undefined;//'a[¬b]'
 						else name=name.label?.lineNumber;
 					}
-					if(name.type=="number")name=name.number;
+					else if(name.type=="number")name=name.number;
 					else if(name.type=="string")name=name.string;
+					else{failed=true}
 				}else failed=true;
 				return {index,name,failed};
 			},
@@ -1721,7 +1757,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						let instruction=failList[0].instruction;
 						let failed=failList[0].failed;
 						let reason=typeof failed== "boolean"?"unspecified reason":failed;
-						console.error("",reason,instruction.scope.getStack());
+						console.error("",reason);//,instruction.scope.getStack());
 						throw Error(throwError({scope:instruction.scope}, "@", ": possibly uncomputable;"
 							+"got: fails:"+fails+", i:"+i+";"
 							+"reason: \""+reason+"\""
@@ -2002,9 +2038,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//Object.seal(this,data);
 			}
 			//constructor(data){Object.assign(this,data??{})}
-		}
-		class Brackets extends Array{
-			;
 		}
 		class ArgsObj extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -2318,6 +2351,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				symbol=Symbol(Variable.objectNum++);
 				prototype=null;///instanceof Variable
 				supertype=null;///instanceof Variable
+				securityLevel=0;//used with '..secure'
 			//as array
 				code=[];//:(CodeLines|Variable|Scope)[]
 			//as function
@@ -2605,8 +2639,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					},
 					//note: name might change
 					"code_assembly":async({label})=>await assemblyCompiler.collectCode(label).toValue("label"),
-					"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
-					"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
+					//change object state
+						"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
+						"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
+						"secure":async({label})=>{//does not need 'recur' to call a secure function
+							throw Error("'label..secure' is not supported yet.");
+							Object.freeze(label.code);
+							label.securityLevel=1;
+							return label;
+						},
 					"this":async({label})=>label.toValue("label"),
 					"return":async({label})=>(label.returnLabel??=new Return(label)).toValue("label"),
 					//from this object
@@ -2766,41 +2807,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//#set 0xmin.settings.language("tptasm");
 				//#set 0xmin.settings.language("0xmin");
 				//#set 0xmin.settings.model="R216K2A";
-				const mainObject=this.label.prototype=new Variable({name:["0xmin"],lineNumber:0,labels:Object.freeze({
-					"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0),this),assemblyCompiler.nullValue)),
-					"settings":Object.seal(new Variable({
-						name:"settings",
-						labels:Object.seal({
-							"log_code":new Variable({name:"log_code",lineNumber:1}),//:1|0
-							"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
-							"model":new Variable({name:"log_code",lineNumber:0}),//:1|0
-							"language":new BuiltinFuntion("language",({args})=>{
-								if(args[0]){//args[0]:Value
-									let str=args[0].toType("string").string;
-									if(["tptasm", "0xmin"].includes(str)){
-										assemblyCompiler.assembly.setLanguage(str);
-									}
-								}
-								return new Value.String(assemblyCompiler.assembly.language);
-							}),//:1|0
-						}),
-					})),
-					"Math":Object.doubleFreeze(new class MathObj extends Variable{
-						constructor(){
-							super({name:"Math"});
-							for(let i in Math){
-								if(Math.hasOwnProperty(i)){
-									this[i]=new BuiltinFunctionFunction(i,
-										({args})=>new Value.Number(Math[i](...(args.map(v=>v.toType("number").number))))
-									,{});
-									Object.doubleFreeze(this[i]);
-								}
-							}
-							Object.doubleFreeze(this.labels);
-						}
-					})
-				})});
 				this.mainObject=mainObject;
+				this.label.prototype=mainObject;
 				this.label.labels={"0xmin":mainObject};
 			}
 			mainObject;
@@ -2825,9 +2833,74 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//code;
 			//parent;
 		}
+		class Language{//TODO: put languages in separate files
+			static langs={};//{langName:Language}
+			static currentLang;//:Language
+			pointers=[];//:String[]
+			parse=({statement,index,scope})=>{}
+			compile=({instruction,cpuState,assemblyCode,code})=>{}
+			instructionSet=[];
+			constructor(data){
+				"use strict";
+				Object.assign(this,data??{});
+			}
+		}
 	//----
 	//functions
-
+		async function evalBlock(block,parentScope=undefined,scope=undefined,calledFrom=undefined){
+			//does not include brackets
+			///block:code tree|Scope[]
+			///parentScope?:Scope
+			///scope?:Scope|Variable
+			///calledFrom?:Statement, used to retect recursion
+			const includeBrackets=false;
+			if(includeBrackets)throw Error("compiler error: not evalBlock does not support including brackets");
+			let label;
+			if(scope instanceof Variable){//used in function calls
+				label=scope;scope=undefined;
+			}
+			if(!scope){
+				if(!parentScope){
+					scope=new GlobalScope({code:block});
+					if(!globalScope){
+						globalScope=scope;
+						callStack[0]??=block;
+					}
+				}else{
+					scope=new BlockScope({fromName:"evalBlock",parent:parentScope,code:block});
+				}
+				if(label)scope.label=label;
+			}
+			scope.defaultPhase="";
+			const symbol=calledFrom?.symbol;
+			for(let i=0;i<block.length;i++){
+				let statement=block[i];
+				const checkRecur=!!calledFrom&&calledFrom.symbol>=statement.symbol;
+				const recur=statement.recur;
+				handleRecursion:if(checkRecur){
+					///calledFrom:Statement
+					recur[symbol]??=0;
+					recur[symbol]++;
+					if(recur[symbol]>(statement.maxRecur??1)){
+						//reached recursion cap
+						continue;
+					}
+					callStack.push(statement);
+				}
+				await contexts.main({statement,scope});
+				if(checkRecur){
+					recur[symbol]--;
+					if(recur[symbol]==0)delete recur[symbol];
+					callStack.pop();
+				}
+			}
+			scope.defaultPhase="";
+			return scope;
+		}
+		async function evalAssembly(scope){
+			let assemblyCode=await assemblyCompiler.main(scope.label);
+			return assemblyCode;
+		}
 	//----
 	{
 		//0xmin label name conventions:
@@ -2848,6 +2921,40 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		assemblyCompiler.assembly.init();
 		Object.doubleFreeze(nullValue);
 	}
+	const mainObject=new Variable({name:["0xmin"],lineNumber:0,labels:Object.freeze({
+		"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0),this),assemblyCompiler.nullValue)),
+		"settings":Object.seal(new Variable({
+			name:"settings",
+			labels:Object.seal({
+				"log_code":new Variable({name:"log_code",lineNumber:0}),//:1|0
+				"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
+				"model":new Variable({name:"model",lineNumber:0}),//:1|0
+				"language":new BuiltinFuntion("language",({args})=>{
+					if(args[0]){//args[0]:Value
+						let str=args[0].toType("string").string;
+						if(["tptasm", "0xmin"].includes(str)){
+							assemblyCompiler.assembly.setLanguage(str);
+						}
+					}
+					return new Value.String(assemblyCompiler.assembly.language);
+				}),//:1|0
+			}),
+		})),
+		"Math":Object.doubleFreeze(new class MathObj extends Variable{
+			constructor(){
+				super({name:"Math"});
+				for(let i in Math){
+					if(Math.hasOwnProperty(i)){
+						this[i]=new BuiltinFunctionFunction(i,
+							({args})=>new Value.Number(Math[i](...(args.map(v=>v.toType("number").number))))
+						,{});
+						Object.doubleFreeze(this[i]);
+					}
+				}
+				Object.doubleFreeze(this.labels);
+			}
+		})
+	})});
 	//'{' ==> '{ ... }'
 	let globalScope;
 	let compileData={model:"R216K2A"};
@@ -2855,61 +2962,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	callStack.getData=function(){
 		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
 	};
-	async function evalBlock(block,parentScope=undefined,scope=undefined,calledFrom=undefined){
-		//does not include brackets
-		///block:code tree|Scope[]
-		///parentScope?:Scope
-		///scope?:Scope|Variable
-		///calledFrom?:Statement, used to retect recursion
-		const includeBrackets=false;
-		if(includeBrackets)throw Error("compiler error: not evalBlock does not support including brackets");
-		let label;
-		if(scope instanceof Variable){//used in function calls
-			label=scope;scope=undefined;
-		}
-		if(!scope){
-			if(!parentScope){
-				scope=new GlobalScope({code:block});
-				if(!globalScope){
-					globalScope=scope;
-					callStack[0]??=block;
-				}
-			}else{
-				scope=new BlockScope({fromName:"evalBlock",parent:parentScope,code:block});
-			}
-			if(label)scope.label=label;
-		}
-		scope.defaultPhase="";
-		const symbol=calledFrom?.symbol;
-		for(let i=0;i<block.length;i++){
-			let statement=block[i];
-			const checkRecur=!!calledFrom&&calledFrom.symbol>=statement.symbol;
-			const recur=statement.recur;
-			handleRecursion:if(checkRecur){
-				///calledFrom:Statement
-				recur[symbol]??=0;
-				recur[symbol]++;
-				if(recur[symbol]>(statement.maxRecur??1)){
-					//reached recursion cap
-					loga(calledFrom.data.line+"->"+statement.data.line)
-					continue;
-				}
-				callStack.push(statement);
-			}
-			await contexts.main({statement,scope});
-			if(checkRecur){
-				recur[symbol]--;
-				if(recur[symbol]==0)delete recur[symbol];
-				callStack.pop();
-			}
-		}
-		scope.defaultPhase="";
-		return scope;
-	}
-	async function evalAssembly(scope){
-		let assemblyCode=await assemblyCompiler.main(scope.label);
-		return assemblyCode;
-	}
 	let outputAsBinary=()=>assemblyCompiler.assembly.language=="0xmin";
 	let parts=inputFile;
 	parts=parseFile(parts,fileName);
@@ -2957,7 +3009,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	;
 	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
 	if(settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber){
-		console.log("len("+outputFile.length+"):", ""
+		console.log(
+			settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber
+			?"len("+outputFile.length+"):":"", ""
 			+(settingsObj["log_code"].lineNumber?outputAsString():"")
 			+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():"")
 		);
@@ -3010,7 +3064,7 @@ let buildSettings={makeFile:true}
 		let fileWriter=()=>new Promise((resolve,reject)=>{//minFilt.lua or a.filt
 			let newFileName=process.argv[3];
 			if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
-			else{console.log("made file")}
+			//else{console.log("made file")}
 			newFileName??="minFilt.lua";//?? "a.filt" ?? "minFilt.lua";
 			let fileType=newFileName.match(/(?<=\.)[^.]*$/)?.[0]??"filt";
 			let content=outputFile;
