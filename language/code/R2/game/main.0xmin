@@ -2,10 +2,10 @@
 import "linker.0xmin";
 //platformer
 let main(){
-	blockScope()::(){
+	blockScope()<:(){
 		let b=var();
 		let a=var();
-	};
+	};//
 	def:{:loop;
 		player.movement();
 		mainDraw();
@@ -32,10 +32,10 @@ let fixedPointNumber(val)={//fixedPoint number
 	#set return=val*(2**constructor.decimalPoint);
 	#set return<->undefined;
 }{
-	let decimalPoint=0;//8;//0xabc.d;
+	let decimalPoint=1;//8;//0xabc.d;
 };
 let getInput(out){
-	blockScope()::()=>{{:this;
+	blockScope()<:()=>{{:this;
 		let const_0=const(0);
 		%const_0=0;
 		wait %const_0;
@@ -45,30 +45,47 @@ let getInput(out){
 		jump->waitToRecover if !carry;
 	}};
 };
-let drawPlayer=data.var(1);
+let shouldDrawPlayer=data.var(1);//:@[bool]
 let mainDraw(){:this;
 	let empty=+" ";
 	let playerCharactor=+"\xae";//STKM!!
-	blockScope()::()=>{
+	blockScope()<:()=>{
 		let const_0=const();
 		let oldPosChar=var();
 		let newPosChar=var();
 		let char;
 		%const_0=0;
 		let shift=#(){
-			%char<<=4;//%char>>=4;
+			$if(fixedPointNumber.decimalPoint>0)<:(){
+				%char>>=fixedPointNumber.decimalPoint
+			};
+			%char<<=$(4+fixedPointNumber.decimalPoint);//%char>>=4;
 		};
 		let shift1=#(){
-			$if(fixedPointNumber.decimalPoint>0)::(){
+			$if(fixedPointNumber.decimalPoint>0)<:(){
 				%char>>=fixedPointNumber.decimalPoint
 			};
 			#(){
-				#def if(fixedPointNumber.decimalPoint>=4)::(){
+				#def if(fixedPointNumber.decimalPoint>=4)<:(){
 					%char>>=#(fixedPointNumber.decimalPoint-4);
-				}::(){
+				}<:(){
 					%char<<=#(4-fixedPointNumber.decimalPoint);
 				};
 			};
+		};
+		{:dontRepeat;
+			//r newPosChar=[shouldDrawPlayer];
+			{:checkForSamePossision;//: ()->bool
+				r oldPosChar=[player.x];
+				r oldPosChar^=[player.oldX];
+				r newPosChar=[player.y];
+				r newPosChar^=[player.oldY];
+				r newPosChar|=r oldPosChar;
+				r newPosChar>>=fixedPointNumber.decimalPoint;
+				//[shouldDrawPlayer]=r newPosChar;
+			};
+			jump->this..return if==0;
+			[shouldDrawPlayer]=0;
 		};
 		{#char=oldPosChar;
 			%char=0;
@@ -91,20 +108,12 @@ let mainDraw(){:this;
 		send %const_0 empty;
 		send %const_0 %newPosChar;
 		send %const_0 playerCharactor;
-		{:checkForSamePossision;
-			r oldPosChar=[player.x];
-			r oldPosChar^=[player.oldX];
-			r newPosChar=[player.y];
-			r newPosChar^=[player.oldY];
-			r newPosChar|=r oldPosChar;
-			[drawPlayer]=r newPosChar;
-		};
 	};
 };
-let doCollision(newPos){
+let doCollision(newPos){//newPos:{%x;%y}
 	return;
 	let newPos=newPos;
-	blockScope()::()=>{
+	blockScope()<:()=>{
 		//newPos:#{%x;%y}
 		let i=var();
 		%i=objects..length;
@@ -124,14 +133,14 @@ let player{:this;
 		def let right=+"d";
 	};//..compile;
 	def let movement()=>{
-		blockScope()::()=>{
+		blockScope()<:()=>{
 			let temp=var();
 			%temp=[player.x];
 			[player.oldX]=%temp;
 			%temp=[player.y];
 			[player.oldY]=%temp;
 		};
-		blockScope()::()=>{
+		blockScope()<:()=>{
 			let moveVec2{let x=var(),y=var()};
 			%moveVec2.x=0;
 			%moveVec2.y=0;
@@ -140,30 +149,57 @@ let player{:this;
 			let dir1=var();
 			{:switch;
 				let doIf(if,then){
-					:this;$debugger dir1"label";
+					:this;//$debugger dir1"label";
 					%dir1=%dir;
 					def: if;
 					jump->this..return if!=0;
 					def then;
 					jump->switch..return;
 				};
-				doIf()::{%dir1^=dirs.right}::{%moveVec2.x=1};
-				doIf()::{%dir1^=dirs.down}:: {%moveVec2.y=1;};
-				doIf()::{%dir1^=dirs.left}:: {%moveVec2.x=#(0xffff&-1)};
-				doIf()::{%dir1^=dirs.up}::   {%moveVec2.y=#(0xffff&-1)};
+				doIf()<:{%dir1^=dirs.right}<:{%moveVec2.x=1};
+				//doIf()<:{%dir1^=dirs.down}<: {};//{%moveVec2.y=1;};
+				doIf()<:{%dir1^=dirs.left}<: {%moveVec2.x=$(0xffff&-1)};
+				doIf()<:{%dir1^=dirs.up}<:   {:jump;
+					let temp=var();
+					{
+						r temp = [onGround];
+						jump -> $(jump..return) if ==0;
+					};
+					r temp=$(0xffff&fixedPointNumber=(-2)[0]);
+					[yVel]=r temp;
+					remove(1);
+				}//{%moveVec2.y=#(0xffff&-1)};
 			};
 			remove(2);
 			delete dir,dir1;
 			let scale=speed_Shift+0;
 			#scale+=fixedPointNumber.decimalPoint;
-			$if(scale!=0)::(){
+			$if(scale!=0)<:(){
 				%moveVec2.x<<=scale;
 				%moveVec2.y<<=scale;
+			};
+			{:gravity;
+				%moveVec2.y+=[yVel];
+				[yVel]+=1;
 			};
 			%moveVec2.x+=[player.x];
 			%moveVec2.y+=[player.y];
 			let newPos=moveVec2;//{x:%;y:%};
 			delete moveVec2;
+			{:ground;
+				let groundY=#(11<<fixedPointNumber.decimalPoint);
+				let compair=var();
+				r compair=r newPos.y;
+				[onGround]=0;
+				r compair-=groundY;
+				jump->ground..return if<0;
+				[onGround]=1;
+				r newPos.y=groundY;
+				[yVel]=0;
+				//else => above ground
+
+				remove(1);
+			}
 			#doCollision=doCollision(newPos);
 			push doCollision..return;//call doCollision;
 			def doCollision;
@@ -177,6 +213,8 @@ let player{:this;
 	def let oldX<=>x;
 	def let oldY<=>y;
 	def let inputDirection;
+	def let yVel={0};
+	def let onGround={0};//bool
 };
 let Rect(x,y,x1,y1)={//x<x1
 	#def let x =fixedPointNumber(min(arguments.x,arguments.x1));
