@@ -1,98 +1,45 @@
-#"tptasm";
-#"table";
-let main;
-jump->main;
-let nand=(){
-	//:Event<2>[]
-	def let input{0;0};
-	def let output{0;0;0};
-	//:const Event*[]
-	def let inputFrom{0;0};
-}{
-	#..prototype{
-		reset(){//#()->{@}
-			let i=-1;
-			repeat (this.input..length+this.output..length): {
-				[@(this[i=i+1])]=0;
+#"code";#"int";
+void ...labelsof{
+	let compile(){
+		:global;
+		void:{#;
+			let compiled=global..compile;
+			global..splice(0,global..length);
+			let i=0;
+			repeat compiled..length void{#;
+				repeat (+compiled[i]==0) void{#;
+					compiled..splice(i,1,0x20000000);
+				};
+				i+=1;
 			};
+			global{...codeof compiled;};
 		};
-		attach(){
-			set state{
-				def this;
-			};
-		};
-	};//..compile;
-	let nandPtr=..this=();
-	#nandPtr.compiled=..compile;//nand pointer prototype
-	#nandPtr.size=nandPtr.compiled..length;
-	def let run{//:#()->@();
-		let regsUsed=4;
-		let rNum=-1;
-		repeat regsUsed push@(rNum=rNum+1);
-		#rNum+=1;
-		let len;//:int = state..length
-		//: %
-		let i=0;
-			let isMax=1;
-			let adr1=1;
-			let o1=1,o2=2,o3=3;
-		let forEach(loop){//do while
-			r i=0;
-			def loop;
-			r i+=nandPtr.size;
-			r isMax=@(len*nandPtr.size);
-			r isMax-=r i;
-			jump->loop if>0;
-		};
-		forEach()<:{//get inputs
-			let j=0;//#int;
-			repeat nandPtr.input..length:{
-				r adr1=[r i+@(nandPtr.inputFrom+j)];//adr1:[%Event]
-				r adr1=[r adr1];//adr1:%Event
-				[r i+@(nandPtr.input+j)]=r adr1;
-				#j=j+1;
-			};
-		};
-		forEach()<:{//process gates
-			r o2=[r i + @(nandPtr.input+0)];
-			r o3=[r i + @(nandPtr.input+1)];
-			r o1=r o2;
-			r o1&=r o2;
-			r o1~=r o1;//%o1= a nand b
-			r o2&=r o1;
-			r o3&=r o1;
-			{
-				let out={o1;o2;o3;};
-				let j=-1;
-				repeat 3: [r i + (nandPtr.output+(j=j+1))]=r @(out[j]);
-			};
-		};
-		repeat regsUsed pop @(rNum=rNum-1);
-		return;
-	};
-	def let state{};
-	let load(){#;
-		run.len<=>state..length;
-	};
-	let link(a,aOutNum,b,bInNum){#;
-		repeat(a-state..length):nand=().attach();
-		repeat(b-state..length):nand=().attach();
-		a=state[a];
-		b=state[b];
-		b.inputFrom[bInNum]={@a.output;};
 	};
 };
-def main;
-def:{:mainLoop;
-	nand.run();
-	jump->mainLoop;
+let jump(line){@;zero;minus1;line};
+let set0(mem){@;
+	@mem;@mem;0;
 };
-{
-	let i=0;
-	let a="asd";
-	//repeat is a macro that makes coppies of the source code
-	repeat a..length {
- 		send r0 #(a[i]);
- 		set i=i+1;
+#let print(str){@;
+	:this;
+	#let data{
+		void #let i=-1;
+		repeat str..length #def:{@;
+			(-(0x20020000|str[i+=1]));
+		};
 	};
+	#let i=-1;
+	repeat str..length {@;
+		data[i+=1];-1;0;
+	};
+	$jump(this..return);
+	#def data;
 };
+let minus1{-1};
+let zero{0};
+print("hello world");
+{:hault;zero;minus1;-1};
+#def zero;
+#def minus1;
+#...run compile;
+//input;output;hault
