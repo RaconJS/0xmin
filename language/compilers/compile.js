@@ -1870,8 +1870,28 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"if":11,
 					"xor":6,
 					"and":7,
-					"or":8,
+					"or":8,"or_input":8,
+					"get_jump":9,//'get jump -1' :9
+					"set_jump":12,//'set jump +3' :12
 				},
+				pointers:{},//:{pointerName:Pointer}
+				registers:{
+
+				},
+				extraInstructions:{
+					string_char   :0x20020000,//0x10??,
+					string_pos    :0x20021000,//0x1???, //0x1yyx '\p00'
+					string_col    :0x20022000,//0x20??, //background,textColor '\c0f'
+					string_confirm:0x20010000, //0x20030000, '\a'
+					input_emptyBuffer:0x20028000,
+					hault:0x00000001,//'\h'
+				},
+				machineCodeArgs:[
+					[0,4],
+					[4,8],
+					[12,1],
+					[13,17],
+				],//[starting bit number,length of argument (in bits)]
 				setLanguage(language){
 					let name;
 					this.language=language;
@@ -1906,23 +1926,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				init(){
 					this.setLanguage(this.language);
 				},
-				pointers:{},//:{pointerName:Pointer}
-				registers:{
-
-				},
-				extraInstructions:{
-					string_char   :0x20020000,//0x10??,
-					string_pos    :0x20021000,//0x1???, //0x1yyx
-					string_col    :0x20022000,//0x20??, //background,textColor
-					string_confirm:0x20010000, //0x20030000,
-					hault:0x00000001,//'\h'
-				},
-				machineCodeArgs:[
-					[0,4],
-					[4,8],
-					[12,1],
-					[13,17],
-				],//[starting bit number,length of argument (in bits)]
 			},
 			nullValue:null,//will be defined later
 			findPointerOrLabel(value,cpuState,scope=undefined){//:HiddenLine|Pointer|Variable
@@ -2574,6 +2577,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(scope!==null)scope??=globalScope;//BODGED
 				if(value?.type=="number"){
 					return new Variable({
+						type:"number",
 						name:"["+value.number+"]",
 						lineNumber:value.number,
 						code:[new AssemblyLine({type:"data",dataType:"number",args:[value.number],scope})],
@@ -2721,6 +2725,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			if(value?.type=="string")
 			return new Variable({
 				name:"<(string)>",
+				type:"string",
 				code:(value.array??value.string.split("")).map(v=>new AssemblyLine({
 					type:"data",
 					dataType:"char",
@@ -2936,9 +2941,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		//0xmin label name conventions:
 		//info about Variable naming, can also be found in the variable class.
 		//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},{pointer}*
+		//name* ==> pointer
 		//{name}* ==> inbuilt function that returns another inbuilt object/function called 'name'
 		//<name> ==> instance of 'name'
-		//{name} ==> inbuilt object
+		//{name} ==> inbuilt object or function
 		//[name] ==> value, (normally a number i.e. `new Variable.fromValue(new Value.Number(name))` )
 		//name ==> normal variable
 		const nullValue=assemblyCompiler.nullValue=new AssemblyLine({
