@@ -130,6 +130,20 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				Statement.number++;
 				this.data=words instanceof Array?words.data[words.i]:words;
 			}
+			toLabel(){loga("??")
+				return this.#asLabel??=new Variable({
+					type:"statement",
+					code:[...this.map(v=>(//v:String|`Statement`
+						typeof v=="string"?new Value({
+							type:"string",
+							string:v,
+							array:v.split("")
+						}).toType("label")?.label
+						:v//v:Statement
+					))],
+				});
+			}
+			#asLabel;
 			recur={};//:{[Statement.symbol]:Number;}
 			data;//:{line:number;column:number;file:string;getLines:getter=>string[];};
 			symbol;//:number|Symbol
@@ -1345,22 +1359,24 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								value.refType="array";
 								if(name<0)name=name+(parent.code?.length??0);//a[]
 								value.number=name;
+								let newVal=parent.code[name];
 								if(parent instanceof MachineCode){
 									value=value.toType("number");
 									//TODO: throw error if index out of range
-									value.number=parent.code[name].binaryValue;
+									value.number=newVal.binaryValue;
 								}
-								else if(parent.code[name] instanceof AssemblyLine){
-									let code=parent.code[name];
+								else if(newVal instanceof AssemblyLine){
+									let code=newVal;
 									let number=(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
-									value=new Value({type:"label",label:new Variable({lineNumber:number,name:"["+name+"]",code:[code]})})
+									value=new Value({type:"label",label:new Variable({type:"number",lineNumber:number,name:"["+name+"]",code:[code]})})
 									//
 								}
 								else value.label=
-									parent.code[name] instanceof HiddenLine.Define&&parent.code[name].insert?parent.code[name].label:
-									parent.code[name] instanceof Variable?parent.code[name]:
-									parent.code[name] instanceof Scope?parent.code[name].label:
-									parent.code[name] instanceof CodeLine?undefined:
+									newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
+									newVal instanceof Variable?newVal:
+									newVal instanceof Scope?newVal.label:
+									newVal instanceof CodeLine?undefined:
+									newVal instanceof Statement?newVal.toLabel():
 								undefined;
 							}
 						}
@@ -1433,7 +1449,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
 					let functionScope=new FunctionScope({fromName:"delcareFunctionOrObject/function",
-						label:new Variable({name:"(scope function)"}),
+						label:new Variable({name:"(scope function)",code:word}),
 						parent:scope,
 						code:word,
 					});
@@ -1517,10 +1533,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						});
 						break;
 						default://ans:Value<label>
-						ans=new Variable({code:{
-							...(arg0.toType("label").label?.code??{}),
-							...(arg0.toType("label").label?.code??{}),
-						}});
+						ans=new Variable({code:[
+							...(arg0.toType("label").label?.code??[]),
+							...(arg1.toType("label").label?.code??[]),
+						]}).toValue("label");
 
 					}
 					args.push(ans);
@@ -2027,7 +2043,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let value;
 				string??=({value,index}=contexts.string({index,statement,scope})).value??"label";
 				{
-					const str = value??"[[label]]";
+					const str = value??
+						!inputValue?"[[label]]":
+						inputValue.type=="label"?"[[label]]":
+						inputValue.type=="number"?"value.number":
+						inputValue.type=="string"?"value.string":
+						inputValue.type=="array"?"value.array":
+						inputValue
+					;
 					const vm=require("vm");
 					const sandbox = {log:"no log;",...{
 						index,statement,scope,
@@ -2089,6 +2112,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				name;//label name (from parent.labels)
 				parent;//'parent.name' ==> label
 				refType="property";//:'property' | 'array' | 'name' | 'return' | 'internal' ; 'a.b','a[b]','set a {b}', 'a..proto';
+			array;//:(char|string)[] ; used with `value.string`
 			string;
 			number=0;//relAddress
 			//for 'let value;'
@@ -2162,14 +2186,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				},"");}
 				else if(value.type=="string")string=value.string;
 				else if(value.type=="array")throw Error("compiler error: the array Value-type is not fully supported yet.");
-				return new Value({type:"string",string});
+				return new Value({type:"string",string,array:[...(string??"").split("")]});
 			}
 			toType(type){
 				switch(type){
 					case"number":return this.toNumber();break;
 					case"string":return this.toValueString();break;
 					//case"array":return this.array;break;
-					case"label":return this.label?Variable.fromValue(this).toValue("label"):this;break;
+					case"label":return Variable.fromValue(this).toValue("label");break;
 				}
 			}
 			toJS(){//UNUSED
@@ -2375,9 +2399,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		class Variable extends DataClass{// codeObj/label
 			constructor(data){super();Object.assign(this,data??{})}
 			//as value
-				type="label";
+				type="label";//:"label"|"string"|"number"|???
 			//as object
-				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},{pointer}*
+				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},pointer*
 				name=undefined;///@string
 				labels={};//aka properties
 				static objectNum=0;
@@ -2560,7 +2584,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					case"label":value.label=this;break;
 					case"string":value.string=this.getString();break;
 					//case"array":value.label=this.getNumber();break;//unsupported
-				}
+				}				
 				return value;
 			}
 			static String=
@@ -2701,6 +2725,40 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						else ans=label.code.indexOf(args[0].label);
 						return new Value.Number(ans);
 					}),
+					//convert string to number
+					flat:async({label})=>{
+						const symbol=Symbol();
+						function* forEachStatement(statement){
+							for(let word of statement){
+								yield word;
+								if(word instanceof Statement){
+									yield* forEachStatement(word);
+								}
+							}
+						};
+						function* forEachLabel(label){
+							if(label[symbol])return;
+							label[symbol]=1;
+							let label1;
+							for(let label1 of label.code){
+								if(label1 instanceof Variable){
+									yield label1;
+									yield* forEachLabel(label1);
+								}
+								if(label1 instanceof Statement){
+									yield label1.toLabel();
+									yield* forEachStatement(label1);
+								}
+							}
+							delete label[symbol];
+						};
+						return new Variable({
+							type:"array",
+							name:"(flat)",
+							code:forEachLabel(label),
+						}).toValue("label");
+					},
+					"asNumber":async({label})=>new Value.Number(+label.toValue("string").string),
 				};
 			});
 		//----
