@@ -1,4 +1,4 @@
-//g++ -pthread emulator3.cpp -o emulator3;
+//g++ -pthread emulator4.cpp -o emulator4;
 //0xmin version 4: "no io in ram"
 //do ctrl+f "commands" to find the main emulator.
 float runSpeed=60;//fps
@@ -165,6 +165,7 @@ filt30* ram;
 int ramLen;
 filt30 getCPU_currentWord();
 class R2Terminal{
+	private: filt30 spairFilts[2];
 	public:
 	short int x=0,y=0;
 	short int bgColor=0,fgColor=15;
@@ -172,8 +173,20 @@ class R2Terminal{
 	short int dims_internal[2]={16,16};
 	short int offset_x=2,offset_y=2;
 	void innit(){
-		input=&ram[3];//from keyboard
-		output=&ram[5];//to screen
+		//detect 'import lib "io.0xmin";'
+		bool has_io_in_ram=
+			ram[2]==0&&
+			ram[3]==0x20000000&&
+			ram[4]==0&&
+			ram[5]==0x20000000
+		;
+		if(has_io_in_ram){
+			input=&ram[3];//from keyboard
+			output=&ram[5];//to screen
+		}else{
+			input=&spairFilts[0];//from keyboard
+			output=&spairFilts[1];//to screen
+		}
 		cout<<ctx.moveTo(1,1);
 		if(0){//testing larger terminal
 			short int asd[2]={40,100};
@@ -549,7 +562,7 @@ class NumberDisplay{
 				case 5:ans=b;break;//'get'
 				case 6:ans=a^b;break;//'xor'
 				case 7:ans=a&b;break;//'and'
-				case 8:ans=input&0x00020000?input:a|b;break;//'or' / 'or input'
+				case 8:ans=input&0x00020000!=0?(u32)input:a|b;break;//'or' / 'or input'
 				case 9:ans=get_jump;break;//'get jump-1;'
 				case 10:set_bray=alu;break;//'set'
 				case 11:blocker=!aluif;aluif=!aluif;break;//if 
