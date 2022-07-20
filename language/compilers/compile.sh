@@ -92,7 +92,7 @@ function compile {
 		else
 			test=0;
 		fi;echo $test;
-		$mainfolder/../emulators/emulator3 $runFileName $test $runSpeed;
+		$mainfolder/../emulators/emulator4 $runFileName $test $runSpeed;
 	fi
 	return;
 }
