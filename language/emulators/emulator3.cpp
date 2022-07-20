@@ -1,4 +1,5 @@
 //g++ -pthread emulator3.cpp -o emulator3;
+//0xmin version 4: "no io in ram"
 //do ctrl+f "commands" to find the main emulator.
 float runSpeed=60;//fps
 //ctrl-f's line: 522 `switch(command)` for the actual commands
@@ -296,6 +297,7 @@ class R2KeyBoard{
 	public:
 	filt30* input;//from keyboard 'terminal.input'
 	filt30* output;//from CPU 'terminal.output'
+	filt30 inputValue;
 	//char inputChar;
 	//bool inputWasPressed;
 	const u32 attensionRequest=0x20010000;
@@ -360,6 +362,7 @@ class R2KeyBoard{
 		if(coolDown>0)coolDown--;
 		if(bufferToinput[0]!=0){
 			*input=bufferToinput[0];
+			inputValue=bufferToinput[0];
 		}
 		bufferToinput[16-1]=0x20000000;
 		for(int i=0;i<16-1;i++){
@@ -434,6 +437,8 @@ class NumberDisplay{
 		filt30 get_jump;
 		u32 set_jump;
 		u32 set_bray;
+
+		filt30 input;
 		public://debugger pause
 		bool wasInputDown=false;
 		void onUpdate();
@@ -518,6 +523,7 @@ class NumberDisplay{
 			jump_next=1;
 			move_next=0;
 		//commands
+			input=keyboard.inputValue;
 			u32 ans=0,a=alu,b=dataFromMove;//for operations
 			switch(command){
 				case 0://move
@@ -543,7 +549,7 @@ class NumberDisplay{
 				case 5:ans=b;break;//'get'
 				case 6:ans=a^b;break;//'xor'
 				case 7:ans=a&b;break;//'and'
-				case 8:ans=a|b;break;//'or'
+				case 8:ans=input&0x00020000?input:a|b;break;//'or' / 'or input'
 				case 9:ans=get_jump;break;//'get jump-1;'
 				case 10:set_bray=alu;break;//'set'
 				case 11:blocker=!aluif;aluif=!aluif;break;//if 
