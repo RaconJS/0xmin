@@ -2865,16 +2865,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
 			//line data, for debugging code only
 				data_phase;//: "#" | "$" | "@";  main()
-			getStack(getdata=(s)=>[s.code.data?.line+1,s.label.name],stack=[]){
-				if(1){//OBSILETE
-					if(this.isSearched)return stack;
-					this.isSearched=true;
-					stack.push(getdata(this,this.label.name));
-					this.parent.getStack(getdata,stack);
-					this.isSearched=false;
-					return stack;
-				}
-			}
 			//scope
 			findLabel(name){
 				const parent=this.findLabelParent(name);//:Variable
