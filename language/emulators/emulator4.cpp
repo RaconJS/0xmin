@@ -174,7 +174,10 @@ class R2Terminal{
 	short int offset_x=2,offset_y=2;
 	void innit(){
 		//detect 'import lib "io.0xmin";'
+		//note: io can now be done without using ram addresses.
+		//`has_io_in_ram` is to support older versions of 0xmin
 		bool has_io_in_ram=
+			ram[1]==1&&//'jump 0;'
 			ram[2]==0&&
 			ram[3]==0x20000000&&
 			ram[4]==0&&
@@ -562,11 +565,12 @@ class NumberDisplay{
 				case 5:ans=b;break;//'get'
 				case 6:ans=a^b;break;//'xor'
 				case 7:ans=a&b;break;//'and'
-				case 8:ans=input&0x00020000!=0?(u32)input:a|b;break;//'or' / 'or input'
+				case 8:ans=a|b;break;//'or' / 'or input'
 				case 9:ans=get_jump;break;//'get jump-1;'
-				case 10:set_bray=alu;break;//'set'
-				case 11:blocker=!aluif;aluif=!aluif;break;//if 
-				case 12:set_jump=alu;break;//'set jump +3;'
+				case 10:ans=a|input;break;
+				case 11:set_bray=alu;break;//'set'
+				case 12:blocker=!aluif;aluif=!aluif;break;//if 
+				case 13:set_jump=alu;break;//'set jump +3;'
 			}
 			//note: with the 'if' command. is run as: 'if;"then";"else/finally";' can be used as: if;jump->then; jump->else
 			//	'if;' means 'if there has been a operation that did not equal 0, from the last if statement; then continue as normal; other wise ignore the next line of code."

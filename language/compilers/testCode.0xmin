@@ -1,1 +1,127 @@
-"hello world"
+#"len";
+let Int()={
+	#this(v)={
+		repeat !v:void#let this.v=0;
+		def v;
+		#constructor{def this};
+	};
+};
+let stack{
+	let int=Int();
+	let start;
+	def let Function(block)={//:#=()-> [ {@}, #()->@()]
+		//function = parent function
+		let function={
+			$move=>callState;
+			def block;
+			move=>output;set;
+			move=>callState.return;//:int=()
+			get;
+			move=>output;
+			set_jump;
+			get;
+			move=>callState;
+			null;
+		};
+		#set: constructor{
+			def function;
+		};
+		#set this(){:caller;
+			let returner{
+				jump function..return->caller..return 1;
+			};
+			move=>input;set;
+			move=>callState.return;
+			{:get_returner;
+				if;null;
+				if;
+				def returner;
+				get_jump;
+			};
+			set;
+			jump->function;
+		};
+	}{
+		#let ..prototype{
+			let callState{};//:move state
+			$set callState=>int;
+			let callState.return=int({jump 0});
+			let input=int(0);
+			let output=int(0);
+		};
+	};
+	let foo(){
+		debugger"'bar'";
+	};
+	...codeof Function..prototype;
+	def let next{
+		$move=>..this;
+		move=>start;
+	};
+	def int;
+	def let push=Function()<:{//@(int)->void
+		let temp=int(0);
+		move=>temp;set;
+		move=>next;get;
+		{set_jump;
+			move=>temp;
+			get;
+		null;}//$move=>nextLine;
+		set;
+		move=>next;get;
+		{:increment;
+			//assert:alu!=white, alu&0x10000000==0
+			let notIn=int(0);//shift = ~input
+			let const_2=int(2);
+			let white=int(~0);
+			:scope;
+			#..this{...labelsof scope;};
+			delete scope;
+			move=>notIn;
+			set;
+			nor;
+			set;
+			blue;
+			move=>const_2;
+			blue;
+			red;
+			move=>white;
+			xor;
+			move=>notIn;
+			red;
+		};
+		move=>next;set;
+	};
+	def start;
+};
+let getInput(waitUntillInput){//:#(bool)->{@}
+	:block;
+	let int=Int=();
+	let const_red=int(0x20000000);
+	move=>const_red;get;
+	let state;
+	{:loop;
+		def state{let move;$.move=>move;};
+		or_input;if;//if true;
+		xor;
+		{if;jump->int..return;
+			repeat !!+waitUntillInput:jump->state;
+			repeat !+waitUntillInput:jump->block..return;
+			def int;
+		};
+	};
+	{
+		get;//assert:move=>const_red;
+		"\a";
+		repeat 14 or_input;
+		//note: 'a & ~b' does not work
+	};
+	repeat !+waitUntillInput:move=>state.move;
+	delete state;
+};
+getInput(1);
+set_jump;
+repeat 3 null;
+move->0xmin;
+jump->0xmin;
+def stack;
