@@ -3,14 +3,14 @@ import "RegisterManager.0xmin";
 let printStr(string,freeReg){
 	$;
 	#let: freeReg1;
-	if(!freeReg)::(){
+	if(!freeReg)<:(){
 		#freeReg1=0;
 		push %freeReg1;
-	}::(){
+	}<:(){
 		#freeReg1=freeReg;
 	};
 	@ %freeReg1=0;
-	forEach(string)::(v){
+	forEach(string)<:(v){
 		@;
 		send %freeReg1 v;
 	};

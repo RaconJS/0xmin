@@ -53,7 +53,7 @@ move=>adder.b;set;
 		move=>a;get;
 		move=>carry;set;//carry=a;
 		move=>b;get;
-		move=>a;#def else0=()::{xor};set;//a=a^b;
+		move=>a;#def else0=()<:{xor};set;//a=a^b;
 		move=>carry;get;
 		move=>b;and;
 		move=>const_2;red;
