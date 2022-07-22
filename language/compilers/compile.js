@@ -1882,13 +1882,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"set":5,
 					//
 					"get":5,
-					"set":10,
-					"if":11,
+					"set":11,
+					"if":12,
 					"xor":6,
 					"and":7,
-					"or":8,"or_input":8,
+					"or":8,
 					"get_jump":9,//'get jump -1' :9
-					"set_jump":12,//'set jump +3' :12
+					"or_input":10,
+					"set_jump":13,//'set jump +3' :12
 				},
 				pointers:{},//:{pointerName:Pointer}
 				registers:{
