@@ -110,7 +110,7 @@ let struct(block)={//new class
 	};
 };
 repeat 0{
-let vec2=struct()::(){
+let vec2=struct()<:(){
 	#def let a{0};
 	#def let b{0};
 };

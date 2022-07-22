@@ -127,7 +127,7 @@ let displayBits(value){
 		if;jump+2;get;
 	};
 	move=>temp;set;
-	#def let:loop1=loop(length)::{
+	#def let:loop1=loop(length)<:{
 		move=>data.const(0x20000000);get;if 1;
 		move=>temp;and;
 		def let drawBit{
@@ -159,7 +159,7 @@ let forever(do)={
 	jump->..this;
 };
 def main;
-def forever()::{
+def forever()<:{
 	move=>last;get;
 	move=>io.output;set;
 	def show;
