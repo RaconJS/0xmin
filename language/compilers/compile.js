@@ -130,7 +130,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				Statement.number++;
 				this.data=words instanceof Array?words.data[words.i]:words;
 			}
-			toLabel(){loga("??")
+			toLabel(){
 				return this.#asLabel??=new Variable({
 					type:"statement",
 					code:[...this.map(v=>(//v:String|`Statement`
@@ -1950,7 +1950,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				/// value:number|Value
 				if(value.type=="number")
 					return Variable.fromValue(value,scope);
-				else if(value.type=="label")return (this.assembly.pointers[value.name]?.getState?.(cpuState)??value.label);
+				else if(value.type=="label"){
+					let pointer=this.assembly.pointers[value.name]?.getState?.(cpuState);
+					return pointer&&value.refType=="name"?pointer:value.label;
+				}
 				else throw Error(throwError({scope}, "$ type", "value must be a label or a number."));
 			},
 			async stateCheck({instruction,cpuState,assemblyCode}){
@@ -2043,14 +2046,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				let value;
 				string??=({value,index}=contexts.string({index,statement,scope})).value??"label";
 				{
-					const str = value??
+					const str = value??(
 						!inputValue?"[[label]]":
 						inputValue.type=="label"?"[[label]]":
 						inputValue.type=="number"?"value.number":
 						inputValue.type=="string"?"value.string":
 						inputValue.type=="array"?"value.array":
 						inputValue
-					;
+					);
 					const vm=require("vm");
 					const sandbox = {log:"no log;",...{
 						index,statement,scope,
@@ -2157,10 +2160,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			//Value.prototype.toNumber
 			toNumber(value=this){//to number type
+				let mask=(assemblyCompiler.assembly.language=="tptasm"?0xffff:0xffffffff);
 				let number;//:number
 				if(value.type=="number"){number=value.number}
 				else if(value.type=="label")number=value.label?.lineNumber;
-				else if(value.type=="string")number=0xffff&(value.array?valueCharToNumber(value.array[0],true):valueCharToNumber(value.string[0],true));
+				else if(value.type=="string")number=mask&(value.array?valueCharToNumber(value.array[0],true):valueCharToNumber(value.string[0],true));
 				else if(value.type=="array")throw Error("compiler error: the array Value-type is not fully supported yet.");
 				return new Value.Number(number);
 			}
