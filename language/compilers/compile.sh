@@ -28,15 +28,15 @@ function compile {
 			val1=${args[$((i+1))]}
 			#'-run true' runs the .filt file afterwards on the emulator
 			if [[ "$operator" = "-run" || "$operator" = "-r" ]]; then
-				if [[ $((i + 1)) < $ELEMENTS ]];then 
-					isRunningFile=$val1;
+				isRunningFile=true #$val1;
+				#if [[ $((i + 1)) < $ELEMENTS ]];then 
 					if [[ $externalOutFile == false ]];then #for pipelineing compiler into emulator
 						mv $mainfolder/../emulators/a.filt $mainfolder/../emulators/aOld.filt;
 						outFileName=$mainfolder/../emulators/a.filt;
 						runFileName=$mainfolder/../emulators/a.filt;
 					fi
-				fi
-				i=$(($i + 1));
+				#fi
+				#i=$(($i + 1));
 				continue;
 			elif [[ "$operator" = "-e" ]]; then #'0xmin -e code.filt;' execute '.filt' file
 				if [[ $((i + 1)) < $ELEMENTS ]];then 
