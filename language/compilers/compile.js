@@ -10,6 +10,7 @@
 //TODO: $detect circular label definisions (more or less done done)
 //TODO: #@make language definitions less BODGED and more formal
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
+//TODO: @0xmin: add support for long jumps
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -1210,7 +1211,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			return {index,failed:failed??index>=statement.length};
 		},
 		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined}){
-			//'(a, b, c) ::{} ::{}'
+			//'(a, b, c) <:{} <:{}'
 			//always includes brackets
 			argsObj??={//:ArgsObj
 				obj:{},//:{[name:String]:Value}
@@ -1228,10 +1229,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}
 					}
 				}else throw Error("compiler error: contexts.arguments() starts at '('")
-				//'::{}' => block argument
+				//'<:{}' => block argument
 				for(let i=0;i<statement.length&&index<statement.length;i++){
 					if("@$#".includes(statement[index])){index++;break;}
-					if(!["::", "<:"].includes(statement[index]))break;
+					if(statement[index]!="<:")break;
 					index++;
 					let value;
 					({value,index}=await contexts.expression_short({index,statement,scope}));
@@ -1662,6 +1663,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					break;
 				}
 				//'foo(){}' or 'obj{}' extend function or object
+				else if(word=="::"){//extend object 'foo(){}::{}'
+
+				}
 				else if(args.length>0&&!({index,value}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
 					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope}));
 				}else if(word=="¬" && args.length>0){//extend value 'a+1¬.b'==> '(a+1).b'
@@ -1787,7 +1791,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					if(fails==0&&i>=0&&passed>0)break;
 					else if(fails==0)passed++;
-					else if(fails>=lastFails){
+					else if(fails>=lastFails||i==codeQueue.length-1){
 						let instruction=failList[0].instruction;
 						let failed=failList[0].failed;
 						let reason=typeof failed== "boolean"?"unspecified reason":failed;
