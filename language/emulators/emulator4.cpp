@@ -493,7 +493,7 @@ class NumberDisplay{
 			cout<<ctx.moveTo(x,y++)<<"*jump: ";
 			if(!(cpu.currentWord&0x00030000)){
 				bool sign = (cpu.currentWord&0x1000)!=0;//is negative
-				cout<<(const char*[]){"move","jump","nor","red","blue","get","xor","and","or","get jump -1","set","if","set jump +3","","null",""}[cpu.currentWord&0xf]
+				cout<<(const char*[]){"move","jump","nor","red","blue","get","xor","and","or","get jump -1","or input","set","if","set jump +3","null",""}[cpu.currentWord&0xf]
 				<<" "<<(const char[]){'+','-'}[sign]<<hex ( ((cpu.currentWord>>4)&0xfe) + ((cpu.currentWord>>4)&1)*(int[2]){1,-1}[sign + (cpu.currentWord&0xf==0)] )
 			;}
 			else if(!(cpu.currentWord&~0x20023fff)){
@@ -565,12 +565,12 @@ class NumberDisplay{
 				case 5:ans=b;break;//'get'
 				case 6:ans=a^b;break;//'xor'
 				case 7:ans=a&b;break;//'and'
-				case 8:ans=a|b;break;//'or' / 'or input'
-				case 9:ans=get_jump;break;//'get jump-1;'
-				case 10:ans=a|input;break;
+				case 8:ans=a|b;break;//'or'
+				case 9:ans=get_jump;break;//'get jump -1'
+				case 10:ans=a|input;break;//'or input'
 				case 11:set_bray=alu;break;//'set'
 				case 12:blocker=!aluif;aluif=!aluif;break;//if 
-				case 13:set_jump=alu;break;//'set jump +3;'
+				case 13:set_jump=alu;break;//'set jump +3'
 			}
 			//note: with the 'if' command. is run as: 'if;"then";"else/finally";' can be used as: if;jump->then; jump->else
 			//	'if;' means 'if there has been a operation that did not equal 0, from the last if statement; then continue as normal; other wise ignore the next line of code."
