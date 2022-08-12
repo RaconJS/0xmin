@@ -3082,7 +3082,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			asm:fillText(v.asmValue??"",highestLen),
 			lineNumber:i,
 			sourceLineNumber:1+v.scope?.code?.data?.line,
-			line:(v.scope?.code?.data?.getLines()[v.scope?.code?.data?.line]??"")
+			line:(v.scope?.code?.data?.getLines()[v.scope?.code?.data?.line]??""),
+			value:v.binaryValue,
 		}))
 		.map(v=>""
 			+"line:"+hex30ToStr(v.lineNumber,Math.ceil(Math.log2(parts.code.length)/4)|1)
@@ -3092,7 +3093,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//+"  ram:"+v.cpu[0]
 					+" jump:"+v.cpu[1]
 					+" move:"+v.cpu[2]
-					+" cmd:"+null
+					+" cmd:"+oxminDisassembler(v.value)
 				:assemblyCompiler.assembly.language=="tptasm"?
 					" asm:"+v.asm
 				:""
@@ -3100,6 +3101,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			+";"
 			+" src:"+decToStr(v.sourceLineNumber,(Math.log10(highestSourceLineNumber)|0)+1)+"| "+v.line
 		).join("\n")
+	;
+	const oxminDisassembler=(code)=>(code&0x3000f)<0x10?
+		["move","jump","nor","red","blue","get","xor","and","or","get jump -1","or input","set","if","set jump +3","null",""][code]:
+		(code&0x20030000)==0x20010000?"\"\\a\"":
+		(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
+		(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+		(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+		code.toString(16)
 	;
 	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
 	if(settingsObj["log_length"].lineNumber||settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber){
