@@ -117,7 +117,7 @@ The language modes only changes the syntax for assembly (`@`) code.
 
 15: unused
 
-0x10000: "\x" (aka print char)
+0x100XY: `"\xXY"` (aka print char)
 
 
 hello world in ZASM: `"hello world\h";`
