@@ -34,6 +34,7 @@ variables:
   assembly_operators: '<->|<-|->'
   operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?¬]'
   operators_functionCallArgs: '::|:>|<:'
+  assembly_commands_special: '\b(?:get\s+jump\s+\-1|set\s+jump\s+\+3|or\s+input)\b'
   assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump|or_input|get_jump|set_jump)\b'
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|len)' #'!?(make file|log.code|log.table)'
@@ -399,6 +400,8 @@ contexts:
       scope: support.constant.import.0xmin
     #- match: '(?=\b(?:let|def)\b)'
     #  push: main_meta
+    #- match: '{{assembly_commands_special}}'
+    #  scope: keyword.command
     - match: '\b(?:var|const|let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|caller|continue|break)\b'
