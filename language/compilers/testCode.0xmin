@@ -4,6 +4,7 @@ let obj{let
 	b=5,
 	c=2
 };
+let array{1;a;3};
 let foo(){
 	#return =5
 };
@@ -12,4 +13,4 @@ let class(){let
 	b=5,
 	c=2
 };
-"\p34"
+or_input
