@@ -2,8 +2,6 @@
 The 0xmin1 is currently, in 2022, the worlds smallest computer in ThePowderToy(https://powdertoy.co.uk/).
 
 
-TPT = The Powder Toy
-
 comes with a compiler, emulator.cpp, and the actual computer save itself.
 
 old computer documentation
@@ -46,3 +44,13 @@ For syntax highlighting to make writing 0xmin code easier.
 instead of using the emulator.cpp, it gives you the actual visual computer.
 
 ## }
+
+#ZASM
+0xmin, Assembly, Small, Macro Language
+To prevent confusion between the computer and the programing language used by the compiler, the language is called ZASM.
+note: none of the files use the "ZASM" name yet.
+ZASM->0@$# represents each of the compilation faces in ZASM.
+# -> meta/macro phase
+$ -> memory assignment & label assignment phase
+@ -> assembly phase ()
+0 -> binary
