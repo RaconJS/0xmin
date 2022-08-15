@@ -2139,8 +2139,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.replaceAll("\\r", "\r")
 						.replaceAll(/\\u(....)/g,(v,v1)=>String.fromCharCode(+v1||0))
 						.replaceAll(/\\x(..)/g,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
-						.replaceAll(/\\([^cpha])/g,"$1")
-						.match(/\\[cp][\s\S]{2}|\\[ha]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
+						.replaceAll(/\\([^cphae])/g,"$1")
+						.match(/\\[cp][\s\S]{2}|\\[hae]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
 					;
 					array=(array??[])//:string[]
 						.map(v=>v in contexts.charSetMap?String.fromCharCode(contexts.charSetMap[v]):v)
@@ -2150,8 +2150,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.replaceAll(/\\(['`])(?!$)/g,"$1")
 						.replaceAll(/^["'`]|["'`]$/g,"\"")
 						.replaceAll(/\\[cp]/g, "\\x")
-						.replaceAll(/\\[ha]/g,"\n")
-						.replaceAll(/\\([^cpha])/g,"$1")
+						.replaceAll(/\\[hae]/g,"\n")
+						.replaceAll(/\\([^cphae])/g,"$1")
 						.replaceAll(/\\ /g," ")
 						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
 						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
@@ -2782,6 +2782,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				:v[1]=="p"?assemblyCompiler.assembly.extraInstructions.string_pos
 				:v[1]=="c"?assemblyCompiler.assembly.extraInstructions.string_col
 				:v[1]=="a"?assemblyCompiler.assembly.extraInstructions.string_confirm
+				:v[1]=="e"?assemblyCompiler.assembly.extraInstructions.input_emptyBuffer
 				:v[1]=="h"?assemblyCompiler.assembly.extraInstructions.hault
 				:0,
 				v.length==1?v.charCodeAt(0):+("0x"+v.substr(2))||0,
@@ -3105,6 +3106,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	const oxminDisassembler=(code)=>(code&0x3000f)<0x10?
 		["move","jump","nor","red","blue","get","xor","and","or","get jump -1","or input","set","if","set jump +3","null",""][code]:
 		(code&0x20030000)==0x20010000?"\"\\a\"":
+		(code&0x20030000)==0x20028000?"\"\\e\"":
 		(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
 		(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
 		(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
