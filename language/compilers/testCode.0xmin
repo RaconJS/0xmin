@@ -1,16 +1,15 @@
-#"len";#"table";
-let obj{let
-	a=2,
-	b=5,
-	c=2
-};
-let array{1;a;3};
-let foo(){
-	#return =5
-};
-let class(){let
-	a=2,
-	b=5,
-	c=2
-};
-or_input
+//note: 'let a=2;' a is 
+let getInput(){//:#()->{@}->int
+	let const_red{0x20000000};
+	let data{
+		const_red;
+	};
+	"\a";
+	def let setup{
+		move=>const_red;get;
+	};
+	repeat (14-setup..length) or_input;
+	delete setup,const_red;
+	jump->return;
+	data;
+}();
