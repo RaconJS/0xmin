@@ -402,6 +402,20 @@ contexts:
     #  push: main_meta
     #- match: '{{assembly_commands_special}}'
     #  scope: keyword.command
+    - match: '\b(set)\s+(jump)\s*(\+\s*3)\b'
+      captures:
+        1: support.constant
+        2: keyword.control
+        3: constant.numeric
+    - match: '\b(get)\s+(jump)\s*(\-\s*1)\b'
+      captures:
+        1: support.constant
+        2: keyword.control
+        3: constant.numeric
+    - match: '\b(or)\s+(input)\b'
+      captures:
+        1: support.constant
+        2: keyword.control
     - match: '\b(?:var|const|let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|caller|continue|break)\b'
