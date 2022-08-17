@@ -1090,6 +1090,26 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							scope,
 						});
 						useInstruction=true;
+						//'get jump -1' --> 'get jump' --> 'get_jump'
+						//'set jump +3' --> 'set jump' --> 'set_jump'
+						let subCommand;
+						let jumpModes={"get":"-1","set":"+3"};
+						if((subCommand=value.name.match(/^(?:get|set)$/)) && statement[index] == "jump"){
+							subCommand=subCommand[0];
+							value.name=subCommand+"_jump";
+							index++;
+							let number;
+							({index,value:number}=contexts.number({index,statement,scope}));
+							//set jump +3
+							if(number != undefined && number!=+jumpModes[subCommand]){loga(number,subCommand)
+								throw Error(throwError({statement,index,scope},"@syntax","expected: '"+subCommand+" jump "+jumpModes[subCommand]+"'. Could also use: '"+subCommand+" jump' or '"+subCommand+"_jump'"));
+							}
+						}
+						//'or input' --> 'or_input'
+						else if(value.name=="or" && statement[index] == "input"){
+							index++;
+							value.name="or_input";
+						}
 					}
 					if(instruction){//arguments
 						({index}=await contexts.main_assembly_arguments({index,statement,scope,instruction}));

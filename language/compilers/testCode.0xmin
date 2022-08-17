@@ -1,41 +1,11 @@
-//note: 'let a=2;' a is 
-#"len";
-let getInput(wait){//:#()->{@}->int
-	let const_red{0x20000000};
-	let data{
-		const_red;
-	};
-	let startState;
-	$startState=>move;
-	{:onKeyPressed;
-		move=>const_red;get;
-		repeat !!wait:def:{:waitLoop;
-			or_input;if;
-			xor;if;{
-				jump->waitLoop..return;
-				jump->waitLoop;
-			};
-		};
-	};
-	"\a";
-	{:getKey;
-		def let setup{
-			move=>const_red;get;
-		};
-		repeat (14-setup..length): or_input;
-		delete setup,const_red;
-	};
-	jump->return..return;
-	data;
-};
-//typeing program
-def:{:loop;
-	let a;
-	$a=>move;
-	getInput();
-	set_jump;
-	move=>a;
-	null;
-	null;
-	jump->loop;
-};
+#"code";
+or input;
+or_input;
+get jump -1;
+get jump;
+get_jump;
+set jump +3;
+set jump;
+set_jump;
+//set jump 4; //ERROR
+//get jump +2; //ERROR
