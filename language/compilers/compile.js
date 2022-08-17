@@ -2230,7 +2230,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			virtualLevel=0;//:int
 			jump=0;//:int ; line pointer
 			move=0;//:int ; data pointer
-			lineNumber=0;//:int
+			lineNumber=0;//:int aka 'ram'
 			get ram(){return this.lineNumber};//only for '$debugger "cpuState.ram";'
 			getData(){return {l:this.lineNumber,j:this.jump,m:this.move,v:this.virtualLevel};}
 			data(){return [this.lineNumber,this.jump,this.move,this.virtualLevel];}
@@ -2435,6 +2435,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				cpuState;//:CpuState
 				defs=[];//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
+			//extra labels
+				returnLabel;//:Variable
+				stateLabel;//:Variable
 			//----
 			get address(){//UNUSED
 				const address=this.defineLine?.address;
@@ -2717,6 +2720,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						},
 					"this":async({label})=>label.toValue("label"),
 					"return":async({label})=>(label.returnLabel??=new Return(label)).toValue("label"),
+					"state":async({label})=>(label.stateLabel??=
+						new Variable({
+							name:"(cpuState)",
+							labels:{
+								move:new StateLabel({name:"(move)",stateName:"move",parent:label}),
+								jump:new StateLabel({name:"(jump)",stateName:"jump",parent:label}),
+								ram:new StateLabel({name:"(ram)",stateName:"lineNumber",parent:label}),
+							}
+						})
+					).toValue("label"),
 					//from this object
 					//`obj.prototype`
 						"prototype":async({label})=>new InternalValue({label,name:"prototype"},"prototype"),
@@ -2813,6 +2826,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			set lineNumber(val){this.label.returnLineNumber=val;}
 			get cpuState(){return this.label.returnCpuState;}
 			set cpuState(val){this.label.returnCpuState=val;}
+		}
+		class StateLabel extends Variable{
+			constructor(data){
+				super();
+				delete this.lineNumber;
+				Object.assign(this,data??{});
+			}
+			stateName;//:'move' | 'jump' | 'lineNumber'
+			parent;//: label
+			get lineNumber(){return this.parent.cpuState?.[this.stateName];}
 		}
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
