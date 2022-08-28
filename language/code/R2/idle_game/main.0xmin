@@ -1,0 +1,41 @@
+#"tptasm";#"table";
+let var(){:this;
+	let found=0;
+	let reg<->0;//`<->` sets the number/pointer part only
+	repeat (found==0 && var.used..length):{
+		repeat (var.used[reg]==0):{
+			#found=1;
+			#var.used[reg]=1;
+			//#var.used..splice(reg,1,{1});
+		};
+		repeat !+found #reg+=1;
+	};
+	repeat (found==1):{
+		#this<->reg;
+	};
+}{
+	let used={repeat 16 0;};
+};
+let del(reg){
+	#var.used..splice(reg,1,{0});
+};
+let const_0=var();
+let cps=var();
+let data{:self;
+	let var(value)={
+		repeat !value:#value=0;
+		def value;
+		set self{def this};
+	};
+	let const(v){#return = var(v)}
+};
+let Buyables(cost,cps)={
+	def let numberOf=0;
+	def let cost=cost;
+	def let cps=cps;
+	#data{def this;};
+}{
+	let prototype=Buyables(10,1);
+	prototype..compile;
+	...let prototype;
+};

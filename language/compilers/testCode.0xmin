@@ -1,11 +1,5 @@
-#"code";
-or input;
-or_input;
-get jump -1;
-get jump;
-get_jump;
-set jump +3;
-set jump;
-set_jump;
-//set jump 4; //ERROR
-//get jump +2; //ERROR
+#"code";#;
+let a;
+(a){
+	debugger !!a;
+}();
