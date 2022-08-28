@@ -1,0 +1,270 @@
+#"len";//#"table";
+let int=#(value)={
+	#constructor{
+		this;
+	};
+	repeat !!value: value;
+	repeat !value: null;
+};
+let const(value)={
+	let found=#();
+	repeat !value: value={null};
+	let i=0;
+	repeat (int..length&&!found): {
+		repeat ( (int[i]..constructor==this..constructor) && (+int[i][0]==+value)): #found=+i;//
+		#i+=1;
+	};
+	#int{
+		this;
+	};
+};
+let MemoryCell(v)={//class
+	repeat !v #v=0;
+	def let value{(v<<2|1)};//:{tag=1;isLower:bool;bit[20]} actual data
+}{
+	let prototype=..this()#{
+		let data=int(1<<2);
+		let isCurrentCell=int(1<<1);//1 if the current cell is ahead of this one
+		let tag = 1;
+	};
+	let set ..prototype{
+		...labelsof prototype;
+	};
+	...labelsof prototype;
+	/*#set ..this()={
+		#set array{
+			this;
+		};
+	};*/
+	0x3fffffff;//#def let startValue;
+	def let array{3;
+		repeat 0 1;
+	};
+	let init(data){
+		set ..this{
+			def:(){
+				let m=MemoryCell;
+			}{
+				...codeof data;
+			}()
+		};
+	};
+};
+let moveToCurrent(direction){:this;
+	repeat(direction==1): {
+		move=>MemoryCell.prototype.isCurrentCell;get;if;
+		move=>MemoryCell.array;
+	};
+	repeat(direction==-1): {
+		if;null;
+		if;
+		$def MemoryCell.prototype.isCurrentCell;
+		get jump-1;if;
+	};
+	def let whileLoop{
+		//assert: if=true
+		and;if;{//if move == 1
+			!jump->whileLoop..return;
+		};
+		let relNextCellPos=direction*MemoryCell.prototype..length;
+		!move relNextCellPos;
+		!jump->whileLoop;
+	};
+	repeat (direction==-1):{
+		//move MemoryCell.prototype..length;
+		$move => MemoryCell.array;
+	};
+};
+let TEST={
+	def let a;
+	jump -0;
+	$debugger a..state.move"label.lineNumber.toString(16)";
+};
+let checkBit{
+	let returnCell;
+	//while (MemoryCell.array[i].isCurrentCell == 0 ) i++;
+	moveToCurrent(1);
+	//assert move=>?
+	{//do: returnCell => alu;
+		get;
+		set jump +3;
+		if;//if true
+		jump 2;
+		null #def returnCell;
+		{
+			if;
+			$def MemoryCell.prototype.isCurrentCell;
+			get jump -1;if;//if true
+		};
+	};
+	moveToCurrent(-1);
+	move=>returnCell;get;if;
+	{//convert null to MemoryCell
+		move=>int({null});xor;
+		move=>int(MemoryCell=());
+		if;jump+2;get;
+		move=>returnCell;get;if;
+	};//----
+	//assert: if->0
+};
+let stateRules{
+	let moveLeft=int(0x100);
+	let moveRight=int(0x200);
+	let flipBit=int(0x400);
+	let nextState_mask=int(0xff);
+	let nextState_shift=int({0 1});
+	let size=int(0x8000);
+};
+let Rule(0b,0l,0r,0s,1b,1l,1r,1s)={//1/0-> left right state
+	//s = state = next rule
+	//rules use all 30 bits. assert: 0s>0 && 1s>0
+	#return=#
+		( (0s*1) | (0l*moveLeft) | (0r*moveRight) | (0b*stateRules.flipBit[0]) ) |
+		( (1s*1) | (1l*moveLeft) | (1r*moveRight) | (1b*stateRules.flipBit[0]) *stateRules.size[0])
+	;
+}{
+	let Pointer(ruleNumber){
+		#return={move ruleNumber}..compile[0];
+	};
+};
+...{:consts;
+	let const_2=int(2);
+};
+let currentRule=int({!move 1});
+let bitNumber=int(MemoryCell.prototype.data[0]);
+let main{
+	"\p00   \p00";
+	checkBit;
+	//assert: if=0
+	let is0,is1;
+	move=>bitNumber;
+	and;
+	move=>is0..state.move;
+	if;jump->is1;jump->is0;
+	//default: is1()
+	let ruleShift=int();{
+		def is1{"1";
+			move=>stateRules.size;
+			get;
+			move=>ruleShift;
+			jump->is0..return;
+		};
+		def is0{"0";
+			move=>int(0x1);
+			get;
+			move=>ruleShift;
+		};
+		set;
+	};
+	{:getRule;
+		move=>currentRule;
+		get;
+		let temp=int();
+		let negative={0 -0};
+		#stateRules..splice(0,0,{negative});
+		move=>negative;
+		set jump +3;
+		xor;
+		set jump +3;
+		null;//move ->stateRules[currentRule];
+		get;
+		null;//move <-stateRules[currentRule];
+		move=>ruleShift;blue;
+	};
+	//asset: alu = rules[currentRule]
+	{
+		let rule=ruleShift;//share memory address
+		delete ruleShift;
+		set;
+		//assert: rule = alu = rules[currentRule]
+		//assert: alu & {@0 0xff} != 0
+		def let doRules{//get next state
+			move=>stateRules.nextState_mask;and;
+			//assert: {@move 0} == {0}
+			move=>stateRules.nextState_shift;red;
+			move=>currentRule;set;
+		}{//flip bit
+			let do_flipBit;
+			move=>rule;get;if;
+			move=>stateRules.flipBit;
+			and;
+			move=>do_flipBit..return..state.move;
+			if;jump->do_flipBit;jump->do_flipBit..return;
+			def do_flipBit{"X";
+				move=>bitNumber;get;
+				move=>checkBit.returnCell;xor;set;
+			};
+		}{
+			let ..this.left_right(direction){//1 -> right, -1 -> left
+				let moveDir={0;$def stateRules.moveRight;$def stateRules.moveLeft}[direction];
+				move=>rule;get;
+				move=>moveDir;if; delete moveDir;
+				let then;
+				def let then.endState;
+				and;if;
+				jump->then;
+				jump->then..return;
+				def then{
+					({0;"+";"-"}[1]);
+					move=>bitNumber;get;
+					move=>const_2;{0;blue;red;}[direction];if;
+					move=>MemoryCell.prototype.data;
+					xor;
+					move=>..state.move;
+					if;jump->..return;
+					{:decrement;//carry to next memory cell
+						let newCellValue;//:MemoryCell
+						move=>checkBit.returnCell;get;
+						move=>newCellValue;set;
+						moveToCurrent(1);
+						//if false
+						if;//assert: [move].isCurrentCell=true;
+						$def MemoryCell.prototype.isCurrentCell;
+						get jump -1;
+						xor;//assert: [move].isCurrentCell=false;
+						set;
+						let moveLen=direction*MemoryCell.prototype..length;
+						move moveLen;//move -MemroyCell.size
+						//assert: [move].isCurrentCell=false;
+						if;if;null#def newCellValue;get jump -1;
+						set;
+						moveToCurrent(-1);
+					};
+					move=>main..state.move;
+					jump->main;//main
+					$move=>endState..state.move;
+				};
+			};
+		}{//left -
+			left_right(-1);
+		}{//right +
+			left_right(1);
+		}{
+			let nextCell;
+			move=>checkBit.returnCell;get;
+			move=>nextCell;set;
+			moveToCurrent(1);
+			//assert if->0
+			if;
+			null#def nextCell;
+			get jump -1;
+			set;
+			moveToCurrent(-1);
+		};
+	};
+	move=>..state.move;
+	jump->..this;//main
+};
+move 0x80;
+$def set main;
+stateRules;
+int;//same as `#def: int;` or `$def set: int;`
+MemoryCell;
+#set stateRules{
+	//   X + - S  X - + S
+	//01 b l/r s  b l/r s
+	Rule(1,0,0,1, 0,0,0,1);
+};
+#MemoryCell{:m;//`#x=2;` -> `#set:x=2;`
+	m(1);
+};

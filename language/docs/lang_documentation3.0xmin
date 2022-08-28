@@ -42,6 +42,7 @@
 	= <=> <->//operator
 	-> <- => <=//assembly operator
 	=> = -> <- //function types
+	:> <: //pipeLineing/external arguments
 	... //concat
 	( ) [ ] { } //brackets
 	"" '' ``; //strings
@@ -61,7 +62,7 @@
 //function calls
 	foo()
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
-	foo(a,b) ::c ::{...d} ::e ::f //same function call, just with some external arguments
+	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
 	foo(bar(baz)); or 
 //object declarations
 	{}
@@ -105,7 +106,7 @@
 {//e.g.
 	#;//void #;
 	let a;//#let: a;
-	a=2;//#def set: a = 2;
+	a=2;//#set: a = 2;
 	@;//void @;
 	a;//@a;
 }//the default phase affects the nearest scope (weak scope).
@@ -159,11 +160,20 @@
 		//pointer commands
 			move;jump;
 		//misc commands
-			set;if;
+			set;//writes the accumilator's (aka 'alu') value to the memory under the 'move' pointer
+			if;//if an operation did not fail (i.e. would not of had result '0') since the last time the 'if' command was used, then do nothing this cycle; otherwise set the 'if' flag to 0 and run the 'null' command next cycle. aka: 'if' command has the structure: 'condision;if;then;else;'
+			
+			//special commands
+				set jump +3;//writes the 'alu's value to the line 3 ahead of the 'jump' pointer.
+				get jump -1;//reads the previous command to the 'alu'. Note that the '-1' is a bit missleading as if the last command was a 'jump 10' command, then it would return that 'jump 10' command even though it is not on the 'x-1'th line.
+				or input;//does 'alu=alu|input' where input is the input port (keyboard) from the R216K2A terminal.
 	
 		//alu commands
 			get;nor;red;blue;and;or;xor;
 		
+		//all commands (exept for the 3 special ones) use this structure
+		command address sign;
+
 		//e.g.
 		jump 4 0;
 		//compiles to:
@@ -187,6 +197,8 @@
 			move=>labelName; //move #(+labelName);
 			move=>labelName; //move 0;
 		//
+		//tip: in general, always use '->' with 'jump', and use '=>' with 'move'
+		jump->labelName;move=>labelName;
 	};
 };
 $;{
@@ -228,7 +240,7 @@ starter line:{
 			1;
 			2;
 			3;
-			let item4=0;//this line is included in the array
+			let item4=0;//this line is included in the array //update: this is not included
 			4 #def item 4;
 		};//array5..length=5
 		e.g. 2
@@ -306,20 +318,43 @@ virtual;{
 	move +2; //move => move+2;
 	null;
 }
-//can use '@: !command;' to ignore state checking
-//'!command;' can be used for variables/constants e.g. can be used in function calls
-!jump -> 2;
-{//example of use
-	$jump=> a;
-	$jump->b;//state check a->b
-	$jump=> 0;
-	!jump a->b;
-};
-{//e.g.
-	$move=>0xmin;
-	!jump -> 2;//ignores state checking and compiles as normal
-	move +2; //move => move+2;
-	null;
+{!jump -> 2;
+	//can use '@: !command;' to ignore state checking
+	//can use '!jump' or '!move'
+	//'!command;' can be used for variables/constants e.g. can be used (in the 0xmin-emulator) to store return addresses in assembly function calls
+	{//example of use
+		$jump=> a;
+		$jump->b;//state check a->b
+		$jump=> 0;
+		!jump a->b;
+	};
+	{//e.g. without '!'
+		$move=>0xmin;
+		jump -> 2;//The state checker throws an error Error: 'cpuState miss-match'.
+		move +2; //move => move+2;
+		null;
+	};
+	{//e.g. with '!' command
+		$move=>0xmin;
+		!jump -> 2;//ignores state checking and compiles as normal 'jump -> 2'
+		move +2; //move => move+2;
+		null;
+	};
+	{//the '!' command can also be used with the 'move' command so it doesn't change the cpuState.
+		//e.g.
+		$move=>0xmin;
+		jump -> 2;
+		!move +2;//doesn't change the move pointer so does not throw an error.
+		null;
+	}
+	{//In practice the '!' modifyer is used to store commands as a variables, as it can do this without changing cpuState
+		//e.g.
+		jump 2;
+		def let jump10Lines = {!jump 10};
+		move=>jump10Lines;get;
+		move=>2;set;
+		null;//:jump command used here
+	}
 };
 $set foo->bar;//'->', aka the `to` operator, returns 'bar - foo'.
 $set move=>label;//'=>', aka the `set to` operator, is similar to '->' exept it sets the memory location of  foo to bar, at ($) compile time
@@ -335,7 +370,7 @@ move->move 2;//does not change
 	};
 	types;{
 		':' operator;
-		'foo : bar' operator would enforce the restriction 'bar' onto 'foo';
+		'foo : bar' operator would enforce the restriction 'bar' onto 'foo'; //similar to typescript
 		where: foo is any Value and bar is a function or just a value;
 		syntacticly: foo is a long expression and bar is a expression that matches up to a '¬' or '='
 		1+1:2+2 ¬# = 2; compiles to: (((1+1) : (2+2)) ¬) = 2;
@@ -349,7 +384,7 @@ move->move 2;//does not change
 		let foo:Int = 2;
 		let bar:Int = "a";//throws error
 	};
-	pipeLine;{
+	pipeLine;{//IS_NOW_IMPLEMENTED
 		':>' operator
 		let foo(a,b,c){
 			;

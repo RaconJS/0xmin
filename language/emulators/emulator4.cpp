@@ -569,8 +569,9 @@ class NumberDisplay{
 				case 9:ans=get_jump;break;//'get jump -1'
 				case 10:ans=a|input;break;//'or input'
 				case 11:set_bray=alu;break;//'set'
-				case 12:blocker=!aluif;aluif=!aluif;break;//if 
+				case 12:blocker=!aluif;aluif=!aluif;break;//'if' 
 				case 13:set_jump=alu;break;//'set jump +3'
+				//case 14:break;//'null'
 			}
 			//note: with the 'if' command. is run as: 'if;"then";"else/finally";' can be used as: if;jump->then; jump->else
 			//	'if;' means 'if there has been a operation that did not equal 0, from the last if statement; then continue as normal; other wise ignore the next line of code."

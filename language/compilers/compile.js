@@ -5,12 +5,14 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: add 'break.name'
+//TODO: add 'break.name'. DONE
 //TODO: #add '$void'
 //TODO: $detect circular label definisions (more or less done done)
 //TODO: #@make language definitions less BODGED and more formal
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
 //TODO: @0xmin: add support for long jumps
+//TODO: allow "->" "=>" operators (that return a HiddenLine) inside expression_short
+//TODO: BUG: fix char line numbers
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -624,7 +626,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	};
 	const contexts={
 		//simple
-			charSetMap:{
+			charSetMap:{//TODO: finish this list
 				"┘":0xdf,
 				"└":0xe0,
 				"┐":0xe1,
@@ -889,6 +891,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(["name", "property"].includes(value.refType)){
 								const newLabel=new Variable({name:value.name});
 								let labelParent=value.refType=="name"?scope.let.label:value.parent;
+								if(labelParent)//BODGED TODO: add refType to callFunction, or make a better default refType for Values.
 								if(!["="].includes(statement[index])){//'let a;' ==> makes default label;
 									if(metaState["set"]){
 										labelParent.labels[value.name]??=newLabel;
@@ -918,7 +921,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							//scope.label.code.push(value.label);
 							value.label.defs.push(scope.parent.label);
 						}else{
-							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name?.toString?.()+"' is undefined"));
+							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name?.toString?.()+"' is undeclared"));
 						}
 					}
 					word=statement[index];
@@ -988,7 +991,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			async main_assembly_expression_short({statement,index,scope,startValue=undefined}){//Value=>Value|HiddenLine
 				let word=statement[index];//'label' ==> 'label+1' or 'label => label+2'
 				let value;
-				let hadStartValue=!!startValue;
+				let hadStartValue=startValue!=undefined;
 				if(word=="["){//UNFINISHED: needs to be redone
 					index++;
 					let newScope=new Scope({fromName:"main_assembly_argument",parent:scope,code:statement[index]});
@@ -998,10 +1001,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}else{
 					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
 				}
-				startValue=value??startValue;
+				//startValue=value??startValue;
 				if(!hadStartValue && startValue!=value){
+					console.error(startValue,value)
+					
 					throw Error("compiler error: the values must be the same in 'jump jump->x;' and different in 'jump->x;'"
-						+"this can break the cpuState checker"
+						+"this can break the cpuState checker"//TODO: remember why this is, and fix it if need be.
 					);
 				}
 				word=statement[index];
@@ -1021,6 +1026,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							:"label or pointer undeclared"
 						))
 					}
+					if(operator[1]==undefined)throw Error(throwError({index,statement,scope},"$","'"+operator.operator+"' needs 2 arguments. e.g. 'a->b'"))
 					const hiddenLine=new HiddenLine.SetLabelOrPointer({operator,scope});
 					value=hiddenLine;
 					//'[a, -> [], b]' => '[a, -> [b]]'
@@ -1077,7 +1083,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						useInstruction=true;
 					}
 					else if(value.type=="string"){
-						codeObj.code.push(...Variable.fromValue(value).code);
+						codeObj.code.push(...Variable.fromValue(value,scope).code);
 						useInstruction=false;
 					}
 					else if(value.type=="array"){
@@ -1094,14 +1100,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						//'set jump +3' --> 'set jump' --> 'set_jump'
 						let subCommand;
 						let jumpModes={"get":"-1","set":"+3"};
-						if((subCommand=value.name.match(/^(?:get|set)$/)) && statement[index] == "jump"){
+						if((subCommand=value.name?.match?.(/^(?:get|set)$/)) && statement[index] == "jump"){
 							subCommand=subCommand[0];
 							value.name=subCommand+"_jump";
 							index++;
 							let number;
 							({index,value:number}=contexts.number({index,statement,scope}));
 							//set jump +3
-							if(number != undefined && number!=+jumpModes[subCommand]){loga(number,subCommand)
+							if(number != undefined && number!=+jumpModes[subCommand]){
 								throw Error(throwError({statement,index,scope},"@syntax","expected: '"+subCommand+" jump "+jumpModes[subCommand]+"'. Could also use: '"+subCommand+" jump' or '"+subCommand+"_jump'"));
 							}
 						}
@@ -1247,6 +1253,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							argsObj.list.push(value);
 							//argsObj.obj[value.name]=value.label;
 						}
+						else{//'foo(());'
+							argsObj.list.push(undefined);
+						}
 					}
 				}else throw Error("compiler error: contexts.arguments() starts at '('")
 				//'<:{}' => block argument
@@ -1389,7 +1398,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								else if(newVal instanceof AssemblyLine){
 									let code=newVal;
 									let number=(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
-									value=new Value({type:"label",label:new Variable({type:"number",lineNumber:number,name:"["+name+"]",code:[code]})})
+									value.type="label";
+									value.label=new Variable({type:"number",lineNumber:number,name:"["+name+"]",code:[code]});
 									//
 								}
 								else value.label=
@@ -1629,20 +1639,25 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					let value;//don't need to do `index++` here
 					({value,index}=await contexts.expression({statement,index,scope,includeBrackets:false}));
 					//value??=new Value();
-					if(firstArg instanceof Value){
+					{
 						if(assignmentType==undefined&&word=="="){//evals 'a = b'
 							//let doAssignMent=0||firstArg.parent.labels.hasOwnProperty(firstArg.name);
+							let isNotNull=firstArg instanceof Value;
 							let newLabel;{
 								//mutation
-								newLabel=Variable.fromValue(value);
+								newLabel=isNotNull?Variable.fromValue(value):undefined;
 							}
 							if(firstArg.type=="label"&&firstArg.parent){
 								//overwrites variable 'a.b=2;' or 'a=2;'
 								//refType:'property' | 'array' | 'name' | 'internal' | 'symbol'
-								if(firstArg.refType=="array")firstArg.parent.code[firstArg.number]=newLabel;//
+								if(firstArg.refType=="array"){
+									//if(isNotNull&&(firstArg.type=="label"?firstArg.label:true))//stop assinging to undecleared labels.
+										firstArg.parent.code[firstArg.number]=newLabel;
+										if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
+								}
 								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
 								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel;
-								value=newLabel?.toValue?.("label")??new Value();
+								value=isNotNull?newLabel?.toValue?.("label")??new Value():undefined;
 							}else{
 								//sets properties of existing variable
 								if(firstArg.type=="label"){
@@ -1654,30 +1669,32 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							args.push(value);
 						}
 						else if(word=="<=>"||word=="<->"){
-							if(firstArg.type=="label"&&firstArg.label){//label:Variable
-								let label=firstArg.label//firstArg.parent.labels[firstArg.name];
-								if(word=="<=>"){//set object
-									switch (value.type){
-										case"label"://object,array,function
-											label.labels={...(value.label?.labels??{})};
-											label.code=[...(value.label?.code??[])];
-											label.parameters=value.label?.parameters??[];
-											label.callType=value.label?.callType??"";
+							if(firstArg instanceof Value){
+								if(firstArg.type=="label"&&firstArg.label){//label:Variable
+									let label=firstArg.label//firstArg.parent.labels[firstArg.name];
+									if(word=="<=>"){//set object
+										switch (value.type){
+											case"label"://object,array,function
+												label.labels={...(value.label?.labels??{})};
+												label.code=[...(value.label?.code??[])];
+												label.parameters=value.label?.parameters??[];
+												label.callType=value.label?.callType??"";
+												break;
+											case"array":
+											label.code=[...value.array];
 											break;
-										case"array":
-										label.code=[...value.array];
-										break;
-										case"string":
-										label.code=[...value.array];
-										break;
+											case"string":
+											label.code=[...value.array];
+											break;
+										}
+									}
+									else if(word=="<->"){//set number
+										label.lineNumber=value?value.toNumber().number:undefined;
 									}
 								}
-								else if(word=="<->"){//set number
-									label.lineNumber=value?value.toNumber().number:undefined;
-								}
+								//UNFINISHED: needs code for array assignment
+								args.push(firstArg);
 							}
-							//UNFINISHED: needs code for array assignment
-							args.push(firstArg);
 						}
 					}
 					break;
@@ -1766,6 +1783,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						this.collectCode(lineObj,codeQueue);
 						codeQueue.push(new HiddenLine.DefineReturn({label:lineObj,scope:lineObj.scope}));
 					}
+					else if(lineObj == undefined){
+						//TODO: work out what this should do
+						//silent error. can be caused by 'def let a,a[2]=1;'
+						//codeQueue.push(this.nullValue);
+					}
 				}
 				variable.isSearched=false;
 				return codeQueue;
@@ -1776,27 +1798,29 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
 				if(!(label instanceof Variable))throw Error("compiler type error");
 				let lastFails=codeQueue.length+1;
+				let lastChanges=0;
 				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
 				const assemblyCode=new MachineCode();
 				let passed=0;//has done a curtain number of reps
-				passed=true;//ISTESTING
+				passed=false;//ISTESTING
 				for(let i=0;i<codeQueue.length;i++){
-					let fails=0;
+					let fails=0,changes=0;
 					let failList=[];//{i;instruction;failed}[]
 					cpuState.setValues(startingCpuState);
 					for(let i=0;i<codeQueue.length;i++){
 						const instruction=codeQueue[i];
 						let failed=false;//failed:bool|error|string; can contain part of error message
+						let changed=false;
 						if(instruction instanceof HiddenLine){
 							///@mutates: cpuState,label;
-							({failed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,label,assemblyCode}));
+							({failed,changed}=await this.evalHiddenLine({instruction,cpuState,code:codeQueue,label,assemblyCode}));
 						}
 						else if(instruction instanceof AssemblyLine){
 							if(cpuState.virtualLevel<=0)assemblyCode.code[cpuState.lineNumber]=instruction;
 							instruction.cpuState=new CpuState(cpuState);
 							///@mutates: instruction,cpuState;
-							({failed}=await this.compileAssemblyLine({instruction,assemblyCode,cpuState,code:codeQueue}));
+							({failed,changed}=await this.compileAssemblyLine({instruction,assemblyCode,cpuState,code:codeQueue}));
 							instruction.cpuStateAfter=new CpuState(cpuState);
 						}
 						//if(isNaN(cpuState.move+cpuState.jump)){fails??=Error("cpuState is NaN");break;}
@@ -1804,10 +1828,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							fails++;
 							failList.push({i,instruction,failed});
 						}
+						if(changed)changes++;
 						if(this.assembly.language=="0xmin"){
 							cpuState.move=Math.max(0,cpuState.move);
 							cpuState.jump=Math.max(0,cpuState.jump);
 						}
+					}
+					if(changes!=0){
+						fails++;
+						//failList.push({i,instruction,failed});
 					}
 					if(fails==0&&i>=0&&passed>0)break;
 					else if(fails==0)passed++;
@@ -1853,8 +1882,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								binaryArg=(arg<0||1/arg==-Infinity)?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
 								binaryValue|=binaryArg;
 								instruction.moveBy=arg|0;//Math.min(Math.max(arg|0??0,-0xff),0xff);
-								if(instruction.args[0]?.name=="move"){//'move+5;' ==> 'move=>move+5';
-									if(!(instruction.args[1] instanceof HiddenLine)){
+								if(instruction.args[0]?.name=="move"&&instruction.hasChecks){//'move+5;' ==> 'move=>move+5;' where as '!move+5;' ==> 'move->move+5;'
+									if(!(instruction.args[1] instanceof HiddenLine)){//HiddenLines can update the cpuState themselves
 										cpuState.move+=instruction.moveBy;
 									}
 								}
@@ -1953,7 +1982,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							assemblyCompiler.compileAssemblyLine=(...args)=>assembler.tptasm.compileAssemblyLine(...args);
 							assemblyCompiler.assembly.instructionSet={...assembler.tptasm.operators,...assembler.tptasm.otherKeywords,};
 							//assemblyCompiler.nullValue.asmValue="dw 0";
-						}
+						}break;
 						default:
 						{//empty instruction set '#"int";'
 							//this.pointers[name="jump"]=new Pointer(name);
@@ -1974,7 +2003,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(!(value instanceof Value))throw Error("compiler type error:");
 				/// value:number|Value
 				if(value.type=="number")
-					return Variable.fromValue(value,scope);
+					return Variable.fromValue(value,scope);//+cpuState.lineNumber;
 				else if(value.type=="label"){
 					let pointer=this.assembly.pointers[value.name]?.getState?.(cpuState);
 					return pointer&&value.refType=="name"?pointer:value.label;
@@ -1986,15 +2015,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(instruction.type=="command"
 						&&instruction.args.length>=2
 						&&instruction.args[0]?.name=="jump"
-						&&instruction.hasChecks
+						&&instruction.hasChecks//ignores '!jump -> x'
 						&&(instruction.args[1] instanceof HiddenLine.SetLabelOrPointer?
-							instruction.args[1].operator?.[0]!=instruction.args[0]//does not check:'jump jump->label;' statements
+							true//instruction.args[1].operator?.[0]!=instruction.args[0]//does not check:'jump jump->label;' statements
 							:true
 						)
 					){
 						let address2=instruction.moveBy+instruction.cpuState.jump;
 						let cpuState2=assemblyCode.code[address2]?.cpuState;
-						if(!cpuState2){//allows jumping to unknown cpuStates
+						if(!cpuState2){//handles jumping to unknown cpuStates //used to say 'allows jumping to ...'
 							if(0)return {failed:Error("could not find cpuState of location:"+address2)};
 							else return {failed:false};
 						}
@@ -2367,7 +2396,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								let addAddress=0;
 								if(this.operator[2]){//'$jump->label+1;'
 									args[2]=assemblyCompiler.findPointerOrLabel(this.operator[2],cpuState,this.scope);
-									addAddress=args[2]?.lineNumber??0;
+									addAddress=(args[2]?.lineNumber??0);
 								}
 								newLineNumber=args[1].lineNumber+addAddress;
 							}
@@ -2507,10 +2536,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					labels:{},
 					code:[]
 				});
+				for(let param of this.parameters){
+					//parem:Parameter
+					argsObj.labels[param.name]=null;
+				}
 				for(let i=0;i<args.list.length;i++){
 					let label=Variable.fromValue(args.list[i]);
 					if(i<this.parameters.length){
-						argsObj.labels[this.parameters[i].name]=label;
+						argsObj.labels[this.parameters[i].name]=label??null;
 					}
 					argsObj.code.push(label);
 				}
@@ -2566,9 +2599,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					middleLabel.labels["arguments"]=argsObj;
 					middleLabel.labels["constructor"]=argsObj;
 					middleLabel.labels[globalScope.symbol]=middleLabel;
-					Object.assign(middleLabel.labels,argsObj.labels);
 					middleLabel.labels["this"]=callingValue.parent??scope.var.label;
 					middleLabel.labels["return"]=returnObj;
+					Object.assign(middleLabel.labels,argsObj.labels);
 					newLabel.labels["caller"]??=scope.label;
 				}
 				for(let codeScope of codeBlock){
@@ -2644,7 +2677,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//	return new Variable({name:"<(array)>",code:value.array});
 				if(value?.type=="string")
 					return valueStringToArray(value,scope);
-				return new Variable({name:"(undefined)",});
+				//return new Variable({name:"(undefined)",});
 			}
 		}
 		//Internal
@@ -2840,6 +2873,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			constructor(label,data={}){
 				super(data);this.label=label;
 				delete this.lineNumber;
+				delete this.cpuState;
 			}
 			label;//:Variable
 			get lineNumber(){return this.label.returnLineNumber;}
@@ -2970,7 +3004,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//parent;
 		}
 		class Language{//TODO: put languages in separate files
-			static langs={};//{langName:Language}
+			static langs=[];//{langName:Language}
 			static currentLang;//:Language
 			pointers=[];//:String[]
 			parse=({statement,index,scope})=>{}
@@ -3137,12 +3171,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//+"  ram:"+v.cpu[0]
 					+" jump:"+v.cpu[1]
 					+" move:"+v.cpu[2]
-					+" cmd:"+oxminDisassembler(v.value)
+					+" cmd:"+oxminDisassembler(v.value)+" ".repeat(Math.max(0,"set jump +3;".length-(oxminDisassembler(v.value)+"").length))
 				:assemblyCompiler.assembly.language=="tptasm"?
 					" asm:"+v.asm
 				:""
 			)
-			+";"
+			+(assemblyCompiler.assembly.language=="tptasm"?";":"")
 			+" src:"+decToStr(v.sourceLineNumber,(Math.log10(highestSourceLineNumber)|0)+1)+"| "+v.line
 		).join("\n")
 	;

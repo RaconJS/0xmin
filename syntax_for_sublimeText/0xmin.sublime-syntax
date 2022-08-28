@@ -418,7 +418,7 @@ contexts:
         2: keyword.control
     - match: '\b(?:var|const|let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
-    - match: '\b(?:this|constructor|return|arguments|caller|continue|break)\b'
+    - match: '\b(?:this|constructor|return|arguments|caller)\b'
       scope: variable.parameter
     - match: '{{assembly_registers}}'
       scope: keyword.control.register.0xmin
@@ -450,7 +450,7 @@ contexts:
   parameters:
     - match: '{{labelName}}'
       scope: variable.parameter
-    - match: '\)'
+    - match: '\)\s*'
       pop: true
       push: functionType
     - include: brackets_expression
