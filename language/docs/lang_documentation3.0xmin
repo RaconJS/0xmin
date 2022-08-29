@@ -91,7 +91,14 @@
 						label from => to
 					#let set def://meta phase; '#def x;' == '$undef def set x;'
 						label=foo({})+4
+					delete label1, label2
+					delete //remove all labels from this scope
+					import this "fileName.0xmin"
+					import lib "libraryName.0xmin"
+					import main "fileName.0xmin"
+					... let set def labelsof codeof run://inject code, similar to import and object extending
 ;
+@ $ # void virtual static recur repeat//start of line
 //note: ':'s,'@$#'s are optional but are recomended as a best practice.
 //Phases symbols can be infered, prioritising the '@' phase over '#' where possible.
 //It is highly recommended to use phase symbols for consistancy.
@@ -288,7 +295,9 @@ delete;{
 	}
 };
 virtual;{
-	allows for running code in different places
+	code inside a virtual line acts like normal code with a few differences that affects the $ and @ phase;
+	assembly inside virtual is not included in the final binary file. At the end of the virtual line, the cpu state is reset to how it was before the line;
+	allows for running code in different places;
 	used for struct pointers;
 	e.g.:{
 		let SomeStructure(){
@@ -299,12 +308,12 @@ virtual;{
 			def let intB;
 			4;
 		};
+		let pointer=SomeStructure=();
+		virtual def pointer;
 		def let someCode{//some code with the same structure as 
 			"a";"b";
 			1;2;
-		}
-		let pointer=SomeStructure=();
-		virtual def pointer;
+		};
 		//We want 'pointer' and it's properties to have the same cpuStates as 'someCode'
 		//without using 'virtual' we could use ..compile() and 
 	};
@@ -373,7 +382,7 @@ move->move 2;//does not change
 		'foo : bar' operator would enforce the restriction 'bar' onto 'foo'; //similar to typescript
 		where: foo is any Value and bar is a function or just a value;
 		syntacticly: foo is a long expression and bar is a expression that matches up to a '¬' or '='
-		1+1:2+2 ¬# = 2; compiles to: (((1+1) : (2+2)) ¬) = 2;
+		1+1:2+2 ¬ = 2; compiles to: (((1+1) : (2+2)) ¬) = 2;
 		e.g.
 		let label:condisions=2;//spl
 		can make "type" objects
@@ -391,7 +400,21 @@ move->move 2;//does not change
 		};
 		let a,b,c;
 		a:>b:>foo(c);
-	}
+	};
+	objectExtending using ::;{
+		'::' operator
+		#let: foo(a,b,c){
+			...doStuff;
+		};
+		#set: foo :: (){
+			...doMoreStuff;
+		} :: (){
+			...doEvenMoreStuff;
+		};
+		This can already be done by adding an unnamed function or object at the end of a long expression,
+		e.g. in 'foo(){...stuff}' '(){...stuff}' is the extension function, that adds onto the end of the 'foo' object.
+		Currently '#obj{...}{...};' can be done to extend an object. This would be changed to '#obj{}::{};'
+	};
 	new,var,const;{
 		new, var, const would be an inbuilt version of the Data object;
 		{
@@ -439,5 +462,5 @@ move->move 2;//does not change
 				@move=>10#const;
 			};
 		};
-	}
-}
+	};
+};
