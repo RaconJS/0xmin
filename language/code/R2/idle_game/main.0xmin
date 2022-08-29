@@ -1,4 +1,4 @@
-#"tptasm";#"table";
+#"tptasm";#"len";//#"table";
 let var(){:this;
 	let found=0;
 	let reg<->0;//`<->` sets the number/pointer part only
@@ -14,28 +14,110 @@ let var(){:this;
 		#this<->reg;
 	};
 }{
+	let usedTypes{
+		def let null;//0:empty
+		def let var;//1:variable
+		def let const;//2:constant
+		def let static;//3:variable that has an infinite lifetime
+	};
 	let used={repeat 16 0;};
 };
 let del(reg){
 	#var.used..splice(reg,1,{0});
 };
+let blockScope(block){
+	#let startState<=>var.used;
+	block();
+	//#set var.used<=>startState;
+	let i=-1;
+	repeat var.used..length {#;
+		repeat (var.used[i+=1]<2):var.used[i]=startState[i];
+	};
+};
 let const_0=var();
 let cps=var();
 let data{:self;
 	let var(value)={
-		repeat !value:#value=0;
+		repeat (arguments..length==0):#value=0;
 		def value;
 		set self{def this};
 	};
 	let const(v){#return = var(v)}
 };
-let Buyables(cost,cps)={
-	def let numberOf=0;
+let printStr(string){
+	let i=-1;
+	repeat string..length:send %const_0 #(string[i+=1]);
+};
+let String(str)={
+	#data.var(this);
+	printStr(str);
+	return;
+};
+let getInput(out){
+	blockScope()<:()=>{{:this;
+		let const_0=const(0);
+		%const_0=0;
+		wait %const_0;
+		jump this..return if sign;
+		bump %const_0;
+		recv %out %const_0#def let waitToRecover;
+		jump->waitToRecover if !carry;
+	}};
+};
+let Buyables(cost,cps,max,info)={//data:{let description:#"";let name:#"";}
+	//repeat !numberOf #set numberOf=0;
 	def let cost=cost;
 	def let cps=cps;
-	#data{def this;};
+	def let max;
+	def let numberOf;
+	repeat !constructor.isNotActive:...(){
+		#{def info.desc};//throw error if info.desc is undeclared
+		let name=String=(info.name);//name:@[char{}]
+		@:#(name);
+		let description=String=(info.desc);
+		@:#(description);
+	};
+	//#data{def this;};
+}{:this;
+	let isNotActive;
+	let prototype=this(10,1);
+	#prototype..compile;
+	//...let prototype;
+	let cast(variable){//cast label to this type
+		let prototype=this(...args);
+		virtual ...(){
+			ram=>variable;
+			...prototype;
+		};
+	};
+
+	delete isNotActive;
+}{let item<=>Buyables;#Buyables..splice(0,1);
+	def item(-1,0,10,{let name="ask", desc="ask for a paperclip";});
+	def item(-1,0,10,{let name="ask1", desc="ask for a paperclip";});
+	def item(-1,0,10,{let name="ask2", desc="ask for a paperclip";});
+	def item(-1,0,10,{let name="ask3", desc="ask for a paperclip";});
 }{
-	let prototype=Buyables(10,1);
-	prototype..compile;
-	...let prototype;
 };
+let i=-1;
+repeat {#i+=1;@(Buyables..length)}[1]:{
+
+};
+
+let main{
+	let i=0;
+	printStr("\p00");
+	repeat Buyables..length:{
+		printStr("0"+i...":");
+		call #(Buyables[i].name);
+		//repeat (i!=#(Buyables..length-1)):
+		//printStr("\n");
+		//call #(Buyables[i].description);
+		printStr("\n");
+		#i+=1;
+	};
+	hault;
+};
+def main;
+def Buyables;
+def data;
