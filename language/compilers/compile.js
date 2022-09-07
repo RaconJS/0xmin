@@ -533,19 +533,25 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				if(args.length>1){args.splice(1,0,",");}
 				if(!operator){
+					//args[0][0]:Value
 					let dataMask=0xffff;
 					operator="dw";
-					if(args.length==1&&args[0][0].type=="string"&&args[0][0].array.length>0){
-						let instruction=[];//new Variable({name:"(string)"});
-						for(let char of args[0][0].array){
-							instruction.push(new AssemblyLine({scope,type:"data",dataType:"char",args:[operator,(valueCharToNumber(char,true)&dataMask)+""]}));
+					if(args.length==1){
+						if(args[0][0].type=="string"&&args[0][0].array.length>0){
+							let instruction=[];//new Variable({name:"(string)"});
+							for(let char of args[0][0].array){
+								let newLine=new AssemblyLine({scope,type:"data",dataType:"char",args:[operator,(valueCharToNumber(char,true)&dataMask)+""]});
+								newLine.dataValue=+newLine.args[1];
+								instruction.push(newLine);
+							}
+							return {index,instruction,isArray:true};
 						}
-						return {index,instruction,isArray:true};
-					}
-					else{
-						instruction.type="data";
-						instruction.dataType="number";
-					}
+						else{
+							instruction.type="data";
+							instruction.dataType="number";
+							instruction.dataValue=args[0][0].number;//:number
+						}
+					}else throw Error(throwError({statement,index,scope},"#/@ syntax","invallid assembly line: expected a string, a number or a command."));
 				}
 				else{
 					for(let i in optionals){//optionals[number]:string & symbol
@@ -605,7 +611,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				{
 					tptasmString=args
-						.map((v,i)=>{v=this.getArg(v);failed||=(v!==v);return v+["", " "][+(i==0)]})
+						.map((v,i)=>{
+							let v1=this.getArg(v);
+							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name:v)+"' is undefined"):false;
+							return v1+["", " "][+(i==0)]
+						})
 						.flat()
 						.join("")
 						.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
@@ -713,6 +723,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}
 					}
 				}
+				//TODO: 'virtual': allow the: 'virtual...(){  }' paturn to work
+				let virtualLine;
+				if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
 				commands:{
 					word=statement[index];
 					if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
@@ -800,8 +813,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							({index}=await contexts.main_importFile({statement,index,scope,phase:state.phase}));
 						}
 					}{
-						let virtualLine;
-						if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
 						if(statement[index]=="{"){
 							index++;
 							newScope.label.code.push(
@@ -832,10 +843,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}
 						else if(!wasUsed&&(state.phase||state.void)){//set default phase '#;' '$;' '@;' 'void;'
 							scope.defaultPhase=state.phase;
-					}
-						if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
+						}
 					}
 				}
+				if(state.virtual)newScope.label.code.push(new HiddenLine.Void(virtualLine,{scope:newScope}));
 			}
 			if(0){
 				statement.recur--;
@@ -888,14 +899,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						let value;
 						({value,index}=await contexts.expression_short({statement,index,scope}));
 						if(value){
-							if(["name", "property"].includes(value.refType)){
+							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
+							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
 								const newLabel=new Variable({name:value.name});
-								let labelParent=value.refType=="name"?scope.let.label:value.parent;
+								let labelParent=["name"].includes(value.refType)?scope.let.label:value.parent;
 								if(labelParent)//BODGED TODO: add refType to callFunction, or make a better default refType for Values.
-								if(!["="].includes(statement[index])){//'let a;' ==> makes default label;
-									if(metaState["set"]){
+								if(statement[index]!="="&&statement[index+1]!="("){//'let a;' ==> makes default label;
+									if(metaState["set"]){//'let set a.b;' ==> `a.b??={};` 
+										//'let set a;' ==> only creates 'a' if it doesn't already exist
 										labelParent.labels[value.name]??=newLabel;
-									}else{
+									}else{//let a;
 										labelParent.labels[value.name]=newLabel;
 									}
 								}
@@ -1077,6 +1090,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						instruction=new AssemblyLine({
 							type:"data",
 							dataType:"number",
+							dataValue:value.number,
 							args:[value.number],
 							scope,
 						});
@@ -1266,7 +1280,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//'<:{}' => block argument
 				for(let i=0;i<statement.length&&index<statement.length;i++){
 					if("@$#".includes(statement[index])){index++;break;}
-					if(statement[index]!="<:")break;
+					if(statement[index]!="<:"){
+						break;
+					}
 					index++;
 					let value;
 					({value,index}=await contexts.expression_short({index,statement,scope}));
@@ -1384,8 +1400,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					if(shouldEval)if(parent){
 						if(isInternal){//'a..b';
-							const label=getInternals(value,{index,statement,scope}).labels[name];//internal object
-							if(label)({value}=await label.callFunction({args:undefined,value,scope,statement}));
+							if(name=="constructor")name="construtor_";//javascript did not like having 'constructor' as a normal property
+							const labels=getInternals(value,{index,statement,scope}).labels;
+							const label=labels[name];//?:internal object
+							if(labels.hasOwnProperty(name))({value}=await label.callFunction({args:undefined,value,scope,statement}));
+							else{
+								throw Error(throwError({index,statement,scope},"# keyword","'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
+							}
 						}//'a.b'
 						else {
 							if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
@@ -1401,10 +1422,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								}
 								else if(newVal instanceof AssemblyLine){
 									let code=newVal;
-									let number=(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
+									let number=code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 									value.type="label";
-									value.label=new Variable({type:"number",lineNumber:number,name:"["+name+"]",code:[code]});
-									//
+									let type= code.dataType=="char"?"string":"number";
+									value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
 								}
 								else value.label=
 									newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
@@ -1520,6 +1541,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"-":(value)=>value?-value.toType("number"):new Value.Number(NaN),
 			"~":(v)=>new Value.Number(~v?.number),
 			"!":(v)=>{v??=new Value();let ans=v.toBool();ans.number=!ans.number;return ans;},
+			"¬":(v)=>{//:Value
+				v=new Value(v??{});
+				if(v.type=="label"){
+					v.refType="symbol";
+					return v;
+				}
+				else {
+					return v.toType("label");//TODO: unsure about this mechanic
+				}
+			},
 			//"...":(v)=>new Value.Number(~v.number),
 		},
 		operators:{
@@ -1554,6 +1585,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 
 			"...":{do({args,hasEquals}){//(args:mut Value[],bool)=>void, mutates args
 				//concat operator
+				//'"a"...{1;"b"}' ==> `"a"+"\x01"+"b"` : 'string...label'
+				//'"a"...14' ==> `"a" + "14"` : 'string...number'
+				//'"a"..."b"' ==> `"a" + "b"` : 'string...string'
+				//if left argument is not a string then both arguments are converted into labels and it returns: '{...codeof a;...codeof b}'
 				let arg1=args.pop();
 				let arg0=args.pop();
 				if(arg0){//'a...b' 2 args
@@ -1582,14 +1617,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//no args -> silent error
 				}
 			}},
-			"¬":{do({args,hasEquals}){//'¬a' to symbol/object UNFINISHED
-				//e.g. 'a[¬b]'
-				let rightArg=args.pop();//
-				if(rightArg){
-					rightArg.refType="symbol";//UNUSED
-					args.push(rightArg);
-				}
-			}},
+			//note: ¬ is done inside the expression function and in left_operators
 		},
 		truthy(value){//(Value)=>bool
 			"use strict";
@@ -2242,8 +2270,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(value.type=="number"){string=""+value.number}
 				else if(value.type=="label"){if(value.label)string=value.label.code.reduce((s,v)=>{
 					if(v instanceof AssemblyLine)
-					if(v.dataType=="char")s+=String.fromCharCode(+v.args[1]);
-					else if(v.dataType=="number")s+=String.fromCharCode(+v.args[0])
+					if(v.dataType=="char")s+=String.fromCharCode(v.dataValue|0);
+					else if(v.dataType=="number")s+=String.fromCharCode(v.dataValue|0)
 					return s;
 				},"");}
 				else if(value.type=="string")string=value.string;
@@ -2308,6 +2336,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			args=[];//:(Value|HiddenLine|number)[];
 			binaryValue=undefined;//:number
 			dataType=undefined;//?: 'number' | 'char'; optional used with e.g.'String.char(5)' in '"text";'
+			dataValue=undefined;//?:number
 			get command(){throw Error("compiler error:@ command is obsilete")};//
 			get data(){throw Error("compiler error:@ data is obsilete")};
 			cpuStateAfter;//:CpuState; the cpuState after this line is run;
@@ -2552,7 +2581,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					argsObj.code.push(label);
 				}
 				let codeBlock=this.getCode();//new code instance
-				const newLabel=new Variable({name:"<"+this.name+">"});
+				const newLabel=new Variable({name:"<"+this.name+">",functionConstructor:this});
 				const middleLabel=new Variable({name:"(function vars)"});
 				const middleScope=new Scope({//allows function to use arguments without them being part of the instance object
 					label:middleLabel,
@@ -2673,7 +2702,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						type:"number",
 						name:"["+value.number+"]",
 						lineNumber:value.number,
-						code:[new AssemblyLine({type:"data",dataType:"number",args:[value.number],scope})],//TODO: allow tptasm Assembly lines 'dw value.number'
+						code:[new AssemblyLine({type:"data",dataType:"number",dataValue:value.number,args:[value.number],scope})],//TODO: allow tptasm Assembly lines 'dw value.number'
 						//scope:new Scope({fromName:"Variable.fromValue",parent:scope,code:new bracketClassMap["{"]([""+value.number,";"])}),
 					});
 				}
@@ -2742,7 +2771,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
 					"length":async({label})=>new Value.Number(label.code.length),
 					"code":async({label})=>new Variable({name:"(..code)",//BODGED
-						code:label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""}))),
+						code:[...label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""})))],
 					}).toValue("label"),
 					"splice":new BuiltinFunctionFunction("splice",async({label,args,value})=>{
 						args[0]??=new Value.Number(0);
@@ -2750,7 +2779,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						args[2]??=new Variable().toValue("label");
 						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
 						if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
-						let code=label.code.splice(args[0],args[1],...args[2])
+						let code=label.code.splice(args[0],args[1],...args[2]);
 						return new Variable({name:"<{splice}>",code}).toValue("label");
 					}),
 					"array":async({label})=>new Variable({name:"(..array)",code:label.code}).toValue("label"),
@@ -2793,7 +2822,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						"supertype":async({label})=>new InternalValue({label,name:"supertype"},"supertype"),
 					//from parent function
 					//`obj.constructor`
-					"construtor":async({label})=>new InternalValue({label,name:"construtor"},"functionConstructor"),
+					"construtor_":async({label})=>new InternalValue({label,name:"construtor"},"functionConstructor"),
 						"proto":async({label})=>new InternalValue({label,name:"proto"},"functionPrototype"),
 						"super":async({label})=>new InternalValue({label,name:"super"},"functionSupertype"),
 					//other
@@ -2861,17 +2890,19 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			return join?ary[0]|ary[1]:outputAsBinary()?ary:["dw", "0x"+((ary[0]|ary[1])&0xffff).toString(16)];
 		}
 		function valueStringToArray(value,scope){
-			if(value?.type=="string")
-			return new Variable({
-				name:"<(string)>",
-				type:"string",
-				code:(value.array??value.string.split("")).map(v=>new AssemblyLine({
-					type:"data",
-					dataType:"char",
-					args:valueCharToNumber(v),
-					scope,
-				}))
-			});
+			if(value?.type=="string"){
+				return new Variable({
+					name:"<(string)>",
+					type:"string",
+					code:(value.array??value.string.split("")).map(v=>new AssemblyLine({
+						type:"data",
+						dataType:"char",
+						dataValue:valueCharToNumber(v,true)&0xffff,//BODGED: only works for the R2 terminal
+						args:valueCharToNumber(v),//:[v] or ["dw",v]
+						scope,
+					}))
+				});
+			}
 		}
 		class Return extends Variable{
 			type="return";

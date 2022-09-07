@@ -1,6 +1,6 @@
-#set 0xmin.settings.language("tptasm");#set 0xmin.settings.log_table=1;
-def let a=1,b=2,oper;//a:%,b:%,c:%
 //instruction set (2nd attempt)
+#"tptasm";#"table";
+def let a=1,b=2,oper;//a:%,b:%,c:%
 a;//db a
 a = b;//mov a,b
 a &= b !store;//and/ands a,b ;note: the '!store, +carry etc..' bits are optional

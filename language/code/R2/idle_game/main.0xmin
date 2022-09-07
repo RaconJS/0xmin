@@ -1,114 +1,281 @@
 #"tptasm";#"len";//#"table";
-let var(){:this;
-	let found=0;
-	let reg<->0;//`<->` sets the number/pointer part only
-	repeat (found==0 && var.used..length):{
-		repeat (var.used[reg]==0):{
-			#found=1;
-			#var.used[reg]=1;
-			//#var.used..splice(reg,1,{1});
+...(){
+	let Register;
+	let: var = Register(){:this;
+		#this..proto=Register;
+		let found=0;
+		let reg<->0;//`<->` sets the number/pointer part only
+		repeat (found==0 && var.used..length):{
+			repeat (var.used[reg]==0):{
+				#found=1;
+				#var.used[reg]=1;
+				//#var.used..splice(reg,1,{1});
+			};
+			repeat !+found #reg+=1;
 		};
-		repeat !+found #reg+=1;
+		repeat (found==1):{
+			#this<->reg;
+		};repeat (found==0):{
+			def:
+				{}["error: out of registers"];
+		};
+	}{
+		let prototype{
+			let ..this[¬Register];
+		};
+		let usedTypes{
+			def let null;//0:empty
+			def let var;//1:variable
+			def let const;//2:constant
+			def let static;//3:variable that has an infinite lifetime
+		};
+		let used={repeat 16 0;};
+		let clear(){
+			let i=0;
+			repeat used..length{
+				#used[i]={0};
+				#i+=1;
+			}
+		};
 	};
-	repeat (found==1):{
-		#this<->reg;
+	let del(reg){
+		#var.used[reg]=0;
 	};
-}{
-	let usedTypes{
-		def let null;//0:empty
-		def let var;//1:variable
-		def let const;//2:constant
-		def let static;//3:variable that has an infinite lifetime
+	let blockScope(block){
+		#let startState<=>var.used;
+		#block=block();
+		//#set var.used<=>startState;
+		let i=0;
+		repeat startState..length {#;
+			repeat (var.used[i]<2):#var.used[i]=startState[i];
+			#i+=1;
+		};
+		delete i,startState;
+		...let set block;
 	};
-	let used={repeat 16 0;};
+	let data{:self;
+		let var(value)={
+			repeat (arguments..length==0):#value=0;
+			def value;
+			set self{def this};
+		};
+		let const(v){#return = var(v)};
+		let codeBlock{#..proto=data;}
+	};
+	let printStr(string){
+		let i=-1;
+		repeat string..length:send %const_0 #(string[i+=1]);
+	};
+	let String(str)={
+		#set constructor{this};
+		printStr(str);
+		return;
+	};
+
+	let getInput(out,wait,idleAnimation){//@(%out,#bool)->out
+		let temp=out;
+		%out=0;
+		repeat !idleAnimation:let set idleAnimation;//?
+		blockScope()<:()=>{def:{:this;
+			//let const_0=const(0);
+			//%const_0=0;
+			def idleAnimation;
+			wait %temp;
+			repeat +wait: jump this if sign;
+			repeat !+wait:jump this..return if sign;
+			bump %const_0;
+			#def let waitToRecover{
+				recv %out %const_0;
+			};
+			jump->waitToRecover if !carry;
+		}};
+	};
+	let waitForKeyPressed(){
+		:loop;
+		let isPressed=var();
+		wait r isPressed;
+		jump->loop if sign;
+		del(isPressed);
+	};
+	let repeater(amount,block)={
+		repeat (amount[¬Register]):r i=r amount;
+		repeat (!amount[¬Register]):r i=amount;
+		def let loop;
+		def block;
+		r i-=1;
+		jump->loop if>0;
+		del(i);
+	}{
+	#set ..prototype{let i=var();}
+	};
+	let printHex(reg)={
+		blockScope()<:(){
+			repeater (16/4)<:{
+				r hexValue = 0;
+				r reg <<<= 4;
+				r hexValue <<= 4 + internal;
+				send r const_0 [printHex.charSet + r hexValue];
+			};
+		};
+	}{
+		let charSet=data.var("0123456789ABCDEF");
+		#set ..prototype{let hexValue=var()};
+	};
+	let ItoS(int){//int to string
+		let string = "" ... +int;//'"" ... 4' --> '"4"'
+		#return = string;
+	};
+	let switch(reg){//(reg,...{value;...then},default)
+		let switch=..constructor;
+		#let ifEqualTo(reg,value,then)={//#(%reg,#value:int,then{@})->void
+			%reg^=#(constructor.mask^value);
+			#constructor.mask=value;
+			jump->then if==0;
+		}{let mask=0};
+		#let cases<=>arguments;
+		#set cases..splice(0,1);//the 'set' is not needed but makes code clearer
+		#let default=cases..splice(-1,1);
+		#let i=0;
+		:this;
+		let break;
+
+		delete this;
+		repeat cases..length:{
+			#let then<=>cases[i];
+			#let value=then..splice(0,1)[0];
+			#def ifEqualTo(reg,value,then);
+			#set data.codeBlock.var()<:{
+				def then;
+				jump->break;
+			};
+			#i+=1;
+		};
+		def default;
+		def break;
+	};
+	let const_0=var();
 };
-let del(reg){
-	#var.used..splice(reg,1,{0});
-};
-let blockScope(block){
-	#let startState<=>var.used;
-	block();
-	//#set var.used<=>startState;
-	let i=-1;
-	repeat var.used..length {#;
-		repeat (var.used[i+=1]<2):var.used[i]=startState[i];
-	};
-};
-let const_0=var();
 let cps=var();
-let data{:self;
-	let var(value)={
-		repeat (arguments..length==0):#value=0;
-		def value;
-		set self{def this};
-	};
-	let const(v){#return = var(v)}
-};
-let printStr(string){
-	let i=-1;
-	repeat string..length:send %const_0 #(string[i+=1]);
-};
-let String(str)={
-	#data.var(this);
-	printStr(str);
-	return;
-};
-let getInput(out){
-	blockScope()<:()=>{{:this;
-		let const_0=const(0);
-		%const_0=0;
-		wait %const_0;
-		jump this..return if sign;
-		bump %const_0;
-		recv %out %const_0#def let waitToRecover;
-		jump->waitToRecover if !carry;
-	}};
-};
-let Buyables(cost,cps,max,info)={//data:{let description:#"";let name:#"";}
+let clips{repeat 1 var()};
+let Buyables(cost,cps,numberOf,max,info)={//data:{let description:#"";let name:#"";}
 	//repeat !numberOf #set numberOf=0;
 	def let cost=cost;
 	def let cps=cps;
-	def let max;
-	def let numberOf;
+	def let numberOf=numberOf;
+	def let max=max;
+	virtual {
+		0 #def let this.name;
+		0 #def let this.description;
+	};
 	repeat !constructor.isNotActive:...(){
-		#{def info.desc};//throw error if info.desc is undeclared
+		#:{def info.desc};//throw error if info.desc is undeclared
 		let name=String=(info.name);//name:@[char{}]
 		@:#(name);
 		let description=String=(info.desc);
 		@:#(description);
+		#constructor.generateStrings(cost,cps,description);
 	};
+	repeat 2 null;
+	#;
 	//#data{def this;};
 }{:this;
 	let isNotActive;
-	let prototype=this(10,1);
+	let prototype=this(10,1,0,10);
 	#prototype..compile;
 	//...let prototype;
-	let cast(variable){//cast label to this type
+	let cast(variable){//type cast label into this type
 		let prototype=this(...args);
-		virtual ...(){
+		virtual {...(){
 			ram=>variable;
 			...prototype;
+		}};
+	};
+	#:{
+		let col="\c0e";
+		let strings{String("\n"...col..." ");String("$\c0f,"...col..."cps:");String("\c0f");};
+		let this.generateStrings(cost,cps,description){
+			#description..splice(-1,1,{
+				call #(strings[0]);
+				printStr(""...+cost);
+				call #(strings[1]);
+				printStr(""...+cps);
+				call #(strings[2]);
+				return;
+			});
 		};
 	};
-
 	delete isNotActive;
 }{let item<=>Buyables;#Buyables..splice(0,1);
-	def item(-1,0,10,{let name="ask", desc="ask for a paperclip";});
-	def item(-1,0,10,{let name="ask1", desc="ask for a paperclip";});
-	def item(-1,0,10,{let name="ask2", desc="ask for a paperclip";});
-	def item(-1,0,10,{let name="ask3", desc="ask for a paperclip";});
-}{
+	def item(-1,0,1,10,{let name="ask", desc="Ask your for a paperclip;";});
+	def item(1,10,0,10,{let name="email bot", desc="Set up an email bot;";});
+	def item(-1,0,0,10,{let name="null", desc="coming soon";});
+	def item(-1,0,0,10,{let name="null", desc="coming soon";});
 };
 let i=-1;
 repeat {#i+=1;@(Buyables..length)}[1]:{
 
 };
-
+let clearScreen=String(
+	{
+		"\p00";
+		let str=" ";
+		repeat 6 #str={repeat 2 ...set str;};//(2**4) * (2**2) * 3 = 12 * 16
+		repeat 3 ...set str;
+		//repeat 12 repeat 16 " "
+	}
+);
+//let clearScreen=String({"\p00";repeat 12 repeat 16 " "});
+let clearLines(length){
+	repeat !length:call clearScreen;
+	repeat (length>=0&&length<=12):
+	let line;//:address
+	#clearLines.functions{
+		def#(){#line<->#(clearScreen+1+(16*(clearScreen[0]..length/16-length)));}
+	};
+	call line;
+}{let functions;};
 let main{
+	let start;
+	let gainClips()={
+		call gainClips;
+		//call constructor.drawClips;
+		printStr(constructor.gotoNumber1);
+		printHex(clips[0]);
+		printStr("\p00");
+	}{:this;
+		#data.var(this);
+		r #(clips[0])+=r cps;
+		return;
+		let starterString=String("\c0b\pB1$:\pB8cps:\c0f");//"\pYX"
+		let gotoNumber1="\pB3";//5 - "c:0x"..length
+		let gotoNumber2="\pBC";
+		let drawAmount;
+		def let drawClips=data.codeBlock.var()<:{//updateNumber
+			printStr(gotoNumber1);
+			printHex(clips[0]);
+			printStr(gotoNumber2);
+			printHex(cps);
+			printStr("\p00");
+			return;
+		};
+		let showClips(){//start
+			call starterString;
+			call drawClips;
+		};
+		#set clearScreen..splice(-1,1);
+		#clearScreen[0]..splice(-16,16);
+		#set clearScreen{
+			call drawClips;
+			return;
+		};
+	};
+	gainClips.showClips();
+	call start;
+	def start;
 	let i=0;
 	printStr("\p00");
 	repeat Buyables..length:{
-		printStr("0"+i...":");
+		printStr("["...(i+1)..."]:");
 		call #(Buyables[i].name);
 		//repeat (i!=#(Buyables..length-1)):
 		//printStr("\n");
@@ -116,8 +283,172 @@ let main{
 		printStr("\n");
 		#i+=1;
 	};
-	hault;
+	let in=var();
+	def let waitForValidInput=getInput(in,1,gainClips());
+	let buyItem(itemNumberChar){//itemNumber:r Char
+		blockScope()<:()=>{
+			let printAmount(){
+				let amount=var();
+				r amount = [r buyable + Buyables.prototype.numberOf];
+				printStr("\namount:");//x/y
+				printHex(amount);
+				r amount = [r buyable + Buyables.prototype.max];
+				printStr("/");
+				printHex(amount);
+				del(amount);
+			};
+			printStr("\p00");
+			clearLines(Buyables..length);
+			printStr("\p00");
+			{
+				let itemName=itemNumberChar;//:register aka 'r' aka '%'
+				{
+					printStr("[");
+					send r const_0 r itemName;
+					printStr("]:");
+				};
+			};
+			let itemNumber=itemNumberChar;
+			repeat (+itemNumber!=+itemNumberChar):
+				r itemNumber = r itemNumberChar;
+			r itemNumber -= "1";
+			let buyable = var();
+			r buyable = r itemNumber;
+			r buyable<<=3;//assert:Buyables.prototype..length==2**3;
+			r buyable+=Buyables;
+			#let name=var();
+			r name=[r buyable+Buyables.prototype.name];//name:r String*
+			call r name;
+			printStr("\n");
+			printAmount();
+			printStr("\n- ");
+			r name=[r buyable + Buyables.prototype.description];
+			call r name;
+			#del(name);
+			#del(itemNumber);
+			#del(itemNumberChar);
+			printStr("\n");
+			printStr("\nbuy[b]");
+			printStr("\nsell[s]");
+			printStr("\ncancel[c]");
+			let in=var();
+			def let loop;
+			getInput(in,1);
+			printStr("\p00");
+			call clearScreen;
+			//clearLines(2);
+			printStr("\p00");
+			//assert buyable:r Buyable*
+			del(in);
+			switch(in)
+				<:{
+					"b";
+					blockScope()<:(){//try buy
+						let hasEnough=var();
+						let then,fail,fail2;
+						r hasEnough = r #(clips[0]);
+						r hasEnough -= [r buyable + Buyables.prototype.cost];
+						if < 0 jump -> fail;
+						let nextAmount=var();
+						r nextAmount = [r buyable + Buyables.prototype.numberOf];
+						r nextAmount += 1;
+						let tooMany=var();
+						r tooMany = [r buyable + Buyables.prototype.max]; 
+						r tooMany -= r nextAmount;
+						if < 0 jump -> fail2;
+						def then{
+							let newAmount=hasEnough;
+							r #(clips[0]) = r hasEnough;
+							r cps += [r buyable + Buyables.prototype.cps];
+							[r buyable + Buyables.prototype.numberOf] = r nextAmount;
+							printStr("buying...");
+							call gainClips.drawClips;//gainClips();
+						};
+						jump->fail2..return;
+						def fail{
+							printStr("not enough clips");
+						};
+						jump->fail2..return;
+						def fail2{
+							printStr("maximun reached");
+						};
+						del(hasEnough);
+						del(nextAmount);
+					}
+				}<:{
+					"s";
+					blockScope()<:(){//try sell
+						let canSell=var();
+						r canSell = [r buyable + Buyables.prototype.numberOf];
+						r canSell -=1;
+						let then,fail;
+						jump->fail if <0;
+						def then{//then sell1
+							[r buyable + Buyables.prototype.numberOf]=r canSell;
+							r cps -=[r buyable + Buyables.prototype.cps];
+							r #(clips[0])+=[r buyable + Buyables.prototype.cost];
+							call gainClips.drawClips;
+							printStr("sold");
+						};
+						def fail{//can't sell
+							printStr("don't have any to sell");
+						};
+					}
+				}<:{
+					"c";
+					blockScope()<:(){//go back
+						printStr("CANSEL");
+						printStr("??");
+					}
+				}<:{
+					jump->loop;
+				}
+			;
+			{
+				let string2="\n\c0APress any key to continue.\c0f";
+				#string2=string2...{repeat (32-(string2..length%16))" "};
+				printStr(string2);
+				waitForKeyPressed();
+				bump r const_0;
+				printStr("\p00");
+				call clearScreen;
+				return;
+			};
+			delete loop;
+		};
+		del(itemNumberChar);
+	};
+	blockScope()<:(){//if Buyables..length>=input>"0" ==> range:["1",Buyables..length]
+		let temp=var();
+		r temp = r in;
+		r temp -= "0";
+		del(temp);
+		jump->buyItem..return if<=0;//fail if temp<="0"
+		r temp -= #(Buyables..length);
+		jump->buyItem..return if>0;//fail if temp>Buyables..length
+	};
+	def set buyItem<=>buyItem(in);
+	jump->waitForValidInput;
+};
+//registors
+debugger var.used"label.code.map(v=>0|v.lineNumber).join('')";
+{
+	call main#def let start;
+	jump-> start;
 };
 def main;
-def Buyables;
-def data;
+def data{
+0x31111111;
+	def Buyables;
+	def codeBlock;
+	def String;
+};
+:global;
+#{
+	#global..compile;
+	let i=0;
+	repeat clearLines.functions..length{
+		#clearLines.functions[i]();
+		#i+=1;
+	};
+};

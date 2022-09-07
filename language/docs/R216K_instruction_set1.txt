@@ -58,7 +58,7 @@ jump -> a if>0;//ja a; all 28 jump commands; I have a list of all the conditions
 null;
 a>>=b;
 a<<=b;
-a>>-=b;//chain shift
+a>>-=b;//chain shift == shift and insert lost bits from last instruction
 a-<<=b;
 a>>>=b;
 a <- bump; port a -> "\a";//

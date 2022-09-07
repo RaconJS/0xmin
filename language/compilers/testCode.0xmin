@@ -1,6 +1,5 @@
-#"code";#;
-let a;
-(a){
+#"table";
+let a(a){
 	debugger !!a;
-}()<:2;
-debugger "null==undefined";
+};
+#def set a(2);
