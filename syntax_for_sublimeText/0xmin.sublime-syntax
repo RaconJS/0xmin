@@ -422,6 +422,8 @@ contexts:
       scope: keyword.control.register.0xmin
     - match: '{{assembly_commands}}'
       scope: support.constant
+    - match: '(?<=[^\s\n;(\[{])\s*[@$#]\s*(?=[(\[{])'
+      scope: source.definiteBracket.0xmin
     - match: '\#;|#'
     #  push: main_meta
       scope: support.constant.meta.0xmin
