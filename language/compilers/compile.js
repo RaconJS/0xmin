@@ -260,16 +260,17 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.is2Args=is2Args;
 			}
 			static equality(value1,value2){//:bool
-				value1=value1.toType(value2.type);
+				value1=value1?.toType?.(value2.type);
 				return this.strictEquality(value1,value2);
 			}
 			static strictEquality(value1,value2){//:bool
-				if(value1.type!=value2.type)return false;
-				switch(value1.type){
-					case"number":return value1.number===value2.number;break;
-					case"string":return value1.string===value2.string;break;
-					case"label":return value1.label===value2.label;break;
-					case"array":return value1.array===value2.array;break;
+				if(value1?.type!=value2?.type)return false;
+				switch(value1?.type){
+					case undefined:return value1===value2||(isNaN(value1)&&isNaN(value2));break;
+					case"number":return value1?.number===value2?.number;break;
+					case"string":return value1?.string===value2?.string;break;
+					case"label":return value1?.label===value2?.label;break;
+					case"array":return value1?.array===value2?.array;break;
 					default: return false;
 				}
 			}
@@ -458,7 +459,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					index++;
 					arg.push("r");
 				}else if(this.registers.hasOwnProperty(statement[index])){
-					arg.push(statement[index++]);
+					arg.push(this.registers[statement[index++]]);
 					return {index};
 				}
 				if(this.otherKeywords.hasOwnProperty(statement[index])){
@@ -611,14 +612,18 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				{
 					tptasmString=args
-						.map((v,i)=>{
+						.map((v,i,a)=>{
 							let v1=this.getArg(v);
+							if(!isNaN(+v1)&&a[i-1]!="r"){
+								v1="0x"+(0x1fffffff&v1).toString(16);
+							}
 							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name:v)+"' is undefined"):false;
 							return v1+["", " "][+(i==0)]
 						})
 						.flat()
 						.join("")
 						.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
+						
 						//.map(v=>v==","?"":v)
 						//.join(",")//:string
 						//.replaceAll("%,", "r")//registers
@@ -744,6 +749,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							let repeatingIndex=index;
 							for(let i=0;i<maxReps;i++){
 								maxReps=Math.min(maxReps,await calcReps());
+								if(i>=maxReps)break;
 								await contexts.main({statement,index:repeatingIndex,scope});
 							}
 							break commands;
@@ -754,6 +760,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								statement.maxRecur=maxRecur;
 							}
 							if(statement[index]==":")index++;
+							await contexts.main({statement,index,scope});
+							break commands;
 							//await contexts.main({statement,index,scope});
 							//break commands;
 						}
@@ -828,7 +836,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									const isInInstructionSet=assemblyCompiler.assembly.instructionSet.hasOwnProperty(word);
 									if(["let", "def", "set"].includes(word)&&!isInInstructionSet)
 										state.phase="#";
-									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]/)&&!isInInstructionSet))
+									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]|::/)&&!isInInstructionSet))
 										state.phase="$";
 									else state.phase="@";
 								}
@@ -906,7 +914,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								if(labelParent)//BODGED TODO: add refType to callFunction, or make a better default refType for Values.
 								if(statement[index]!="="&&statement[index+1]!="("){//'let a;' ==> makes default label;
 									if(metaState["set"]){//'let set a.b;' ==> `a.b??={};` 
-										//'let set a;' ==> only creates 'a' if it doesn't already exist
+										//'let set a;' ==> only creates 'a' if it doesn't already exist in this scope
 										labelParent.labels[value.name]??=newLabel;
 									}else{//let a;
 										labelParent.labels[value.name]=newLabel;
@@ -1250,7 +1258,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}if(endingStringList.includes(statement[index]))failed=true;
 			return {index,failed:failed??index>=statement.length};
 		},
-		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined}){
+		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true}){
 			//'(a, b, c) <:{} <:{}'
 			//always includes brackets
 			argsObj??={//:ArgsObj
@@ -1272,6 +1280,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(statement[index]=="("){
 					const argBlock=statement[index+1];
 					index+=3;
+					if(shouldEval)
 					for(const statement of argBlock){
 						let {value,index}=await contexts.expression({index:0,statement,scope,includeBrackets:false});
 						addArg(value);
@@ -1285,7 +1294,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					index++;
 					let value;
-					({value,index}=await contexts.expression_short({index,statement,scope}));
+					({value,index}=await contexts.expression_short({index,statement,scope,shouldEval}));
 					addArg(value);
 				}
 			}
@@ -1450,7 +1459,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						index++;
 					}
 					//'foo=>()=>{}' ==> 'foo => #()=>{}'let argsObj;
-					({index,argsObj}=await contexts.arguments({index,statement,scope,callType,argsObj}));
+					({index,argsObj}=await contexts.arguments({index,statement,scope,callType,argsObj,shouldEval}));
+					if(shouldEval)
 					if(value.type=="label"&&value.label!=undefined){
 						({value}=await value.label.callFunction({args:argsObj,value,scope,callType,statement}));
 					}
@@ -1573,15 +1583,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			">":new Operator_numeric((a,b)=>a>b),
 			"<":new Operator_numeric((a,b)=>a<b),
 
-			"==":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.equality(v1,v2))),
-			"!=":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
-			"===":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
-			"!==":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
+			"==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.equality(v1,v2))),
+			"!=":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
+			"===":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
+			"!==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
 			//"!":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!b2)),
 
-			"&&":new Operator_bool(v=>v,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
-			"||":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v1:v2),
-			"^^":new Operator_bool(v=>!v,(b1,b2,v1,v2)=>b1?v2:b2?new Value.Number(0):v2),//xor
+			"&&":new Operator_bool(b=>b,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
+			"||":new Operator_bool(b=>!b,(b1,b2,v1,v2)=>b1?v1:v2),
+			"^^":new Operator_bool(b=>true,(b1,b2,v1,v2)=>b1?b2?new Value.Number(0):v1:b2?v2:new Value.Number(0)),//xor
 
 			"...":{do({args,hasEquals}){//(args:mut Value[],bool)=>void, mutates args
 				//concat operator
@@ -1599,7 +1609,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						ans=new Value({
 							type:"string",
 							array:[...arg0.array,...arg1.array],
-							string:arg0.string+arg1.string,
+							string:arg0.string+(arg1.string??""),
 						});
 						break;
 						default://ans:Value<label>
@@ -1733,7 +1743,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				//'foo(){}' or 'obj{}' extend function or object
 				else if(word=="::"){//extend object 'foo(){}::{}'
-
+					index++;
+					let startValue=args[args.length-1];
+					if(!startValue)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }'"));
+					if(({index,value}=await contexts.delcareFunctionOrObject({
+						index,statement,scope,
+						startValue,shouldEval
+					})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected: 'label :: { }' or 'label :: (){}'"));
 				}
 				else if(args.length>0&&!({index,value}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
 					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope}));
@@ -2122,7 +2138,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			if(word=="debugger"){//debugger name "label";
 				if(statement[index]=="debugger")index++;//if done in '#' phase
 				if(statement[index]==":")index++;//if done in '#' phase
-				word=statement[index];
+				word=statement[index]||"";
 				if(!inputValue)if(!word.match(stringRegex)){//'debugger' =>  'debugger name' optional argument;
 					let value;
 					({value,index}=await contexts.expression_short({index,statement,scope}));
@@ -2547,7 +2563,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
 				this.code.reduce((s,v)=>{
-					///code: Variable ?? CodeLine|FunctionScope
+					///v: Variable ?? CodeLine|FunctionScope
 					if(v instanceof Scope)s.push(v);//pushes :FunctionScope
 					else if(v instanceof Variable)s.push(...v.getCode?.(n+1));//pushes :...FunctionScope|code tree
 					//else if(v instanceof CodeLine)s.push(v.code);
@@ -2607,7 +2623,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					middleLabel.labels["constructor"]=this;
 					Object.assign(middleLabel.labels,argsObj.labels);
 					break;//pure, unpure, 
-					case"=>"://arrow function
+					case"=>"://arrow function, has no special labels
 					instanceScope.let=instanceScope;
 					Object.assign(middleLabel.labels,argsObj.labels);
 					break;
@@ -2623,7 +2639,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					newLabel.labels["scope"]??=scope.label;
 					break;
 					case"->"://'weak(){}' impure function
-					instanceScope.let=scope.let;
+					instanceScope.let=scope.let;//takes the scope of the caller
 					instanceScope.var=scope.var;
 					middleLabel.parent=middleLabel;//instanceScope;
 					break;
@@ -2689,6 +2705,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			class String extends Variable{
 				constructor(string,data){
 					"use strict";
+					super();
 					let newObj=new Value({type:"string",string}).toType("label");
 					Object.assign(newObj,data??{});
 				}
@@ -2706,7 +2723,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						//scope:new Scope({fromName:"Variable.fromValue",parent:scope,code:new bracketClassMap["{"]([""+value.number,";"])}),
 					});
 				}
-				//if(value?.type=="array")//instance of built-in array
+				if(value?.type=="array"){//instance of built-in array
+					//only for arrays of strings
+					//only works when value.array:string[]
+					return new Variable({
+						type:"array",
+						name:"("+value.name+")",
+						code:value.array.map(v=>new Value({type:"string",string:v}).toType("label").label),
+					})
+				}
 				//	return new Variable({name:"<(array)>",code:value.array});
 				if(value?.type=="string")
 					return valueStringToArray(value,scope);
@@ -2770,7 +2795,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					///(Variable)=>Value
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
 					"length":async({label})=>new Value.Number(label.code.length),
-					"code":async({label})=>new Variable({name:"(..code)",//BODGED
+					"code":async({label})=>new Variable({name:"(..code)",//BODGED //extract all the function blocks from a label
 						code:[...label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""})))],
 					}).toValue("label"),
 					"splice":new BuiltinFunctionFunction("splice",async({label,args,value})=>{

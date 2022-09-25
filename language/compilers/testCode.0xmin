@@ -1,5 +1,19 @@
-#"table";
-let a(a){
-	debugger !!a;
+#"tptasm";#"table";
+add [2- 10];
+
+//new syntax: the return of '::'
+let a={
+	1;2
+}::{
+	3;
+	let a=5;
+}::(){
+	0x11;
+	0x22;
+	0x33
 };
-#def set a(2);
+a;//{1;2;3}
+@:#(a..length);//4
+a.a;//5
+a();//{0x11;0x22;0x33}
+#::
