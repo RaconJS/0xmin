@@ -40,7 +40,7 @@ variables:
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|len)' #'!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|->|<-|=)'
   inbuiltProperties: '\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf|asNumber|state)\b'
-
+  oxminFunctions: '\b(?:language|model|log_(?:code|table|length))\b'
   line_start_endLinePart: ':|(?=\S)'
 contexts:
   main:
@@ -362,8 +362,12 @@ contexts:
 #old simple parser
   mainScope:
     - include: baseMain
-    - match: \b(0xmin|0bmin)\b
-      scope: variable.language.0xminObject.0xmin
+    - match: \b(0xmin|0bmin)(?:\s*\.\s*({{oxminFunctions}}))?\b
+      captures:
+        1: variable.language.0xminObject.0xmin
+        2: support.constant.builtin.0xmin
+    #- match: \b(0xmin|0bmin)\b
+    #  scope: variable.language.0xminObject.0xmin
     - match: '(\.\.\.)((?:\s*\b(?:let|set|def|codeof|labelsof|run)\b)*)'
       captures:
         1: keyword.inject.0xmin
@@ -512,8 +516,8 @@ contexts:
         2: keyword.ZASM_A.0xmin
         3: entity.name.hidden.ZASM_S.0xmin
         4: support.constant.ZASM_M.0xmin
-    - match: \b(0xmin|0bmin)\b
-      scope: variable.language.0xminObject.0xmin
+    #- match: \b(0xmin|0bmin)
+    #  scope: variable.language.0xminObject.0xmin
     #- match: ()["'`]
     #  scope: punctuation.definition.string.begin.0xmin
     - match: \"

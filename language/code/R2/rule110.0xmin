@@ -1,3 +1,33 @@
-let rule110{//@function
-	
+#"tptasm";
+#"table";debugger (+()|0)"value";
+let rule110{//:{@}
+	let Cell(value,type,isEnd)={
+		repeat ((+type||0)==0):
+		def let value: (value*1|isEnd.mask*(arguments.isEnd||0));
+	}{
+		let ..prototype{
+			let isEnd={let mask=0x8000;let end=1;};
+			{
+				let
+				let ..this.setValue(){
+
+				};
+			};
+			let value={let mask=0x0fff;};
+			#..this..compile;
+			#..this<=>{...let ..this};
+		};
+	};
+	let Cell1(white,black)={//:Cell[2]
+	};
+	let list{repeat 10 Cell=(0,0,0);Cell=(0,0,1);};
+	def let forEachCell(block){
+		//block:#(cell:r Cell*)->{@}
+		let cell=0;
+		r cell = list;
+
+	};
+	forEachCell()<:(cell){
+
+	};
 };

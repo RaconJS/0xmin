@@ -1,5 +1,6 @@
+#"0xmin";//30bit rule110
 //import "adder.0xmin";
-import lib "io.0xmin";//spares 4 words of memory for us used by periferals e.g. keyboard and screen.
+//import lib "io.0xmin";//spares 4 words of memory for us used by periferals e.g. keyboard and screen.
 "hello world\n";//print("hello world");
 let Data()={
 	delete;
@@ -148,7 +149,7 @@ let displayBits(value){
 		};//assert if == false
 		move=>temp;set;
 	};
-	"\n";
+	//"\n";
 };
 let show=displayBits(last);
 let forever(do)={
@@ -158,12 +159,18 @@ let forever(do)={
 	move=>state;
 	jump->..this;
 };
-def main;
+def let set main;
 def forever()<:{
-	move=>last;get;
-	move=>io.output;set;
-	def show;
-	def doStep;
+	repeat 0:{//note: I have no idea what this line did.
+		move=>last;get;
+		repeat io: {move=>io.output;set;};
+		repeat !io: {set jump +3;null;null;null;};
+	};
+	"\p00";
+	loop(12)<:{
+		def show;
+		def doStep;
+	};
 };
 jump 0;
 //rule110

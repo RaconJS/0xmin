@@ -89,7 +89,7 @@
 					jump label1 => label2//assembly phase; '=>' sets value, '->' just evaluates it.
 					$undef set def://hidden/secret phase;
 						label from => to
-					#let set def://meta phase; '#def x;' == '$undef def set x;'
+					#let set def://meta phase; '#def: x;' == '$undef def set: x;'
 						label=foo({})+4
 					delete label1, label2
 					delete //remove all labels from this scope
@@ -102,7 +102,7 @@
 //note: ':'s,'@$#'s are optional but are recomended as a best practice.
 //Phases symbols can be infered, prioritising the '@' phase over '#' where possible.
 //It is highly recommended to use phase symbols for consistancy.
-// ':' can be used to allow keywords to be seen as variable names
+://':' can be used to allow keywords to be seen as variable names
 //e.g.
 	#let: let=2;//makes a variable called 'let';
 //instead of
@@ -190,8 +190,8 @@
 	};
 	//can also use 'a to b' aka 'a -> b' syntax
 	{
-		#let labelName;//created a variable/label called 'labelName' in the 'meta' ('#') phase;
-		$def labelName->0xmin 5;//then in the memory assignment ('$') phase it sets labelName's memory address to 5;
+		#let: labelName;//created a variable/label called 'labelName' in the 'meta' ('#') phase;
+		$def: labelName->0xmin 5;//then in the memory assignment ('$') phase it sets labelName's memory address to 5;
 		//labels can be 
 		jump->labelName;//jumps to labelName
 		move=>labelName;//moves to labelName
@@ -218,16 +218,24 @@ $;{
 	#let: label;/*creates a label. Can add this to the block scope e.g.*/ let label=0; /* or to the parent object e.g.*/ let object.label=2;
 	//if a label exists it will replace it. labels can not be created through expressions like in javascript*/
 	/*e.g.*/#set: object.newProperty=2;/*will not do anything*/  
-		
+	
+	#let set: label;//creates a new label if it does not already exist in this scope.
+	#let set: label.property;//only creates a new property if it does not exist.
+	#let set: a=b;//'let set' can be used for expressions just like and '#' operator
 
+	#set:// is used for assigning values to existing labels.
+	/*e.g*/#let: label;#set:label=2;
+	/*note: because*/ #def: /*also can be used to assign values,*/#def set:/*is exactly the same as*/#def:
+	/*combinind 'let' and 'set' has its own special case as shown previously.
 	intended use:
 	#let: a;
 	#set: a=2;
-	#def a;
+	#def: a;
 	#set: 1 + 2 * 4;//evaluates an expression operators are done in order exept for the assignment operators: '=', '<=>' and '<->'
 	#def: label;/*inserts label into the scope's code array;*/
 
-	/*note: at the moment:*/ #def: /*is syntactic sugar for:*/ $set label;$def label;//in that order
+	/*note: at the moment:*/ #def:label; /*is syntactic sugar for:*/ $undef: label;$set: label;$def: label;//in that order
+	/*the */#def/*(just like the 3:*/$undef set def:/*), applies the to the final value, meaning:*/#def: foo();/*is the same as:*/#let: bar=foo();#def: bar;
 	expressions;(
 		//value types:
 		1,//number
@@ -235,14 +243,28 @@ $;{
 		label,//label,
 		,//array: not used
 	);
+	
+	infered syntax:
+		/*the '#' in*/#let #set #def/*can be infered as long it is not a keyword in the assembly language. i.e in #"0xmin"; you can use*/let x=2;def x;/*instead of*/#let:x=2;#def:x;
+		//e.g.
+		let label=2;/*is syntactic sugar for:*/#let:label=2;
+		
+		//the colon ':' is only needed if the next word is a keyword, otherwise it is infered.
+		//e.g.
+		let set def label;/*is the same as*/#let set def: label;/*which is also the same as*/#let set: label;#def:label;
+		/*More generally: this sort of infrence applies to all parts of this programming language, and not just for*/#let set def;
+		//in this document we have tried to use the more explicit syntax where possible to reduce confusion.
+		
+		foo()/*if a word (regex/\b\w+\b/), that is not a keyword: then it will default to*/:#:foo();/*which defaults to*/#def:foo();
+		//this is usefull for including functions calls that look the same as in most C-like programming languages
 };
 starter line:{
-	void;{
+	void;{//OUT_OF_DATE
 		does not add this line of code to the parent scope_object;
 		usefull for mutating arrays without leaving a trace;
 		note: it is pointless to use '$' and '@' type code on void lines as they cannot be found in the assembly/hidden phases.
 		//lets say we want an #array with 4 items and a property pointing to the last one
-		e.g. 1
+		example1
 		let array5{
 			1;
 			2;
@@ -250,7 +272,7 @@ starter line:{
 			let item4=0;//this line is included in the array //update: this is not included
 			4 #def item 4;
 		};//array5..length=5
-		e.g. 2
+		example2
 		let array4{
 			1;
 			2;
@@ -262,8 +284,33 @@ starter line:{
 	static;{
 		not supported yet; might allow running code in function scopes.
 	};
+	//to ensure that Macros always hault, maximum recursion and iteration must be stated.
 	repeat;{
-		repeat expression
+		//allows for iteration.
+		repeat expression:lineOfCode;//Runs the line:'lineOfCode' 'expression' times.
+		e.g.
+		repeat 10:foo();
+		/*The expression just after the 'repeat' keyword is evaluated every iteration,
+			but the maximum iterations allowed can only be reduced. This is so breaking is possible
+		*/
+		
+		//repeat can be used to generate long arrays
+		e.g.
+		let longArrayOf1s={repeat 100:@1;};
+		
+		//example of repeat.
+		#def let: array={
+			let i=0;
+			repeat (10-(i+=1)):
+				#def: i;
+			;
+		};/*results with the array: {1;2;3;4;5;6}*/
+	};
+	recur;{
+		recur//Allows for the use of recursion.
+		recur expression:lineOfCode;
+		e.g.
+		recur 10: foo();//
 	}
 };
 import;{
@@ -287,8 +334,8 @@ delete;{
 	delete;//delete all labels in block scope
 	delete label;//deletes label from 
 	intended use:{
-		#let bar;
-		#def bar;
+		#let:bar;
+		#def:bar;
 		move=>bar;
 		delete bar;
 		//ensures that 'bar' cannot be used beyond this point
@@ -365,10 +412,10 @@ virtual;{
 		null;//:jump command used here
 	}
 };
-$set foo->bar;//'->', aka the `to` operator, returns 'bar - foo'.
-$set move=>label;//'=>', aka the `set to` operator, is similar to '->' exept it sets the memory location of  foo to bar, at ($) compile time
+$set:foo->bar;//'->', aka the `to` operator, returns 'bar - foo'.
+$set:move=>label;//'=>', aka the `set to` operator, is similar to '->' exept it sets the memory location of  foo to bar, at ($) compile time
 move 2;/*is the same as:*/move=>move 2;
-move=>move 2;/*is the same as:*/move->move 2;$set move=>move 2;
+move=>move 2;/*is the same as:*/move->move 2;$set:move=>move 2;
 move->move 2;//does not change
 {//un implemented future potential features
 	static;{

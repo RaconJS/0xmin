@@ -6,7 +6,7 @@
 		let found=0;
 		let reg<->0;//`<->` sets the number/pointer part only
 		repeat (found==0 && var.used..length):{
-			repeat (var.used[reg]==0):{
+			repeat ((var.used[reg]==0)||(var.used[reg]==4)):{
 				#found=1;
 				#var.used[reg]=1;
 				//#var.used..splice(reg,1,{1});
@@ -28,7 +28,8 @@
 			def let var;//1:variable
 			def let const;//2:constant
 			def let static;//3:variable that has an infinite lifetime
-		};
+			def let used;//4:empty but is free for use.
+		}..compile;
 		let used={repeat 16 0;};
 		let clear(){
 			let i=0;
@@ -53,6 +54,47 @@
 		delete i,startState;
 		...let set block;
 	};
+	let function(foo)={//foo:#()->{@}
+		let functionRegs={};//:Register[] & [0 to 15][]
+		let call(){
+			let canCall={
+				let canCall=1;
+				let i=0;
+				repeat (canCall&&functionRegs..length): {#;
+					let reg=var.used[functionRegs[i]];
+					canCall=#(reg==0)||(reg==4);
+					repeat canCall:var.used[functionRegs[i]]=4;
+					i+=1;
+				};
+				delete i;
+				def canCall;	
+			}[-1];
+			repeat canCall call this;
+			repeat!canCall
+			{
+				def:
+				{}["can't call function."];
+			}
+		};
+		let startState<=>var.used;
+		let i=0;
+		let state1;
+		repeat var.used..length {#;
+			repeat (var.used[i]==4):
+				
+			i+=1;
+		};
+		blockScope()<:()=>{
+			#def: foo();
+		};
+		let this.endState<=>var.used;
+		let i=0;
+		repeat var.used..length {#;
+			repeat (startState[i]==0&&endState[i]==4):
+
+			i+=1;
+		};
+	};
 	let data{:self;
 		let var(value)={
 			repeat (arguments..length==0):#value=0;
@@ -74,7 +116,7 @@
 
 	let getInput(out,wait,idleAnimation){//@(%out,#bool)->out
 		let temp=out;
-		%out=0;
+		%temp=0;
 		repeat !idleAnimation:let set idleAnimation;//?
 		blockScope()<:()=>{def:{:this;
 			//let const_0=const(0);
@@ -206,10 +248,11 @@ let Buyables(cost,cps,numberOf,max,info)={//data:{let description:#"";let name:#
 	};
 	delete isNotActive;
 }{let item<=>Buyables;#Buyables..splice(0,1);
-	def item(-1,0,1,10,{let name="ask", desc="Ask your for a paperclip;";});
-	def item(1,10,0,10,{let name="email bot", desc="Set up an email bot;";});
-	def item(-1,0,0,10,{let name="null", desc="coming soon";});
-	def item(-1,0,0,10,{let name="null", desc="coming soon";});
+	//cost,cps,start,max
+	def item(-10,0,0,10,{let name="ask", desc="Ask your for a paperclip;";});
+	def item(30,1,0,10,{let name="email bot", desc="Set up an email bot;";});
+	def item(-1,2,0,10,{let name="null", desc="coming soon";});
+	def item(-1,5,0,10,{let name="", desc="coming soon";});
 };
 let i=-1;
 repeat {#i+=1;@(Buyables..length)}[1]:{
@@ -274,12 +317,11 @@ let main{
 	def start;
 	let i=0;
 	printStr("\p00");
-	repeat Buyables..length:{
-		printStr("["...(i+1)..."]:");
+	let buttonPos1="\p01";//char[] & "\pYX"[]; for highighting selected buyable
+	repeat Buyables..length:{//prints all the buyables
+		let str;
+		printStr(str="["...(i+1)..."]:");
 		call #(Buyables[i].name);
-		//repeat (i!=#(Buyables..length-1)):
-		//printStr("\n");
-		//call #(Buyables[i].description);
 		printStr("\n");
 		#i+=1;
 	};
@@ -328,21 +370,26 @@ let main{
 			#del(itemNumber);
 			#del(itemNumberChar);
 			printStr("\n");
+			let highlight="\c0e";
 			printStr("\nbuy[b]");
 			printStr("\nsell[s]");
 			printStr("\ncancel[c]");
 			let in=var();
 			def let loop;
 			getInput(in,1);
-			printStr("\p00");
-			call clearScreen;
-			//clearLines(2);
-			printStr("\p00");
+			let clear{
+				printStr("\p00");
+				call clearScreen;
+				//clearLines(2);
+				printStr("\p00");
+			};
 			//assert buyable:r Buyable*
 			del(in);
 			switch(in)
 				<:{
 					"b";
+					//printStr("\p00"highlight)
+					$clear;
 					blockScope()<:(){//try buy
 						let hasEnough=var();
 						let then,fail,fail2;
@@ -377,6 +424,7 @@ let main{
 					}
 				}<:{
 					"s";
+					$clear;
 					blockScope()<:(){//try sell
 						let canSell=var();
 						r canSell = [r buyable + Buyables.prototype.numberOf];
@@ -396,9 +444,9 @@ let main{
 					}
 				}<:{
 					"c";
+					$clear;
 					blockScope()<:(){//go back
 						printStr("CANSEL");
-						printStr("??");
 					}
 				}<:{
 					jump->loop;
@@ -426,6 +474,22 @@ let main{
 		jump->buyItem..return if<=0;//fail if temp<="0"
 		r temp -= #(Buyables..length);
 		jump->buyItem..return if>0;//fail if temp>Buyables..length
+		{//highight
+			r temp = r in;
+			r temp -= "1";
+			r temp <<=4;
+			r temp |= "\p01";
+			send r0 r temp;
+			//printHex(temp);
+			let yellow="\c0e";
+			printStr(yellow);
+			{
+				//printStr("[");
+				send r0 r in;
+				//printStr("]");
+				printStr("\c0f");
+			};
+		};
 	};
 	def set buyItem<=>buyItem(in);
 	jump->waitForValidInput;
@@ -433,22 +497,24 @@ let main{
 //registors
 debugger var.used"label.code.map(v=>0|v.lineNumber).join('')";
 {
-	call main#def let start;
-	jump-> start;
-};
-def main;
-def data{
-0x31111111;
-	def Buyables;
-	def codeBlock;
-	def String;
-};
-:global;
-#{
-	#global..compile;
-	let i=0;
-	repeat clearLines.functions..length{
-		#clearLines.functions[i]();
-		#i+=1;
+	{
+		call main#def let start;
+		jump-> start;
+	};
+	def main;
+	def data{
+	0x31111111;
+		def Buyables;
+		def codeBlock;
+		def String;
+	};
+	:global;
+	#{
+		#global..compile;
+		let i=0;
+		repeat clearLines.functions..length{
+			#clearLines.functions[i]();
+			#i+=1;
+		};
 	};
 };
