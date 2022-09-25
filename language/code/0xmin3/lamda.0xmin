@@ -1,0 +1,161 @@
+#"tptasm";#"len";#"table";
+let lamda(){
+	(a>b>a a)p p
+}{
+	def let .["p"] = {send r0 "F";return};
+};
+...(){
+	let: maxRecur=100000;
+	let getRecur(code){
+		#return = maxRecur;
+	};
+	#set swap{
+		pop r1;//arg
+		pop r2;//foo
+		push r1;
+		push r2;
+	};
+	let output;
+};
+let newFoo(code,function,argName)={//:scope
+	let stackLevel=function.stackLevel+1||0;
+	let scope{
+		repeat !!argName:let ..this[""...argName]<->stackLevel;
+		let ..proto=function.scope;
+	};
+	let numOfArgs=0;
+	let block={...codeof code};
+	let handleCall(){
+		#numOfArgs+=1;
+		repeat (numOfArgs>=2):{
+			#numOfArgs-=1;
+			#call();
+		};
+	};
+	let addFoo(arg){//arg from heap
+		//arg:Function
+		#set block{
+			push arg;//addFoo
+		};
+		#handleCall();
+		#return=arg;
+	};
+	let addArg(arg,scope){//arg on stack 'arg'
+		#set block{
+			push [stack+getArg(arg,scope)];//add
+		};
+		#handleCall();
+		#return=arg;
+	};
+	let call(){//stack={foo} //'(foo) arg'
+		#set block{
+			pop r1;//arg
+			pop r2;//foo
+			push r1;
+			call r2;
+		};
+	};
+	let getArg(arg,scope){
+		#return=#(scope.stackLevel-arg)*2+1+numOfArgs;
+	};
+	{
+		//{arg} -> {arg;ret}->{arg;ret;ans}->{ans;ret} -> {ans}
+		let const_0=0;
+		let ans=1;
+		let ret=2;
+		let temp=3;
+		//assert: stack = {arg;ret}
+		def block;
+		//assert: stack = {arg;ret;ans}
+
+		pop r ans;
+		pop r ret;//return address
+		pop r temp;//arg
+		push r1;//ans
+		push r2;//ret
+		//assert: stack = {ans;ret}
+		return;
+		//assert: stack = {ans}
+	};
+	repeat (arguments..length>1):
+	#set output{
+		null;//start of function
+		def this;
+	};
+};
+let parse(code,i,function,hasRecur){
+	let returnValue;//:function
+	//!!hasRecur => recur>1
+	let line=code;
+	repeat !hasRecur:{
+		#line=code[0][0];
+		#output={//extension object
+			:this;
+			let maxRecur=getRecur(line);
+			let mainFoo=function=newFoo=({});
+			call mainFoo;
+			hault;
+			def mainFoo<=>{...let mainFoo;}{
+				{
+					let end{return};#end<->0;
+					let inputFunctions=arguments[1];//:newFoo//parse(lamda,argument)
+					#let list=inputFunctions..labels,i1=0;
+					repeat list..length:{
+						let mainFoo.scope[""...list[i1]]<->i1/2;
+						push #(inputFunctions[""...list[i1]]);
+						//push end;
+						#i1+=1;
+					};
+					null;//start main
+					def block;
+					null;//end main
+					let ans=2;//:%
+					def let ..this.getAns{pop r ans};
+					#stackLevel=i1/2-1;
+					delete i1;
+					repeat list..length:pop r1;
+					delete list;
+					return;
+					def inputFunctions;
+				};
+			};
+			delete this;
+			//$undef mainFoo;
+		};//:0xmin[]
+		repeat !line:#:{}[]ERROR;
+		#i=0;
+	};
+	let oldI=i;
+	#i=+i;
+	recur output.maxRecur:
+	repeat (i<line..length&&(line..length-oldI)): {
+		let word=line[i];
+		let continue=1;//:bool
+		repeat (word=="("): {//zero cost abstraction
+			#i+=1;
+			repeat !!line[i][1]
+				#:{}[]ERROR;//silent error
+			recur output.maxRecur: 
+			repeat !!line[i]: #returnValue=parse(line[i][0],0,function,1);
+			#i+=2;
+			#continue=0;
+		};
+		let word=line[i];
+		repeat (line[i+1]==">"):{//function a>b ==> (a){#return=b}
+			#i+=2;
+			let foo1=newFoo({},function,""...word);
+			#returnValue=parse(line,i,function.addFoo(foo1),1);
+			#continue=0;
+		};
+		repeat !!+continue:{//word
+			let value=function.scope[""...word];
+			repeat !value#:{}[];//ERROR:value not defined
+			#returnValue=function.addArg(value,function);
+			#i+=1;
+		};
+	};
+	#oldI<->i;
+	repeat !hasRecur repeat (function.numOfArgs==0) #function.getAns<=>{};
+	repeat !!hasRecur:#return = returnValue;
+	repeat !hasRecur:#return = output;
+};parse(lamda,lamda);
