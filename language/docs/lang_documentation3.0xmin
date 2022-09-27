@@ -46,6 +46,8 @@
 	... //concat
 	( ) [ ] { } //brackets
 	"" '' ``; //strings
+//defenite brackets
+	#() #[] #{} //normal meta-expression brackets. The '#' is normally highlighted as white to indicate this.
 //function delcarations
 `note: can also do`#(){}`to avoid confusion with`foo = (){}` => `(foo=())#{}` or `foo = #(){}` => `foo = #((){})``
 	(){}
@@ -56,6 +58,7 @@
 	()<={}//reverse arrow function
 //function extensions for existing variables
 	foo (){}
+	foo::(){}
 	foo ()={}
 	foo ()=>{}
 	foo ()<={}
@@ -63,7 +66,8 @@
 	foo()
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
 	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
-	foo(bar(baz)); or 
+	a:> b:> foo(c,{...d}) <:e <:f //using pipelinging operators
+	foo(bar(baz)); or bar(baz):>foo()
 //object declarations
 	{}
 	#{}
@@ -417,6 +421,38 @@ $set:move=>label;//'=>', aka the `set to` operator, is similar to '->' exept it 
 move 2;/*is the same as:*/move=>move 2;
 move=>move 2;/*is the same as:*/move->move 2;$set:move=>move 2;
 move->move 2;//does not change
+
+long expressions:{
+	pipeLine;{
+		':>' operator
+		let foo(a,b,c){
+			;
+		};
+		let a,b,c;
+		a:>b:>foo(c);
+	};
+	objectExtending using ::;{
+		'::' operator
+		#let: foo(a,b,c){
+			...doStuff;
+		};
+		#set: foo :: (){
+			...doMoreStuff;
+		} :: (){
+			...doEvenMoreStuff;
+		};
+		used to concatnate objects '{}' or add a function block '(){}';
+	};
+};
+single expressions;{
+	types;{//UNFINISHED feature
+		':' operator;
+		type annotations are ignored by the code, almost like comments;
+		e.g. let a:((#int,#array)->{@})=#(a,b){
+			repeat 10: 1;
+		}
+	};
+}
 {//un implemented future potential features
 	static;{
 		let foo(){
