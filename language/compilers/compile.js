@@ -821,12 +821,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							({index}=await contexts.main_importFile({statement,index,scope,phase:state.phase}));
 						}
 					}{
-						if(statement[index]=="{"){
+						if(false) if(statement[index]=="{"){
 							index++;
 							newScope.label.code.push(
 								(await evalBlock(statement[index++],scope)).label
 							);
 							index++;
+						}
+						let {value,failed}=await contexts.delcareFunctionOrObject({statement,index,scope});
+						if(!failed&&value?.label){
+							newScope.label.code.push(value.label);
 						}
 						else if(statement[index]!=";"&&index<statement.length){
 							assemblyPart:{
@@ -2574,6 +2578,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.code.reduce((s,v)=>{
 					///v: Variable ?? CodeLine|FunctionScope
 					if(v instanceof Scope)s.push(v);//pushes :FunctionScope
+					//else if(v instanceof HiddenLine.Define)s.push(v.label?.getCode?.(n+1));//pushes :...FunctionScope|code tree //I am not sure about this feature, although it does make the language more intuitive
 					else if(v instanceof Variable)s.push(...v.getCode?.(n+1));//pushes :...FunctionScope|code tree
 					//else if(v instanceof CodeLine)s.push(v.code);
 					return s;
