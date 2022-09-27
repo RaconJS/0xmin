@@ -1340,7 +1340,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//value=new Value();
 				if(!TESTING)return {index,value:undefined};
 			}
-			return await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets});
+			({index,value}=await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets}));
+			if(statement[index]==":"){
+				index++;
+				({index,value}=await contexts.typeSystem({value,index,statement,scope,shouldEval}));
+			};
+			return {index,value};
 		},
 		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
 		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
@@ -1478,6 +1483,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}else break;
 					}
 				}
+				return {index,value};
+			},
+			async typeSystem({index,statement,scope,value,shouldEval=true}){
+				({index}=await contexts.expression_short({index,statement,scope,shouldEval:false}));
 				return {index,value};
 			},
 			delcare_typeChecks(isExtension,startValue){

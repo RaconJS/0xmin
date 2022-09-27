@@ -1,6 +1,8 @@
 #"tptasm";#"table";
-add [2- 10];
-
+let a:a=4;
+let fooList={(){5;3};()={1;2}};
+fooList[0]();
+add [2 + a];
 //new syntax: the return of '::'
 let a={
 	1;2
@@ -16,4 +18,4 @@ a;//{1;2;3}
 @:#(a..length);//4
 a.a;//5
 a();//{0x11;0x22;0x33}
-#::
+//#::
