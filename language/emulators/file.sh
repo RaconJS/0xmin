@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 #file.sh is run by file.out
-g++ -pthread emulator4.cpp -o emulator4;
+g++ -pthread emulator.cpp -o 0xmin_emulator;
 echo done

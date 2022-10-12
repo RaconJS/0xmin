@@ -3,7 +3,7 @@ echo preparing repo for git
 echo code
 cp -r ./../compilers ./language
 cp -r ./../emulators ./language
-cp -r ./../code ./language
+cp -r ./../examples ./language
 cp -r ./../docs ./language
 cp -r ./../include ./language
 echo tpt
