@@ -1987,23 +1987,21 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			assembly:{//0xmin assembly language
 				language:"0xmin",//"0xmin"|"tptasm"
 				instructionSet_0xmin:{
-					"null":0,
 					"move":0,
 					"jump":1,
-					"nor":2,
+					"or_input":2,//'or input'
 					"red":3,
 					"blue":4,
-					"set":5,
-					//
-					"get":5,
+					"get_jump":5,//'get jump -1'
+					"nor":6,
+					"get":7,
+					"xor":8,
+					"and":9,
+					"or":10,
 					"set":11,
 					"if":12,
-					"xor":6,
-					"and":7,
-					"or":8,
-					"get_jump":9,//'get jump -1' :9
-					"or_input":10,
-					"set_jump":13,//'set jump +3' :12
+					"set_jump":13,//'set jump +3' 
+					"null":0,//read as command 30. also is command 14. 30&0xf==14
 				},
 				pointers:{},//:{pointerName:Pointer}
 				registers:{
@@ -2084,6 +2082,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					){
 						let address2=instruction.moveBy+instruction.cpuState.jump;
 						let cpuState2=assemblyCode.code[address2]?.cpuState;
+						if(isNaN(cpuState.move))return {failed:Error("jumping from an unknown cpuState:"+cpuState.move)}
 						if(!cpuState2){//handles jumping to unknown cpuStates //used to say 'allows jumping to ...'
 							if(0)return {failed:Error("could not find cpuState of location:"+address2)};
 							else return {failed:false};
@@ -3256,14 +3255,18 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			+" src:"+decToStr(v.sourceLineNumber,(Math.log10(highestSourceLineNumber)|0)+1)+"| "+v.line
 		).join("\n")
 	;
-	const oxminDisassembler=(code)=>(code&0x3000f)<0x10?
-		["move", "jump", "nor", "red", "blue", "get", "xor", "and", "or", "get jump -1", "or input", "set", "if", "set jump +3", "null", ""][code]:
-		(code&0x20030000)==0x20010000?"\"\\a\"":
-		(code&0x20030000)==0x20028000?"\"\\e\"":
-		(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
-		(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
-		(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
-		code.toString(16)
+	const oxminDisassembler=(code)=>
+		code==1?"\"\\h\"":
+		(
+			(code&0x3000f)<0x10?
+			["move", "jump", "or_input", "red", "blue", "get_jump", "nor", "get", "xor", "and", "or", "set", "if", "set_jump", "null", ""][code&0xf]:
+			(code&0x20030000)==0x20010000?"\"\\a\"":
+			(code&0x20030000)==0x20028000?"\"\\e\"":
+			(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
+			(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+			(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+			code.toString(16)
+		)+((code&0x3000f)<=1?(code&0x1000?" -":" +")+((code&0xff0)>>4):"")
 	;
 	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
 	if(settingsObj["log_length"].lineNumber||settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber){

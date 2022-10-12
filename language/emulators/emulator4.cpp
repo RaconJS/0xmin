@@ -163,7 +163,7 @@ using namespace std ;
 //----
 filt30* ram;
 int ramLen;
-filt30 getCPU_currentWord();
+filt30 getCPU_output();
 class R2Terminal{
 	private: filt30 spairFilts[2];
 	public:
@@ -178,9 +178,9 @@ class R2Terminal{
 		//`has_io_in_ram` is to support older versions of 0xmin
 		bool has_io_in_ram=
 			ram[1]==1&&//'jump 0;'
-			ram[2]==0&&
+			ram[2]==(filt30)0&&
 			ram[3]==0x20000000&&
-			ram[4]==0&&
+			ram[4]==(filt30)0&&
 			ram[5]==0x20000000
 		;
 		if(has_io_in_ram){
@@ -282,7 +282,7 @@ class R2Terminal{
 	void onUpdate(){
 		//*input=redFilt;
 		handle_output:{
-			filt30 currentWord=getCPU_currentWord();//auto print
+			filt30 currentWord=getCPU_output();//auto print
 			filtObj = !(currentWord&redFilt)?*output:currentWord;
 			if(filtObj&redFilt){
 				if(filtObj&data){
@@ -455,6 +455,7 @@ class NumberDisplay{
 		u32 set_bray;
 
 		filt30 input;
+		filt30 output;
 		public://debugger pause
 		bool wasInputDown=false;
 		void onUpdate();
@@ -539,13 +540,14 @@ class NumberDisplay{
 			jump_next=1;
 			move_next=0;
 		//commands
+			u32 output_bray;
 			input=keyboard.inputValue;
 			u32 ans=0,a=alu,b=dataFromMove;//for operations
 			switch(command){
-				case 0://move
+				case 0 ://move
 					move_next=address*((int[2]){1,-1})[address_sign];
 					break;
-				case 1://jump
+				case 1 ://jump
 					jump_next=((address&~1)*(int[2]){1,-1}[address_sign])+(address&1);
 					if(address==0){
 						if(!address_sign)hasHault=true;//'jump 0;' => 'hault;'
@@ -559,19 +561,23 @@ class NumberDisplay{
 						}
 					}
 					break;
-				case 2:ans=~(a|b);break;//'nor'
-				case 3:ans=a*(b&-b);break;//'red'
-				case 4:ans=b==0?a:a/(b&-b);break;//'blue'
-				case 5:ans=b;break;//'get'
-				case 6:ans=a^b;break;//'xor'
-				case 7:ans=a&b;break;//'and'
-				case 8:ans=a|b;break;//'or'
-				case 9:ans=get_jump;break;//'get jump -1'
-				case 10:ans=a|input;break;//'or input'
+				//alu
+				case 2 :ans=a|input;break;//'or input'
+				case 3 :ans=a*(b&-b);break;//'red'
+				case 4 :ans=b==0?a:a/(b&-b);break;//'blue'
+				case 5 :ans=get_jump;break;//'get jump -1'
+				case 6 :ans=~(a|b);break;//'nor'
+				case 7 :ans=b;break;//'get'
+				case 8 :ans=a^b;break;//'xor'
+				case 9 :ans=a&b;break;//'and'
+				case 10:ans=a|b;break;//'or'
+				//misc
 				case 11:set_bray=alu;break;//'set'
 				case 12:blocker=!aluif;aluif=!aluif;break;//'if' 
 				case 13:set_jump=alu;break;//'set jump +3'
 				//case 14:break;//'null'
+				//case 15:break;//empty
+				default:output_bray=currentWord;//print char
 			}
 			//note: with the 'if' command. is run as: 'if;"then";"else/finally";' can be used as: if;jump->then; jump->else
 			//	'if;' means 'if there has been a operation that did not equal 0, from the last if statement; then continue as normal; other wise ignore the next line of code."
@@ -579,8 +585,9 @@ class NumberDisplay{
 				alu=ans;
 				aluif=true;
 			}
+			output=output_bray!=0?output_bray:0x20000000;
 	}
-filt30 getCPU_currentWord(){return cpu.currentWord;}
+filt30 getCPU_output(){return cpu.output;}
 //----
 void doStep(int i){
 	cpu.onUpdate();
