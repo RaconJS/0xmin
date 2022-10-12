@@ -1,3 +1,4 @@
+#"0xmin";
 //keywords
 	void;
 	static;//static is not used yet
@@ -12,6 +13,9 @@
 	...let;
 	...set;
 	...def;
+	...labelsof;
+	...codeof;
+	...run;
 	#let;
 	#set;
 	#def;
@@ -32,6 +36,9 @@
 	@and;
 	@or;
 	@xor;
+	@or input;
+	@get jump -1;
+	@set jump +3;
 //words that can't be used for variables
 
 	//[there are none]
@@ -60,10 +67,18 @@
 	foo (){}
 	foo::(){}
 	foo ()={}
+	foo::()={}//etc... can put '::' to make extention functions/object more explicit
 	foo ()=>{}
 	foo ()<={}
+	foo ()->{}
+	foo ()<-{}
 //function calls
 	foo()
+	foo=()
+	foo=>()
+	foo<=()
+	foo->()
+	foo<-()
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
 	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
 	a:> b:> foo(c,{...d}) <:e <:f //using pipelinging operators
@@ -314,7 +329,9 @@ starter line:{
 		recur//Allows for the use of recursion.
 		recur expression:lineOfCode;
 		e.g.
-		recur 10: foo();//
+		let foo(){
+			recur 10: foo();//
+		};
 	}
 };
 import;{
@@ -327,11 +344,13 @@ import;{
 };
 ...;{
 	...//injects parts of a label into the current scope's label (scope.label)
-	...let: {let a,b,c;};...let object;//properties (namespace)
-	...set: {1;2;3;};...set array;//code (array)
-	...def: (){1;2;3};...def function;//runs code in scope
+	...let: {let a,b,c;};...let object;...labelsof;//properties (namespace)
+	...set: {1;2;3;};...set array;...codeof;//code (array)
+	...def: (){1;2;3};...def function;...run;//runs code in scope. Can act the same as 'import'.
 	//these can be combined;
 	... let set def: label;
+	//default
+	... label; /*is the same as*/ ...let set def: label;
 };
 delete;{
 	removes properties from an object.
@@ -422,7 +441,61 @@ move 2;/*is the same as:*/move=>move 2;
 move=>move 2;/*is the same as:*/move->move 2;$set:move=>move 2;
 move->move 2;//does not change
 
-long expressions:{
+single_expressions;{
+	expressions have the form:
+	+!~ (long_expression) .a.b()()[4]..length();
+	single argument operators are included in expressions as well as indexing and function calls.
+	
+	datatypes;{
+		label;{
+			casting: ¬x ;
+		}
+		string;{
+			casting: (""...x) ;
+			casting_decimalNumber: (""...+x);
+		}
+		number;{
+			casting: +x or !x;
+			note that booleans have the number datatype so doing !!x will cast a truthy value to 1 and a falsy value to 0;
+			!!label returns 1 if the label exists;
+			!!+label returns 1 if the labels number value is not 0;
+		}
+		array;{
+			casting: can not cast to array;
+			array is a poorly supported type.
+			It is mainly used in: debugger object..labels;
+		}
+	}
+	internal properties;{
+		Every label has internal properties;
+		Accessing them calls an inbuilt javascript function;
+		Some internal properties return inbuilt functions that are bonded to the label;
+		full list:
+		label..length;//:number
+		label..code;
+		label..splice(a,b,c);
+		label..array;
+		label..labels;
+		label..compile;
+		label..seal;
+		label..freeze;
+		label..this;
+		label..return;
+		label..proto;
+		label..super;
+		label..constructor;
+		label..prototype;
+		label..supertype;
+		label..defs;
+		label..indexOf(item);
+		label..asNumber;
+		label..state;
+		label..state.move;
+		label..state.jump;
+		label..state.ram;
+	};
+}
+long_expressions;{
 	pipeLine;{
 		':>' operator
 		let foo(a,b,c){
@@ -440,17 +513,10 @@ long expressions:{
 			...doMoreStuff;
 		} :: (){
 			...doEvenMoreStuff;
+		} :: {
+			...staticProperties;
 		};
 		used to concatnate objects '{}' or add a function block '(){}';
-	};
-};
-single expressions;{
-	types;{//UNFINISHED feature
-		':' operator;
-		type annotations are ignored by the code, almost like comments;
-		e.g. let a:((#int,#array)->{@})=#(a,b){
-			repeat 10: 1;
-		}
 	};
 }
 {//un implemented future potential features
@@ -459,6 +525,7 @@ single expressions;{
 			static ..this.bar=2;
 		};
 		foo.bar;
+		static scopes are always run exactly once.
 	};
 	types;{
 		':' operator;

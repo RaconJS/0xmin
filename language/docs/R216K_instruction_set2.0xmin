@@ -1,6 +1,6 @@
 //instruction set (2nd attempt)
 #"tptasm";#"table";
-def let a=1,b=2,oper;//a:%,b:%,c:%
+def let a=1,b=2,oper;@;//a:%,b:%,c:%
 a;//db a
 a = b;//mov a,b
 a &= b !store;//and/ands a,b ;note: the '!store, +carry etc..' bits are optional
@@ -49,12 +49,12 @@ a;
 //register; I have chosen '%' over '¬' because '%' is easier to type;
 %a;//compiles to 'r1'
 //pointer addressing is the same as in tptasm;
-[a]
-[%a]
-[%a + b]
-[%a + %b]
-[%a - b]
-[%a - %b]
+[a];
+[%a];
+[%a + b];
+[%a + %b];
+[%a - b];
+[%a - %b];
 //classes
 	//class 1*
 		oper = a;
