@@ -1345,7 +1345,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(!TESTING)return {index,value:undefined};
 			}
 			({index,value}=await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets}));
-			if(statement[index]==":"){
+			if(false)if(statement[index]==":"){
 				index++;
 				({index,value}=await contexts.typeSystem({value,index,statement,scope,shouldEval}));
 			};
