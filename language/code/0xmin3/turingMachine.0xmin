@@ -21,7 +21,7 @@ let const(value)={
 let MemoryCell(v)={//class
 	repeat !v #v=0;
 	def let value{(v<<2|1)};//:{tag=1;isLower:bool;bit[20]} actual data
-}{
+}::{
 	let prototype=..this()#{
 		let data=int(1<<2);
 		let isCurrentCell=int(1<<1);//1 if the current cell is ahead of this one
@@ -44,7 +44,7 @@ let MemoryCell(v)={//class
 		set ..this{
 			def:(){
 				let m=MemoryCell;
-			}{
+			}::{
 				...codeof data;
 			}()
 		};
@@ -122,7 +122,7 @@ let Rule(0b,0l,0r,0s,1b,1l,1r,1s)={//1/0-> left right state
 		( (0s*1) | (0l*moveLeft) | (0r*moveRight) | (0b*stateRules.flipBit[0]) ) |
 		( (1s*1) | (1l*moveLeft) | (1r*moveRight) | (1b*stateRules.flipBit[0]) *stateRules.size[0])
 	;
-}{
+}::{
 	let Pointer(ruleNumber){
 		#return={move ruleNumber}..compile[0];
 	};
@@ -183,7 +183,7 @@ let main{
 			//assert: {@move 0} == {0}
 			move=>stateRules.nextState_shift;red;
 			move=>currentRule;set;
-		}{//flip bit
+		}::{//flip bit
 			let do_flipBit;
 			move=>rule;get;if;
 			move=>stateRules.flipBit;
@@ -194,7 +194,7 @@ let main{
 				move=>bitNumber;get;
 				move=>checkBit.returnCell;xor;set;
 			};
-		}{
+		}::{
 			let ..this.left_right(direction){//1 -> right, -1 -> left
 				let moveDir={0;$def stateRules.moveRight;$def stateRules.moveLeft}[direction];
 				move=>rule;get;
@@ -235,11 +235,11 @@ let main{
 					$move=>endState..state.move;
 				};
 			};
-		}{//left -
+		}::{//left -
 			left_right(-1);
-		}{//right +
+		}::{//right +
 			left_right(1);
-		}{
+		}::{
 			let nextCell;
 			move=>checkBit.returnCell;get;
 			move=>nextCell;set;

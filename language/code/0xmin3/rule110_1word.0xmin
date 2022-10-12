@@ -42,7 +42,7 @@ let loop(times,do){
 	move=>times;get;
 	move=>i;set;
 	delete times;
-	#def:{}{//main loop; has this
+	#def:{}::{//main loop; has this
 		#let state;
 		$set state=>move;
 		#def do;

@@ -114,7 +114,7 @@
 			#def mainLoop;
 			//repeat (16*12):" ";
 			"\pff";
-		}{
+		}::{
 			let callBase=call;
 			let call(reps){
 				def let data=Data();
@@ -188,7 +188,7 @@
 					move=>data.const(0b111);
 					and;
 					move=>ans;
-					#def: {}{
+					#def: {}::{
 						let then;
 						if;
 						jump -> then;
@@ -217,7 +217,7 @@
 			$set endLoopState=>move;
 			$set endLoop;
 			move=>ans;get;
-		}{
+		}::{
 			1 #def let defaultInput;
 			let baseCall=call;
 			#set call=#(len){
@@ -306,7 +306,7 @@
 				$set move=>Executable.returner.startState;
 			},Executable.hault(),block)#{let address=exe_address;};
 			#set fileSystem.addFile(block);
-		}{
+		}::{
 			let hault(){
 				move=>Executable.returner.startState;
 				jump->Executable.returner;
@@ -427,7 +427,7 @@
 			repeat 0: def defIf(time>minLen)<:{
 				def loop()
 			};
-		}{
+		}::{
 			let emptyLoop=loop(1,"");
 			let innerLen=emptyLoop.mainLoop..length;
 			let loopLen=..length;
@@ -518,7 +518,7 @@
 				#def exit;
 				move=>ram;
 			$set exit.state=>move;
-		}{
+		}::{
 			let goto(menu){
 				move=>menu.enter.state;
 				jump->menu.main;
