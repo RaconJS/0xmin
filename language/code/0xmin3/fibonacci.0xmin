@@ -1,0 +1,201 @@
+#"len";
+//NEEDS_TESTING
+//fibonacci sequence
+//does not work. Also works differently on emulator and in TPT
+let main;jump->main;
+#let key;
+#let ComputerState()={//class ComputerState
+	#let dataRegister -> 0xmin;
+	$dataRegister -> move;
+	#let jumpRegister -> 0xmin;
+	$jumpRegister -> jump;
+};
+let forLoop=#(start,condition,next,do)={//forloop factory function
+	repeat(!!block):{
+		#;
+		start=block[0];
+		condition=block[1];
+		next=block[2];
+		do=block[3];
+		return = this;
+	};
+	#def let startState;
+	#let endState;
+	def start;
+	def startState;
+	def:{:loop;
+		//if;null;
+		def condition;
+		def endState;
+		if;
+		jump+2;
+		jump->loop..return;
+		def do;
+		def next;
+		move=>startState..state.move;
+		jump->loop..this;
+		$move=>endState..state.move;
+	};
+};
+let adder={//array of subroutines (assembly)
+	#let a,b;
+	def let addision_loop{
+		{@;
+			jump+3;
+			null #def a;
+			null #def b;
+		};
+		{@;
+			if;null;
+			move=>a;get;if;
+			move=>b;and;
+		};
+		{@;
+		};
+		{@;
+			jump+3;
+			null #def let carry;
+			2 #def let rightShiftBy1;
+			//assert alu = a & b;
+			//assert a & b != 0;
+			move=>rightShiftBy1;red;
+			move=>carry;set;
+			move=>a;get;if;
+			move=>b;xor;
+			move=>carry;
+			//if;jump+2;get;//if(a^b)a=a^b;else a=a&b<<1;
+			move=>a;set;
+			move=>carry;get;
+			move=>b;set;
+		};
+	}::{
+		def ..this<=>forLoop(.[0],.[1],.[2],.[3]);
+	};
+	move=>a;get;
+	move=>b;or;//[a&b == 0] => [a^b == a|b]
+};
+def let printInt{//does not work with numbers ending in 0's
+	let endState;
+	:this;//this==..this;
+	let numbers;
+	let mask,rightShift4;
+	let indexer={0 +1;};
+	let indexer_negative={0 -0;};
+	let val;
+	let val1;
+	let red={0x20000000};
+	let bool_isPrinting={0};
+	def:{:self;
+		{@;//start
+			"0x";
+			#let next;
+			jump->next;
+				null #def let self.value;
+				0x10 #def rightShift4;
+				0x0f000000 #def mask;
+				0x0fffffff #def let self.notZero;
+				#def bool_isPrinting;
+				#def red;
+			#def next;
+			if;null;
+			move=>notZero;and;
+			move=>endState..state.move;
+			if;jump+3;"0";jump->self..return;//print "0";
+			move=>value;set;get;
+		};{@;//while
+			#let end;
+			move=>notZero;
+			if;jump+2;jump->end;
+			and;
+			#def end;
+		};{@;//next
+			move=>value;get;if;
+			move=>rightShift4;red;
+			move=>value;set;
+		};{@;//do
+			//assert move = &value;
+			//assert alu = value;
+			//assert if = false;
+			if;null;
+			move=>mask;and;
+			if;jump+3;
+				"0" #def let char0;#let endPart;
+				jump->endPart;
+			blue;
+			{:switch;
+				#let goTo,returnFrom;
+				move=>indexer;red;
+				move=>goTo;set;
+				move=>indexer_negative;xor;
+				move=>returnFrom;set;
+				move=>numbers;
+				null #def goTo;
+				get;
+				null #def returnFrom;
+			};
+			move=>jump+2;set;null;
+			move=>mask;
+			#def endPart;
+			#delete char0;
+		};
+	}::{
+		def ..this<=>forLoop(.[0],.[1],.[2],.[3]);
+	};
+	//move=>endState..state.move;
+	jump->..return;
+	def indexer;
+	def indexer_negative;
+	"0123456789ABCDEF" #def numbers;
+	def endState;
+};
+//dont need a main function
+def main;
+"adder:\n";
+def:{
+	//#{
+		let a,b,carry,one,zero;
+		let data{
+			jump ->..return;
+			0x20000000 #def zero;
+			1 #def one;
+			null #def a;
+			null #def b;
+			null #def carry;
+		};
+	//}
+	{@;
+		#def data;
+		move=>zero;get;
+		move=>a;set;
+		move=>one;get;
+		move=>b;set;
+	};{@;
+		get;//if(true)
+	};{@;
+	};{@;
+		move=>a;get;
+		move=>adder.a;set;
+		move=>b;get;
+		move=>adder.b;set;
+		move=>carry;set;
+		#def adder;
+		{:moveNubers;
+			repeat 0: {move=>io.output;set};
+			repeat 1: {move=>jump+1;null;};//NEEDS_TESTING
+			move=>b;set;
+			move=>carry;get;
+			move=>a;set;
+			move=>b;get;
+		};
+		repeat 0 {
+			move=>2;jump+2;
+			(8+5);
+			get;
+		};
+		#def printInt;
+		" next:\n";
+	};
+}//let{{@;move=>0;};{@;get;move=>0;};{@;move=>0;};{@;"a";move=>0;};};
+::{
+	def ..this<=>forLoop(.[0],.[1],.[2],.[3]);
+};
