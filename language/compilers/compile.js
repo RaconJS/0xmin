@@ -5,9 +5,8 @@
 //TESTING
 //TODO
 //UNUSED
-//TODO: add 'break.name'. DONE
+//TODO: #add '#"text";' for text output
 //TODO: #add '$void'
-//TODO: $detect circular label definisions (more or less done done)
 //TODO: #@make language definitions less BODGED and more formal
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
 //TODO: @0xmin: add support for long jumps
@@ -84,7 +83,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"tptasm"(v){setLanguage("tptasm")},
 					"asm"(v){setLanguage("asm")},
 					"int"(v){setLanguage("")},
-					"code"(v){labels["log_code"].lineNumber=v},
+					"code"(v){labels["log_code"].lineNumber=v;},//language: raw number output
 					"table"(v){labels["log_table"].lineNumber=v},
 					"len"(v){labels["log_length"].lineNumber=v},
 				}
