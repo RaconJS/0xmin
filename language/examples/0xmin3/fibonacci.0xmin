@@ -74,7 +74,7 @@ let adder={//array of subroutines (assembly)
 	move=>a;get;
 	move=>b;or;//[a&b == 0] => [a^b == a|b]
 };
-def let printInt{//does not work with numbers ending in 0's
+let printInt{//does not work with numbers ending in 0's
 	let endState;
 	:this;//this==..this;
 	let numbers;
@@ -133,13 +133,13 @@ def let printInt{//does not work with numbers ending in 0's
 				get;
 				null #def returnFrom;
 			};
-			move=>jump+2;set;null;
+			move=>jump+3;set;null;null;//since 'set' is done on the next frame after the next instruction is read, I have to insert an extra 'null'.
 			move=>mask;
 			#def endPart;
 			#delete char0;
 		};
 	}::{
-		def ..this<=>forLoop(.[0],.[1],.[2],.[3]);
+		#..this<=>forLoop(.[0],.[1],.[2],.[3]);
 	};
 	//move=>endState..state.move;
 	jump->..return;
@@ -181,7 +181,7 @@ def:{
 		#def adder;
 		{:moveNubers;
 			repeat 0: {move=>io.output;set};
-			repeat 1: {move=>jump+1;null;};//NEEDS_TESTING
+			repeat 0: {move=>jump+1;null;};//NEEDS_TESTING
 			move=>b;set;
 			move=>carry;get;
 			move=>a;set;
@@ -197,5 +197,5 @@ def:{
 	};
 }//let{{@;move=>0;};{@;get;move=>0;};{@;move=>0;};{@;"a";move=>0;};};
 ::{
-	def ..this<=>forLoop(.[0],.[1],.[2],.[3]);
+	#..this<=>forLoop(.[0],.[1],.[2],.[3]);
 };
