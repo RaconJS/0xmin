@@ -1,32 +1,5 @@
 #"table";
-let int(val)={
-	def val;
-	#set ..constructor::{
-		def this;
-	};
-	//#return;
-}::{};
-def let getInput{
-	:this;
-	let accept;
-	let red={0x20000000};
-	{move=>red}..compile[0]);get;
-	move=>accept;
-	or input #def let loop;if;
-	xor;xor;
-	if;
-	let then;
-	jump->then;
-	def let else{
-		"\a"#def accept;
-		move=>red;
-		jump->this..return;
-	};
-	$move=>else..state.move;
-	def then{
-		jump->loop;
-	};
-	def red;
-	$move=>else..return..state.move;
-};
-def int;
+let a{2};
+move=>a;get;
+"\h";
+def a;
