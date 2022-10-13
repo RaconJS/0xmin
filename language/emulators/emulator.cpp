@@ -522,19 +522,20 @@ class NumberDisplay{
 		//pointers
 			filt30 get_jump=ram[jump];//for 'get jump -1;'
 			jump+=jump_next;
-			if(jump>=ramLen){
-				jump=ramLen-1;
+			if(jump>=ramLen||jump<0){
+				if(jump<0)jump=0;
+				else jump=ramLen-1;
 				hasHault=true;
 			}
+			filt30 dataFromJump=ram[jump];
+			if(set_bray!=0){ram[move]=set_bray;set_bray=0;}//'set' is done after instruction is read but before the "move pointer" is updated.
 			move=max(0l,((long)move)+move_next);
 			if(set_jump!=0){ram[jump+2]=set_jump;set_jump=0;}
 			filt30 dataFromMove=ram[move];
 		//read input
 			if(!blocker){
-				currentWord=ram[jump];
-			}
-			if(set_bray!=0){ram[move]=set_bray;set_bray=0;}//'set' is done after instruction is read
-			int command=currentWord&0x3000f;
+				currentWord=dataFromJump;
+			}int command=currentWord&0x3000f;
 			short int address=(currentWord&0x0ff0)/0x10;
 			short int address_sign=(currentWord&0x1000)/0x1000;
 			jump_next=1;
@@ -553,7 +554,7 @@ class NumberDisplay{
 						if(!address_sign)hasHault=true;//'jump 0;' => 'hault;'
 						else {
 							if(inputWasPressed&&wasInputDown){//jump -0;' => 'wait for input'; for debugging
-								jump++;//on rising rising
+								jump++;//on rising edge
 								inputWasPressed=false;
 								wasInputDown=true;
 							}
