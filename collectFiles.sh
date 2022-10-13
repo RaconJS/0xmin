@@ -6,6 +6,7 @@ cp -r ./../emulators ./language
 cp -r ./../examples ./language
 cp -r ./../docs ./language
 cp -r ./../include ./language
+cp -r ./../0xmin.sh ./language
 echo tpt
 cp ~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/Saves/"a subframe tester.cps" the_powder_toy/Saves/"0xmin.cps"
 cp ~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/Saves/"a_R216K2A.cps" the_powder_toy/Saves/"R216K2A.cps"
