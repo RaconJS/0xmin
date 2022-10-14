@@ -1,4 +1,5 @@
 #"table";
-let a{1;$def set a};
-$def a;
-$debugger+a;//getCode() does not search duplecate labels
+let x=2;
+$x 1->3;
+jump ->x;
+jump -> x;

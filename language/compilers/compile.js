@@ -5,13 +5,13 @@
 //TESTING
 //TODO
 //UNUSED
+//TODO: BUG: fix char line numbers
 //TODO: #add '#"text";' for text output
 //TODO: #add '$void'
 //TODO: #@make language definitions less BODGED and more formal
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
 //TODO: @0xmin: add support for long jumps
 //TODO: allow "->" "=>" operators (that return a HiddenLine) inside expression_short
-//TODO: BUG: fix char line numbers
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -1495,9 +1495,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			delcare_typeChecks(isExtension,startValue){
 				if(isExtension){//'obj{}'
 					//type checking
+					//TODO: replace the following with throwError errors
 					if(startValue==undefined)throw Error("0xmin error: #: startValue is not defined");
 					if(!(startValue instanceof Value))throw Error("compiler type error:");
-					if(startValue.type!="label")throw Error("0xmin type error: startValue is not a label");
+					if(startValue.type!="label")throw Error("0xmin type error: #: startValue is not a label");
 					if(!startValue.label){
 						startValue.label=new Variable({name:startValue.name});
 					}
@@ -2870,7 +2871,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						else ans=label.code.indexOf(args[0].label);
 						return new Value.Number(ans);
 					}),
-					//convert string to number
+					//flat maps all statements in a function. (Makes recursion easier)
 					flat:async({label})=>{
 						const symbol=Symbol();
 						function* forEachStatement(statement){
@@ -2900,9 +2901,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return new Variable({
 							type:"array",
 							name:"(flat)",
-							code:forEachLabel(label),
+							code:[...forEachLabel(label)],
 						}).toValue("label");
 					},
+					//convert string to number
 					"asNumber":async({label})=>new Value.Number(+label.toValue("string").string),
 				};
 			});
