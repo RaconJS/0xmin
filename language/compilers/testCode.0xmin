@@ -1,5 +1,46 @@
-#"table";
-let x=2;
-$x 1->3;
-jump ->x;
-jump -> x;
+(a> b> b) p
+let findArgument=@(argNumber,context)={//:@(Int,Context*)->argument
+	let currentContext=context;
+	@:repeat argNumber:{currentContext=currentContext.parent};
+	return = currentContext.argument;
+};
+let Value()={
+	def let context:Context*;
+	def let function:Function*;
+};
+let Context()={
+	def let parent:Context*;
+	def let argument:Value*;
+};
+let Function()={
+	#let argument=from stack;
+	#let parentContext=from stack;
+	#let context=malloc(2)<:Context({parent=parentContext;argument=argument});
+	push context to stack;
+	remove parentContext from stack;
+	#delete parentContext
+	def let body{
+		list of function calls & adding things to the stack;
+		e.g.
+		push findArgument(-2,context);//+1
+		push stack[-1](stack[-5]);//
+		push stack[-1];
+		push stack[-3];
+		call stack[-1](stack[-2]);
+		etc...
+	};
+	return last item on stack;
+};
+let a {
+	let ans {
+		push context;
+		call b;
+	};
+	let parentContext=from stack;
+	let argument=from stack;
+	let innerContext=malloc(2)<:{parent=parentContext;argument=argument};
+	return=malloc(ans);
+};
+let b{
+
+};
