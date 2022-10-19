@@ -1,23 +1,88 @@
 #"tptasm";#"len";#"table";
 let lamda(){
-	(a>b>a a)p p
-}{
-	def let .["p"] = {send r0 "F";return};
+	(a>a a)//(a>b>a b)p p//(a> b>a) p p
+}::{
+	def let .["p"] {r0=0;send r0 "F";return};
 };
+let heap{import lib "heap.0xmin";};
 ...(){
-	let: maxRecur=100000;
-	let getRecur(code){
-		#return = maxRecur;
+	let m_class(class,argsLen,classConstructor)={
+		//class:#Struct,constructor:#()->{@}
+		let m_class=this..constructor;
+		#class::{
+			#class..proto=m_class..prototype;
+			()={#..compile};
+		};
+		#class..prototype::{
+			let new(){//:(...%[])->push[Context*]
+				let rMemory = heap.malloc.inputs[0];
+				r rMemory=this..length;
+				let rMemory = heap.malloc.outputs[0];
+				call heap.malloc;
+				#let i=this..length-1;
+				repeat argsLen:{
+					[r rMemory+i]=pop;//r arguments.(i);//argument
+					#i=i-1;
+				};
+				classConstructor();
+			};
+			#new::(){
+				push r rMemory;
+			};
+			let del(){//:pop[this:Context*]
+				let rMemory = heap.malloc.outputs[0];
+				pop r rMemory;
+				call heap.free;
+			};
+		};
+		#return=class;
 	};
-	#set swap{
-		pop r1;//arg
-		pop r2;//foo
-		push r1;
-		push r2;
+	let Context()={
+		def let parent{0};//:Context*
+		def let argument{0};//:Function*
+	}:>m_class(2)<:{
+	};
+	let FunctionInstance()={
+		let context{0};//:Context*
+		let function{0};//:Function*
+		r0 = [ip+2];//r context = this.context
+		jump->[ip+2];//jump->function
+		def context;
+		def function;
+	}:>m_class(2)<:(){
+		let vals={
+			@0x20BF0020;//-> @r0 = [ip+2];   //push context
+			@0x31BF0020;//-> @jump->[ip+2]; //jump-> function
+		};
+		let rMemory=heap.malloc.outputs[0];
+		let spare=rMemory+1;
+		let i=0;
+		repeat 2:{
+			swm=#(vals[i]>>16);
+			r spare = #(vals[i]&0xffff);
+			[r rMemory+i]=r spare;
+			#i=i+1;
+		};
+		swm=0;
+	};
+	let for_repeat(repeatNum,reg_i,do){//#(int,%,{@})->{@}
+		repeat !!+repeatNum:{
+			let i=reg_i;
+			r i=repeatNum;
+			def let loop{
+				def do;
+				r i-=1;
+				jump->..this if > 0;
+			};
+		};
+	};
+	let getRecur(code){
+		#return = code..flat..length;
 	};
 	let output;
 };
-let newFoo(code,function,argName)={//:scope
+//m_ == # aka meta
+let newFoo(code,function,argName)={//:Function
 	let stackLevel=function.stackLevel+1||0;
 	let scope{
 		repeat !!argName:let ..this[""...argName]<->stackLevel;
@@ -25,54 +90,82 @@ let newFoo(code,function,argName)={//:scope
 	};
 	let numOfArgs=0;
 	let block={...codeof code};
-	let handleCall(){
-		#numOfArgs+=1;
-		repeat (numOfArgs>=2):{
-			#numOfArgs-=1;
-			#call();
-		};
-	};
 	let addFoo(arg){//arg from heap
-		//arg:Function
+		//arg:Function*
 		#set block{
-			push arg;//addFoo
+			let foo=FunctionInstance=();
+			push r registers.context;//:Context*
+			push arg;//:Function*
+			foo.new();//:(pop Context*,Function*)->push FunctionInstance*
 		};
-		#handleCall();
 		#return=arg;
 	};
 	let addArg(arg,scope){//arg on stack 'arg'
+		//arg:index, scope:
+		let isNormalArgument=!arg[¬newFoo];
+		repeat !!+isNormalArgument:
 		#set block{
-			push [stack+getArg(arg,scope)];//add
+			let currentContext=+registers..length;//:%Context*
+			#currentContext = Context=() <-> currentContext;
+			r currentContext = r registers.context;
+			//let i = 2;//:%
+			let argNumber=getArg(arg,scope);
+			let getParentContext(){
+				r currentContext = [r currentContext + currentContext.parent];
+			};
+			#let fast=1;
+			repeat !!fast: repeat argNumber:getParentContext();
+			repeat !fast: for_repeat(argNumber,i)<:getParentContext;
+			push [r currentContext + currentContext.argument];//:push FunctionInstance*
 		};
-		#handleCall();
+		repeat !+isNormalArgument://arg is an input function
+		#set block{
+			push arg;//:push Function*
+		};
 		#return=arg;
 	};
-	let call(){//stack={foo} //'(foo) arg'
-		#set block{
-			pop r1;//arg
-			pop r2;//foo
-			push r1;
-			call r2;
-		};
+	let addCall(){//stack={foo} //'(foo>...) arg'
+		#set block{...set{
+			//assert:context=r0;
+			let arg=1;
+			let foo=2;
+			pop r arg;//arg
+			pop r foo;//foo
+			push r registers.context;
+			push r arg;
+			call r foo;
+			pop r arg;
+			pop r registers.context;
+			push r arg;
+		}};
 	};
-	let getArg(arg,scope){
-		#return=#(scope.stackLevel-arg)*2+1+numOfArgs;
+	let getArg(arg,scope){//assert:arg<=scope.stackLevel
+		#return = scope.stackLevel-arg;
 	};
 	{
 		//{arg} -> {arg;ret}->{arg;ret;ans}->{ans;ret} -> {ans}
-		let const_0=0;
+		//let const_0=0;
+		let arg=1;
 		let ans=1;
 		let ret=2;
-		let temp=3;
+		let context= Context=() <-> registers.context;//:%Context*
 		//assert: stack = {arg;ret}
+		r ret = pop;//ret
+		r arg = pop;//arg
+		push = r ret;
+		{
+			push r context;//parent
+			push r arg;//argument
+			context.new();//:(parent:&sp,argument:&sp) -> push Context*
+		};
+		pop r context;
+		//assert: stack = {ret}
 		def block;
-		//assert: stack = {arg;ret;ans}
-
+		//assert: stack = {ret;ans}
 		pop r ans;
-		pop r ret;//return address
-		pop r temp;//arg
-		push r1;//ans
-		push r2;//ret
+		pop r ret;
+		push r ans;//ans
+		push r ret;//ret
 		//assert: stack = {ans;ret}
 		return;
 		//assert: stack = {ans}
@@ -82,7 +175,17 @@ let newFoo(code,function,argName)={//:scope
 		null;//start of function
 		def this;
 	};
-};
+}::{let ..prototype{
+	let swap{
+		pop r1;//arg
+		pop r2;//foo
+		push r1;
+		push r2;
+	};
+	let registers={
+		def let context=0;
+	};
+}};
 let parse(code,i,function,hasRecur){
 	let returnValue;//:function
 	//!!hasRecur => recur>1
@@ -93,28 +196,23 @@ let parse(code,i,function,hasRecur){
 			:this;
 			let maxRecur=getRecur(line);
 			let mainFoo=function=newFoo=({});
-			call mainFoo;
-			hault;
-			def mainFoo<=>{...let mainFoo;}{
+			let inputFunctions={...let code};
+			def mainFoo<=>{...let mainFoo;}::{
+				#let list=inputFunctions..labels,i1=0;
+				repeat list..length:{#;
+					let foo=inputFunctions[""...list[i1]];
+					let foo[¬newFoo];//mark the input functions
+					let mainFoo.scope[""...list[i1]]=foo;
+					//push end;
+					i1+=1;
+				};
 				{
 					let end{return};#end<->0;
 					let inputFunctions=arguments[1];//:newFoo//parse(lamda,argument)
-					#let list=inputFunctions..labels,i1=0;
-					repeat list..length:{
-						let mainFoo.scope[""...list[i1]]<->i1/2;
-						push #(inputFunctions[""...list[i1]]);
-						//push end;
-						#i1+=1;
-					};
-					null;//start main
 					def block;
-					null;//end main
 					let ans=2;//:%
 					def let ..this.getAns{pop r ans};
-					#stackLevel=i1/2-1;
-					delete i1;
-					repeat list..length:pop r1;
-					delete list;
+					#stackLevel=0;
 					return;
 					def inputFunctions;
 				};
@@ -127,6 +225,7 @@ let parse(code,i,function,hasRecur){
 	};
 	let oldI=i;
 	#i=+i;
+	let args=0;
 	recur output.maxRecur:
 	repeat (i<line..length&&(line..length-oldI)): {
 		let word=line[i];
@@ -139,23 +238,40 @@ let parse(code,i,function,hasRecur){
 			repeat !!line[i]: #returnValue=parse(line[i][0],0,function,1);
 			#i+=2;
 			#continue=0;
+			#args+=1;
 		};
 		let word=line[i];
-		repeat (line[i+1]==">"):{//function a>b ==> (a){#return=b}
+		repeat ((args<2) && (line[i+1]==">")):{//function a>b ==> (a){#return=b}
 			#i+=2;
 			let foo1=newFoo({},function,""...word);
 			#returnValue=parse(line,i,function.addFoo(foo1),1);
 			#continue=0;
+			#args+=1;
 		};
-		repeat !!+continue:{//word
+		let word=line[i];
+		repeat ( (args<2) && !!word && (word!="(") && (word!=">")):{//word
 			let value=function.scope[""...word];
+			repeat !value:debugger (""...word);
 			repeat !value#:{}[];//ERROR:value not defined
 			#returnValue=function.addArg(value,function);
+			#args+=1;
 			#i+=1;
+		};
+		repeat(args>1):{
+			#args-=1;
+			#function.addCall();
 		};
 	};
 	#oldI<->i;
-	repeat !hasRecur repeat (function.numOfArgs==0) #function.getAns<=>{};
+	repeat !hasRecur repeat (args==0) #function.getAns<=>{};
 	repeat !!hasRecur:#return = returnValue;
 	repeat !hasRecur:#return = output;
-};parse(lamda,lamda);
+};
+let main=parse(lamda,lamda);
+call main;
+def let end{
+	null;null;
+	jump->..this;
+};
+def main;
+def heap;

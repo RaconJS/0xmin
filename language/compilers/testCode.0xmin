@@ -1,3 +1,5 @@
+#"tptasm";
+#(){
 (a> b> b) p
 let findArgument=@(argNumber,context)={//:@(Int,Context*)->argument
 	let currentContext=context;

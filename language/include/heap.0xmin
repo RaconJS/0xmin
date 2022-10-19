@@ -4,7 +4,8 @@ void #set:(){//documentation
 		#type int{i29};
 		#type Function{
 			@(...%[])->%[];    //non-macro(#) function(->) that takes in a list(...) of register names(%) that store memory addresses([]) and outputs it to a single output register(%) that stores a memory location([]).
-			call:#(...%)->@{};     //property 'call' is a macro function that takes in no arguments
+			call:#(...%[])->@{};     //property 'call' is a macro function that takes in no arguments
+			inputs:#{...%[]};//array of registers
 		};
 		#type Page{
 			next:@Page*;
