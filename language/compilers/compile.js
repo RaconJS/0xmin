@@ -62,7 +62,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			let wordsData=[];
 			let lines=inputFile.split(/\n[\t ]*/);//getLines is a function so that it doesn't show up in console logs
 			highestSourceLineNumber=Math.max(highestSourceLineNumber,inputFile.split("\n").length);
-			let data={line:0,column:0,file:fileName,i:0,getLines(){return lines;}};
+			let data={line:0,column:0,file:filePath,i:0,getLines(){return lines;}};
 			words.fileName=fileName;
 			words.filePath=filePath;
 			{//do settings
@@ -258,8 +258,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.operator=operator;
 				this.is2Args=is2Args;
 			}
-			static equality(value1,value2){//:bool
-				value1=value1?.toType?.(value2.type);
+			static equality(value1,value2){//:bool 
+				if(value1&&value2){
+					if(value1.type!=value2.type){
+						//labels -> non labels
+						if(value1.type=="label")value1=value1.toType(value2.type);
+						else if(value2.type=="label")value2=value2.toType(value1.type);
+						//a==b --> a.toType(b) === b
+						else value1=value1.toType(value2.type);
+					}
+				}
 				return this.strictEquality(value1,value2);
 			}
 			static strictEquality(value1,value2){//:bool
@@ -1175,7 +1183,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					const fromTypes={
 						"lib":compilerFolder+"../include/",
 						"main":mainFolder,
-						"this":mainFolder+(statement.data.file??"").match(/^[\s\S]*\/|/),
+						"this":(statement.data.file??"").match(/^[\s\S]*\/|/),
 						"compiler":compilerFolder,
 					};
 					word=statement[index];
@@ -1383,9 +1391,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
 				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
-					if(value==undefined||value.type=="undefined"){
+					if(value===undefined||value.type=="undefined"){
 						//sets default labels from scopes
-						//'(..b)' ==> 'this.b' var scope's label
+						//'(..b)' ==> 'this..b' var scope's label
 						//'(.b)' and '(.(b))' ==> 'b' let scope's label
 						//'([b])' ==> 'b'; weak scope's label
 						if(word=="..")value=scope.var.label.toValue("label");
@@ -2234,6 +2242,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			number=0;//relAddress
 			//for 'let value;'
 			allowedLet=false;
+			//tracking line numbers
+				statement;//?:Statement for
+				scope;//?:Scope for 
 			get array(){return this.label?.code;}//code ///arry: Variable|CodeLine; from: Variable.prototype.code
 			set array(val){(this.label??=new Variable()).code=val;}
 			static Number=//Value.Number
@@ -2615,7 +2626,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				const middleScope=new Scope({//allows function to use arguments without them being part of the instance object
 					label:middleLabel,
 					code:(Variable.middleScopeCode??=new Statement()),//:Statement 
-					parent:this.scope??globalScope
+					parent:scope//temporary parent value. Is replaced in the forloop at the bottom
 				});
 				let instanceScope=new Scope({//weak scope
 					fromName:"callFunction",
@@ -2624,50 +2635,74 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					code:codeBlock
 				});
 				let returnObj=newLabel;
+				let useParentVarScope=false;//unused; TODO: fix var scope
 				switch(callType){
 					case"="://class
-					instanceScope.let=instanceScope;
-					instanceScope.var=instanceScope;
-					newLabel.functionPrototype=this.prototype;
-					newLabel.functionSupertype=this.pupertype;
-					middleLabel.labels["this"]=newLabel;
-					middleLabel.labels["return"]=newLabel;
-					middleLabel.labels["arguments"]=argsObj;
-					middleLabel.labels["constructor"]=this;
-					Object.assign(middleLabel.labels,argsObj.labels);
+						instanceScope.let=instanceScope;
+						instanceScope.var=instanceScope;
+						newLabel.functionPrototype=this.prototype;
+						newLabel.functionSupertype=this.pupertype;
+						middleLabel.labels["this"]=newLabel;
+						middleLabel.labels["return"]=newLabel;
+						middleLabel.labels["arguments"]=argsObj;
+						middleLabel.labels["constructor"]=this;
+						Object.assign(middleLabel.labels,argsObj.labels);
 					break;//pure, unpure, 
 					case"=>"://arrow function, has no special labels
-					instanceScope.let=instanceScope;
-					Object.assign(middleLabel.labels,argsObj.labels);
+						instanceScope.let=instanceScope;
+						Object.assign(middleLabel.labels,argsObj.labels);
 					break;
 					case"<="://'using(){}'
-					instanceScope.let=instanceScope;
-					instanceScope.var=instanceScope;
-					instanceScope.parent=globalScope;//instanceScope;
-					newLabel.labels["this"]??=callingValue.parent;
+						instanceScope.let=instanceScope;
+						instanceScope.var=instanceScope;
+						instanceScope.parent=globalScope;//instanceScope;
+						newLabel.labels["this"]??=callingValue.parent;
 					break;
 					case"<-"://'macro(){}'
-					instanceScope.parent=scope;//instanceScope;
-					newLabel.labels["block"]??=scope.label;
-					newLabel.labels["scope"]??=scope.label;
+						instanceScope.parent=scope;//instanceScope;
+						newLabel.labels["block"]??=scope.label;
+						newLabel.labels["scope"]??=scope.label;
 					break;
 					case"->"://'weak(){}' impure function
-					instanceScope.let=scope.let;//takes the scope of the caller
-					instanceScope.var=scope.var;
-					middleLabel.parent=middleLabel;//instanceScope;
+						instanceScope.let=scope.let;//takes the scope of the caller
+						instanceScope.var=scope.var;
+						middleLabel.parent=middleLabel;//instanceScope;
 					break;
 					default:
-					instanceScope.let=instanceScope;
-					middleLabel.labels["arguments"]=argsObj;
-					middleLabel.labels["constructor"]=argsObj;
-					middleLabel.labels[globalScope.symbol]=middleLabel;
-					middleLabel.labels["this"]=callingValue.parent??scope.var.label;
-					middleLabel.labels["return"]=returnObj;
-					Object.assign(middleLabel.labels,argsObj.labels);
-					newLabel.labels["caller"]??=scope.label;
+						instanceScope.let=instanceScope;
+						middleLabel.labels["arguments"]=argsObj;
+						middleLabel.labels["constructor"]=argsObj;
+						middleLabel.labels[globalScope.symbol]=middleLabel;
+						middleLabel.labels["this"]=callingValue.parent??scope.var.label;
+						middleLabel.labels["return"]=returnObj;
+						Object.assign(middleLabel.labels,argsObj.labels);
+						newLabel.labels["caller"]??=scope.label;
+					//
 				}
 				for(let codeScope of codeBlock){
-					if(callType!="<=")middleScope.parent=codeScope;
+					switch(callType){
+						case"=":middleScope.parent=codeScope;break;
+						case"=>":
+							middleScope.parent=codeScope;
+							middleScope.let = codeScope.let;
+							middleScope.var = codeScope.var;
+						break;
+						case"<=":break;
+						case"->":
+							middleScope.parent=codeScope;
+							middleScope.let = codeScope.let;
+							middleScope.var = codeScope.var;
+						break;
+						case"<-":
+							middleScope.parent=codeScope;
+							middleScope.let = codeScope.let;
+							middleScope.var = codeScope.var;
+						break;
+						default:
+							middleScope.parent=codeScope;
+							middleScope.let = codeScope.let;
+							middleScope.var = codeScope.var;
+					};
 					if(codeScope instanceof Scope.CodeObj)
 						await contexts.main({statement:codeScope.code,scope:instanceScope});
 					else await evalBlock(codeScope.code,undefined,instanceScope,statement);
@@ -2872,13 +2907,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return new Value.Number(ans);
 					}),
 					//flat maps all statements in a function. (Makes recursion easier)
-					flat:async({label})=>{
+					"flat":async({label})=>{
 						const symbol=Symbol();
 						function* forEachStatement(statement){
 							for(let word of statement){
-								yield word;
 								if(word instanceof Statement){
+									yield word;
 									yield* forEachStatement(word);
+								}
+								else if (typeof word=="string"){
+									yield new Value({string:word,type:"string"}).toType("label").label;
 								}
 							}
 						};
@@ -2891,9 +2929,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									yield label1;
 									yield* forEachLabel(label1);
 								}
-								if(label1 instanceof Statement){
+								else if(label1 instanceof Statement){
 									yield label1.toLabel();
 									yield* forEachStatement(label1);
+								}
+								else if (label1 instanceof Scope){
+									yield label1.code.toLabel();
+									yield* forEachStatement(label1.code);
+								}
+								else {
+									yield label1;
 								}
 							}
 							delete label[symbol];
