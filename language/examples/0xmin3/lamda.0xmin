@@ -1,8 +1,16 @@
-#"tptasm";#"len";#"table";
+#"tptasm";#"len";
 let lamda(){
-	(a>a a)//(a>b>a b)p p//(a> b>a) p p
-}::{
-	def let .["p"] {r0=0;send r0 "F";return};
+	(f>(a>b>a)(f n))p//(a> >> ^ << ^ p)
+	//(f>x>f1>x1>((a>f1)(f x)x1))p n (a>p p n) n
+}::{//p = print
+	let val{"0"};
+	def let .["p"] {r0=0;send r0 [val];return;#def val};
+	def let .["<<"] {[val]<<=1;return};
+	def let .[">>"] {[val]>>=1;return};
+	def let .["^"] {[val]^=1;return};
+	def let .["v"] {[val]=0;return};
+	def let .["n"] {return};
+	delete val;
 };
 let heap{import lib "heap.0xmin";};
 ...(){
@@ -270,8 +278,7 @@ let parse(code,i,function,hasRecur){
 let main=parse(lamda,lamda);
 call main;
 def let end{
-	null;null;
-	jump->..this;
+	hault;
 };
 def main;
 def heap;
