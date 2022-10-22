@@ -1437,7 +1437,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
 							if(typeof name=="number"){//'a[b]'
 								value.refType="array";
-								if(name<0)name=name+(parent.code?.length??0);//a[]
+								{//handle negative indexes
+									if(name<0)name=name+(parent.code?.length??0);//'a[-n]' => 'a[a..length-n]'
+									if(1/name==-Infinity)name=(parent.code?.length??0);//'a[-0]' => 'a[a..length]'
+								}
 								value.number=name;
 								let newVal=parent.code[name];
 								if(parent instanceof MachineCode){
@@ -1947,7 +1950,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(typeof arg=="number"){
 							if(this.assembly.language=="0xmin"&&i==1&&instruction.type=="command"){
 								//compile address; handles 0xmin quirks
-								let isJump=instruction.args[0]?.name=="jump";
+								let isJump=instruction.args[0]?.name=="jump";//note: 1/-0 == -infinity;
 								binaryArg=(arg<0||1/arg==-Infinity)?(((2*(arg&1)*isJump-arg)&0xff)*0x10)|0x1000:(Math.abs(arg)&0xff)*0x10;
 								binaryValue|=binaryArg;
 								instruction.moveBy=arg|0;//Math.min(Math.max(arg|0??0,-0xff),0xff);
@@ -2277,7 +2280,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
 						.replaceAll(/\t/g,includeAllWhiteSpace?"\\t": "")
 					;
-					string=JSON.parse(string);
+					try{
+						string=JSON.parse(string);
+					}catch(error){
+						console.error("str:",string);
+						throw error;
+					}
 					return new Value({type:"string",string,array});
 				}else{
 					return undefined;
@@ -2851,7 +2859,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						args[1]??=new Value.Number(0);
 						args[2]??=new Variable().toValue("label");
 						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
-						if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
+						{//handle negative indexes
+							if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
+							if(1/args[0]==-Infinity)args[0]=label.code.length;//'a..splice(-0,x,y)' => 'a..splice(a..length,x,y)'
+						}
 						let code=label.code.splice(args[0],args[1],...args[2]);
 						return new Variable({name:"<{splice}>",code}).toValue("label");
 					}),
