@@ -1,0 +1,19 @@
+#"len";
+import lib "var_const.0xmin";
+let count = var("99");
+{//@ count = "99";
+	let startCount=const("9");//int[2]
+	move=>startCount;get;
+	move=>count;set;move 1;set;
+};
+let sub1(count){};
+let printCount(count,setAlu,preString){
+	repeat !!+setAlu:{move=>}
+	let stringPart=preString..splice(-3,2);
+	set jump +3;
+
+};
+"(n) bottles of beer on the wall. (n) bottles of beer. Take one down, pass it around,";
+sub1(count);
+" (n-1) bottles of beer on the wall. ";
+var;const;
