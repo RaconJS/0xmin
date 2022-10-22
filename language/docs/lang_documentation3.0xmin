@@ -51,6 +51,7 @@
 	=> = -> <- //function types
 	:> <: //pipeLineing/external arguments
 	... //concat
+	:: //extend object or function
 	( ) [ ] { } //brackets
 	"" '' ``; //strings
 //defenite brackets
@@ -441,11 +442,42 @@ move 2;/*is the same as:*/move=>move 2;
 move=>move 2;/*is the same as:*/move->move 2;$set:move=>move 2;
 move->move 2;//does not change
 
+code blocks;{
+	a codeBlock is made using curly brackets;
+	e.g. { ...doStuff; } //
+	It contains a list of instructions;
+	when parsed in the metacode phase:
+		It is turned into a list of numbers (aka 0 code), assembly code(aka @ code), functions(aka # code),and compiler code(aka $ code).
+	Code blocks can be named. This can be used to make loops.
+	e.g.
+	{:blockName;
+		jump->blockName;
+	};
+
+};
+function blocks;{
+	function is made by a pair of normal brackets () followed by an optional function type =,=>,<=,<-,-> folloed by a code block {}. the normal brackets contain a list of parameters.
+	all parameters are stored in a scope inbetween the function instance and the parent scope of the function.
+	e.g.
+		let Foo = #(a,b)={a;b};
+		here we make a 'Foo' class. the '=' is what makes it a class.
+		we can also do:
+		let Foo(a,b)={a;b};
+		For more consise syntax; This 2nd example is slightly different than the first one in what it does.
+
+	by default functions return the code block.
+	this can be changed by assigning a value to the inbuilt 'return' label.
+
+	note:
+		#let a = #(){};
+	is exactly the same as
+		#let a;#let a[0] = #(){};
+
+};
 single_expressions;{
 	expressions have the form:
-	+!~ (long_expression) .a.b()()[4]..length();
+	+!~ (long_expression) .a.b()()[4]..length()<:a<:b;
 	single argument operators are included in expressions as well as indexing and function calls.
-	
 	datatypes;{
 		label;{
 			casting: ¬x ;
@@ -494,15 +526,19 @@ single_expressions;{
 		label..state.jump;
 		label..state.ram;
 	};
-}
+};
 long_expressions;{
-	pipeLine;{
+	pipeLine;{#;
 		':>' operator
+		e.g.
 		let foo(a,b,c){
 			;
 		};
 		let a,b,c;
 		a:>b:>foo(c);
+		intended use:
+			//foo1:(a,b)->x; foo2:(x,c)->y
+			foo1(a,b):>c:>foo2();
 	};
 	objectExtending using ::;{
 		'::' operator
@@ -518,6 +554,42 @@ long_expressions;{
 		};
 		used to concatnate objects '{}' or add a function block '(){}';
 	};
+	brackets;{
+		Can use: () {} [] aswell as #() #{} #[];
+		The '#' (aka the meta) symbol can be put infront of a bracket in a long or short expression to distinguish it from function syntax
+		e.g. a = (2+2) ;
+		Here we call the function 'a' as a class.
+		e.g. a = #(2+2);
+		Here we assign 4 to the variable 'a'.
+		In assembly scopes (@). the #(...) can be used to run meta code inbetween assembly lines.
+		e.g. in tptasm: {
+			r0 = #(4*3);//compiles to: mov r0 12
+		}
+	};
+	{:operators;
+		¬;{
+			the ¬ can be used in 2 ways depending on number of argumments.
+			¬x turns a value into a label with the 'symbol' value-subtype.
+			This can be used to make private variables that can only be accessed by curtain parts of the code
+			{:intended use;
+				e.g.
+				let a;
+				{
+					let symbol;
+					#a[¬symbol]=2;
+					let a.returnSymbol(){
+						#return = +a[¬symbol];
+					}
+				};
+			};
+		};
+	};
+	proceedence{
+		except for assignment operators (=,<=>,<->) everything has the same priority.
+		e.g. a+b*c is parsed as (a+b)*c
+		assignment operators are always done last, and have the same priority
+		e.g. a+b=c+d=e+f is parsed as  (a) = #(b = #(c))
+	}
 }
 {//un implemented future potential features
 	static;{
