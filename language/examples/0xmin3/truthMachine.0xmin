@@ -1,0 +1,53 @@
+#"len";
+let accept;
+//note: 'if 1' is executed exactly the same as 'if', 'if 1' is a documentation thing to make 'clear the if flag' more clear
+let red={0x20000000};
+move=>red;get;//clears if flag;
+def let waitLoop;
+or_input;if 1;
+xor;
+if;
+jump 2;
+jump ->waitLoop;
+"\a"#def accept;
+repeat 14:{
+	or_input;
+};
+move=>accept;xor;
+move=>red;or;
+if 1;
+{
+	let one,zero;
+	{
+		move=>one;
+		xor;
+		if;
+	};{
+		jump 2;
+		jump ->one;
+	};{
+		xor;if 1;
+		{
+			move=>zero;
+			xor;
+			if;
+		};{
+			jump 2;
+			jump->zero;
+		};{
+			move=>0xmin;
+			jump->0xmin;
+		};
+	};
+	{
+		$move=>0;
+		"0"#def zero;
+		jump 0;
+	};
+	{
+		$move=>0;
+		"1"#def one;
+		jump-1;
+	};
+};
+def red;
