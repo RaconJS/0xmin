@@ -949,7 +949,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
 							value.label.unDefine();
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true},true);
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true},true);//note: uses 'unshift' mode so that the '$' instructions are in the right order
 							//scope.label.code.push(value.label);
 							value.label.defs.push(scope.parent.label);
 						}else{
@@ -1719,7 +1719,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 										if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
 								}
 								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
-								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel;
+								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' ==> a is an empty label (aka null)
 								value=isNotNull?newLabel?.toValue?.("label")??new Value():null;
 							}else{
 								//sets properties of existing variable
