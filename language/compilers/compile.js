@@ -3312,19 +3312,28 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			+" src:"+decToStr(v.sourceLineNumber,(Math.log10(highestSourceLineNumber)|0)+1)+"| "+v.line
 		).join("\n")
 	;
-	const oxminDisassembler=(code)=>
-		code==1?"\"\\h\"":
-		(
-			(code&0x3000f)<0x10?
-			["move", "jump", "or_input", "red", "blue", "get_jump", "nor", "get", "xor", "and", "or", "set", "if", "set_jump", "null", ""][code&0xf]:
-			(code&0x20030000)==0x20010000?"\"\\a\"":
-			(code&0x20030000)==0x20028000?"\"\\e\"":
-			(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
-			(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
-			(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
-			code.toString(16)
-		)+((code&0x3000f)<=1?(code&0x1000?" -":" +")+((code&0xff0)>>4):"")
-	;
+	const oxminDisassembler=(code)=>{
+		let command=
+			code==1?"\"\\h\"":
+			(
+				(code&0x3000f)<0x10?
+				["move", "jump", "or_input", "red", "blue", "get_jump", "nor", "get", "xor", "and", "or", "set", "if", "set_jump", "null", ""][code&0xf]:
+				(code&0x20030000)==0x20010000?"\"\\a\"":
+				(code&0x20030000)==0x20028000?"\"\\e\"":
+				(code&0x20033000)==0x20020000?"\""+String.fromCharCode(code&0xff)+"\"":
+				(code&0x20033000)==0x20021000?"\"\\p"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+				(code&0x20033000)==0x20022000?"\"\\c"+((code&0xf0)>>4).toString(16)+(code&0xf).toString(16)+"\"":
+				code.toString(16)
+			)
+		;
+		return command+(
+			(code&0x3000f)<=1?
+			code&0x1fff==0x1011?
+				" +1"//0x1011 -> jump -1
+				:(code&0x1000?" -":" +")+( ((code&0xff0)>>4)-2*(!!((code&0x10)&&((code&0xf)==1))) )
+			:""
+		);
+	};
 	let settingsObj=globalScope.mainObject.labels["settings"].labels;//:Variable().labels
 	if(settingsObj["log_length"].lineNumber||settingsObj["log_code"].lineNumber||settingsObj["log_table"].lineNumber){
 		console.log(
