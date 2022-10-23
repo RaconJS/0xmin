@@ -1,19 +1,98 @@
-#"len";
+#"len";#"table";
 import lib "var_const.0xmin";
-let count = var("99");
-{//@ count = "99";
+let count = var("90");
+move 1;
+repeat 0 {//@ count = "99";
 	let startCount=const("9");//int[2]
 	move=>startCount;get;
 	move=>count;set;move 1;set;
 };
-let sub1(count){};
-let printCount(count,setAlu,preString){
-	repeat !!+setAlu:{move=>}
-	let stringPart=preString..splice(-3,2);
-	set jump +3;
-
+let sub1(count){
+	let list=var({
+		#let i=-1;
+		"9";
+		repeat 9:def: ¬(""...+(i=i+1));//[0-8]
+	});
+	move=>count+1;get;
+	def let subDigit{
+		move=>const(0x2000000f);and;
+		move=>const(0x02000000);or;
+		move=>const({0 1}..compile[0]);red;
+		//assume: {move}..compile[0] == 0;
+		//assert: alu:move +count;
+		let command;
+		move=>command;set;
+		move=>const({0 -0}..compile[0]);
+		or;
+		move=>list;
+		jump -0;
+		set jump+3;
+		null#def command;//move->list[count];
+		get;//alu=list[count];
+		null;//move<-list[count];
+		jump -0;
+	};
+	null#def let subDigit.returnTo;//:command jump->next instruction
+	move=>count+1;set;
+	{:if;
+		let then,else;
+		move=>const("9");
+		if 1;xor;
+		if;//if !(count[1]=="9"); -> handle carry
+		jump->if..return #def then;
+		#def else;//else: handle carry
+		let returnTo;
+		move=>var({
+			$jump=>subDigit..return..state.jump;
+			$move=>subDigit..return..state.move;
+			jump->returnTo;
+			$jump=>0;
+		});
+		get;
+		move=>subDigit.returnTo;set;
+		move=>count;get;
+		move=>subDigit..state.move;
+		jump->subDigit;
+		$move=>subDigit..return..state.move;
+		#def returnTo;
+		move=>count;set;
+		move=>const({null}..compile[0]);get;
+		move=>subDigit.returnTo;set;
+		move=>then..state.move;
+	};
 };
-"(n) bottles of beer on the wall. (n) bottles of beer. Take one down, pass it around,";
+let printCount(preString){
+	move=>count;
+	get;
+	set jump +3;
+	move 1;
+	get;
+	null;
+	set jump +3;
+	repeat 3 null;
+};
+def let loop;
+printCount();
+//" bottles of beer on the wall. ";
+//printCount();
+//" bottles of beer.";
 sub1(count);
-" (n-1) bottles of beer on the wall. ";
-var;const;
+//" Take one down, pass it around, ";
+//printCount();
+//" bottles of beer on the wall. ";
+let bridge;
+def:{:block;
+	jump->block..return;
+	$move=>loop..state.move;
+	jump->loop#def bridge;
+	$move=>block..state.move;
+	var;
+	const;
+	$move=>block..state.move;
+};" ";/*
+"\p00";
+repeat 16 repeat 12 " ";
+"\p00";*/
+move=>loop..state.move;
+null;
+jump->bridge;
