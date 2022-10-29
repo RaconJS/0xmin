@@ -33,7 +33,8 @@ variables:
   equalSigns: '<=>|<=|=>|=|==|<->|<-|->'
   assembly_operators: '<->|<-|->'
   operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?¬]'
-  operators_functionCallArgs: '::|:>|<:'
+  operators_functionCallArgs: ':>|<:'
+  objectExtentionSymbol: '::'
   assembly_commands_special: '\b(?:get\s+jump\s+\-1|set\s+jump\s+\+3|or\s+input)\b'
   assembly_commands_start: '(?<=^|;|@|:|{)\s*'
   assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump|or_input|get_jump|set_jump)\b'
@@ -441,6 +442,8 @@ contexts:
       scope: support.constant.operator.0xmin
     - match: '{{operators_functionCallArgs}}'
       scope: keyword.argumentJoiner.0xmin
+    - match: '{{objectExtentionSymbol}}'
+      scope: keyword.objectExtender.0xmin
     - match: '{{operators}}'
       scope: keyword.operator
     - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:{{functionCallSymbols}}\s*)?{)' # foo(param1,param2){}
