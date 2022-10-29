@@ -1391,7 +1391,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
 				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
-					if(value===undefined||value.type=="undefined"){
+					//'()'-> null, '' -> undefined
+					if(value===undefined||value?.type=="undefined"){//TODO: add undefined and null types to the Value class
 						//sets default labels from scopes
 						//'(..b)' ==> 'this..b' var scope's label
 						//'(.b)' and '(.(b))' ==> 'b' let scope's label
@@ -1400,8 +1401,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(word==".")value=scope.let.label.toValue("label");
 						if(word=="[")value=scope.label.toValue("label");
 					}
+					else if(value===null){}
 					let isInternal=word=="..";
-					let parent=value.label;
+					let parent=value?.label;
 					value=new Value({parent});
 					let oldIndex=index;
 					let name,nameFound=false;
@@ -1443,8 +1445,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								}
 								value.number=name;
 								let newVal=parent.code[name];
-								if(parent instanceof MachineCode){
-									value=value.toType("number");
+								if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
+									value.type=value.toType("number");
 									//TODO: throw error if index out of range
 									value.number=newVal.binaryValue;
 								}
