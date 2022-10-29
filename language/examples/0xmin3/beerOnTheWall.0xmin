@@ -1,9 +1,9 @@
-#"len";#"table";
+#"len";//#"table";
 import lib "var_const.0xmin";
-let count = var("90");
+let count = var("99");
 move 1;
-repeat 0 {//@ count = "99";
-	let startCount=const("9");//int[2]
+repeat 0 def let innit{//@ count = "99";
+	let startCount=const({"9"}[0]);//int[2]
 	move=>startCount;get;
 	move=>count;set;move 1;set;
 };
@@ -25,18 +25,16 @@ let sub1(count){
 		move=>const({0 -0}..compile[0]);
 		or;
 		move=>list;
-		jump -0;
 		set jump+3;
 		null#def command;//move->list[count];
 		get;//alu=list[count];
 		null;//move<-list[count];
-		jump -0;
 	};
 	null#def let subDigit.returnTo;//:command jump->next instruction
 	move=>count+1;set;
 	{:if;
 		let then,else;
-		move=>const("9");
+		move=>const({"9"}[0]);
 		if 1;xor;
 		if;//if !(count[1]=="9"); -> handle carry
 		jump->if..return #def then;
@@ -72,14 +70,15 @@ let printCount(preString){
 	repeat 3 null;
 };
 def let loop;
+let plurals={};
 printCount();
-//" bottles of beer on the wall. ";
-//printCount();
-//" bottles of beer.";
+" bottle";"s"#def let plurals[0]={};" of beer on the wall. ";
+printCount();
+" bottle";"s"#def let plurals[1]={};" of beer.";
 sub1(count);
-//" Take one down, pass it around, ";
-//printCount();
-//" bottles of beer on the wall. ";
+" Take one down, pass it around, ";
+printCount();
+" bottle";"s"#def let plurals[2]={};" of beer on the wall. ";
 let bridge;
 def:{:block;
 	jump->block..return;
@@ -89,10 +88,55 @@ def:{:block;
 	var;
 	const;
 	$move=>block..state.move;
-};" ";/*
+};
+let repeat(n,do){//(n:int,do:#(var(1<<lel))->{@})->{@}
+	let i=var(0);
+	move=>var(1<<n);get;move=>i;set;
+	repeat (n>0) def:{:loop;
+		do(i);
+		move=>i;get;if 1;
+		move=>const(2);blue;
+		move=>i;set;
+		if;jump->loop;
+	};
+};
+let return,jumpTo;
+let loopRound={
+	repeat 0 {:block;
+		jump->block..return;
+		def let state;
+		$move=>return..state.move;
+		def jumpTo;
+		set jump +3;
+		jump->return;
+		$move=>state..state.move;
+	};
+	move=>loop..state.move;
+	jump->bridge;
+};
+repeat 0 {:checkForEnd;
+	let breakIfEqual(index,value){
+		move=>count +index;get;if 1;
+		move=>const(value);xor;if;
+		move=>checkForEnd..return..state.move;
+		jump->checkForEnd..return;
+	};
+	def let onLastVerse{
+		let null=const({null}..compile[0]);
+		move=>null;get;
+		let i=0;
+		repeat plurals..length:{
+			move=>plurals[i];set;
+			#i=i+1;
+		};
+		move=>const({jump+1}..compile[0]);get;
+		jump->loopRound+1;
+		#def return;//move=>loopRound..return-1;set;
+		"done\h";
+	};
+};
 "\p00";
-repeat 16 repeat 12 " ";
-"\p00";*/
-move=>loop..state.move;
-null;
-jump->bridge;
+def repeat(4)<:{};
+def repeat(16)<:{repeat 12 " ";};
+"\p00";
+def loopRound;
