@@ -1223,9 +1223,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			const state={"let":false,"set":false,"def":false,"run":false,"codeof":false,"labelsof":false};
 			let found;
 			({index,found}=contexts.keyWordList({keywords:state,statement,index,scope}));
-			if(!found){state["def"]=true;}
+			if(!found){state["let"]=state["set"]=state["def"]=true;}
 			let value;
-			({index,value}=await contexts.expression_short({statement,index,scope}));
+			({index,value}=await contexts.expression({statement,index,scope}));
 			const label=Variable.fromValue(value);
 			if(label){
 				if(state["let"]|state["labelsof"])Object.assign(scope.let.label.labels,label.labels);
