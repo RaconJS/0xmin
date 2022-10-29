@@ -1,0 +1,37 @@
+//macro version
+#"0xmin";#"len";
+//note: since 0xmin is the default assembly language, the #"0xmin"; is not needed.
+let max=99;
+let i = 99;
+let verse(i){
+	...(""...+i);" bottles of beer on the wall. ";
+	...(""...+i);" bottles of beer.";
+	" Take one down, pass it around, ";
+	...(""...+(i-=1));" bottles of beer on the wall. ";
+};
+def:{
+	repeat (max-2):...verse(i);
+	"2 bottle of beer on the wall. ";
+	"2 bottle of beer. ";
+	"Take it down, pass it around, ";
+	"1 bottle of beer on the wall. ";
+	"1 bottle of beer on the wall. ";
+	"1 bottle of beer. ";
+	"Take it down, pass it around, ";
+	"no more bottles of beer on the wall.\h";"\h";
+}::{repeat 1...(){
+	#;
+	:block;
+	let screenSize=16*12;
+	let rep=..length/screenSize;
+	repeat (rep|0!=+rep):#rep=rep|0+1;
+	let newBlock;
+	repeat rep:{//note: repeat rounds down.
+		#;
+		let a=..splice(0,screenSize);
+		newBlock..splice(-0,0,{a});
+		newBlock..splice(-0,0,"\p00");
+	};
+	#..this<=>newBlock;
+	delete;
+}};
