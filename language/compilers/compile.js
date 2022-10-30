@@ -1225,7 +1225,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			({index,found}=contexts.keyWordList({keywords:state,statement,index,scope}));
 			if(!found){state["let"]=state["set"]=state["def"]=true;}
 			let value;
-			({index,value}=await contexts.expression({statement,index,scope}));
+			({index,value}=await contexts.expression({statement,index,scope,includeBrackets:false}));
 			const label=Variable.fromValue(value);
 			if(label){
 				if(state["let"]|state["labelsof"])Object.assign(scope.let.label.labels,label.labels);
@@ -1445,17 +1445,17 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								}
 								value.number=name;
 								let newVal=parent.code[name];
-								if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
-									value.type=value.toType("number");
-									//TODO: throw error if index out of range
-									value.number=newVal.binaryValue;
-								}
-								else if(newVal instanceof AssemblyLine){
+								if(newVal instanceof AssemblyLine){
 									let code=newVal;
 									let number=code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 									value.type="label";
 									let type= code.dataType=="char"?"string":"number";
 									value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
+									
+									if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
+										value=value.toType("number");
+										//TODO: throw error if index out of range
+									}
 								}
 								else value.label=
 									newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
@@ -1664,7 +1664,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			else if(value.type=="array")return !!value.array;
 			else return false;
 		},
-		async expression({index,statement,scope,startValue=undefined,includeBrackets=true,shouldEval=true}){//a + b
+		async expression({index,statement,scope,startValue=undefined,includeBrackets=false,shouldEval=true}){//a + b
 			let value=new Value();
 			const argsObj=new Variable({code:[]});
 			const args=argsObj.code;//:Value[]
@@ -2119,7 +2119,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(arg instanceof bracketClassMap["("]){//code tree
 					const scope=undefined;
 					throw Error("compiler error: @: scope is not defined. '@()' is not supported yet");
-					let {value,index}=await contexts.expression({index:0,statement:arg,scope});
+					let {value,index}=await contexts.expression({index:0,statement:arg,scope,includeBrackets:false});
 					arg=value;
 				}
 				if(arg instanceof HiddenLine){

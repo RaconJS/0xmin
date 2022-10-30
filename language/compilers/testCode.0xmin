@@ -1,5 +1,2 @@
-#;
-let a = {1}..compile;
-a[0]=3;//does not assign as a[0] returns a number instead of an indexed label
-//..compile returns a MachineCode object.
-debugger +a[0];
+let a;
+debugger{$ def set a}"label.code[0]";
