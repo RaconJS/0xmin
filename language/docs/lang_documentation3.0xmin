@@ -235,10 +235,17 @@ $;{
 };
 #;{
 	#let set def;//are executed in that order
-	#let: label;/*creates a label. Can add this to the block scope e.g.*/ let label=0; /* or to the parent object e.g.*/ let object.label=2;
+	#let: label;/*creates a label. Can add this to the local block scope e.g.*/ let label=0; /* or to an existing object e.g.*/ let object.label=0;
 	//if a label exists it will replace it. labels can not be created through expressions like in javascript*/
-	/*e.g.*/#set: object.newProperty=2;/*will not do anything*/  
-	
+	//i.e. labels must be created using `let`
+	/*e.g.*/#set: object.newProperty=2;/*will not do anything*/
+	/*technically*/
+		#let:/*takes in as arguments: a single expression, followed by a long expression. The short expression becomes the 1st argument in the long expression e.g.*/let (["short"..."expression"]) * long + expression;
+		/*. This is then used for the new label.*/
+		special cases:
+			{let a = a + 2} -> {let b=a+2;let a=b;delete b}:/*If the next symbol is*/ = /*then it creates the label after the long expression. e.g.*/let a=a+1;/*Other wise it creates the label before evaluating the long expression. e.g.*/let a::{def let a.b=2;};
+			{def let a:>foo()} -> {let a;def a:>foo()}:/*:> is ignored in the first short expression. This is to allow type conversions. e.g.*/let a :> float(2);/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
+	//----
 	#let set: label;//creates a new label if it does not already exist in this scope.
 	#let set: label.property;//only creates a new property if it does not exist.
 	#let set: a=b;//'let set' can be used for expressions just like and '#' operator
