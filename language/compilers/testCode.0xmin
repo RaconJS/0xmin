@@ -1,1 +1,4 @@
-debugger 0xmin.Math.sin(0xmin.Math.TAU/4);
+let foo(a){
+	debugger a"label.name";
+};
+#let b:>foo();

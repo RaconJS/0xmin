@@ -727,7 +727,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					let keywords={"void":false,"virtual":false,"static":false};
 					({index}=contexts.keyWordList({index,statement,scope,keywords}));
 					Object.assign(state,keywords);
-					({index}=contexts.phaseSetter({index,statement,scope,state}));
+					if(keywords["void"]||keywords["virtual"]||keywords["static"])
+						({index}=contexts.phaseSetter({index,statement,scope,state}));
 				}
 				//TODO: 'virtual': allow the: 'virtual...(){  }' paturn to work
 				let virtualLine;
@@ -910,7 +911,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(endingStringList.includes(word)){break;}
 					if(metaState["let"]){
 						let value;
-						({value,index}=await contexts.expression_short({statement,index,scope}));
+						({value,index}=await contexts.expression_short({statement,index,scope,argsObj:contexts.noPipeLineing}));
 						if(value){
 							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
 							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
@@ -935,6 +936,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							}else{
 								startValue=value;
 							}
+							({value:startValue,index}=await contexts.expression_fullExtend({statement,index,scope,value:startValue}));//allow '#let a:>foo()'->'#let a;#set a:>foo();'
 						}
 					}
 					let value;
@@ -1382,6 +1384,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				value??=null;
 				return{value,index};
 			},
+			noPipeLineing:Symbol(),
 			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
 				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
@@ -1482,9 +1485,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					argsObj.obj={};
 					argsObj.list=[];
 					return {index,value};
-				}else if(word==":>"){
+				}else if(word==":>"&&argsObj!=contexts.noPipeLineing){
 					argsObj??=new ArgsObj({obj:{},list:[]});
 					for(let i=index;i<statement.length;i++){
+						//argsObj==NaN -> don't use pipeline
 						if(statement[index]==":>"){//pipeLine
 							index++;
 							argsObj.obj[value.name]=value;
