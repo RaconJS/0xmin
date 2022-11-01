@@ -6,7 +6,7 @@ let var,const,remove,blockScope,getState,save,load,Function;
 	blockScope:#(#()->{@})->{@};
 	Function:#(@(...%)->...%)->@(...%)->...%;
 }
-let registerStack{:this;#;
+let registerStack{#;
 	let dataLen=0;
 	let maxRegisters=14;
 	let consts=[];
