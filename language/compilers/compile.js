@@ -29,6 +29,7 @@ function loga(...args){console.log(...args);};
 	Object.doubleFreeze=(obj)=>{
 		for(let i in obj)if(obj.hasOwnProperty(i)&&typeof obj[i]=="object")Object.freeze(obj[i]);
 		Object.freeze(obj);
+		return obj;
 	};
 //----
 const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//language:'0xmin'|'tptasm'
@@ -2790,7 +2791,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 		}
 		//Internal
-			class BuiltinFuntion extends Variable{//'{builtIn}'
+			class BuiltinFunction extends Variable{//'{builtIn}'
 				constructor(name,foo,data){super(data??{});this.run=foo;this.name="{"+name+"}";}
 				run=({value,args})=>new Value();
 				async callFunction({args={},value:callingValue,scope}){
@@ -2805,11 +2806,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					})};
 				}
 			}
-			class BuiltinFunctionFunction extends BuiltinFuntion{
+			class BuiltinFunctionFunction extends BuiltinFunction{
 				constructor(name,foo,data){//'a..b(1,2);'
 					super(name,()=>{},data);
 					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
-					this.#functionAsValue=new BuiltinFuntion(name,foo).toValue("label");
+					this.#functionAsValue=new BuiltinFunction(name,foo).toValue("label");
 				}
 				#functionAsValue;//:const Value<label>
 				async callFunction({args={},value:callingValue,scope}){
@@ -2838,8 +2839,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				constructor(){
 					super();
 					for(let i in this.labels){
-						if(this.labels.hasOwnProperty(i)&&!(this.labels[i] instanceof BuiltinFuntion))
-							this.labels[i]=new BuiltinFuntion(i,this.labels[i]);
+						if(this.labels.hasOwnProperty(i)&&!(this.labels[i] instanceof BuiltinFunction))
+							this.labels[i]=new BuiltinFunction(i,this.labels[i]);
 					}
 				};
 				labels={//'a..b'
@@ -3228,7 +3229,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
 				"log_length":new Variable({name:"log_length",lineNumber:0}),//:1|0
 				"model":new Variable({name:"model",lineNumber:0}),//:1|0
-				"language":new BuiltinFuntion("language",({args})=>{
+				"language":new BuiltinFunction("language",({args})=>{
 					if(args[0]){//args[0]:Value
 						let str=args[0].toType("string").string;
 						if(["tptasm", "0xmin"].includes(str)){
@@ -3242,14 +3243,18 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		"Math":Object.doubleFreeze(new class MathObj extends Variable{
 			constructor(){
 				super({name:"Math"});
-				for(let i in Math){
+				for(let i of ["abs","acos","acosh","asin","asinh","atan","atan2","atanh","cbrt","ceil","clz32","cos","cosh","exp","expm1","floor","fround","hypot","imul","log","log10","log1p","log2","max","min","pow","random","round","sign","sin","sinh","sqrt","tan","tanh","trunc"]){
 					if(Math.hasOwnProperty(i)){
-						this[i]=new BuiltinFunctionFunction(i,
+						this.labels[i]=new BuiltinFunction(i,
 							({args})=>new Value.Number(Math[i](...(args.map(v=>v.toType("number").number))))
 						,{});
 						Object.doubleFreeze(this[i]);
 					}
 				}
+				for(let i of ["E","LN10","LN2","LOG10E","LOG2E","PI","SQRT1_2","SQRT2"]){
+					this.labels[i]=Variable.fromValue(new Value.Number(Math[i]),null);
+				}
+				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),null);
 				Object.doubleFreeze(this.labels);
 			}
 		})

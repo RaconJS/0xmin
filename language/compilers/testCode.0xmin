@@ -1,1 +1,1 @@
-debugger 0xmin.Math;
+debugger 0xmin.Math.sin(0xmin.Math.TAU/4);
