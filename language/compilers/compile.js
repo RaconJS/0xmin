@@ -288,6 +288,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			constructor(){
 
 			}
+			//main_assembly:#()->{@}
+			//compileAssemblyLine:@(@)->{0}
+			//assemblyLineToLabel:(AssemblyLine)->Variable
+			//setLanguage:({context})->void
+			//
 			keywordsRegex=/^(?:%|(?:[&|^+\-]|>>[>\-]?|[<\-]?<<)?=|->|hault|jump|if|null|store|carry|sign|overflow|0|\+|-|[!><=]=?|port|bump|wait|push|pop|call|return)$/;
 			registerSymbol="%";
 			ifParts=[];
@@ -716,31 +721,19 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//TODO: add 'break', to be similar to the old compiler
 					break parsing;
 				}
-				if(["void", "static", "virtual", "#", "$", "@"].includes(word))
-				loop:for(let i=index;i<statement.length;i++){
-					let word=statement[index];
+				({index}=contexts.phaseSetter({index,statement,scope,state}));
+				if(state.phase==""||state.phase=="#"){
+					let keywords={"void":false,"virtual":false,"static":false};
+					({index}=contexts.keyWordList({index,statement,scope,keywords}));
+					Object.assign(state,keywords);
 					({index}=contexts.phaseSetter({index,statement,scope,state}));
-					switch(word){
-						case"void"://does not add code to block
-							state.void=true;index++;break;
-						case"static"://UNUSED; does not add code to function; Allows code to be run in function block
-							state.static=true;index++;break;
-						case"virtual":
-							state.virtual=true;index++;break;
-						case":":
-							index++;break loop;
-						break;
-						default:{
-							break loop;
-						}
-					}
 				}
 				//TODO: 'virtual': allow the: 'virtual...(){  }' paturn to work
 				let virtualLine;
 				if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
 				commands:{
 					word=statement[index];
-					if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
+					if(state.phase==""||state.phase=="#")if(["repeat", "recur"].includes(word)){//repeat 10: recur 10:
 						index++;
 						const repeatingIndex_number=index;
 						const calcReps=async()=>{
@@ -2255,7 +2248,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			static Number=//Value.Number
 			class Number extends Value{constructor(number,data={}){super({number,type:"number",...data});}}
 			static String=//Value.String
-			function Value_String(rawString){//:Value.String?
+			function Value_String(rawString){//(string)->Value.String?
 				if(rawString&&"\"'`".includes(rawString[0])){
 					let includeAllWhiteSpace=rawString[0]=="`";
 					let array=rawString.substr(1,rawString.length-2)//(string|char)[]
