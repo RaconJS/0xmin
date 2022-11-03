@@ -830,7 +830,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							);
 							index++;
 						}
-						let {value,failed}=await contexts.delcareFunctionOrObject({statement,index,scope});
+						let value,failed=true;
+						if(state.phase=="")//||state.phase=="$"
+							({value,failed}=await contexts.delcareFunctionOrObject({statement,index,scope}));
 						if(!failed&&value?.label){
 							newScope.label.code.push(value.label);
 						}

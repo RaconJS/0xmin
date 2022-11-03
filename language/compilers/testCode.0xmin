@@ -1,4 +1,6 @@
-let foo(a){
-	debugger a"label.name";
-};
-#let b:>foo();
+#"tptasm";
+push 1;
+push 1;
+[sp]=0xffff;
+[sp]=pop;
+hlt;
