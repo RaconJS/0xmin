@@ -1,6 +1,4 @@
-#"tptasm";
-push 1;
-push 1;
-[sp]=0xffff;
-[sp]=pop;
-hlt;
+let a{
+let b(){debugger caller"value";}
+};
+#a.b();

@@ -12,6 +12,7 @@
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
 //TODO: @0xmin: add support for long jumps
 //TODO: allow "->" "=>" operators (that return a HiddenLine) inside expression_short
+//TODO: add 0xminMath.random(seed)
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
