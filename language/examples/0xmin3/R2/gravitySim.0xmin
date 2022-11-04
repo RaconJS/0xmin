@@ -11,15 +11,20 @@
 			def force;
 			def addForce;
 			def doInteraction;
+			def doStep;
 			null;
+			def partList;
 			def var,const;
 			null;
 		};
 		def main;
 		{
-			push part(vec(1,4)):>var();
-			push part(vec(4,8)):>var();
-			call doInteraction;
+			let scale=3;
+			repeat 3:push part(
+				vec(0xmin.Math.random()*scale,0xmin.Math.random()*scale)
+			):>addPart();
+			call doStep;
+			jump->main;
 			hlt;
 		};
 	};
@@ -59,9 +64,9 @@
 			%a=pop;
 			//assume: %a>0,%b>0,all registers are free
 			{	
-				r b1 = r b;
 				r dp = float.fixedPoint;
 				r ans = 0;
+				r b1 = r b;
 				def:{//shift b<<end
 					:loop;
 					r a-= r b;
@@ -85,7 +90,7 @@
 						r a += r b;
 						r b>>=1;
 						r dp>>=1;
-						jump->loop;
+						jump->loop if !=0;
 					};
 					r ans|=r dp;
 					r b>>=1;
@@ -287,7 +292,7 @@
 			};
 			jump->r ret;
 		};
-		let addForce{//@(pop part* a,pop part* b,pop float force)->push part* a, mutate (a.a, b.a)
+		let addForce{//@(pop part* a,pop part* b,pop float force)->push part* a,b & mutate (a.a, b.a)
 			let a=part=()<->0,b=part=()<->1;//a,b:%part*;
 			let force=2;//:float
 			let ret=3;
@@ -335,11 +340,12 @@
 				[r b + b.a.y]+=r dif.(1);
 			};
 			push r a;
+			push r b;
 			jump->[data.ret];
 			def data;
 		};
 		let doInteraction{
-			//@(pop part* a,pop part* b)->push part* b
+			//@(pop part* a,pop part* b)->push part* a, b
 			let a=part=()<->0,b=part=()<->1;//a,b:%part*;
 			let ret=10;
 			let ans=a;
@@ -360,8 +366,111 @@
 			};
 			jump->r ret;
 		};
+		let partList{
+			let length;//:int
+		};
+		let addPart(part){
+			#partList::{def part};
+			#partList.length<->partList..length-1;
+			#return = part;
+		};
+		let forLoop(start,while,next,do,end)={//(...((sp int,sp,{@})->{@})[])->{@}
+			let stack=0;//:sp
+			let i;//:sp int
+			start(i,stack,this);
+			#def let loop;
+			while(i,stack,this);
+			let stack1<->stack;
+			let endBlock;
+			jump->endBlock if<=0;
+			do(i,stack1,this);
+			next(i,stack,this);
+			jump->loop;
+			def endBlock;
+			#def end(i,stack,this)||{pop r0};
+		};
+		let drawPart(char){//:(pop part*,char) -> push part*
+			let scale = 4;//:#int
+			let a=part():>type_register_pointer(0);//:%part*
+			let moveCurser=1;//:%char
+			let coords = vec():>type_register(2);//%[] & vec
+			r a = [sp];
+			r coords.x = [r a + a.s.x];
+			r coords.y = [r a + a.s.y];
+			{:scaleCoords;//c*4
+				r coords.x>>(float.fixedPointBitNumber-2);
+				r coords.y>>(float.fixedPointBitNumber-2);
+			};
+			{//get
+				r coords.x&=0xf;
+				r coords.y&=0xf;
+				r moveCurser = r coords.y;
+				r moveCurser << 4;
+				r moveCurser |= r coords.x;
+				r moveCurser |= "\p00";
+			};
+			let const_0=4;
+			r const_0=0;
+			send r const_0 r moveCurser;
+			send r const_0 char.(0);
+		};
 		let doStep{
-			let fo
+			let partSize = part=().size;
+			//type sp : stack* | [stack]
+			let loop{
+				let start(i,stack){
+					push partList;//:part*
+					#stack<->-1;
+					#i<->-1;//sp part*
+				};
+				let while(i,stack){
+					r0 = partList..return;
+					r0-= [sp+(i-stack)];
+				};
+				let next(i,stack){
+					[sp+(i-stack)]+=partSize;
+				};
+				let end(){pop r0};
+			};
+			//update possisions a,v,s
+			forLoop(loop.start,loop.while,loop.next)
+			<:(i,stack,loopI){
+				def let draw= drawPart(" ");
+				...labelsof draw;//a:%part*,coords:%[]vec,const_0:% int 0
+				let carry = const_0;//:%float
+				r carry = [r a + a.a.x];
+				[r a + a.v.x] += r carry;
+				[r a + a.a.x] = 0;
+				r carry = [r a + a.a.y];
+				[r a + a.v.y] += r carry;
+				[r a + a.a.y] = 0;
+
+				r carry = [r a + a.v.x];
+				[r a + a.s.x] += r carry;
+				r carry = [r a + a.v.y];
+				[r a + a.s.y] += r carry;
+				drawPart(".");
+			}<:loop.end;
+			//interactions
+			forLoop()
+			<:loop.start
+			<:loop.while
+			<:loop.next
+			<:(i,stack,loopI){
+				forLoop()
+				<:(j,stack){
+					push partList;//part*
+					#stack<->-2;
+					#j<->-2;//:sp part*
+				}
+				<:loop.while
+				<:loop.next
+				<:(j,stack,loopJ){
+					let a=0,b=a;//:%part*
+					call doInteraction;
+				}<:loop.end;
+			}<:loop.end;
+			return;
 		};
 	};
 	main();
@@ -396,8 +505,9 @@
 		#let set class..prototype..prototype=constructor.prototype;
 		#class..proto=m_class..prototype;
 		#class::{()={
-			repeat !size:let size=..compile;
-			#..compile;}};
+			repeat !size:let size=..compile..length;
+			#..compile;
+		}};
 		#class..prototype::{
 			repeat !argsLen;
 			let new(){//:(...%[])->push[Context*]
@@ -451,7 +561,7 @@
 		//(instanceObject)->dataSubType
 		let type_register(object,startAt)={#;//:#(struct)->%[] struct aka an object across multiple registers
 			repeat !startAt:startAt=0;
-			object..splice(0,0,{$ram=>startAt});
+			object..splice(0,0,{$set ram=>startAt});
 			object..compile;
 			object..splice(0,1);
 			object<->startAt;
@@ -459,7 +569,7 @@
 		}:>dataType();
 		let type_register_pointer(object,registerNum)={#;//:#(struct,%)->%struct* aka [%type]
 			repeat !registerNum:registerNum=0;
-			object..splice(0,0,{$ram=>0});
+			object..splice(0,0,{$set ram=>0});
 			object..compile;
 			object..splice(0,1);
 			object<->registerNum;
@@ -467,7 +577,7 @@
 		}:>dataType();//type->type*
 		let memoryAddress(object,location)={#;//:#(type)->type*
 			repeat !!location:{
-				object..splice(0,0,{$ram=>location});
+				object..splice(0,0,{$set ram=>location});
 				object..compile;
 				object..splice(0,1);
 				object<->location;
