@@ -1,4 +1,15 @@
-let a{
-let b(){debugger caller"value";}
+#"table";
+let foo,class,weak,arrow,using,macro;
+//existing in javascript
+let foo(){};
+let class()={};
+
+//only in 
+let macro()<-{};
+let weak()->{let b;1;};
+let arrow()=>{};
+let using()<={
+	
 };
-#a.b();
+#weak();
+debugger ..length;
