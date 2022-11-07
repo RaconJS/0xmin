@@ -1,4 +1,4 @@
-#"tptasm";#"len";
+#"tptasm";#"len";#"table";
 let lamda(){
 	(f>(a>b>a)(f n))p//(a> >> ^ << ^ p)
 	//(f>x>f1>x1>((a>f1)(f x)x1))p n (a>p p n) n
@@ -50,6 +50,7 @@ let heap{import lib "heap.0xmin";};
 		def let argument{0};//:Function*
 	}:>m_class(2)<:{
 	};
+	let spareReg=heap.malloc.nextReg.n+1;
 	let FunctionInstance()={
 		let context{0};//:Context*
 		let function{0};//:Function*
@@ -63,7 +64,7 @@ let heap{import lib "heap.0xmin";};
 			@0x31BF0020;//-> @jump->[ip+2]; //jump-> function
 		};
 		let rMemory=heap.malloc.outputs[0];
-		let spare=rMemory+1;
+		let spare=spareReg;
 		let i=0;
 		repeat 2:{
 			swm=#(vals[i]>>16);
@@ -98,53 +99,67 @@ let newFoo(code,function,argName)={//:Function
 	};
 	let numOfArgs=0;
 	let block={...codeof code};
+	//this program does not clean up it's memory usage.
+	//I have not learnt how to do that yet. This is fine for smaller lamda expressions.
 	let addFoo(arg){//arg from heap
 		//arg:Function*
 		#set block{
-			let foo=FunctionInstance=();
-			push r registers.context;//:Context*
-			push arg;//:Function*
-			foo.new();//:(pop Context*,Function*)->push FunctionInstance*
+			def let addFoo{
+				let foo=FunctionInstance=();
+				push r registers.context;//:Context*
+					//new
+						push r registers.context;//:Context*
+						push arg;//:Function*
+					foo.new();//:(pop Context*,Function*)->push FunctionInstance*
+				//assume registers.context<14
+				pop r #(registers.context+1);//:%FunctionInstance*
+				pop r registers.context;//:%FunctionInstance*
+				push r #(registers.context+1);
+			};
 		};
 		#return=arg;
 	};
 	let addArg(arg,scope){//arg on stack 'arg'
 		//arg:index, scope:
 		let isNormalArgument=!arg[¬newFoo];
-		repeat !!+isNormalArgument:
 		#set block{
-			let currentContext=+registers..length;//:%Context*
-			#currentContext = Context=() <-> currentContext;
-			r currentContext = r registers.context;
-			//let i = 2;//:%
-			let argNumber=getArg(arg,scope);
-			let getParentContext(){
-				r currentContext = [r currentContext + currentContext.parent];
+			def let addArg{
+				repeat !!+isNormalArgument:...set{
+					let currentContext=+registers..length;//:%Context*
+					#currentContext = Context=() <-> currentContext;
+					r currentContext = r registers.context;
+					//let i = 2;//:%
+					let argNumber=getArg(arg,scope);
+					let getParentContext(){
+						r currentContext = [r currentContext + currentContext.parent];
+					};
+					#let fast=1;
+					repeat !!fast: repeat argNumber:getParentContext();
+					repeat !fast: for_repeat(argNumber,i)<:getParentContext;
+					push [r currentContext + currentContext.argument];//:push FunctionInstance*
+				};
+				repeat !+isNormalArgument:...set{//arg is an input function
+					push arg;//:push Function*
+				};
 			};
-			#let fast=1;
-			repeat !!fast: repeat argNumber:getParentContext();
-			repeat !fast: for_repeat(argNumber,i)<:getParentContext;
-			push [r currentContext + currentContext.argument];//:push FunctionInstance*
-		};
-		repeat !+isNormalArgument://arg is an input function
-		#set block{
-			push arg;//:push Function*
 		};
 		#return=arg;
 	};
 	let addCall(){//stack={foo} //'(foo>...) arg'
 		#set block{...set{
-			//assert:context=r0;
-			let arg=1;
-			let foo=2;
-			pop r arg;//arg
-			pop r foo;//foo
-			push r registers.context;
-			push r arg;
-			call r foo;
-			pop r arg;
-			pop r registers.context;
-			push r arg;
+			def let addCall{
+				//assert:context=r0;
+				let arg=1;
+				let foo=2;
+				pop r arg;//arg
+				pop r foo;//foo
+				push r registers.context;
+				push r arg;
+				call r foo;
+				pop r arg;
+				pop r registers.context;
+				push r arg;
+			};
 		}};
 	};
 	let getArg(arg,scope){//assert:arg<=scope.stackLevel
