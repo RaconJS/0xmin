@@ -13,20 +13,21 @@
 			def doInteraction;
 			def doStep;
 			null;
-			def partList;
 			def var,const;
 			null;
 		};
 		def main;
 		{
 			let scale=3;
-			repeat 3:push part(
-				vec(0xmin.Math.random()*scale,0xmin.Math.random()*scale)
-			):>addPart();
+			let i=-1;
+			//repeat 2:#part(vec(0xmin.Math.random()*scale,0xmin.Math.random()*scale)):>addPart();
+			#part(vec(5.0,1)):>addPart();
+			#part(vec(8.0,2)):>addPart();
 			call doStep;
 			jump->main;
 			hlt;
 		};
+		def partList;
 	};
 	...(){
 		let float(x,val)={#;//fixed-point number
@@ -334,10 +335,10 @@
 				//dif = (a-b)/2*force
 				r a = [data.a];
 				r b = [data.b];
-				[r a + a.a.x]-=r dif.(0);
-				[r a + a.a.y]-=r dif.(1);
-				[r b + b.a.x]+=r dif.(0);
-				[r b + b.a.y]+=r dif.(1);
+				[r a + a.a.x]+=r dif.(0);//idk why these are reversed it should be a-=dif. but it only works reversed like this
+				[r a + a.a.y]+=r dif.(1);
+				[r b + b.a.x]-=r dif.(0);
+				[r b + b.a.y]-=r dif.(1);
 			};
 			push r a;
 			push r b;
@@ -389,8 +390,8 @@
 			def endBlock;
 			#def end(i,stack,this)||{pop r0};
 		};
-		let drawPart(char){//:(pop part*,char) -> push part*
-			let scale = 4;//:#int
+		let drawPart(char,isReg){//:(pop part*,char) -> push part*
+			let scale = 1;//:#int
 			let a=part():>type_register_pointer(0);//:%part*
 			let moveCurser=1;//:%char
 			let coords = vec():>type_register(2);//%[] & vec
@@ -398,8 +399,8 @@
 			r coords.x = [r a + a.s.x];
 			r coords.y = [r a + a.s.y];
 			{:scaleCoords;//c*4
-				r coords.x>>(float.fixedPointBitNumber-2);
-				r coords.y>>(float.fixedPointBitNumber-2);
+				r coords.x>>(float.fixedPointBitNumber);
+				r coords.y>>(float.fixedPointBitNumber);
 			};
 			{//get
 				r coords.x&=0xf;
@@ -412,7 +413,8 @@
 			let const_0=4;
 			r const_0=0;
 			send r const_0 r moveCurser;
-			send r const_0 char.(0);
+			repeat !+isReg:send r const_0 char.(0);
+			repeat !!+isReg:send r const_0 r char;
 		};
 		let doStep{
 			let partSize = part=().size;
@@ -433,6 +435,8 @@
 				let end(){pop r0};
 			};
 			//update possisions a,v,s
+			let n=13;//:%char
+			%n="0";
 			forLoop(loop.start,loop.while,loop.next)
 			<:(i,stack,loopI){
 				def let draw= drawPart(" ");
@@ -449,7 +453,8 @@
 				[r a + a.s.x] += r carry;
 				r carry = [r a + a.v.y];
 				[r a + a.s.y] += r carry;
-				drawPart(".");
+				drawPart(n,1);
+				%n+=1;
 			}<:loop.end;
 			//interactions
 			forLoop()
