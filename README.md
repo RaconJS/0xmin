@@ -20,7 +20,11 @@ sudo apt update;
 curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -;
 sudo apt-get install -y nodejs;
 ```
-3. You can now use the compiler and emulator.
+4. in .bashrc add `alias 0xmin=pathToRepo/language/0xmin.sh`
+
+5. If you have sublime text add the `pathToRepo/syntax_for_sublimeText/` folder into the `/Packages/` folder in sublime text.
+
+6. If you have the powder toy from the ubuntu store move the `pathToRepo/the_powder_toy/` into the powder toy
 
 ## how to use
 ### the compiler:
