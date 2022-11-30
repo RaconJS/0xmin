@@ -11,11 +11,14 @@ void #set:(){//documentation
 			next:@Page*;
 			last:@Page*;
 			isUsed:@bool;
+			data:@any[];//+page == +page.data
 		};
 		malloc:Function(%int length)->%Page*;
 		free:Function(%Page*)->void;
-		clear:Function(%Page*[1])->void;
+		clear:Function(%Page*,%Page*?,%Page*?)->void;
 		memset:Function(%Page*,%int16,%int13)->void;
+		ref:#(%Page*)->{@};
+		unref:#(%Page*)->{@};
 		memory{
 			@Page;//start page
 			#list of intended actions{
@@ -29,6 +32,7 @@ void #set:(){//documentation
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{
 	#let: free,malloc,clear,memset;//@functions
+	#let: ref,unref;
 	#let: memory;
 	//each of the functions has a '.call(...args)' method
 	#let: call;
@@ -46,11 +50,11 @@ void #let set: heap{
 	};
 	#;
 	#set: call(foo){//call functionName,args
-		#let: args={void...set arguments;};
+		#let: args={...set arguments;};
 		#set: args..splice(0,1);//remove foo
-		#let: outputSize=foo.outputs..length;
 		#let: i=outputSize;
-		repeat (foo.nextReg.n-outputSize):{
+		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-args..length);
+		repeat (foo.nextReg.n):{
 			@push %i;
 			#set: i=i+1;
 		};
@@ -63,7 +67,7 @@ void #let set: heap{
 			};
 		};
 		call foo;
-		repeat (foo.nextReg.n-outputSize):{
+		repeat (foo.nextReg.n):{
 			#set: i=i-1;
 			repeat (+i>=foo.outputs..length):@pop %i;
 		};
@@ -74,6 +78,7 @@ void #let set: heap{
 			//repeat (len==1)
 			#let: foo.call=2;
 			#let: heap_Call=call;
+			repeat (len==1)
 			#let: foo.call(x){
 				...let set: heap_Call(foo,x);
 			};
@@ -90,7 +95,7 @@ void #let set: heap{
 	#let: Page()={
 		#def let: next{0};//:@* //pointer
 		#def let: last{0};//:@* //pointer
-		#def let: isUsed{0};//@bool
+		#def let: isUsed{0};
 		#def let: data;//:@[] //array
 	}::{
 		#let: prototype=..this();
@@ -99,6 +104,7 @@ void #let set: heap{
 			...set let prototype;
 		};
 	};
+	//note: Page=().isUsed can used as an int to count refernces for smart pointers.
 	#let: page0=Page();//:@
 	#set: page0{//start of the heap
 		#set: next..splice(0,1,{0x7fff});
@@ -142,10 +148,15 @@ void #let set: heap{
 		#set: page{...let set Page();};
 		#let: compiledPage=#(page..compile);
 		#let: pageSize=nextReg();//:%int
+		#let: hasMovedStartPage=nextReg();//:%bool
 		#let: remainder=pageSize;
+		#let: spaceNeeded=words;
+		#let: extraSpace=compiledPage..length;//:int; miminum page size
+		%spaceNeeded += extraSpace;
+		delete words;
 		%page=[startPage];//Page* = [Page**]
 		//%page=[%page];//Page = [Page*]
-
+		%hasMovedStartPage=0;
 		#let: whenFound;
 		#def let: loop{
 			#let: failed;
@@ -154,10 +165,16 @@ void #let set: heap{
 				%isUsed=[%page+page.isUsed];
 				jump failed if !=0;
 			};
+			def:{:ifBlock;//moves [startPage] to increase malloc's efficiency
+				//assert: %page = next unused page
+				%hasMovedStartPage=%hasMovedStartPage;
+				jump->ifBlock..return if>0;
+				[startPage]=%page;
+			};
 			{//hasEnoughSpace?
 				%pageSize=[%page+page.next];
 				%pageSize-=%page;
-				%remainder-=%words;
+				%remainder-=%spaceNeeded;
 				jump failed if<0;
 			};
 			jump whenFound;
@@ -167,10 +184,9 @@ void #let set: heap{
 			};
 		};
 		#def: whenFound{
-			#let: extraSpace=compiledPage..length;//miminum page size
 			[%page+page.isUsed]=1;
 			%remainder-=extraSpace;
-			jump ..return if==0;//if no space => dont need to rewire page pointers
+			jump ..return if<=0;//if no space => dont need to rewire page pointers
 			//%remainder+=extraSpace;
 			delete remainder;
 			//find location for nextPage
@@ -178,8 +194,7 @@ void #let set: heap{
 			#let: nextPage=nextReg();
 			%nextPage=[%page+page.next];
 			%newPage=%page;
-			%newPage+=%words;
-			%newPage+=extraSpace;//extra space
+			%newPage+=%spaceNeeded;
 			{//setUp page pointers;
 				//a<-->c
 				//a<->b<->c
@@ -187,7 +202,11 @@ void #let set: heap{
 				#let: a=page,b=newPage,c=nextPage;
 				[%b+page.isUsed]=0;
 				[%b+page.next]=%c;//b->c
-				[%c+page.last]=%b;//b<-c
+				def:{:block;
+					%c-=0x7fff;//if %c == end of heap then don't mutate
+					jump->block..return if<=0;//handles end of heap
+					[%c+page.last]=%b;//b<-c
+				};
 				[%b+page.last]=%a;//a<-b aka: b.<- = a
 				[%a+page.next]=%b;//a->b aka: a.-> = b
 			};
@@ -210,26 +229,35 @@ void #let set: heap{
 		#set: page{...let set Page();};
 		#let: compiledPage=#(page..compile);
 		%page-=compiledPage..length;
-		#let: nextPage=nextReg(),lastPage=nextPage;
-		#let: newAddress=nextPage;
-		#let: isUsed=nextReg();
-		#let: joinIfFree(lowPage,highPage,condisionPage){//:#(%newAddress,%isUsed)=> @(%Page*,%Page*)=>void
+		#let otherPage=nextReg();//:%Page* contains next/last page
+		#let: isUsed=nextReg();//:bool
+		#let: joinIfFree(toOtherPage,toThis){//:#(page property,page property)=> @(%Page*,%Page*)=>void
 			//extends low_address_page into high_address_page
 			#let: end;
-			%isUsed=[%condisionPage+page.isUsed];
+			%otherPage = [%page+toOtherPage];
+			%isUsed=[%otherPage+page.isUsed];
 			jump->end if!=0;
 			//if free then join
-			%newAddress=[%highPage+page.next];
-			[%lowPage+page.next]=%newAddress;
+			//:delete isUsed
+			#let: newAddress=isUsed;//:%Page*
+			%newAddress = [%otherPage+toOtherPage];
+			[%page+toOtherPage]=%newAddress;//assert: page.toOtherPage=otherPage.toOtherPage
+			%newAddress = [%page+toThis];
+			[%otherPage+toThis]=%newAddress;//assert: otherPage.toThis=page.toThis
 			#def: end;
 		};
-		%nextPage=[%page+page.next];
-		#def: joinIfFree(page,nextPage,nextPage);
-		delete nextPage;
-		%lastPage=[%page+page.last];
-		#def: joinIfFree(lastPage,page,lastPage);
-		delete lastPage;
+		#def: joinIfFree(page.next,page.last);
+		#def: joinIfFree(page.last,page.next);
 		[%page+page.isUsed]=0;
+		def:{:moveStartingPage;
+			let startPage=isUsed;//:[%]
+			///[startPage]=%page if %page<[startPage];
+			%startPage=[malloc.data.startPage];
+			%startPage-=%page;
+			jump->moveStartingPage..return if<=0;
+			//assert:%startPage>%page
+			[malloc.data.startPage]=%page;
+		};
 		return;
 		#def: data;
 	}::{void #set: call.addCaller(..this,1);};
@@ -267,10 +295,14 @@ void #let set: heap{
 				%i-=n;
 				jump->end if<0;
 				#def let: start;
-				repeat n:{
-					[%address]=%fillData;
-					%address+=1;
+				{
+					let i=0;
+					repeat n:{
+						[%address+i]=%fillData;
+						#i=i+1;
+					};
 				};
+				%address+=n;
 				%i-=n;
 				jump->start if>0#def end;
 				%i+=n;
@@ -303,6 +335,32 @@ void #let set: heap{
 		[clear.data.blueHalf]=0;
 		return;
 	}::{void #call.addCaller(..this,3);};
+	//garbidge collection
+		#set: ref(r_address){//#([%Page.data])->{@}
+			//can be used when adding a reference
+			[%r_address-#(Page.prototype.data-Page.prototype.isUsed)]+=1;
+		};
+		#set: unref(r_address,longVersion){//#([%Page.data],label?)->{@}
+			//can be used when removing a reference
+			[%r_address-#(Page.prototype.data-Page.prototype.isUsed)]-=1;
+			:block;
+			jump->block..return if>0;
+			delete block;
+			#let: nextReg=free.nextReg;
+			repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
+			repeat +!!longVersion:free.call(r_address);
+			repeat +!longVersion:call free;
+			repeat 0:{//clear
+				%clear.inputs.(0)=%r_address;
+				push %r_address;
+				%r_address=0xffff;
+				[clear.data.redHalf]=%r_address;
+				[clear.data.blueHalf]=%r_address;
+				pop %r_address;
+				call clear;
+			}
+		};
+	//----
 	#def: memoryData();
 };
 ...let set heap;

@@ -23,6 +23,7 @@
 			//repeat 2:#part(vec(0xmin.Math.random()*scale,0xmin.Math.random()*scale)):>addPart();
 			#part(vec(5.0,1)):>addPart();
 			#part(vec(8.0,2)):>addPart();
+			#part(vec(2,5.0)):>addPart();
 			call doStep;
 			jump->main;
 			hlt;

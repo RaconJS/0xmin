@@ -1389,6 +1389,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return{value,index};
 			},
 			noPipeLineing:Symbol(),
+			getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
 			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
 				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
@@ -1440,10 +1441,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
 							if(typeof name=="number"){//'a[b]'
 								value.refType="array";
-								{//handle negative indexes
-									if(name<0)name=name+(parent.code?.length??0);//'a[-n]' => 'a[a..length-n]'
-									if(1/name==-Infinity)name=(parent.code?.length??0);//'a[-0]' => 'a[a..length]'
-								}
+								name=contexts.getIndexNumber(name,parent)??0;
 								value.number=name;
 								let newVal=parent.code[name];
 								if(newVal instanceof AssemblyLine){
@@ -1621,7 +1619,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"||":new Operator_bool(b=>!b,(b1,b2,v1,v2)=>b1?v1:v2),
 			"^^":new Operator_bool(b=>true,(b1,b2,v1,v2)=>b1?b2?new Value.Number(0):v1:b2?v2:new Value.Number(0)),//xor
 
-			"...":{do({args,hasEquals}){//(args:mut Value[],bool)=>void, mutates args
+			"...":{do({args,hasEquals,index,statement,scope}){//(args:mut Value[],bool)=>void, mutates args
 				//concat operator
 				//'"a"...{1;"b"}' ==> `"a"+"\x01"+"b"` : 'string...label'
 				//'"a"...14' ==> `"a" + "14"` : 'string...number'
@@ -1629,10 +1627,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//if left argument is not a string then both arguments are converted into labels and it returns: '{...codeof a;...codeof b}'
 				let arg1=args.pop();
 				let arg0=args.pop();
+				if(arg1===undefined)throw Error(throwError({index,statement,scope},"#expression syntax","concatnation operator \"a...b\" missing 2nd argument"));
 				if(arg0){//'a...b' 2 args
 					let ans;
 					switch(arg0.type){
 						case"string"://ans:Value<string>
+						if(arg1===null)arg1=new Value();
 						arg1=arg1.toType("string");
 						ans=new Value({
 							type:"string",
@@ -1649,9 +1649,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					args.push(ans);
 				}else if(arg1){//'...a' 1 arg
-					throw Error("compiler #operator error: '...a' aka spread operator is not supported yet");
+					throw Error(throwError({index,statement,scope},"#expression syntax","'...a' aka spread operator is not supported yet"));
 					//args.push(...arg1); UNFINISHED
 				}else{
+					throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments"));
 					//no args -> silent error
 				}
 			}},
@@ -1804,7 +1805,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						else {//operator:Operator_numeric
 							({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
 							args.push(value);
-							operator.do({args,hasEquals});
+							operator.do({args,hasEquals, index,statement,scope});
 						}
 					}else{
 						({index}=await contexts.expression_short({index,statement,scope,shouldEval}));
@@ -2674,6 +2675,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						newLabel.labels["this"]??=callingValue.parent;
 					break;
 					case"<-"://'macro(){}' weak scoped macro function
+						//uses scope from where it was called
 						middleScope.parent=scope;
 						instanceScope.let = scope.let;
 						instanceScope.var = scope.var;
@@ -2861,11 +2863,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						args[1]??=new Value.Number(0);
 						args[2]??=new Variable().toValue("label");
 						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
-						{//handle negative indexes
-							if(args[0]<0)args[0]+=label.code.length;//'a[-1]' => 'a[a..length-1]'
-							if(1/args[0]==-Infinity)args[0]=label.code.length;//'a..splice(-0,x,y)' => 'a..splice(a..length,x,y)'
-						}
-						let code=label.code.splice(args[0],args[1],...args[2]);
+						//handles negative indexes
+						const getIndex=contexts.getIndexNumber;
+						let code=label.code.splice(getIndex(args[0],label),getIndex(args[1],label),...args[2]);
 						return new Variable({name:"<{splice}>",code}).toValue("label");
 					}),
 					"array":async({label})=>new Variable({name:"(..array)",code:label.code}).toValue("label"),
@@ -2917,6 +2917,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						let ans;
 						if(!args[0].label)ans=-1;
 						else ans=label.code.indexOf(args[0].label);
+						if(ans==-1){
+							for(let i=0;i<label.code.length;i++){
+								const v =label.code[i];
+								if(v instanceof HiddenLine.Define){
+									if(v.label==args[0].label){
+										ans=i;break;
+									}
+								}
+							}
+						}
 						return new Value.Number(ans);
 					}),
 					//flat maps all statements in a function. (Makes recursion easier)
@@ -3336,7 +3346,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			(code&0x3000f)<=1?
 			code&0x1fff==0x1011?
 				" +1"//0x1011 -> jump -1
-				:(code&0x1000?" -":" +")+( ((code&0xff0)>>4)-2*(!!((code&0x10)&&((code&0xf)==1))) )
+				:((code&0x1000)?" -":" +")+( ((code&0xff0)>>4)-2*(!!((code&0x10)&&(code&0x1000)&&((code&0xf)==1))) )
 			:""
 		);
 	};
