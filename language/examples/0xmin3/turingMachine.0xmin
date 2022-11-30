@@ -127,7 +127,7 @@ let Rule(0b,0l,0r,0s,1b,1l,1r,1s)={//1/0-> left right state
 		#return={move ruleNumber}..compile[0];
 	};
 };
-...{:consts;
+...codeof labelsof{:consts;
 	let const_2=int(2);
 };
 let currentRule=int({!move 1});

@@ -32,7 +32,7 @@ variables:
   #buildSettingWords: '\!?(make file|log.table|log.code)'
   equalSigns: '<=>|<=|=>|=|==|<->|<-|->'
   assembly_operators: '<->|<-|->'
-  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!%*\-+=@#~|<>/?¬]'
+  operators: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!><]=|[!%*\-+=@#~|<>/?¬]'
   operators_functionCallArgs: ':>|<:'
   objectExtentionSymbol: '::'
   assembly_commands_special: '\b(?:get\s+jump\s+\-1|set\s+jump\s+\+3|or\s+input)\b'
@@ -42,7 +42,7 @@ variables:
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|len)' #'!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)'
   inbuiltProperties: '\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf|asNumber|state|flat)\b'
-  oxminFunctions: '\b(?:language|model|log_(?:code|table|length))\b'
+  oxminFunctions: '\b(?:language|model|log_(?:code|table|length)|Math)\b'
   line_start_endLinePart: ':|(?=\S)'
 contexts:
   main:

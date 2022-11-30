@@ -244,7 +244,7 @@ $;{
 		/*. This is then used for the new label.*/
 		special cases:
 			{let a = a + 2} -> {let b=a+2;let a=b;delete b}:/*If the next symbol is*/ = /*then it creates the label after the long expression. e.g.*/let a=a+1;/*Other wise it creates the label before evaluating the long expression. e.g.*/let a::{def let a.b=2;};
-			{def let a:>foo()} -> {let a;def a:>foo()}:/*:> is ignored in the first short expression. This is to allow type conversions. e.g.*/let a :> float(2);/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
+			{def let a:>foo()} -> {let a;#set a:>foo();def a;}:/*:> is ignored in the first short expression. This is to allow type conversions. e.g.*/let a :> float(2);/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
 	//----
 	#let set: label;//creates a new label if it does not already exist in this scope.
 	#let set: label.property;//only creates a new property if it does not exist.
@@ -565,9 +565,9 @@ long_expressions;{
 		Can use: () {} [] aswell as #() #{} #[];
 		The '#' (aka the meta) symbol can be put infront of a bracket in a long or short expression to distinguish it from function syntax
 		e.g. a = (2+2) ;
-		Here we call the function 'a' as a class.
+		In line above we call the function 'a' as a class with the argument 4.
 		e.g. a = #(2+2);
-		Here we assign 4 to the variable 'a'.
+		In line above we assign 4 to the variable 'a'.
 		In assembly scopes (@). the #(...) can be used to run meta code inbetween assembly lines.
 		e.g. in tptasm: {
 			r0 = #(4*3);//compiles to: mov r0 12
@@ -576,19 +576,29 @@ long_expressions;{
 	{:operators;
 		¬;{
 			the ¬ can be used in 2 ways depending on number of argumments.
-			¬x turns a value into a label with the 'symbol' value-subtype.
-			This can be used to make private variables that can only be accessed by curtain parts of the code
-			{:intended use;
+			1:
+				¬x turns a value into a label with the 'symbol' value-subtype.
+				This can be used to make private variables that can only be accessed by curtain parts of the code
+				{:intended use;
+					e.g.
+					let a;
+					{
+						let symbol;
+						#a[¬symbol]=2;
+						let a.returnSymbol(){
+							#return = +a[¬symbol];
+						}
+					};
+				};]
+			2: In a long expresstion, if there are statements behind the ¬, ¬ will be interpretted as the collecter operator:
+				This collecter operator gets the current long expression value makes it the start of a short expression.
+				It is intended to be syntactic sugar for putting '()'s around a long expresstion
 				e.g.
-				let a;
-				{
-					let symbol;
-					#a[¬symbol]=2;
-					let a.returnSymbol(){
-						#return = +a[¬symbol];
-					}
-				};
-			};
+				a + b * c ¬.d
+				is the same as: ( (a + b * c).d )
+				e.g.
+				a + b * c ¬()
+				is the same as: ( (a + b * c)() )
 		};
 	};
 	proceedence{

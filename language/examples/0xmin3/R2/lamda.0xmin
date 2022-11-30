@@ -1,7 +1,19 @@
 #"tptasm";#"len";#"table";
-let lamda(){
-	(f>(a>b>a)(f n))p//(a> >> ^ << ^ p)
-	//(f>x>f1>x1>((a>f1)(f x)x1))p n (a>p p n) n
+let lamda(){//01010011
+	(t>f>
+		(and>or>nor>
+			and f f (a>p n) (a>p p n) n
+		)
+		(a>b>a b f)//and
+		(a>b>a t b)//or
+		(a>b>a f (b f t))//nor
+	)
+	(a>b>a)
+	(a>b>b)
+	//(a>b>(f>x>a f (b f x)))//+
+	//(a>b>(f>x>a (x>b f x) x))//*
+	//(f>x>f(f x))//2
+	//(f>x>f(f(f x)))//3
 }::{//p = print
 	let val{"0"};
 	def let .["p"] {r0=0;send r0 [val];return;#def val};
@@ -13,8 +25,15 @@ let lamda(){
 	delete val;
 };
 let heap{import lib "heap.0xmin";};
+//#heap.unref<=>(){};//unref() & free does not fully work yet
+//#heap.malloc..splice(0,0,{hlt});
+//#heap.malloc..splice(-2,0,{hlt});
 ...(){
-	let m_class(class,argsLen,classConstructor)={
+	let nextAddress{
+		//#heap..splice(0,-0,{def ..this});
+		0;
+	};
+	let m_class(class,argsLen,classConstructor,classDeconstructor)={
 		//class:#Struct,constructor:#()->{@}
 		let m_class=this..constructor;
 		#class::{
@@ -26,7 +45,15 @@ let heap{import lib "heap.0xmin";};
 				let rMemory = heap.malloc.inputs[0];
 				r rMemory=this..length;
 				let rMemory = heap.malloc.outputs[0];
-				call heap.malloc;
+				repeat 0 {:malloc;
+					//quicker O(1) way of allocating memory
+					let address= rMemory+1;//[%]*
+					r address=r rMemory;
+					r rMemory = [nextAddress];
+					r rMemory += heap..return;
+					[nextAddress] += r address;
+				};
+				repeat 1 call heap.malloc;
 				#let i=this..length-1;
 				repeat argsLen:{
 					[r rMemory+i]=pop;//r arguments.(i);//argument
@@ -34,12 +61,23 @@ let heap{import lib "heap.0xmin";};
 				};
 				classConstructor();
 			};
+			let addRef(){
+				let rMemory=heap.malloc.outputs[0];
+				pop rMemory;
+				[r rMemory-#(heap.Page.prototype.data-heap.Page.prototype.isUsed)]+=1;
+			};
+			let delRef(){
+				let rMemory=heap.malloc.outputs[0];
+				pop r rMemory;
+				[r rMemory-#(heap.Page.prototype.data-heap.Page.prototype.isUsed)]-=1;
+				jump->..return if > 0;
+				del();
+			};
 			#new::(){
 				push r rMemory;
 			};
 			let del(){//:pop[this:Context*]
-				let rMemory = heap.malloc.outputs[0];
-				pop r rMemory;
+				classDeconstructor();
 				call heap.free;
 			};
 		};
@@ -47,20 +85,20 @@ let heap{import lib "heap.0xmin";};
 	};
 	let Context()={
 		def let parent{0};//:Context*
-		def let argument{0};//:Function*
+		def let argument{0};//:FunctionInstance*||InbuiltFunction*
 	}:>m_class(2)<:{
 	};
 	let spareReg=heap.malloc.nextReg.n+1;
-	let FunctionInstance()={
+	let FunctionInstance()={//extends Function
 		let context{0};//:Context*
 		let function{0};//:Function*
-		r0 = [ip+2];//r context = this.context
+		r0 = ip;//r context = this.context
 		jump->[ip+2];//jump->function
 		def context;
 		def function;
 	}:>m_class(2)<:(){
 		let vals={
-			@0x20BF0020;//-> @r0 = [ip+2];   //push context
+			@0x200000F0;//-> @r0 = ip;   //r0 = functionInstance
 			@0x31BF0020;//-> @jump->[ip+2]; //jump-> function
 		};
 		let rMemory=heap.malloc.outputs[0];
@@ -90,6 +128,7 @@ let heap{import lib "heap.0xmin";};
 	};
 	let output;
 };
+//note: 'a b > c d' --> 'a (b > (c d))'
 //m_ == # aka meta
 let newFoo(code,function,argName)={//:Function
 	let stackLevel=function.stackLevel+1||0;
@@ -99,6 +138,7 @@ let newFoo(code,function,argName)={//:Function
 	};
 	let numOfArgs=0;
 	let block={...codeof code};
+	let string=">";
 	//this program does not clean up it's memory usage.
 	//I have not learnt how to do that yet. This is fine for smaller lamda expressions.
 	let addFoo(arg){//arg from heap
@@ -107,9 +147,16 @@ let newFoo(code,function,argName)={//:Function
 			def let addFoo{
 				let foo=FunctionInstance=();
 				push r registers.context;//:Context*
-					//new
+					//new FunctionInstance
 						push r registers.context;//:Context*
 						push arg;//:Function*
+						...set{:ifBlock;
+							//if no context then don't add reference
+							r registers.context|=0;
+							jump->ifBlock..return if == 0;
+							heap.ref(registers.context);
+							def ifBlock..return;
+						};
 					foo.new();//:(pop Context*,Function*)->push FunctionInstance*
 				//assume registers.context<14
 				pop r #(registers.context+1);//:%FunctionInstance*
@@ -130,6 +177,7 @@ let newFoo(code,function,argName)={//:Function
 					r currentContext = r registers.context;
 					//let i = 2;//:%
 					let argNumber=getArg(arg,scope);
+					#set string{...(" "...+argNumber);};
 					let getParentContext(){
 						r currentContext = [r currentContext + currentContext.parent];
 					};
@@ -137,8 +185,16 @@ let newFoo(code,function,argName)={//:Function
 					repeat !!fast: repeat argNumber:getParentContext();
 					repeat !fast: for_repeat(argNumber,i)<:getParentContext;
 					push [r currentContext + currentContext.argument];//:push FunctionInstance*
+					let arg<->currentContext;
+					r arg=[sp];
+					let next;jump->next if==0;
+					heap.ref(arg);
+					def next;
 				};
 				repeat !+isNormalArgument:...set{//arg is an input function
+					#set string{...("i"...+output.inputFunctions..indexOf(arg));};
+					r1 = arg;
+					heap.ref(1);//handle refs
 					push arg;//:push Function*
 				};
 			};
@@ -146,6 +202,7 @@ let newFoo(code,function,argName)={//:Function
 		#return=arg;
 	};
 	let addCall(){//stack={foo} //'(foo>...) arg'
+		#set string{"c"};
 		#set block{...set{
 			def let addCall{
 				//assert:context=r0;
@@ -155,7 +212,7 @@ let newFoo(code,function,argName)={//:Function
 				pop r foo;//foo
 				push r registers.context;
 				push r arg;
-				call r foo;
+				call r foo;//ref counting is handled inside the function itself
 				pop r arg;
 				pop r registers.context;
 				push r arg;
@@ -168,20 +225,31 @@ let newFoo(code,function,argName)={//:Function
 	{
 		//{arg} -> {arg;ret}->{arg;ret;ans}->{ans;ret} -> {ans}
 		//let const_0=0;
-		let arg=1;
-		let ans=1;
-		let ret=2;
-		let context= Context=() <-> registers.context;//:%Context*
+		let context = Context=() <-> registers.context;//:%Context*
+		let fooInstance = FunctionInstance=() <-> context;
+		let contextParent=Context=() <-> 1;
+		//assume: %fooInstance!=0
+		//assume: fooInstance:%FunctionInstance*
+		%contextParent=[%fooInstance+fooInstance.context];
+		//note contextParent is unrefed and reffed so they cansle out 
+		let arg=2;
+		let ans=2;
+		let ret=3;
 		//assert: stack = {arg;ret}
 		r ret = pop;//ret
 		r arg = pop;//arg
 		push = r ret;
 		{
-			push r context;//parent
+			push r contextParent;//parent
+			//contextParent would be reffed here
+			let next;
 			push r arg;//argument
+			heap.ref(arg);
+			heap.unref(fooInstance);
+			delete fooInstance;
 			context.new();//:(parent:&sp,argument:&sp) -> push Context*
+			pop r context;
 		};
-		pop r context;
 		//assert: stack = {ret}
 		def block;
 		//assert: stack = {ret;ans}
@@ -189,6 +257,22 @@ let newFoo(code,function,argName)={//:Function
 		pop r ret;
 		push r ans;//ans
 		push r ret;//ret
+		{:handleRefs;
+			let temp=ret;
+			push r context;
+				r context=[sp];
+				r temp = [r context + context.parent];
+				let next;
+				jump->next if==0;//ignore undefined parent contexts
+				heap.unref(temp);//parent
+				def next;
+				#delete next;
+				r context=[sp];
+				r temp = [r context + context.argument];
+				heap.unref(temp);//argument
+			pop r context;
+			heap.unref(context);
+		};
 		//assert: stack = {ans;ret}
 		return;
 		//assert: stack = {ans}
@@ -206,7 +290,8 @@ let newFoo(code,function,argName)={//:Function
 		push r2;
 	};
 	let registers={
-		def let context=0;
+		def let context<->0;
+		def let fooInstance<->0;
 	};
 }};
 let parse(code,i,function,hasRecur){
@@ -219,7 +304,8 @@ let parse(code,i,function,hasRecur){
 			:this;
 			let maxRecur=getRecur(line);
 			let mainFoo=function=newFoo=({});
-			let inputFunctions={...let code};
+			let inputFunctions={...let set arguments[1]};
+			let functions{};
 			def mainFoo<=>{...let mainFoo;}::{
 				#let list=inputFunctions..labels,i1=0;
 				repeat list..length:{#;
@@ -229,9 +315,14 @@ let parse(code,i,function,hasRecur){
 					//push end;
 					i1+=1;
 				};
-				{
+				#i1=0;
+				repeat list..length:{#;
+					//asume: '@[Page*-1]' == page.isUsed
+					inputFunctions..splice(i1,0,{1});//inserts heap.Page.prototype.isUsed's so it can be unreferenced
+					i1+=2;
+				};
+				{:main;
 					let end{return};#end<->0;
-					let inputFunctions=arguments[1];//:newFoo//parse(lamda,argument)
 					def block;
 					let ans=2;//:%
 					def let ..this.getAns{pop r ans};
@@ -267,7 +358,25 @@ let parse(code,i,function,hasRecur){
 		repeat ((args<2) && (line[i+1]==">")):{//function a>b ==> (a){#return=b}
 			#i+=2;
 			let foo1=newFoo({},function,""...word);
-			#returnValue=parse(line,i,function.addFoo(foo1),1);
+
+			#returnValue=parse(line,i,foo1,1);
+			{//removes repeated functions
+				let r=output.functions..length;
+				let i1=0;
+				repeat r:{
+					repeat ((""...output.functions[i1].string)==#(""...foo1.string)):{
+						#r=0;//r = i1+1; aka break;
+						$undef foo1;
+						#foo1=output.functions[i1];
+					};
+					#i1+=1;
+				};
+				repeat (+r==output.functions..length):{
+					#output.functions..splice(-0,0,{$def foo1});
+				};
+			};
+			#function.addFoo(foo1);
+			#set function.string{"(";...codeof foo1.string;")"};
 			#continue=0;
 			#args+=1;
 		};
@@ -296,4 +405,5 @@ def let end{
 	hault;
 };
 def main;
+def heap.clear;
 def heap;
