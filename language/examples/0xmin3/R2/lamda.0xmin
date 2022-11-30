@@ -230,7 +230,6 @@ let newFoo(code,function,argName)={//:Function
 		let contextParent=Context=() <-> 1;
 		//assume: %fooInstance!=0
 		//assume: fooInstance:%FunctionInstance*
-		%contextParent=[%fooInstance+fooInstance.context];
 		//note contextParent is unrefed and reffed so they cansle out 
 		let arg=2;
 		let ans=2;
@@ -239,6 +238,33 @@ let newFoo(code,function,argName)={//:Function
 		r ret = pop;//ret
 		r arg = pop;//arg
 		push = r ret;
+		call newFoo.part1;
+		//assert: stack = {ret}
+		def block;
+		jump->newFoo.part2;
+	};
+	repeat (arguments..length>1):
+	#set output{
+		null;//start of function
+		def this;
+	};
+}::{
+	let ..prototype{
+		let swap{
+			pop r1;//arg
+			pop r2;//foo
+			push r1;
+			push r2;
+		};
+		let registers={
+			def let context<->0;
+			def let fooInstance<->0;
+		};
+	};
+	let prototype=..this=();
+	def let part1{
+		...let prototype[0];
+		%contextParent=[%fooInstance+fooInstance.context];
 		{
 			push r contextParent;//parent
 			//contextParent would be reffed here
@@ -246,12 +272,15 @@ let newFoo(code,function,argName)={//:Function
 			push r arg;//argument
 			heap.ref(arg);
 			heap.unref(fooInstance);
-			delete fooInstance;
+			//delete fooInstance;
 			context.new();//:(parent:&sp,argument:&sp) -> push Context*
 			pop r context;
 		};
 		//assert: stack = {ret}
-		def block;
+		return;
+	};
+	def let part2{
+		...let prototype[0];
 		//assert: stack = {ret;ans}
 		pop r ans;
 		pop r ret;
@@ -277,23 +306,7 @@ let newFoo(code,function,argName)={//:Function
 		return;
 		//assert: stack = {ans}
 	};
-	repeat (arguments..length>1):
-	#set output{
-		null;//start of function
-		def this;
-	};
-}::{let ..prototype{
-	let swap{
-		pop r1;//arg
-		pop r2;//foo
-		push r1;
-		push r2;
-	};
-	let registers={
-		def let context<->0;
-		def let fooInstance<->0;
-	};
-}};
+};
 let parse(code,i,function,hasRecur){
 	let returnValue;//:function
 	//!!hasRecur => recur>1
@@ -405,5 +418,6 @@ def let end{
 	hault;
 };
 def main;
+def newFoo;
 def heap.clear;
 def heap;
