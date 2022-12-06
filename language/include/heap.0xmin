@@ -346,10 +346,6 @@ void #let set: heap{
 			:block;
 			jump->block..return if>0;
 			delete block;
-			#let: nextReg=free.nextReg;
-			repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
-			repeat +!!longVersion:free.call(r_address);
-			repeat +!longVersion:call free;
 			repeat 0:{//clear
 				%clear.inputs.(0)=%r_address;
 				push %r_address;
@@ -358,7 +354,11 @@ void #let set: heap{
 				[clear.data.blueHalf]=%r_address;
 				pop %r_address;
 				call clear;
-			}
+			};
+			#let: nextReg=free.nextReg;
+			repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
+			repeat +!!longVersion:free.call(r_address);
+			repeat +!longVersion:call free;
 		};
 	//----
 	#def: memoryData();
