@@ -631,7 +631,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(!isNaN(+v1)&&a[i-1]!="r"){
 								v1="0x"+(0x1fffffff&v1).toString(16);
 							}
-							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name:v)+"' is undefined"):false;
+							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name?.toString?.():v)+"' is undefined"):false;
 							return v1+["", " "][+(i==0)]
 						})
 						.flat()
