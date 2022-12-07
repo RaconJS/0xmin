@@ -357,8 +357,8 @@ void #let set: heap{
 			};
 			#let: nextReg=free.nextReg;
 			repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
-			repeat +!!longVersion:free.call(r_address);
-			repeat +!longVersion:call free;
+			repeat !!longVersion:free.call(r_address);
+			repeat !longVersion:call free;
 		};
 	//----
 	#def: memoryData();
