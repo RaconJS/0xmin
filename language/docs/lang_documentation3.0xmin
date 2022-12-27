@@ -510,28 +510,29 @@ single_expressions;{
 		Accessing them calls an inbuilt javascript function;
 		Some internal properties return inbuilt functions that are bonded to the label;
 		full list:
-		label..length;//:number
+		label..length;//returns a number type
 		label..code;
-		label..splice(a,b,c);
+		label..splice(a,b,c);//takes in 1 indexes, how many to remove, and an array label object. e.g. a..splice(1,2,{1;2;3});
 		label..array;
-		label..labels;
-		label..compile;
+		label..labels;//returns list of all the properties in an object (ignoring symbol properties)
+		label..compile;//returns a MachineCode object, converted into a label. 
 		label..seal;
 		label..freeze;
-		label..this;
-		label..return;
-		label..proto;
-		label..super;
+		label..this;//returns the label itself. '..this' is usefull when used like javascript's `this`. e.g. 'let obj{let addBar(){let ..this.bar=2;}}'
+		label..return;//returns an inbuil label that is defaultly defined at the end of the parent label. e.g. def let block{jump->block..return;...doStuff;}
+		label..proto;//if label does not contain a property, then the compiler looks for the property in label..proto
+		label..super;//similar to proto except looked for first when finding a property
 		label..constructor;
-		label..prototype;
-		label..supertype;
-		label..defs;
+		label..prototype;//used in class calls i.e. 'class=()' as 'class..prototype'. 'class=()..proto == class..prototype'
+		label..supertype;//similar to 'label..prototype' but for supertypes
+		label..defs;//returns an array of all the places where
 		label..indexOf(item);
-		label..asNumber;
+		label..asNumber;//converts to number and returns a number type
 		label..state;
-		label..state.move;
+		label..state.move;//make for 0xmin assembly but can be used in any assembly
 		label..state.jump;
 		label..state.ram;
+		label..flat;//returns a 1D array,can be used to get a list of all the objects in a graph, can also be used to get all the source-code of a function
 	};
 };
 long_expressions;{
