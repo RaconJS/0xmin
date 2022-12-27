@@ -6,6 +6,7 @@
 //TODO
 //UNUSED
 //TODO: BUG: fix char line numbers
+//TODO: BUG: fix '||=' bug
 //TODO: #add '#"text";' for text output
 //TODO: #add '$void'
 //TODO: #@make language definitions less BODGED and more formal
@@ -917,11 +918,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						({value,index}=await contexts.expression_short({statement,index,scope,argsObj:contexts.noPipeLineing}));
 						if(value){
 							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
+							let hasOperator=contexts.operators.hasOwnProperty(statement[index]);//e.g. 'let a + = b' or 'let a || = b'
+							let willCreateLabel=statement[index+hasOperator]!="="&&statement[index+1+hasOperator]!="(";
 							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
 								const newLabel=new Variable({name:value.name});
 								let labelParent=["name"].includes(value.refType)?scope.let.label:value.parent;
 								if(labelParent)//BODGED TODO: add refType to callFunction, or make a better default refType for Values.
-								if(statement[index]!="="&&statement[index+1]!="("){//'let a;' ==> makes default label;
+								if(willCreateLabel){//'let a;' and not 'let a = ...' ==> makes default label;
 									if(metaState["set"]){//'let set a.b;' ==> `a.b??={};` 
 										//'let set a;' ==> only creates 'a' if it doesn't already exist in this scope
 										labelParent.labels[value.name]??=newLabel;
@@ -936,10 +939,26 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									name:newLabel.name,
 									parent:labelParent,
 								});
-							}else{
+							}
+							else if(value.refType=="array"){//'let a[2]'
+								const newLabel=new Variable({name:"["+value.number+"]"});
+								if(willCreateLabel&&!metaState["set"]||value.parent.code[value.number])
+								value.parent.code[value.number]=newLabel;
+								startValue=value;
+							}
+							else if(value.refType=="internal"){//'let a..proto;'
+								if(willCreateLabel&&!metaState["set"]||!value.get()){
+									value.set(new Variable({name:"("+value.name+")"}));
+								}
+								startValue=value;
+								startValue.label=startValue.get();//TODO: fix unfound related bugs caused by this line.
+							}
+							else{
 								startValue=value;
 							}
 							({value:startValue,index}=await contexts.expression_fullExtend({statement,index,scope,value:startValue}));//allow '#let a:>foo()'->'#let a;#set a:>foo();'
+							if(startValue.refType=="internal"){
+							}
 						}
 					}
 					let value;
@@ -952,7 +971,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							//scope.label.code.push(value.label);
 							value.label.defs.push(scope.parent.label);
 						}else{
-							if(isStrict)throw Error(throwError({statement,index,scope}, "type", "label '"+value.name?.toString?.()+"' is undeclared"));
+							if(isStrict)throw Error(throwError({statement,index,scope}, "# type", "label '"+value.name?.toString?.()+"' is undeclared"));
 						}
 					}
 					word=statement[index];
@@ -1652,7 +1671,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					throw Error(throwError({index,statement,scope},"#expression syntax","'...a' aka spread operator is not supported yet"));
 					//args.push(...arg1); UNFINISHED
 				}else{
-					throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments"));
+					throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments. 0 arguments provided"));
 					//no args -> silent error
 				}
 			}},
@@ -2836,7 +2855,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				type="label";//: const
 				refType="internal";//: const
 				#propertyName;//: string
-				get(){//UNUSED
+				get(){
 					return this.parent[this.#propertyName];
 				}
 				set(label){
