@@ -2705,6 +2705,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						middleScope.parent=scope;
 						instanceScope.let = scope.let;
 						instanceScope.var = scope.var;
+						newLabel.functionPrototype=this.prototype;
+						newLabel.functionSupertype=this.pupertype;
 						newLabel.labels["scope"]??=scope.label;
 					break;
 					case"->"://'weak(){}' impure function
