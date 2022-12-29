@@ -876,7 +876,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					statement.maxRecur=undefined;
 				}
 			}
-			if(!state.void){
+			if(!state.void&&!Object.isFrozen(scope.label.code)){
 				scope.label.code.push(...codeObj.code);//(codeObj);
 			}
 			return {index,value:newScope};
@@ -2908,8 +2908,19 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//note: name might change
 					"code_assembly":async({label})=>await assemblyCompiler.collectCode(label).toValue("label"),
 					//change object state
-						"seal":async({label})=>{Object.seal(label.labels);Object.seal(label.code);return label;},
-						"freeze":async({label})=>{Object.freeze(label.labels);Object.freeze(label.code);return label.toValue("label");},
+						"seal":async({label})=>{//TODO: finnish ..seal and ..freeze
+							Object.seal(label.labels);
+							Object.seal(label.code);
+							return (label.sealKey=new Variable({name:"(seal)"})).toValue("label");
+						},
+						"freeze":async({label})=>{
+							throw Error ("'label..freeze' is not supported yet.")
+							Object.seal(label.labels);
+							Object.seal(label.code);
+							Object.freeze(label.labels);
+							Object.freeze(label.code);
+							return (label.freezeKey=new Variable({name:"(freeze)"})).toValue("label");
+						},
 						"secure":async({label})=>{//does not need 'recur' to call a secure function
 							throw Error("'label..secure' is not supported yet.");
 							Object.freeze(label.code);
