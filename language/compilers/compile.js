@@ -261,7 +261,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.operator=operator;
 				this.is2Args=is2Args;
 			}
-			static equality(value1,value2){//:bool 
+			static equality(value1,value2){//:bool
 				if(value1&&value2){
 					if(value1.type!=value2.type){
 						//labels -> non labels
@@ -270,6 +270,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						//a==b --> a.toType(b) === b
 						else value1=value1.toType(value2.type);
 					}
+				}
+				else {
+					if(value1?.type=="label"&&value1.label===undefined)value1=null;
+					else if(value2?.type=="label"&&value2.label===undefined)value2=null;
 				}
 				return this.strictEquality(value1,value2);
 			}
@@ -1597,6 +1601,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			"~":(v)=>new Value.Number(~v?.number),
 			"!":(v)=>{v??=new Value();let ans=v.toBool();ans.number=!ans.number;return ans;},
 			"¬":(v)=>{//:Value
+				if(v===null||v===undefined){//'¬()' and '(¬)' --> empty, undeclared label
+					return new Value({type:"label",label:null});
+				}
 				v=new Value(v??{});
 				if(v.type=="label"){
 					v.refType="symbol";
