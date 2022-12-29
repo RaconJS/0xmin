@@ -1,0 +1,22 @@
+#"table";
+#..this<=>(variable,list)={};//:Label[]
+()={#;
+	//let a=enum<:{};
+	repeat (arguments..length<2):list=arguments[0];
+	repeat !!variable:return = variable;
+	{
+		let i=-1;
+		let list=list..labels;
+		repeat list..length:{
+			#let variable[+(i+=1)]=""...list[+i];
+			#let variable[""...list[+i]]=i;
+		};
+	};
+	#this<=>variable;
+	return..seal;
+	//return..freeze;
+};
+let enum = ..this;
+let days = enum()<:{let
+	a,b,c=3
+};

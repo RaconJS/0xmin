@@ -8,6 +8,7 @@ let A(a,x,y)={#;
 	repeat +bool: b <-> a+x;
 	repeat !+bool:
 		repeat (x-1):
-			recur (y+2): b<->A(b,a,y-1);
+			recur (y+2):
+				b<->A(b,a,y-1);
 };
 debugger +A(4,2,2);

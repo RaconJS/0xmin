@@ -58,12 +58,14 @@
 	#() #[] #{} //normal meta-expression brackets. The '#' is normally highlighted as white to indicate this.
 //function delcarations
 `note: can also do`#(){}`to avoid confusion with`foo = (){}` => `(foo=())#{}` or `foo = #(){}` => `foo = #((){})``
-	(){}
+	(){}//defualt function
 	#(){}
 	()={}//class
 	#()={}//etc... can put '#' infront of a shortExpression to separate it from others
-	()=>{}//arrow function
-	()<={}//reverse arrow function
+	()=>{}//block scope function (aka arrow function)
+	()<={}//strong scope function. Is like a sandbox
+	()->{}//weak scope function
+	()<-{}//
 //function extensions for existing variables
 	foo (){}
 	foo::(){}
@@ -82,13 +84,14 @@
 	foo<-()
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
 	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
-	a:> b:> foo(c,{...d}) <:e <:f //using pipelinging operators
+	a:> b:> foo(c,{...d}) <:e <:f //using pipelining operators
 	foo(bar(baz)); or bar(baz):>foo()
 //object declarations
 	{}
 	#{}
 //object extensions
 	obj{}
+	obj::{}
 //@ / $ expressions
 //number can be any of: +123,-123,*123,/123
 	label;
