@@ -1,3 +1,12 @@
-let with(obj)<-{
-
+let with(obj,code) <- {
+	repeat !code:...labelsof obj;
+	repeat !!code:{
+		...labelsof obj;
+		...code;
+	};
 };
+let if(condision,then,else) <- {
+	repeat !!+condision:...then;
+	repeat !+condision:...else;
+};
+#if<-(1)<:(){let a=2}<:(){let b=2};

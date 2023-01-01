@@ -74,7 +74,12 @@
 
 		{
 			"trigger":"class",
-			"contents":"let ${1:className}() = {\n\t${2:...constructor;}\n} :: {\n\tvar set prototype {\n\t\t${3:...prototype;}\n\t}\n\tvar set supertype {\n\t\t${4:...supertype;}\n\t}\n\t${5:...static;}\n}",
+			"contents":"let ${1:className}(${2:argument}) = {\n\t${3:...constructor;}\n} :: {\n\t#let set: ..prototype {\n\t\t${4:...protos;}\n\t}\n\t#let set ..supertype: {\n\t\t${5:...supers;}\n\t}\n\t${6:...statics;}\n}",
+			//"kind":"type",
+		},
+		{
+			"trigger":"macro",
+			"contents":"let ${1:macroName}(${2:argument}) <- {\n\t${3:...code;}\n} :: {\n\t#let set: ..supertype {\n\t\t${4:...supertype;}\n\t}\n}",
 			//"kind":"type",
 		},
 		{
