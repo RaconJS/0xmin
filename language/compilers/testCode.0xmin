@@ -1,4 +1,5 @@
 #"tptasm";#"table";
-let a;
-debugger {}::{2}..length;
-//{}:>(()={@;}::{#;})()<:(){};
+let foo=#(){
+	debugger 4;
+}[0];
+#;debugger (){}()..labels;//used to return '["caller"]'. should return '[]'

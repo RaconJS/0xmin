@@ -2697,7 +2697,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						instanceScope.let=instanceScope;
 						instanceScope.var=instanceScope;
 						middleScope.parent=middleScope;//instanceScope;
-						newLabel.labels["this"]??=callingValue.parent;
+						middleLabel.labels["this"]??=callingValue.parent;
 					break;
 					case"<-"://'macro(){}' weak scoped macro function
 						//uses scope from where it was called
@@ -2706,7 +2706,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						instanceScope.var = scope.var;
 						newLabel.functionPrototype=this.prototype;
 						newLabel.functionSupertype=this.pupertype;
-						newLabel.labels["scope"]??=scope.label;
+						middleLabel.labels["scope"]??=scope.label;
 					break;
 					case"->"://'weak(){}' impure function
 					break;
@@ -2717,7 +2717,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						middleLabel.labels[globalScope.symbol]=middleLabel;
 						middleLabel.labels["this"]=callingValue.parent??null;
 						middleLabel.labels["return"]=returnObj;
-						newLabel.labels["caller"]??=scope.let.label;
+						middleLabel.labels["caller"]??=scope.let.label;
 					//
 				}
 				for(let codeScope of codeBlock){
