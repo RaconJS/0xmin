@@ -46,9 +46,9 @@
 	@ $ #
 	+ - * / ** % ^ & ~ ¬
 	! ^^ || &&
-	= <=> <->//operator
-	-> <- => <=//assembly operator
-	=> = -> <- //function types
+	= <=> <->//assignment operator
+	-> <- => <=//$/@ assembly operator
+	=> = -> <- <=//function types
 	:> <: //pipeLineing/external arguments
 	... //concat
 	:: //extend object or function
@@ -93,7 +93,7 @@
 	obj{}
 	obj::{}
 //@ / $ expressions
-//number can be any of: +123,-123,*123,/123
+	//number can be any of: +123,-123,*123,/123
 	label;
 	label +123;
 	label label;
@@ -174,6 +174,7 @@
 	//special charactors
 	//char's
 	"\p00";//set curser posision
+	"\c00";//set curser colour
 	"\h";//hault. compiles to 'jump 0;'
 	"\a";//accept input from terminal
 	"\x00";//ASCII charactor
@@ -249,7 +250,7 @@ $;{
 			{let a = a + 2} -> {let b=a+2;let a=b;delete b}:/*If the next symbol is*/ = /*then it creates the label after the long expression. e.g.*/let a=a+1;/*Other wise it creates the label before evaluating the long expression. e.g.*/let a::{def let a.b=2;};
 			{def let a:>foo()} -> {let a;#set a:>foo();def a;}:/*:> is ignored in the first short expression. This is to allow type conversions. e.g.*/let a :> float(2);/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
 	//----
-	#let set: label;//creates a new label if it does not already exist in this scope.
+	#let set: label;//creates a new label only if it does not already exist in this block scope.
 	#let set: label.property;//only creates a new property if it does not exist.
 	#let set: a=b;//'let set' can be used for expressions just like and '#' operator
 
@@ -269,7 +270,7 @@ $;{
 	expressions;(
 		//value types:
 		1,//number
-		"string",
+		"string",//string
 		label,//label,
 		,//array: not used
 	);
@@ -279,13 +280,13 @@ $;{
 		//e.g.
 		let label=2;/*is syntactic sugar for:*/#let:label=2;
 		
-		//the colon ':' is only needed if the next word is a keyword, otherwise it is infered.
+		//the colon ':' is only needed if the next word would be a keyword but should be parsed as a label, otherwise the ":" can infered.
 		//e.g.
 		let set def label;/*is the same as*/#let set def: label;/*which is also the same as*/#let set: label;#def:label;
 		/*More generally: this sort of infrence applies to all parts of this programming language, and not just for*/#let set def;
 		//in this document we have tried to use the more explicit syntax where possible to reduce confusion.
 		
-		foo()/*if a word (regex/\b\w+\b/), that is not a keyword: then it will default to*/:#:foo();/*which defaults to*/#def:foo();
+		foo()/*if a word (regex/\b\w+\b/), that is not a keyword: then it will default to*/$:foo();/*which defaults to*/$let set def: foo();
 		//this is usefull for including functions calls that look the same as in most C-like programming languages
 };
 starter line:{
@@ -317,7 +318,7 @@ starter line:{
 	//to ensure that Macros always hault, maximum recursion and iteration must be stated.
 	repeat;{
 		//allows for iteration.
-		repeat expression:lineOfCode;//Runs the line:'lineOfCode' 'expression' times.
+		repeat single_expression:lineOfCode;//Runs the line:'lineOfCode' 'expression' times.
 		e.g.
 		repeat 10:foo();
 		/*The expression just after the 'repeat' keyword is evaluated every iteration,
@@ -335,14 +336,29 @@ starter line:{
 				#def: i;
 			;
 		};/*results with the array: {1;2;3;4;5;6}*/
+
+		inferance;
+			the colon ":" is not needed but can be used in some cases to stop the statement and the expression from merging.
+			e.g.
+			repeat 10: (1+1);//colon is needed here for clearness
+			repeat 10 jump +3;//colon is not needed here
 	};
 	recur;{
 		recur//Allows for the use of recursion.
 		recur expression:lineOfCode;
-		e.g.
-		let foo(){
-			recur 10: foo();//
-		};
+		//note: Recursion is only allowed by using the recur statement. This is to prevent it from being turing complete
+		example1{
+			let foo(){
+				recur 10: foo();//
+			};
+		}
+		example2{
+			let foo(){
+				recur 10 #foo()...foo();//the 'recur 10' applies to the rest of the line of code after it so both 'foo()'s will be called ~10 times
+			};
+		}
+		by default every line of code is the same as
+		repeat 1 recur 1:...doStuff;
 	}
 };
 import;{
@@ -437,7 +453,7 @@ virtual;{
 		!move +2;//doesn't change the move pointer so does not throw an error.
 		null;
 	}
-	{//In practice the '!' modifyer is used to store commands as a variables, as it can do this without changing cpuState
+	{//In practice the '!' modifyer is normally used to store commands as a variables, as it can do this without changing cpuState
 		//e.g.
 		jump 2;
 		def let jump10Lines = {!jump 10};
