@@ -1,3 +1,4 @@
 #"tptasm";#"table";
-let a=#();//a:declared,unassigned,undefined
-debugger (a == ¬());//true
+let a;
+debugger {}::{2}..length;
+//{}:>(()={@;}::{#;})()<:(){};
