@@ -838,7 +838,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}
 						let value,failed=true;
 						if(state.phase=="")//||state.phase=="$"
-							({value,failed}=await contexts.delcareFunctionOrObject({statement,index,scope}));
+							({value,failed}=await contexts.declareFunctionOrObject({statement,index,scope}));
 						if(!failed&&value?.label){
 							newScope.label.code.push(value.label);
 						}
@@ -1350,7 +1350,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//'"abc"'
 				let string=value;
 				if(shouldEval)value=new Value({string,type:"string",array});
-			}else if(!({index,value,failed}=await contexts.delcareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
+			}else if(!({index,value,failed}=await contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
 			else if("([".includes(word)){//'(label)'
 				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
 				value??=null;//'()' ==> `undefined`. Used for 'foo(());'
@@ -1494,7 +1494,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					!(statement[index+3]=="{"||functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{")
 					||(functionCallTypes.includes(word)&&statement[index+1]=="(")
 				){
-					//function call: 'foo()' to 'foo=>()::{}::{}'
+					//function call: 'foo()' to 'foo=>()<:{}<:{}'
 					let startIndex=index;
 					let callType="";
 					if(functionCallTypes.includes(word)){
@@ -1522,25 +1522,34 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}else break;
 					}
 				}
+				else if(word=="::"){//extend object 'foo(){}::{}'
+					//extention operator '::{}' or '::(){}' or '::label'
+					index++;
+					if(!value)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
+					if(({index,value}=await contexts.declareFunctionOrObject({
+						index,statement,scope,
+						startValue:value,shouldEval
+					})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected form: `label :: { }' or 'label :: ( ){ }'"));
+				}
 				return {index,value};
 			},
 			async typeSystem({index,statement,scope,value,shouldEval=true}){
 				({index}=await contexts.expression_short({index,statement,scope,shouldEval:false}));
 				return {index,value};
 			},
-			delcare_typeChecks(isExtension,startValue){
+			delcare_typeChecks({index,statement,scope},isExtension,startValue){
 				if(isExtension){//'obj{}'
 					//type checking
 					//TODO: replace the following with throwError errors
-					if(startValue==undefined)throw Error("0xmin error: #: startValue is not defined");
+					if(startValue==undefined)throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not defined"));
 					if(!(startValue instanceof Value))throw Error("compiler type error:");
-					if(startValue.type!="label")throw Error("0xmin type error: #: startValue is not a label");
+					if(startValue.type!="label")throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not a label"));
 					if(!startValue.label){
 						startValue.label=new Variable({name:startValue.name});
 					}
 				}
 			},
-			async delcareFunctionOrObject({index,statement,scope,startValue=undefined,shouldEval=true}){
+			async declareFunctionOrObject({index,statement,scope,startValue=undefined,shouldEval=true}){
 				const isExtension=!!startValue;
 				let value=startValue;
 				let word=statement[index];
@@ -1548,7 +1557,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					statement[index+3]=="{"||
 					functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
 				)){//function declaration '(){}'
-					contexts.delcare_typeChecks(isExtension,startValue);
+					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
 					let functionObj={callType:""};//:Variable|temp object
 					if(shouldEval){
 						if(isExtension)functionObj=startValue.label;
@@ -1563,7 +1572,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						index++;
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
-					let functionScope=new FunctionScope({fromName:"delcareFunctionOrObject/function",
+					let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
 						label:new Variable({name:"(scope function)",code:word}),
 						parent:scope,
 						code:word,
@@ -1574,7 +1583,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					functionObj.supertype??=new Variable({name:"(supertype)"});
 					return {index,value,failed:false};//isExtension&&!startValue};
 				}else if(word=="{"){//'{}' object declaration
-					contexts.delcare_typeChecks(isExtension,startValue);
+					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
 					index++;
 					if(shouldEval){
 						//makes block scope
@@ -1582,7 +1591,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							statement[index],
 							scope,
 							isExtension
-								?new ObjectScope({fromName:"delcareFunctionOrObject/object",parent:scope,label:startValue.label,code:statement[index]})
+								?new ObjectScope({fromName:"declareFunctionOrObject/object",parent:scope,label:startValue.label,code:statement[index]})
 								:undefined
 							,undefined//not recursive
 						);
@@ -1796,17 +1805,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					break;
 				}
-				//'foo(){}' or 'obj{}' extend function or object
-				else if(word=="::"){//extend object 'foo(){}::{}'
-					index++;
-					let startValue=args[args.length-1];
-					if(!startValue)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }'"));
-					if(({index,value}=await contexts.delcareFunctionOrObject({
-						index,statement,scope,
-						startValue,shouldEval
-					})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected: 'label :: { }' or 'label :: (){}'"));
-				}
-				else if(args.length>0&&!({index,value}=await contexts.delcareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
+				else if(args.length>0&&!({index,value}=await contexts.declareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
 					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope}));
 				}else if(word=="¬" && args.length>0){//extend value 'a+1¬.b'==> '(a+1).b'
 					index++;let value=args.pop();
