@@ -1,6 +1,5 @@
 #"tptasm";#"len";#"table";
 let lamda(){//01010011
-	(f>f (a>a) (a>a))(a>a)(a>a)
 	/*(//hello_world
 		v
 			^<< << <<^<< << <<  p//H 1001000
@@ -16,9 +15,9 @@ let lamda(){//01010011
 			v^<<^<< << <<^<< << p//d 1100100
 		v n
 	)*/
-	/*
 		(and>or>t>f>+>*>
-			or (and t f) t (+ f f) (* t f) 
+			(a>b>a)(or (and t f) t (+ f f) (* t f)) p n
+			//(* (f>x>f(f(f x))) t)(a>p) n
 		)
 		(a>b>a b (a>b>b))//and
 		(a>b>a (a>b>a) b)//or
@@ -26,7 +25,6 @@ let lamda(){//01010011
 		(a>b>b)//f
 		(a>b>(f>x>a f (b f x)))//+
 		(a>b>(f>x>a (x>b f x) x))//*
-	*/
 }::{//p = print
 	def let val{"0"};
 	def let .["p"] {r1=0;send r1 [val]};
@@ -103,49 +101,46 @@ let heap{import lib "heap.0xmin";};
 		};
 		#return=class;
 	};
+	let setup()->{delete setup;};
 	let Context()={//when function called
 		def let argument{0}:>Ref(FunctionInstance);//:FunctionInstance*||{InbuiltFunction*}*
 		def let parent{0}:>Ref(Context);//:Context*
 	}:>m_class(2,{})::{
 		//used as %Context*
 		#..prototype::{
-			let unref(thisReg){
+			let unref(thisReg)={
 				#thisReg=thisReg||0;
 				#thisReg<=>Context=();//:%heap.Page*
 				//assume %thisReg == &this;
 				let loop;
-				let loop1;
+				let loop1;//unrefs FunctionInstance
 				push loop..return;
-				def loop1;
+				//def loop1;
 				def loop{
 					push r thisReg;
-					def:{:_if;
-						jump->_if..return if!=0;
-						hlt;//null pointer error
-					};
 					heap.unref(thisReg)<:{
 						def:{:block;
 							r thisReg=[r thisReg+thisReg.argument];
-							jump->block..return if==0;
-							call loop;
+							call loop1;//unref FunctionInstance
 						};
 						def:{:block;
 							r thisReg=[sp];
 							r thisReg=[r thisReg+thisReg.parent];
 							jump->block..return if==0;
-							call loop1;
+							call loop;//unref Context
 						};
-						repeat 0{
-							r thisReg=[sp];
-							[r thisReg+0]=8;
-							[r thisReg+1]=8;
-							[r thisReg+2]=8;
+						r thisReg=[sp];
+						repeat 1{
+							[r thisReg+0]=0;
+							[r thisReg+1]=0;
 						};
 					};
 					pop r thisReg;
 					return;
 				};
 			};
+		};
+		#setup::(){
 		};
 	};
 	let FunctionInstance()={//'(a>a)' when function created polymorph of Context
@@ -172,10 +167,9 @@ let heap{import lib "heap.0xmin";};
 							repeat !unrefContext:Context().unref(thisReg);
 						};
 						r thisReg=[sp];
-						repeat 0{
+						repeat 1{
 							[r thisReg+0]=0;
 							[r thisReg+1]=0;
-							[r thisReg+2]=0;
 						};
 					};
 					pop r thisReg;
@@ -184,6 +178,7 @@ let heap{import lib "heap.0xmin";};
 			};
 		};
 	};
+	#setup();
 	//note: function must come first so that 'addFoo()' works quicker.
 	//note: argument must come first so it isn't assigned when 'new' is called
 	let spareReg=heap.malloc.nextReg.n;
@@ -215,10 +210,12 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 			let maxRecur=getRecur(line);
 			let mainFoo=function=newFoo=({});
 			let inputFunctions={...let set arguments[1]};
+			let parent0;
 			let contexts={
 				def let refs;
-				1;//ref counter
-				Context=()::{let refs=refs};
+				repeat(inputFunctions..labels..length==0): 1;//ref counter
+				//assume: only '[parent0-1]' is used
+				virtual:{#def parent0=Context=()::{let refs=refs}};
 			};
 			let functions{};
 			def mainFoo<=>{...let mainFoo;}::{
@@ -227,25 +224,27 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 					let foo=inputFunctions[""...list[i1]];
 					repeat!foo[¬newFoo]:{
 						let contextReg=function.registers.context;//:%Context*
-						let context=Context=()::{#function<=>{@:foo;}};
+						let context=FunctionInstance=()::{#function<=>{@:foo;}};
 						let foo[¬newFoo]=context;//mark the input functions
 						#set contexts::{
 							#def let context.refs;
 							1;//ref counter
 							def context;
+							ram=>-1;7;
 						};
-						foo..splice(0,0,{null;
+						foo..splice(0,0,{//null;
 							push [r contextReg + contextReg.argument];
 						});
 						foo..splice(-0,0,{jump->[sp+1]});
 						let mainFoo.scope[""...list[i1]]=foo;
 						//push end;
 					};
+					#set contexts::{ram=>-1};
 					i1+=1;
 				};
 				{:main;
 					let end{return};#end<->0;
-					r newFoo..prototype.registers.context = #(contexts[2]);
+					r newFoo..prototype.registers.context = parent0;//:virtual parent0
 					def block;
 					def let ..this.getAns{
 						let ans=2;//:%
@@ -291,11 +290,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 		let word=line[i];
 		repeat ((args<2) && (line[i+1]==">")):{//function a>b ==> (a){#return=b}
 			#i+=2;
-			let foo1=newFoo({},function,""...word);
-			#set output::{
-				null;//start of function
-				def foo1;
-			};
+			let foo1=newFoo({},function,""...word);//:{@}
 			#returnValue=parse(line,i,foo1,1,output);
 			{//removes repeated functions
 				let r=output.functions..length;
@@ -308,7 +303,11 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 					};
 					#i1+=1;
 				};
-				repeat (+r==output.functions..length):{
+				repeat (+r==output.functions..length):{//if it is a new function
+					#set output::{
+						//null;//start of function
+						def foo1;
+					};
 					#output.functions..splice(-0,0,{$def foo1});
 				};
 			};
@@ -450,40 +449,38 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 					//assume: context=r0;
 					let stack_functionInstance = 3;
 					{//{@} & ()->push[ans]
-						let arg = registers.context+1;
+						let temp = registers.context+1;
 						let arg_stack = 2;
 						r registers.fooInstance = [sp+stack_functionInstance];
 						{:copyContext;//does: context=new Context(context);
-							/*let temp=arg;
-							r temp = [r registers.fooInstance+registers.fooInstance.parent];
-							push r temp;//parent
-							def heap.ref(temp)::{
-								r temp|=0;
+							let arg=temp;
+							r arg = [sp+arg_stack];//arg
+							push r arg;
+							let parent=temp;
+							r parent = [r registers.fooInstance+registers.fooInstance.parent];
+							push r parent;//parent
+							def heap.ref(parent)::{
+								r parent|=0;
 								#..splice(0,0,{jump->..return if==0})
 							};
-							delete temp;*/
-							r arg = [sp+arg_stack];
-							push r arg;
-							let =;delete;
-							let temp=arg;delete arg;
-							r temp = [r registers.fooInstance+registers.fooInstance.parent];
-							push r temp;//parent
 							registers.context.new();
 							pop r registers.context;
 						};
 						//move arg reference from stack to heap
-						call [r registers.context + registers.context.function];
+						let fooInstance=FunctionInstance=()<->temp;
+						r fooInstance = [sp+stack_functionInstance];
+						call [r fooInstance + fooInstance.function];//foo.function:[{@}]
 					};
-					//stack [context,arg,ret,parent,ret1,ans]
+					//stack [foo,arg,ret,parent,ret1,ans]
 					//assert %registers.context == newContext
 					repeat 1{//handle unrefs
 						let arg_stack=4;
 						let parent_stack=2;
-						let context_stack=5;//original functionInstance
+						let foo_stack=5;//original functionInstance
 						//unref(newContext,context);
-						def let removeContext=Context=().unref(registers.context,{:arg});//removed from register
+						def let removeContext=Context=().unref(registers.context);//removed from register
 						//do not need to remove arg ref from stack as it bellongs to the context on the heap and would be unrefed by this point.
-						r registers.context = [sp + context_stack];//removed from stack
+						r registers.context = [sp + foo_stack];//removed from stack
 						FunctionInstance=().unref(registers.context,removeContext);//no arg
 					};
 					let ans <-> registers.context+1;
@@ -500,15 +497,39 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 			let makeContextInstance= ..prototype.makeContextInstance;
 			def ..prototype.makeContextInstance;
 		};
-		debugger ..this..labels;
 	};
 };
 let main=parse(lamda,lamda);
 sp = 0x800;
 call main;
+let counterLabel;
 def let end{
+	let printStr(str,clearReg){
+		let i=-1;
+		repeat !!clearReg r0=0;
+		repeat str..length:send r0 #(0xffff&str[i+=1]);
+	};
+	let printHexFromMemory(intAddress,clearReg)={//:#([int])=>{@}
+		repeat !!clearReg r0=0;
+		let int=1;//:%
+		let char=2;//:% & [0x0-0xf]
+		%int=[intAddress];
+		let i=-1;
+		repeat 4:{
+			r char=#("0"&0xffff>>4);
+			r int<<4;
+			r char<<=4 +internal;
+			send r0 r char;
+		}
+	};
+	//printStr("\n\c0fmemory used:",{});
+	//printHexFromMemory(counterLabel);
 	hault;
 	jump->0;
 };
 def main;
+#let counter;
+#heap[-1][-1]..splice(1,0,{#def counterLabel;0 #def counter;});
+#heap.malloc..splice(0,0,{[counter]+=1});
+#heap.free..splice(0,0,{[counter]-=1});
 def heap;
