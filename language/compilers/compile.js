@@ -579,9 +579,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						let optional=this.optionals[i];
 						let fail=true;
 						if(!optional){}
+						if(!(operator in optional.map)){
+							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+i+"' with the '"+operator+"' instruction"));
+							//TODO: add 'try doing ...' to this error message
+						}
 						if(optional&&(
-							optional.defaultSymbols.includes(optionals[i])||
-							(optional.useArray&&optional.map[operator][1]==optionals[i])
+							optional.defaultSymbols.includes(optionals[i])||//if valid symbol used with keyword
+							(optional.useArray&&optional.map[operator]?.[1]==optionals[i])
 						)){
 							if(optional.useArray)operator=optional.map[operator][0]??operator;
 							else operator=optional.map[operator]??operator;
