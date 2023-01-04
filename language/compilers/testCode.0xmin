@@ -1,5 +1,19 @@
 #"tptasm";#"table";
-let foo=#(){
-	debugger 4;
-}[0];
-#;debugger (){}()..labels;//used to return '["caller"]'. should return '[]'
+{}:>(){}::{}()<:{};
+let copy(obj,label){
+	#;
+	obj<=>label;
+	obj<->label;
+	obj..prototype=label..prototype;
+	obj..supertype=label..supertype;
+	obj..return=label..return;
+	obj..super=label..super;
+	obj..proto=label..proto;
+};
+let a{1};
+void #def a;
+let clear{
+	let number(obj){#obj<->()};
+	let labels(obj){#obj::{delete;}};
+	let list(obj){#obj..splice(0,-0)};
+};
