@@ -42,11 +42,47 @@ let heap{import lib "heap.0xmin";};
 		0;
 	};
 	let m_class(class,argsLen,classConstructor,classDeconstructor)={
-		//class:#Struct,constructor:#()->{@}
+		//class:#Struct,constructor:#(label?,arguments?:any)->{@}
 		let m_class=this..constructor;
 		#class::{
 			#class..proto=m_class..prototype;
-			()={#..compile};
+			//#..splice(0,0,{});
+			()={
+				repeat !!arguments[0]:{#;
+					return=#(arguments[0]<->this)::{
+						#;
+						..splice(0,-0);
+						...codeof this;
+						...labelsof this;
+					};
+					return..proto=..proto;
+					return..super=..super;
+					return..prototype=..prototype;
+					return..supertype=..supertype;
+				};
+				repeat !return[¬m_class..prototype.static]:#..compile;
+			};
+			def let delRef<=>{
+				let reg:>..this=()<->0;//:%this*
+				let isFirstRef;//:#{}|#(¬)
+				heap.unref(reg)<:{
+					push reg;
+					let i=-1;
+					repeat ..this..length:{
+						let ref=..this[i+=1][¬Ref];
+						repeat !!ref:{:block;
+							repeat !isFirst:r thisReg=[sp];
+							repeat ref.canBeNull:jump->block..return if==0;
+							r thisReg=[r thisReg+thisReg.parent];
+							#isFirstRef=¬;
+						};
+					};
+					pop reg;
+					:unrefRefs;
+					repeat !!isFirstRef:#unrefRefs<=>{};
+				};
+				return;
+			};
 		};
 		#let set class..prototype::{
 			let Ref(label,class)={#;
@@ -69,6 +105,7 @@ let heap{import lib "heap.0xmin";};
 				};
 				repeat 1 call heap.malloc;
 				#let i=this..length-1;
+				repeat !argsLen:let argsLen=this..length;
 				def let assigner = {
 					repeat argsLen:{
 						[r rMemory+i]=pop;//r arguments.(i);//argument
@@ -77,29 +114,36 @@ let heap{import lib "heap.0xmin";};
 				}
 				:definer;
 				let output=rMemory;//:%Object* aka %heap.Page*
-				classConstructor(definer);
+				def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
 			};
 			let addRef(reg){
 				heap.ref(reg);
-			};
-			let delRef(reg){
-				let selfRefs={},i=-1;
-				repeat ..this..length:{#;
-					repeat !!..this[i+=1][¬Ref]:Refs..splice(-0,0,{$def..this[i]});
-				};
-				heap.unref(reg)<:{
-
-				};
 			};
 			#new::(){
 				push r rMemory;
 			};
 			let del(){//:pop[this:Context*]
-				classDeconstructor->();
+				def classDeconstructor->()||{};
 				call heap.free;
 			};
 		};
 		#return=class;
+	}::{
+		let ..prototype{
+			let static(label,valss){//:@[this] aka {@}
+				#repeat !label: :label;
+				let label[¬static];
+				let label.new=¬;
+				let label.addRef=¬;
+				let label.delRef=¬;
+				#return=this=(label,valss);
+			};
+			let ptr(label,vals){//:@[%this] aka %{@}*
+				#repeat !label: :label;
+				let label[¬ptr];
+				#return=this=(label,vals);
+			};
+		};
 	};
 	let setup()->{delete setup;};
 	let Context()={//when function called
@@ -499,37 +543,39 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 		};
 	};
 };
-let main=parse(lamda,lamda);
-sp = 0x800;
-call main;
-let counterLabel;
-def let end{
-	let printStr(str,clearReg){
-		let i=-1;
-		repeat !!clearReg r0=0;
-		repeat str..length:send r0 #(0xffff&str[i+=1]);
+def let program{
+	let main=parse(lamda,lamda);
+	sp = 0x800;
+	call main;
+	let counterLabel;
+	def let end{
+		let printStr(str,clearReg){
+			let i=-1;
+			repeat !!clearReg r0=0;
+			repeat str..length:send r0 #(0xffff&str[i+=1]);
+		};
+		let printHexFromMemory(intAddress,clearReg)={//:#([int])=>{@}
+			repeat !!clearReg r0=0;
+			let int=1;//:%
+			let char=2;//:% & [0x0-0xf]
+			%int=[intAddress];
+			let i=-1;
+			repeat 4:{
+				r char=#("0"&0xffff>>4);
+				r int<<4;
+				r char<<=4 +internal;
+				send r0 r char;
+			}
+		};
+		//printStr("\n\c0fmemory used:",{});
+		//printHexFromMemory(counterLabel);
+		hault;
+		jump->0;
 	};
-	let printHexFromMemory(intAddress,clearReg)={//:#([int])=>{@}
-		repeat !!clearReg r0=0;
-		let int=1;//:%
-		let char=2;//:% & [0x0-0xf]
-		%int=[intAddress];
-		let i=-1;
-		repeat 4:{
-			r char=#("0"&0xffff>>4);
-			r int<<4;
-			r char<<=4 +internal;
-			send r0 r char;
-		}
-	};
-	//printStr("\n\c0fmemory used:",{});
-	//printHexFromMemory(counterLabel);
-	hault;
-	jump->0;
+	def main;
+	#let counter;
+	#heap[-1][-1]..splice(1,0,{#def counterLabel;0 #def counter;});
+	#heap.malloc..splice(0,0,{[counter]+=1});
+	#heap.free..splice(0,0,{[counter]-=1});
+	def heap;
 };
-def main;
-#let counter;
-#heap[-1][-1]..splice(1,0,{#def counterLabel;0 #def counter;});
-#heap.malloc..splice(0,0,{[counter]+=1});
-#heap.free..splice(0,0,{[counter]-=1});
-def heap;

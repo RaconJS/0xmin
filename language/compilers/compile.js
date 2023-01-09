@@ -927,11 +927,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(value){
 							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
 							let hasOperator=contexts.operators.hasOwnProperty(statement[index]);//e.g. 'let a + = b' or 'let a || = b'
-							let willCreateLabel=statement[index+hasOperator]!="="&&statement[index+1+hasOperator]!="(";
+							let willCreateLabel=!(statement[index+hasOperator]=="="&&statement[index+1+hasOperator]!="(");
 							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
 								const newLabel=new Variable({name:value.name});
 								let labelParent=["name"].includes(value.refType)?scope.let.label:value.parent;
-								if(labelParent)//BODGED TODO: add refType to callFunction, or make a better default refType for Values.
+								if(labelParent)//BODGED; TODO: add refType to callFunction, or make a better default refType for Values.
 								if(willCreateLabel){//'let a;' and not 'let a = ...' ==> makes default label;
 									if(metaState["set"]){//'let set a.b;' ==> `a.b??={};` 
 										//'let set a;' ==> only creates 'a' if it doesn't already exist in this scope
@@ -940,7 +940,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 										labelParent.labels[value.name]=newLabel;
 									}
 								}
-								else labelParent.labels[newLabel.name]=undefined;//allow writing to this new label;
+								else labelParent.labels[newLabel.name]??=undefined;//allow writing to this new label;
 								startValue=new Value({
 									type:"label",
 									label:newLabel,
@@ -1766,7 +1766,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 										if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
 								}
 								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
-								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' ==> a is an empty label (aka null)
+								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' and 'a= ¬();' ==> a is an empty label (aka null)
 								value=isNotNull?newLabel?.toValue?.("label")??new Value():null;
 							}else{
 								//sets properties of existing variable
@@ -2582,7 +2582,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				supertype=null;///instanceof Variable
 				securityLevel=0;//used with '..secure'
 			//as array
-				code=[];//:(CodeLines|Variable|Scope)[]
+				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
 				callType="";//:'' | '=>' | '=' | '->' | '<-' etc...
 				parameters=[];//:Parameter[]

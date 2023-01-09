@@ -1,19 +1,120 @@
 #"tptasm";#"table";
-{}:>(){}::{}()<:{};
-let copy(obj,label){
-	#;
-	obj<=>label;
-	obj<->label;
-	obj..prototype=label..prototype;
-	obj..supertype=label..supertype;
-	obj..return=label..return;
-	obj..super=label..super;
-	obj..proto=label..proto;
+/*{}:>(){}::{}()<:{};
+//let a:><=>;//causes an
+let m_class(class,argsLen,classConstructor,classDeconstructor)={
+	//class:#Struct,constructor:#(label?,arguments?:any)->{@}
+	let m_class=this..constructor;
+	#class::{
+		#class..proto=m_class..prototype;
+		//#..splice(0,0,{});
+		()={
+			repeat !!arguments[0]:{#;
+				return=#(arguments[0]<->this)::{
+					#;
+					..splice(0,-0);
+					...codeof this;
+					...labelsof this;
+				};
+				return..proto=..proto;
+				return..super=..super;
+				return..prototype=..prototype;
+				return..supertype=..supertype;
+			};
+			repeat !return[¬m_class..prototype.static]:#..compile;
+		};
+		def let delRef<=>{
+			let reg:>..this=()<->0;//:%this*
+			let isFirstRef;//:#{}|#(¬)
+			heap.unref(reg)<:{
+				push reg;
+				let i=-1;
+				repeat ..this..length:{
+					let ref=..this[i+=1][¬Ref];
+					repeat !!ref:{:block;
+						repeat !isFirst:r thisReg=[sp];
+						repeat ref.canBeNull:jump->block..return if==0;
+						r thisReg=[r thisReg+thisReg.parent];
+						#isFirstRef=¬;
+					};
+				};
+				pop reg;
+				:unrefRefs;
+				repeat !!isFirstRef:#unrefRefs<=>{};
+			};
+			return;
+		};
+	};
+	#let set class..prototype::{
+		let Ref(label,class)={#;
+			//used for class().unref();
+			//label has type [class*] on heap
+			let label[¬constructor]=class;
+			return = label;
+		};
+		let new(){//:(...%[])->push[Context*]
+			let rMemory = heap.malloc.inputs[0];
+			r rMemory=this..length;
+			let rMemory = heap.malloc.outputs[0];
+			repeat 0 {:malloc;
+				//quicker O(1) way of allocating memory
+				let address= rMemory+1;//[%]*
+				r address=r rMemory;
+				r rMemory = [nextAddress];
+				r rMemory += heap..return;
+				[nextAddress] += r address;
+			};
+			repeat 1 call heap.malloc;
+			#let i=this..length-1;
+			repeat !argsLen:let argsLen=this..length;
+			def let assigner = {
+				repeat argsLen:{
+					[r rMemory+i]=pop;//r arguments.(i);//argument
+					#i=i-1;
+				};
+			}
+			:definer;
+			let output=rMemory;//:%Object* aka %heap.Page*
+			def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
+		};
+		let addRef(reg){
+			heap.ref(reg);
+		};
+		#new::(){
+			push r rMemory;
+		};
+		let del(){//:pop[this:Context*]
+			def classDeconstructor->()||{};
+			call heap.free;
+		};
+	};
+	#return=class;
+}::{
+	let ..prototype{
+		let static(label,vals){//:@[this] aka {@}
+			#repeat !label: :label;
+			let label[¬static];
+			let label.new=¬;
+			let label.addRef=¬;
+			let label.delRef=¬;
+			#return=Int=(label,vals);
+		};
+		let ptr(label,vals){//:@[%this] aka %{@}*
+			#repeat !label: :label;
+			let label[¬ptr];
+			#return=this=(label,vals);
+		};
+	};
 };
-let a{1};
-void #def a;
-let clear{
-	let number(obj){#obj<->()};
-	let labels(obj){#obj::{delete;}};
-	let list(obj){#obj..splice(0,-0)};
+let heap{import lib"heap.0xmin"};
+let Int(this,valsw)={
+	let valsw=valsw;
+	def let val{4};
+}:>m_class();
+#{}::()={
+	ram=>this;
+	def vals||{};
+	ram=>0;
 };
+#debugger (Int.static()<:1<:2).valsw;
+virtual{heap};*/
+debugger("asd"[2][2])"value";
