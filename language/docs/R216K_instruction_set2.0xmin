@@ -17,7 +17,7 @@ a <<= b +internal;//shl/scl
 a >>>= b;//ror; circular shift:
 a <<<= b;//rol; 
 bump a; port a?; port a -> "\a";//'\a'; //note: 'bump' can't use litteral Uint in bump comand because of hardware limitations
-wait a; port a;  port a <- "\a";//if terminal.input == "\a";
+wait a; port a;  port a <- "\a";//a = (terminal.input == "\a")? 0 to 255 : -1;
 a = port b;//recv
 port a = b;//send
 push a;

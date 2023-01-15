@@ -4,15 +4,16 @@
 	var:{...var[]};
 	const:{...const[]};
 };
-#let: var(val)={
-	#def: val;
-	#set: constructor::{null}¬..splice(-1,1,{def this});
+#let: var(val)={//val:int|{@}
+	let val=val;
+	#def: val;//#set: return = val;
+	#set: constructor..splice(-0,0,{#def: this});
 };
-#let: const(val)={
+#let: const(val)={//val:int
 	#def: val;
 	#let: name=""...+val;
 	#let: label = constructor[""...name];
-	#repeat !label:{
+	#repeat !label: {
 		#set: label=this;
 		#let: constructor[""...name]=label;
 		#set: constructor::{@null}¬..splice(-1,1,{def this});
