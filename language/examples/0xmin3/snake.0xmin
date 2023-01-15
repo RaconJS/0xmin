@@ -1,0 +1,228 @@
+//15:25
+#"0xmin";#"len";
+()->{
+	let pos{
+		let x=var(0x100000);//:int in range[1,16]
+		let y=var(0x100000);//:int in range[1,12]
+		let bit=var(2);//shift(30) in range[2,0x20000000]
+		let cell=var(1);
+	};
+	let grid{repeat 12:0x1;}¬:>var();
+	let snake{
+		let len=var(0x100003);
+		let direction=var(1);
+		//tail side
+		"\p88\p87\p86";
+		repeat (12*16):"\p88";
+		//head side
+	};
+	let i=-1;
+	repeat 3:{def ¬(""...snake[i+=1]);"#"};
+	:this;
+	#this[-1][-1]=¬"H";
+	let heap{
+		def snake;
+	};
+	move=>var;
+	def let mainLoop{
+		let getInput=getInput({:wait});
+		getInput;
+		let hitBorder{
+
+		};
+		if;//if !!input
+		{let then,else;
+			jump->then;
+			def else{
+				jump->then..return;
+			};
+			def then{
+				def switch()<:"w"<:(){
+					move=>pos.y;get;
+					increment();
+					move=>pos.y;set;
+					move=>const(1);xor;
+				};
+				def switch()<:"a"<:(){
+					move=>pos.x;get;
+					decrement();
+					move=>pos.x;set;
+					move=>pos.bit;
+					get;blue;set;
+				};
+				def switch()<:"s"<:(){
+					move=>pos.y;get;
+					decrement();
+					move=>pos.y;set;
+				};
+				def switch()<:"d"<:(){
+					move=>pos.x;get;
+					increment();
+					move=>pos.x;set;
+					move=>pos.bit;
+					get;red;set;
+				};
+				let getHead=#(){
+					move=>snake.len;get;
+					indexArray(snake)<:(){
+						set jump+3;
+						get;
+						null;
+						null;
+					};
+				};
+				let setHead=#(){
+					move=>snake.len;get;
+					let val;
+					indexArray(snake)<:(){
+						set jump+3;
+						get;
+						null;
+						null;
+					};
+				};
+				def let UpdateScreen{
+					getHead();
+					//assert: alu = snake[snake.len] aka head
+					//alu:print
+					set jump+3;
+					jump+2;
+					null;
+					null;//move curser to head
+					"#";
+					move=>snake+0;get;
+					set jump+3;
+					jump+2;
+					null;
+					null;//move curser to tail
+					" ";
+				};
+				def let shuffleSnakeParts{
+					
+				};
+				move=>else..state.move;
+			};
+		};
+		move=>mainLoop..state.move;
+		jump->mainLoop;
+	};
+	def data;
+	def heap;
+};
+...(){
+	import lib "var_const.0xmin";
+	let Tempory()={//:()=>(#()=>{@}){}
+		#this(vars)={
+			#set constructor::{
+				ram=>..this;
+				def vars();
+			};
+		};
+	};
+	let tempory=Tempory():>var()[0];
+	let indexArray(array,do){
+		//$assert: alu = index, do:#()=>{@}
+		move=>const({move 1}..compile[0]);red;//$assert: alu:move command
+		move=>const({move -0}..compile[0]);
+		set jump +3;
+		xor;
+		move=>array;
+		null;//assert: move=>array[index], alu = move<=array[index]
+		def do();
+		$move=>array;
+	};
+	let increment(){
+		let sub2=const(-2&0x2fffffff);
+		tempory()<:()->{
+			#def let notIn,notOut;
+		};
+		#let const_2=const(2);
+		move=>notIn;
+		set;
+		nor;
+		set;//notIn= ~input
+		blue;
+		move=>const_2;
+		blue;
+		red;
+		move=>notOut;
+		set;
+		nor;
+		move=>notIn;
+		red;
+	};
+	let decrement(){
+		let sub2=const(-2&0x2fffffff);
+		tempory()<:()->{
+			#def let val;
+			#def let mask;
+		};
+		move=>val;
+		set;
+		move=>sub2;
+		get;
+		move=>val;
+		red;
+		nor;
+		set;
+		nor;
+		//-x = ~x+1
+		//~x = -x-1
+		//x+1
+	};
+	let data{
+		jump->..return;
+		def var,const;
+	};
+	let Function()={
+		let call(foo){
+			jump->foo;
+			!jump<-foo..return;
+		};
+	};
+	let getInput(shouldWait){
+		//shouldWait:label?
+		:this;
+		move=>const(0x20000000);get;
+		move=>const("\a");
+		def let checkBuffer{
+			or input;if 1;xor;xor;
+			repeat !shouldWait:move=>this..return..state.move;
+			{if;//if(no input) then loop or return;
+				repeat !shouldWait:jump->this..return;
+				repeat !!shouldWait:jump->..this;
+			};
+		};
+		"\a";
+		move=>const(0x20000000);
+		repeat 13:or_input;
+		//if flag is true if there was an input
+	};
+	let switch(){
+		:this;
+		let cases{...codeof arguments};//:{...{case:int;code:#(switch,i){@}}[]};
+		let cases.case=0,cases.code=1;
+		let i=0;
+		let lastCase=0;
+		if;null;
+		repeat (cases..length/2):{//rounded down
+			:case;
+			let returner={
+				move=>this..return..state.move;
+				jump->this..return;
+				let noTampering;
+			};
+			let code=cases[i*2+cases.code](case,+i,this);//v,i,a
+			move=>const(lastCase^(lastCase=cases[i*2+cases.case]));
+			xor;
+			repeat !code.noMoveState:move=>code..return..state.move;
+			if;//if value!=case
+			jump->code..return;
+			def code;
+			#i+=1;
+			def returner;
+		};
+		repeat (i>0 &&!!this[-1].returner.noTampering)#this[-1].returner<=>{};//removes the last jump->..return
+	};
+};
+def .[0]();

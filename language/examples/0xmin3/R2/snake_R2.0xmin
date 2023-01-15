@@ -1,0 +1,50 @@
+#"tptasm";#"table";
+import lib "var_const.0xmin";
+let segment(x,y)={
+	#this<->¬(#(y&0xf)<<4|(x&0xf));
+	#this<=>¬+this;
+};
+let snake{
+	let len=var(0)[0];
+	let pos={def let y=0,x=0;}:>var()[0];
+	repeat (16*12):segment(0,0);//:(y<<4|x)[]
+	{
+		#.[0]=segment(8,6);
+		#len<=>1;
+	};
+}:>var();
+let reset{
+	[snake.len]=0;
+	[snake.pos.x]=16/2;
+	[snake.pos.y]=12/2;
+};
+let RegCounter(val)={
+	#this<->val||0;
+}::{#;..prototype{
+	let next(){
+		#return= +this;
+		#this<->this+1;
+	};
+}};
+let getInput(enum,wait){
+	:this;
+	let enum=RegCounter=(enum);
+	let temp = enum.next();
+	let port0 = enum.next();
+	wait r temp;
+	repeat !!wait:jump->this if sign;
+	repeat ! wait:jump->this..return if sign;
+	r port0=0;
+	port r port0;
+	{:loop;
+		r temp
+		jump->loop if;
+	};
+};
+let mainLoop{
+
+};
+{:memory;
+	def reset;
+	def var,const;
+};
