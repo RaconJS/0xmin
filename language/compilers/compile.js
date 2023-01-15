@@ -288,380 +288,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					default: return false;
 				}
 			}
-		}
+		};
 	//----
-	const assembler={//oper,label
-		tptasm:new class InstructionSet{
-			constructor(){
-
-			}
-			//main_assembly:#()->{@}
-			//compileAssemblyLine:@(@)->{0}
-			//assemblyLineToLabel:(AssemblyLine)->Variable
-			//setLanguage:({context})->void
-			//
-			keywordsRegex=/^(?:%|(?:[&|^+\-]|>>[>\-]?|[<\-]?<<)?=|->|hault|jump|if|null|store|carry|sign|overflow|0|\+|-|[!><=]=?|port|bump|wait|push|pop|call|return)$/;
-			registerSymbol="%";
-			ifParts=[];
-			registers={
-				"ip":"ip",
-				"sp":"sp",
-				...(()=>{
-					let names={};
-					for(let i=0;i<16;i++)names["r"+i]="r"+i;
-					return names;
-				})(),
-				"stack":"sp",
-				"instruction":"ip",
-			};
-			otherKeywords=Object.freeze({
-				"if":"??",
-				"r":"r",
-				...this.registers,
-			});
-			optionals=Object.freeze({
-				"carry":{
-					useArray:true,
-					map:{"add":["addc", "!"], "adds":["addcs", "!"], "sub":["sbb", "+"],"subs":[, "+"]},
-					defaultSymbols:[""],
-				},
-				"store":{
-					map:{"add":"adds", "addc":"addcs", "sub":"subs", "sbb":"sbbs", "and":"ands", "xor":"xors", "or":"ors"},
-					defaultSymbols:["", "!"],
-				},"internal":{
-					map:{"shl":"scl", "shr":"scr"},
-					defaultSymbols:["", "+"],
-				},
-				"chain":{
-					map:{"shl":"scl", "shr":"scr"},
-					defaultSymbols:["", "+"],
-				},
-			});
-			operators=Object.freeze({//name:{map:default name
-				"+":"add",
-				"-":"sub",
-				"=":"mov",
-				"&":"and",
-				"|":"or",
-				"^":"xor",
-				"mask":"swm",
-				"hault":"hlt",
-				"jump":"jmp",
-				"null":"nop",
-				">>":"shr",//scl with +chain
-				"<<":"shl",//scr
-				">>>":"ror",
-				"<<<":"rol",
-				"port":"bump",
-				"check":"wait",
-					//"cin":"recv",
-					//"cout":"send",
-				"push":"push",
-				"pop":"pop",
-				"call":"call",
-				"return":"ret",
-				//used to help the autophase-detector
-					"if":null,
-					"carry":null,
-					"store":null,
-					"internal":null,
-				//old instruction set
-				"send":"send",
-				"recv":"recv",
-				"wait":"wait",
-				"bump":"bump",
-				"mov":"mov",
-				"db":"db",
-				"dw":"dw",
-				"and":"and",
-				"or":"or",
-				"xor":"xor",
-				"add":"add",
-				"adds":"adds",
-				"adcs":"adcs",
-				"sub":"sub",
-				"subs":"subs",
-				"sbb":"sbb",
-				"sbbs":"sbbs",
-				"shl":"shl",
-				"shr":"shr",
-				"ror":"ror",
-				"rol":"rol",
-				"scl":"scl",
-				"scr":"scr",
-				"push":"push",
-				"pop":"pop",
-				"call":"call",
-				"ret":"ret",
-				"hlt":"hlt",
-				"jmp":"jmp",
-				"nop":"nop",
-				"jn":"jn",
-				"jz":"jz",
-				"jnz":"jnz",
-				"jc":"jc",
-				"jnc":"jnc",
-				"jo":"jo",
-				"jno":"jno",
-				"js":"js",
-				"jns":"jns",
-				"jge":"jge",
-				"jle":"jle",
-				"je":"je",
-				"jne":"jne",
-				"jg":"jg",
-				"jl":"jl",
-				"swm":"swm",
-			});
-			flags={
-				"0"       :{map:"ZF",jumpMap:["jnz", "jz"]},
-				"carry"   :{map:"CF",jumpMap:["jnc", "jc"]},
-				"overflow":{map:"OF",jumpMap:["jno", "jo"]},
-				"sign"    :{map:"SF",jumpMap:["jns", "js"]},
-			};
-			ifOperations={//!>=,>=
-				"true":"jmp",
-				"false":"nop",
-				">=":"jge",
-				"<=":"jle",
-				"==":"je",
-				"!=":"jne",
-				">":"jg",
-				"<":"jl",
-			};
-			asm_ifStatement({statement,index,scope,operator,hasIf}){//#:string?
-				let jumpType;
-				if(statement[index]=="if"&&!hasIf)block:{
-					index++;
-					hasIf=true;
-					let ifData={type:null,flag:null};
-					if(this.ifOperations.hasOwnProperty(statement[index])){//'if >= x'
-						ifData.type=statement[index++];
-						if(statement[index]=="0")index++;//'if >=;'==> 'if >= 0;'
-						ifData.flag="0";
-						jumpType=this.ifOperations[ifData.type];
-					}
-					else {
-						if(statement[index]=="!"){//'if !sin'
-							ifData.type="!";
-							index++;
-						}
-						if(this.flags.hasOwnProperty(statement[index])){//'if sign'
-							ifData.flag=statement[index++];
-							jumpType=this.flags[ifData.flag].jumpMap[+(ifData.type!="!")];
-						}
-						else{//'if;' or 'if !;'
-							jumpType=this.ifOperations[""+(ifData.type!="!")];
-						}
-					}
-					jumpType||=this.operators["null"];
-					operator=jumpType;
-				}
-				return {index,operator,hasIf};
-			}
-			asm_optionalStatement({statement,index,scope,optionals}){
-				//'a-=b !store +carry'
-				let hasSymbol=false,symbol,optional="";//optional:string
-				if("+-!".includes(statement[index])){
-					hasSymbol=true;
-					symbol=statement[index++];
-				}
-				if(this.optionals.hasOwnProperty(optional=statement[index])){
-					optionals[optional]=symbol;
-					index++;
-				}
-				else if(hasSymbol)index--;
-				return {index};
-			}
-			async asm_NumberOrRegister({statement,index,scope},{arg}){//#:
-				if(statement[index]==this.registerSymbol||statement[index]=="r"){
-					index++;
-					arg.push("r");
-				}else if(this.registers.hasOwnProperty(statement[index])){
-					arg.push(this.registers[statement[index++]]);
-					return {index};
-				}
-				if(this.otherKeywords.hasOwnProperty(statement[index])){
-					arg.push(statement[index++]," ");
-				}
-				let value;
-				({index,value}=await contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
-				if(value){arg.push(value);}
-				return {index};
-			}
-			asm_operator({statement,index,scope,operator}){//#:string|undefined
-				let word=statement[index];
-				let hasOperator=false;
-				if(!hasOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
-					let oper1=word;
-					index++;
-					if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b' ==> 'a + b'
-						index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
-					}
-					if(oper1=="="||oper1=="=>"){//%register = pop;
-						word=statement[index];
-						if(["pop", "recv", ""].includes(word)){
-							oper1=word;
-							index++;
-						}
-					}
-					operator||=this.operators[oper1];
-					hasOperator=true;
-				}
-				return {index,operator,hasOperator};
-			}
-			async asm_arg({statement,index,scope}){//#:(string|Value)[]
-				let word=statement[index];
-				let value;//:Value
-				let arg=[];//:(string|Value)[]
-				if(word=="["){
-					index++;
-					word=statement[index];
-					arg.push("[");
-					for(let i=0;i<word.length&&i<1;i++){
-						let statement=word[i],index=0;
-						({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
-						if("+-".includes(statement[index])){
-							arg.push(statement[index++]);
-							({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
-						}
-					}
-					index+=2;
-					arg.push("]");
-				}
-				else{
-					({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
-				}
-				return {index,arg};
-			}
-			async generateAssemblyLine({statement,index,scope}){//:void & mutates scope
-				const instruction=new AssemblyLine({scope});
-				let argsList=[];
-				let operator,args=[],hasIf=false,hasOperator=false,optionals={};//optionals:Map
-				for(let i=0;i<9;i++){
-					let arg;
-					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
-					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator}));
-					({index}=this.asm_optionalStatement({statement,index,scope,optionals}));
-					if(args.length<2){
-						;({index,arg}=await this.asm_arg({statement,index,scope}));
-						if(arg?.length>0){args.push(arg);}
-						if(statement[index]==","&&args.length==1)index++;//'mov a,b;'
-					}
-					let word=statement[index],failed;
-					if(({index}=contexts.endingSymbol({index,statement})).failed){break;}
-				}
-				if(args.length>1){args.splice(1,0,",");}
-				if(!operator){
-					//args[0][0]:Value
-					let dataMask=0xffff;
-					operator="dw";
-					if(args.length==1){
-						if(args[0][0].type=="string"&&args[0][0].array.length>0){
-							let instruction=[];//new Variable({name:"(string)"});
-							for(let char of args[0][0].array){
-								let newLine=new AssemblyLine({scope,type:"data",dataType:"char",args:[operator,(valueCharToNumber(char,true)&dataMask)+""]});
-								newLine.dataValue=+newLine.args[1];
-								instruction.push(newLine);
-							}
-							return {index,instruction,isArray:true};
-						}
-						else{
-							instruction.type="data";
-							instruction.dataType="number";
-							instruction.dataValue=args[0][0].number;//:number
-						}
-					}else throw Error(throwError({statement,index,scope},"#/@ syntax","invallid assembly line: expected a string, a number or a command."));
-				}
-				else{
-					for(let i in optionals){//optionals[number]:string & symbol
-						if(!optionals.hasOwnProperty(i))continue;
-						let optional=this.optionals[i];
-						let fail=true;
-						if(!optional){}
-						if(!(operator in optional.map)){
-							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+i+"' with the '"+operator+"' instruction"));
-							//TODO: add 'try doing ...' to this error message
-						}
-						if(optional&&(
-							optional.defaultSymbols.includes(optionals[i])||//if valid symbol used with keyword
-							(optional.useArray&&optional.map[operator]?.[1]==optionals[i])
-						)){
-							if(optional.useArray)operator=optional.map[operator][0]??operator;
-							else operator=optional.map[operator]??operator;
-						}
-						else{
-							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+optionals[i]+"' symbol with '"+i+"'"));
-						}
-					}
-				}
-				{
-					argsList=[operator,...args.flat()];
-					instruction.args=argsList;
-				}
-				return {index,instruction};
-			}
-			async main_assembly({statement,index,scope}){//# tptasm
-				({index}=contexts.keyWordList({statement,index,scope,keywords:{}}));
-				let instruction,isArray;
-				({instruction,isArray,index}=await this.generateAssemblyLine({statement,index,scope}));
-				if(isArray)//instruction:AssemblyLine[]
-					scope.label.code.push(...instruction);
-				else //instruction:AssemblyLine
-					scope.label.code.push(instruction);
-				return {index};
-			};
-			async getLabel({statement,index,scope}){//#
-				return (await contexts.expression_short({statement,index,scope})).toType(label);
-			};
-			getArg(value,level=0){//@:(string|Value|Operator)=>(string|Value)[]
-				if(level>4)return [];//only allow 4 levels of assembly recursion
-				return typeof value=="string"?value:
-				typeof value=="number"?""+value:
-				value instanceof Value?
-					isNaN(value=value.toType("number").number)?
-						NaN//Error("label is not assigned")
-					:""+value
-				:value instanceof Operator?this.doOperator(value,level+1)
-				:[];
-			};
-			async compileAssemblyLine({instruction,cpuState,assemblyCode}){//@
-				//asm -> tptasm
-				let args=instruction.args;//(string|Value|operator)[]
-				let failed=false;
-				let tptasmString;
-				if(args.length==1&& typeof args[0]=="number"){//for AssemblyLine<number> for: 'def let a=2;'
-					args=["dw",args[0]];
-				}
-				{
-					tptasmString=args
-						.map((v,i,a)=>{
-							let v1=this.getArg(v);
-							if(!isNaN(+v1)&&a[i-1]!="r"){
-								v1="0x"+(0x1fffffff&v1).toString(16);
-							}
-							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name?.toString?.():v)+"' is undefined"):false;
-							return v1+["", " "][+(i==0)]
-						})
-						.flat()
-						.join("")
-						.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
-						
-						//.map(v=>v==","?"":v)
-						//.join(",")//:string
-						//.replaceAll("%,", "r")//registers
-						//.split(",")
-					;
-				}
-				instruction.asmValue=tptasmString;
-				{
-					cpuState.lineNumber++;
-					cpuState.jump++;
-				}
-				return {failed};
-			};
-		},
-	};
 	const contexts={
 		//simple
 			charSetMap:{//TODO: finish this list
@@ -2066,6 +1694,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					[12,1],
 					[13,17],
 				],//[starting bit number,length of argument (in bits)]
+				language:undefined,//:Language
 				setLanguage(language){
 					let name;
 					this.language=language;
@@ -3025,7 +2654,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			return new Variable(Internal);
 		}
 		function valueCharToNumber(value,join=false){//:sting-> number | tptasm command string
-			let v=value;
+			let v=value;//:String
 			let ary=v==undefined?[]:[
 				v==undefined?v:
 				v.length==1?assemblyCompiler.assembly.extraInstructions.string_char
@@ -3040,7 +2669,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			];
 			return join?ary[0]|ary[1]:outputAsBinary()?ary:["dw", "0x"+((ary[0]|ary[1])&0xffff).toString(16)];
 		}
-		function valueStringToArray(value,scope){
+		function valueStringToArray(value,scope){//:Variable
 			if(value?.type=="string"){
 				return new Variable({
 					name:"<(string)>",
@@ -3081,6 +2710,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		class MacroFunction extends Variable{}
 		class Pointer extends Variable{///similar to Variable
 			constructor(name){
+				if(!new CpuState().hasOwnProperty(name))throw Error("compiler error:'"+name+"' is not a property of CpuState");
 				super();
 				this.name=name;
 				delete this.lineNumber;
@@ -3190,12 +2820,25 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//code;
 			//parent;
 		}
-		class Language{//TODO: put languages in separate files
+		class Language{//TODO: put assembly languages in separate files
 			static langs=[];//{langName:Language}
 			static currentLang;//:Language
-			pointers=[];//:String[]
-			parse=({statement,index,scope})=>{}
-			compile=({instruction,cpuState,assemblyCode,code})=>{}
+			keywords={};//{[String]:any}
+			pointers={
+				"ram":new Pointer("lineNumber"),
+			};//:{[String]:Pointer(property name of CpuState)}
+			charSetMap={};//{[String]:Number}
+			//aka main_assembly #
+			async parse({statement,index,scope}){//#
+
+			}
+			//aka compileAssemblyLine @
+			async compile({instruction,cpuState,assemblyCode,code}){//@
+
+			}
+			valueCharToNumber(char,joined){//:(String,Bool) -> String[]|String
+				//joined:true -> return int, false -> return array of string parts.
+			}
 			instructionSet=[];
 			constructor(data){
 				"use strict";
@@ -3203,6 +2846,381 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 		}
 	//----
+	const assembler={//oper,label
+		tptasm:new class InstructionSet extends Language{
+			//main_assembly:#()->{@}
+			//compileAssemblyLine:@(@)->{0}
+			//assemblyLineToLabel:(AssemblyLine)->Variable
+			//setLanguage:({context})->void
+			//
+			keywordsRegex=/^(?:%|(?:[&|^+\-]|>>[>\-]?|[<\-]?<<)?=|->|hault|jump|if|null|store|carry|sign|overflow|0|\+|-|[!><=]=?|port|bump|wait|push|pop|call|return)$/;
+			registerSymbol="%";
+			ifParts=[];
+			registers={
+				"ip":"ip",
+				"sp":"sp",
+				...(()=>{
+					let names={};
+					for(let i=0;i<16;i++)names["r"+i]="r"+i;
+					return names;
+				})(),
+				"stack":"sp",
+				"instruction":"ip",
+			};
+			otherKeywords=Object.freeze({
+				"if":"??",
+				"r":"r",
+				...this.registers,
+			});
+			optionals=Object.freeze({
+				"carry":{
+					useArray:true,
+					map:{"add":["addc", "!"], "adds":["addcs", "!"], "sub":["sbb", "+"],"subs":[, "+"]},
+					defaultSymbols:[""],
+				},
+				"store":{
+					map:{"add":"adds", "addc":"addcs", "sub":"subs", "sbb":"sbbs", "and":"ands", "xor":"xors", "or":"ors"},
+					defaultSymbols:["", "!"],
+				},"internal":{
+					map:{"shl":"scl", "shr":"scr"},
+					defaultSymbols:["", "+"],
+				},
+				"chain":{
+					map:{"shl":"scl", "shr":"scr"},
+					defaultSymbols:["", "+"],
+				},
+			});
+			operators=Object.freeze({//name:{map:default name
+				"+":"add",
+				"-":"sub",
+				"=":"mov",
+				"&":"and",
+				"|":"or",
+				"^":"xor",
+				"mask":"swm",
+				"hault":"hlt",
+				"jump":"jmp",
+				"null":"nop",
+				">>":"shr",//scl with +chain
+				"<<":"shl",//scr
+				">>>":"ror",
+				"<<<":"rol",
+				"port":"bump",
+				"check":"wait",
+					//"cin":"recv",
+					//"cout":"send",
+				"push":"push",
+				"pop":"pop",
+				"call":"call",
+				"return":"ret",
+				//used to help the autophase-detector
+					"if":null,
+					"carry":null,
+					"store":null,
+					"internal":null,
+				//old instruction set
+				"send":"send",
+				"recv":"recv",
+				"wait":"wait",
+				"bump":"bump",
+				"mov":"mov",
+				"db":"db",
+				"dw":"dw",
+				"and":"and",
+				"or":"or",
+				"xor":"xor",
+				"add":"add",
+				"adds":"adds",
+				"adcs":"adcs",
+				"sub":"sub",
+				"subs":"subs",
+				"sbb":"sbb",
+				"sbbs":"sbbs",
+				"shl":"shl",
+				"shr":"shr",
+				"ror":"ror",
+				"rol":"rol",
+				"scl":"scl",
+				"scr":"scr",
+				"push":"push",
+				"pop":"pop",
+				"call":"call",
+				"ret":"ret",
+				"hlt":"hlt",
+				"jmp":"jmp",
+				"nop":"nop",
+				"jn":"jn",
+				"jz":"jz",
+				"jnz":"jnz",
+				"jc":"jc",
+				"jnc":"jnc",
+				"jo":"jo",
+				"jno":"jno",
+				"js":"js",
+				"jns":"jns",
+				"jge":"jge",
+				"jle":"jle",
+				"je":"je",
+				"jne":"jne",
+				"jg":"jg",
+				"jl":"jl",
+				"swm":"swm",
+			});
+			flags={
+				"0"       :{map:"ZF",jumpMap:["jnz", "jz"]},
+				"carry"   :{map:"CF",jumpMap:["jnc", "jc"]},
+				"overflow":{map:"OF",jumpMap:["jno", "jo"]},
+				"sign"    :{map:"SF",jumpMap:["jns", "js"]},
+			};
+			ifOperations={//!>=,>=
+				"true":"jmp",
+				"false":"nop",
+				">=":"jge",
+				"<=":"jle",
+				"==":"je",
+				"!=":"jne",
+				">":"jg",
+				"<":"jl",
+			};
+			asm_ifStatement({statement,index,scope,operator,hasIf}){//#:string?
+				let jumpType;
+				if(statement[index]=="if"&&!hasIf)block:{
+					index++;
+					hasIf=true;
+					let ifData={type:null,flag:null};
+					if(this.ifOperations.hasOwnProperty(statement[index])){//'if >= x'
+						ifData.type=statement[index++];
+						if(statement[index]=="0")index++;//'if >=;'==> 'if >= 0;'
+						ifData.flag="0";
+						jumpType=this.ifOperations[ifData.type];
+					}
+					else {
+						if(statement[index]=="!"){//'if !sin'
+							ifData.type="!";
+							index++;
+						}
+						if(this.flags.hasOwnProperty(statement[index])){//'if sign'
+							ifData.flag=statement[index++];
+							jumpType=this.flags[ifData.flag].jumpMap[+(ifData.type!="!")];
+						}
+						else{//'if;' or 'if !;'
+							jumpType=this.ifOperations[""+(ifData.type!="!")];
+						}
+					}
+					jumpType||=this.operators["null"];
+					operator=jumpType;
+				}
+				return {index,operator,hasIf};
+			}
+			asm_optionalStatement({statement,index,scope,optionals}){
+				//'a-=b !store +carry'
+				let hasSymbol=false,symbol,optional="";//optional:string
+				if("+-!".includes(statement[index])){
+					hasSymbol=true;
+					symbol=statement[index++];
+				}
+				if(this.optionals.hasOwnProperty(optional=statement[index])){
+					optionals[optional]=symbol;
+					index++;
+				}
+				else if(hasSymbol)index--;
+				return {index};
+			}
+			async asm_NumberOrRegister({statement,index,scope},{arg}){//#:
+				if(statement[index]==this.registerSymbol||statement[index]=="r"){
+					index++;
+					arg.push("r");
+				}else if(this.registers.hasOwnProperty(statement[index])){
+					arg.push(this.registers[statement[index++]]);
+					return {index};
+				}
+				if(this.otherKeywords.hasOwnProperty(statement[index])){
+					arg.push(statement[index++]," ");
+				}
+				let value;
+				({index,value}=await contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
+				if(value){arg.push(value);}
+				return {index};
+			}
+			asm_operator({statement,index,scope,operator}){//#:string|undefined
+				let word=statement[index];
+				let hasOperator=false;
+				if(!hasOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
+					let oper1=word;
+					index++;
+					if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b' ==> 'a + b'
+						index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
+					}
+					if(oper1=="="||oper1=="=>"){//%register = pop;
+						word=statement[index];
+						if(["pop", "recv", ""].includes(word)){
+							oper1=word;
+							index++;
+						}
+					}
+					operator||=this.operators[oper1];
+					hasOperator=true;
+				}
+				return {index,operator,hasOperator};
+			}
+			async asm_arg({statement,index,scope}){//#:(string|Value)[]
+				let word=statement[index];
+				let value;//:Value
+				let arg=[];//:(string|Value)[]
+				if(word=="["){
+					index++;
+					word=statement[index];
+					arg.push("[");
+					for(let i=0;i<word.length&&i<1;i++){
+						let statement=word[i],index=0;
+						({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
+						if("+-".includes(statement[index])){
+							arg.push(statement[index++]);
+							({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
+						}
+					}
+					index+=2;
+					arg.push("]");
+				}
+				else{
+					({index}=await this.asm_NumberOrRegister({statement,index,scope},{arg}));
+				}
+				return {index,arg};
+			}
+			///interface
+			async generateAssemblyLine({statement,index,scope}){//:void & mutates scope
+				const instruction=new AssemblyLine({scope});
+				let argsList=[];
+				let operator,args=[],hasIf=false,hasOperator=false,optionals={};//optionals:Map
+				for(let i=0;i<9;i++){
+					let arg;
+					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
+					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator}));
+					({index}=this.asm_optionalStatement({statement,index,scope,optionals}));
+					if(args.length<2){
+						;({index,arg}=await this.asm_arg({statement,index,scope}));
+						if(arg?.length>0){args.push(arg);}
+						if(statement[index]==","&&args.length==1)index++;//'mov a,b;'
+					}
+					let word=statement[index],failed;
+					if(({index}=contexts.endingSymbol({index,statement})).failed){break;}
+				}
+				if(args.length>1){args.splice(1,0,",");}
+				if(!operator){
+					//args[0][0]:Value
+					let dataMask=0xffff;
+					operator="dw";
+					if(args.length==1){
+						if(args[0][0].type=="string"&&args[0][0].array.length>0){
+							let instruction=[];//new Variable({name:"(string)"});
+							for(let char of args[0][0].array){
+								let newLine=new AssemblyLine({scope,type:"data",dataType:"char",args:[operator,(valueCharToNumber(char,true)&dataMask)+""]});
+								newLine.dataValue=+newLine.args[1];
+								instruction.push(newLine);
+							}
+							return {index,instruction,isArray:true};
+						}
+						else{
+							instruction.type="data";
+							instruction.dataType="number";
+							instruction.dataValue=args[0][0].number;//:number
+						}
+					}else throw Error(throwError({statement,index,scope},"#/@ syntax","invallid assembly line: expected a string, a number or a command."));
+				}
+				else{
+					for(let i in optionals){//optionals[number]:string & symbol
+						if(!optionals.hasOwnProperty(i))continue;
+						let optional=this.optionals[i];
+						let fail=true;
+						if(!optional){}
+						if(!(operator in optional.map)){
+							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+i+"' with the '"+operator+"' instruction"));
+							//TODO: add 'try doing ...' to this error message
+						}
+						if(optional&&(
+							optional.defaultSymbols.includes(optionals[i])||//if valid symbol used with keyword
+							(optional.useArray&&optional.map[operator]?.[1]==optionals[i])
+						)){
+							if(optional.useArray)operator=optional.map[operator][0]??operator;
+							else operator=optional.map[operator]??operator;
+						}
+						else{
+							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+optionals[i]+"' symbol with '"+i+"'"));
+						}
+					}
+				}
+				{
+					argsList=[operator,...args.flat()];
+					instruction.args=argsList;
+				}
+				return {index,instruction};
+			}
+			///interface
+			async main_assembly({statement,index,scope}){//# tptasm
+				({index}=contexts.keyWordList({statement,index,scope,keywords:{}}));
+				let instruction,isArray;
+				({instruction,isArray,index}=await this.generateAssemblyLine({statement,index,scope}));
+				if(isArray)//instruction:AssemblyLine[]
+					scope.label.code.push(...instruction);
+				else //instruction:AssemblyLine
+					scope.label.code.push(instruction);
+				return {index};
+			};
+			async getLabel({statement,index,scope}){//#
+				return (await contexts.expression_short({statement,index,scope})).toType(label);
+			};
+			getArg(value,level=0){//@:(string|Value|Operator)=>(string|Value)[]
+				if(level>4)return [];//only allow 4 levels of assembly recursion
+				return typeof value=="string"?value:
+				typeof value=="number"?""+value:
+				value instanceof Value?
+					isNaN(value=value.toType("number").number)?
+						NaN//Error("label is not assigned")
+					:""+value
+				:value instanceof Operator?this.doOperator(value,level+1)
+				:[];
+			};
+			async compileAssemblyLine({instruction,cpuState,assemblyCode}){//@
+				//asm -> tptasm
+				let args=instruction.args;//(string|Value|operator)[]
+				let failed=false;
+				let tptasmString;
+				if(args.length==1&& typeof args[0]=="number"){//for AssemblyLine<number> for: 'def let a=2;'
+					args=["dw",args[0]];
+				}
+				{
+					tptasmString=args
+						.map((v,i,a)=>{
+							let v1=this.getArg(v);
+							if(!isNaN(+v1)&&a[i-1]!="r"){
+								v1="0x"+(0x1fffffff&v1).toString(16);
+							}
+							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name?.toString?.():v)+"' is undefined"):false;
+							return v1+["", " "][+(i==0)]
+						})
+						.flat()
+						.join("")
+						.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
+						
+						//.map(v=>v==","?"":v)
+						//.join(",")//:string
+						//.replaceAll("%,", "r")//registers
+						//.split(",")
+					;
+				}
+				instruction.asmValue=tptasmString;
+				{
+					cpuState.lineNumber++;
+					cpuState.jump++;
+				}
+				return {failed};
+			};
+		},
+		"0xmin":new class extends Language{//UNFINISHED
+			keywords={move:0,jump:1,nor:2,red:3,blue:4,set:5};
+			;
+		},
+	};
 	//functions
 		async function evalBlock(block,parentScope=undefined,scope=undefined,calledFrom=undefined){
 			//does not include brackets
