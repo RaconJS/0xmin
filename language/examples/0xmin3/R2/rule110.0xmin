@@ -4,7 +4,7 @@ let rule110{//:{@}
 	let Cell(value,type,isEnd)={
 		repeat ((+type||0)==0):
 		def let value: (value*1|isEnd.mask*(arguments.isEnd||0));
-	}{
+	}::{
 		let ..prototype{
 			let isEnd={let mask=0x8000;let end=1;};
 			{

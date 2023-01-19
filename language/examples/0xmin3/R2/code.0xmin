@@ -170,7 +170,7 @@ let mainFoo(){
 				%shiftedAddVal=%ans;
 				%shiftedAddVal>>=dxShift;
 				%ans+=%shiftedAddVal;
-			}{
+			}::{
 				%i-=1;
 				jump->..this if>=0;
 			};

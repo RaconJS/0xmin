@@ -31,7 +31,7 @@ let data{:data;
 let fixedPointNumber(val)={//fixedPoint number
 	#set return=val*(2**constructor.decimalPoint);
 	#set return<->undefined;
-}{
+}::{
 	let decimalPoint=1;//8;//0xabc.d;
 };
 let getInput(out){
@@ -222,7 +222,7 @@ let Rect(x,y,x1,y1)={//x<x1
 	#def let x1=fixedPointNumber(max(arguments.x,arguments.x1));
 	#def let y1=fixedPointNumber(max(arguments.y,arguments.y1));
 	void this..compile;
-}{
+}::{
 	let prototype={#;
 		null#def let x;//:fixed&f16
 		null#def let y;//:fixed&f16

@@ -163,7 +163,7 @@ def:{
 			null #def carry;
 		};
 	//}
-	{@;
+	;{@;
 		#def data;
 		move=>zero;get;
 		move=>a;set;
