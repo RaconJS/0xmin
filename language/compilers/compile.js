@@ -408,7 +408,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 					word=statement[index];
 					//'keyword : arg' or 'keyword arg'
-					if(["debugger", "import", "delete", "..."].includes(word)){
+					if(["debugger", "throw", "import", "delete", "..."].includes(word)){
 						wasUsed=true;
 						if(word=="debugger"
 							&&["", "$", "#"].includes(state.phase)
@@ -422,6 +422,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								//if(statement[index]==":")index++;
 								({index}=await evalDebugger({index,statement,scope,word:"debugger"}));
 							}
+						}
+						else if (word=="throw"
+							&&["", "$", "#"].includes(state.phase)
+						){
+							if(state.phase=="$")throw Error(throwError({index,statement,scope},"#/$ unsupported syntax","$throw is not supported yet"));
+							index++;
+							let value,errorString;
+							({value,index}=await contexts.expression({index,statement,scope}));
+							errorString=value.toType("string").string;
+							throw Error(throwError({index,statement,scope},"#",errorString));
 						}
 						else if(word=="delete"//'delete a,b;' from any scope
 							&&["", "#"].includes(state.phase)
