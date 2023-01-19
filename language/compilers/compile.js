@@ -1494,9 +1494,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		},
 	};
 	const assemblyCompiler={
-		async main(label,logErrors){//(Variable) => Variable / MachineCode
+		async main(label,logErrors,dataObj){//(Variable) => Variable / MachineCode
 			"use strict";
 			const codeQueue=this.collectCode(label);//:CodeLine[]
+			if(dataObj)dataObj.codeQueue=codeQueue;//dataObj:Object?
 			const {assemblyCode}=await this.assignMemory(codeQueue,label,logErrors);//:Variable
 			//(Variable) -> Variable
 			const machineCode=await this.compileAssembly(assemblyCode);//(Variable) -> MachineCode
@@ -2546,9 +2547,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return new Value({type:"array",array:list,number:list.length});
 					},
 					"compile":async({label})=>{
-						let value;
-						try {value=(await assemblyCompiler.main(label,false)).toValue("label");}
-						catch(e){value= new Value.String(e);}
+						let value,data={codeQueue:undefined};
+						try {value=(await assemblyCompiler.main(label,false,data)).toValue("label");}
+						catch(e){
+							value= new Variable({
+								name:"(failed compilation)",
+								labels:{
+									error:new Value.String(e).toType("label").label,
+								}
+							}).toValue("label");
+						};
 						return value;
 					},
 					//note: name might change
