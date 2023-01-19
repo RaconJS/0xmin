@@ -5,12 +5,11 @@ let segment(x,y)={
 	#this<=>¬+this;
 };
 let snake{
-	let len=var(0)[0];
-	let pos={def let y=0,x=0;}:>var()[0];
-	repeat (16*12):segment(0,0);//:(y<<4|x)[]
+	let len:>var(1);
+	let pos=var()<=>{def let x=0;def let y=0};
+	//repeat (16*12):segment(0,0);//:(y<<4|x)[]
 	{
-		#.[0]=segment(8,6);
-		#len<=>1;
+		#let ..this[0]=segment(8,6);
 	};
 }:>var();
 let reset{
@@ -26,10 +25,12 @@ let RegCounter(val)={
 		#this<->this+1;
 	};
 }};
-let getInput(enum,wait){
+let getInput(enum,output,wait){
 	:this;
 	let enum=RegCounter=(enum);
-	let temp = enum.next();
+	repeat !output:let output=enum.next();
+	let temp = output;
+	let output=output;
 	let port0 = enum.next();
 	wait r temp;
 	repeat !!wait:jump->this if sign;
@@ -37,12 +38,12 @@ let getInput(enum,wait){
 	r port0=0;
 	port r port0;
 	{:loop;
-		r temp
+		r temp = port r port0;
 		jump->loop if;
 	};
 };
 let mainLoop{
-
+	
 };
 {:memory;
 	def reset;

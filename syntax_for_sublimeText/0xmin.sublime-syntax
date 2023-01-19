@@ -382,7 +382,7 @@ contexts:
       scope: keyword.control
     - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
       scope: keyword.control
-    - match: '\b(?:import|debugger|delete)\b' #3rd part of line along with
+    - match: '\b(?:import|throw|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
     - match: '{{labelName}}\s*(?=(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function

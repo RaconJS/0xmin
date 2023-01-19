@@ -1,21 +1,22 @@
 #"0xmin";
 //keywords
-	void;
-	static;//static is not used yet
-	virtual;
-	recur;
-	repeat;
-	import;
-	delete;
-	import lib;
-	import this;
-	import main;
-	...let;
-	...set;
-	...def;
-	...labelsof;
-	...codeof;
-	...run;
+	#void;
+	#static;//static is not used yet
+	#virtual;
+	#recur;
+	#repeat;
+	#delete;
+	#throw;
+	#import;
+	#import lib;
+	#import this;
+	#import main;
+	#...let;
+	#...set;
+	#...def;
+	#...labelsof;
+	#...codeof;
+	#...run;
 	#let;
 	#set;
 	#def;
@@ -116,6 +117,8 @@
 						label=foo({})+4
 					delete label1, label2
 					delete //remove all labels from this scope
+					throw "error message";
+					debugger (label+4) "label.labels";
 					import this "fileName.0xmin"
 					import lib "libraryName.0xmin"
 					import main "fileName.0xmin"
@@ -536,21 +539,21 @@ single_expressions;{
 		label..labels;//returns list of all the properties in an object (ignoring symbol properties)
 		label..compile;//returns a MachineCode object, converted into a label. 
 		label..seal;
-		label..freeze;
+		label..freeze;//returns a key that can be used to unfreeze the label. a frozen label's properties, number and code etc... cannot be changed. note that it only freezes 1 layer deep.
 		label..this;//returns the label itself. '..this' is usefull when used like javascript's `this`. e.g. 'let obj{let addBar(){let ..this.bar=2;}}'
 		label..return;//returns an inbuil label that is defaultly defined at the end of the parent label. e.g. def let block{jump->block..return;...doStuff;}
 		label..proto;//if label does not contain a property, then the compiler looks for the property in label..proto
 		label..super;//similar to proto except looked for first when finding a property
-		label..constructor;
+		label..constructor;//Returns the class '()={}' (if any) that was used to construct this label.
 		label..prototype;//used in class calls i.e. 'class=()' as 'class..prototype'. 'class=()..proto == class..prototype'
 		label..supertype;//similar to 'label..prototype' but for supertypes
 		label..defs;//returns an array of all the places where
-		label..indexOf(item);
+		label..indexOf(item);//similar to indexOf in javascript
 		label..asNumber;//converts to number and returns a number type
-		label..state;
-		label..state.move;//make for 0xmin assembly but can be used in any assembly
-		label..state.jump;
-		label..state.ram;
+		label..state;//returns the label's CpuState (from the start of the label). the ..state contains it's own properties.
+		label..state.move;//the data pointer's state. This property was disigned for 0xmin assembly but can be used in any assembly
+		label..state.jump;//the instruction pointer's state.
+		label..state.ram;//the memory location. ..ram is not as usefull. It is easier to use 'jump->label' instead of 'jump->label..state.ram'
 		label..flat;//returns a 1D array,can be used to get a list of all the objects in a graph, can also be used to get all the source-code of a function
 	};
 };
@@ -563,9 +566,14 @@ long_expressions;{
 		};
 		let a,b,c;
 		a:>b:>foo(c);
-		intended use:
+		special case:
+			as described in the #let section, if the pipeline just after the first symbol in a let statement then it will be p
+			e.g.
+			#let a:>foo() is parsed at #let a;#set a:>foo();
+		intended uses:
 			//foo1:(a,b)->x; foo2:(x,c)->y
 			foo1(a,b):>c:>foo2();
+			{let a:>Vector3(3,4,5);}
 	};
 	objectExtending using ::;{
 		'::' operator
@@ -627,7 +635,25 @@ long_expressions;{
 		assignment operators are always done last, and have the same priority
 		e.g. a+b=c+d=e+f is parsed as  (a) = #(b = #(c))
 	}
-}
+};
+compilation_settings;{
+	These include the following:
+		#"0xmin";
+		#"tptasm";//made for the R216K computer.
+		#"int";//basic number assembly language. no pointers or special assembly syntax except for "ram"
+		#"table";//prints out a list of the output file, allong with the command name and source code. Is very usefull for debugging your machine code.
+		#"len";
+		#"code";//
+		#"make file";//is true by default can use #"!make file"; if you just want to check that some code would compile.
+	At the start of a '.0xmin' file you can add; all the compilation settings.
+	You can put comments and white space before and between the compilation settings are fine.
+	The compilation settings are parsed after the raw text file has been broken up into a syntax tree.
+	This means that you can put white space, comments between the octothwarp '#', the string '""' and the semicolon ';'. Note that the semi-colon is mandatory.
+	It is also parsed before the main code is.
+
+	You can also put a "!" at the start of the string to negate the setting. e.g. #"!table"; will not print out a table
+	This normally includes the assembly language and what data the compiler should print out when it is done.
+};
 {//un implemented future potential features
 	static;{
 		let foo(){

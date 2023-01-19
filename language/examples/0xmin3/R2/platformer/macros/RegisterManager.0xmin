@@ -5,7 +5,7 @@ let CpuState(oldState)={
 	repeat !!oldState:{
 		#set:usedRegisters<=>#{...codeof oldState};
 	};
-}{
+}::{
 	let prototype{
 		let var(val){#;
 			let i=0;
@@ -32,7 +32,7 @@ let CpuState(oldState)={
 		:this;
 		void #set this<->i;
 		void ...prototype;
-	}{
+	}::{
 		let prototype{
 			let use(val){
 

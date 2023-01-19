@@ -19,7 +19,7 @@
 			def:
 				{}["error: out of registers"];
 		};
-	}{
+	}::{
 		let prototype{
 			let ..this[¬Register];
 		};
@@ -147,7 +147,7 @@
 		r i-=1;
 		jump->loop if>0;
 		del(i);
-	}{
+	}::{
 	#set ..prototype{let i=var();}
 	};
 	let printHex(reg)={
@@ -159,7 +159,7 @@
 				send r const_0 [printHex.charSet + r hexValue];
 			};
 		};
-	}{
+	}::{
 		let charSet=data.var("0123456789ABCDEF");
 		#set ..prototype{let hexValue=var()};
 	};
@@ -173,7 +173,7 @@
 			%reg^=#(constructor.mask^value);
 			#constructor.mask=value;
 			jump->then if==0;
-		}{let mask=0};
+		}::{let mask=0};
 		#let cases<=>arguments;
 		#set cases..splice(0,1);//the 'set' is not needed but makes code clearer
 		#let default=cases..splice(-1,1);
@@ -220,7 +220,7 @@ let Buyables(cost,cps,numberOf,max,info)={//data:{let description:#"";let name:#
 	repeat 2 null;
 	#;
 	//#data{def this;};
-}{:this;
+}::{:this;
 	let isNotActive;
 	let prototype=this(10,1,0,10);
 	#prototype..compile;
@@ -247,7 +247,7 @@ let Buyables(cost,cps,numberOf,max,info)={//data:{let description:#"";let name:#
 		};
 	};
 	delete isNotActive;
-}{let item<=>Buyables;#Buyables..splice(0,1);
+}::{let item<=>Buyables;#Buyables..splice(0,1);
 	//cost,cps,start,max
 	def item(-10,0,0,10,{let name="ask", desc="Ask your for a paperclip;";});
 	def item(30,1,0,10,{let name="email bot", desc="Set up an email bot;";});
@@ -276,7 +276,7 @@ let clearLines(length){
 		def#(){#line<->#(clearScreen+1+(16*(clearScreen[0]..length/16-length)));}
 	};
 	call line;
-}{let functions;};
+}::{let functions;};
 let main{
 	let start;
 	let gainClips()={
@@ -285,7 +285,7 @@ let main{
 		printStr(constructor.gotoNumber1);
 		printHex(clips[0]);
 		printStr("\p00");
-	}{:this;
+	}::{:this;
 		#data.var(this);
 		r #(clips[0])+=r cps;
 		return;

@@ -1,21 +1,25 @@
 //15:25
 #"0xmin";#"len";
 ()->{
-	let pos{
-		let x=var(0x100000);//:int in range[1,16]
-		let y=var(0x100000);//:int in range[1,12]
-		let bit=var(2);//shift(30) in range[2,0x20000000]
-		let cell=var(1);
+	let pos{//the 0x2000... is done that way to make converting it to a '\p' easier
+		let x=var(0x20000000|8);//:int in range[1,16]
+		let y=var( 0x2000000|8);//:int in range[1,12]
+		let char=var("\p88");
 	};
 	let grid{repeat 12:0x1;}¬:>var();
 	let snake{
-		let len=var(0x100003);
+		let len=var(1);
+		let maxLen=const(12*16*0+30);
+		let pos=pos;
 		let direction=var(1);
 		//tail side
-		"\p88\p87\p86";
-		repeat (12*16):"\p88";
+		0x3fffffff;//used to find the end of the snake.
+		def let tail;
+		"\p88";
+		repeat (maxLen[0]-1):"\p00";
 		//head side
 	};
+	let apple={let x=var(0x100004),y=var(0x100004)};
 	let i=-1;
 	repeat 3:{def ¬(""...snake[i+=1]);"#"};
 	:this;
@@ -23,7 +27,12 @@
 	let heap{
 		def snake;
 	};
+	//the pain begins here. luckilly thanks to get/set jump, the move pointer should not need to leave the var/const area
+	move 0xff;
 	move=>var;
+	let gameEnd{
+		"\p00You loose\h";
+	};
 	def let mainLoop{
 		let getInput=getInput({:wait});
 		getInput;
@@ -37,75 +46,213 @@
 				jump->then..return;
 			};
 			def then{
-				def switch()<:"w"<:(){
-					move=>pos.y;get;
-					increment();
-					move=>pos.y;set;
-					move=>const(1);xor;
-				};
-				def switch()<:"a"<:(){
-					move=>pos.x;get;
-					decrement();
-					move=>pos.x;set;
-					move=>pos.bit;
-					get;blue;set;
-				};
-				def switch()<:"s"<:(){
-					move=>pos.y;get;
-					decrement();
-					move=>pos.y;set;
-				};
-				def switch()<:"d"<:(){
-					move=>pos.x;get;
-					increment();
-					move=>pos.x;set;
-					move=>pos.bit;
-					get;red;set;
-				};
-				let getHead=#(){
-					move=>snake.len;get;
-					indexArray(snake)<:(){
-						set jump+3;
-						get;
-						null;
-						null;
+				let setDir=#()={
+					let i=-1;
+					#this<=>(){
+						move=>const(i+=1);get;
+						move=>snake.direction;set;
 					};
-				};
-				let setHead=#(){
-					move=>snake.len;get;
-					let val;
-					indexArray(snake)<:(){
-						set jump+3;
-						get;
-						null;
-						null;
-					};
-				};
-				def let UpdateScreen{
-					getHead();
-					//assert: alu = snake[snake.len] aka head
-					//alu:print
-					set jump+3;
-					jump+2;
-					null;
-					null;//move curser to head
-					"#";
-					move=>snake+0;get;
-					set jump+3;
-					jump+2;
-					null;
-					null;//move curser to tail
-					" ";
-				};
-				def let shuffleSnakeParts{
-					
-				};
+				}();
+				def switch()
+					<:"w"<:setDir
+					<:"a"<:setDir
+					<:"s"<:setDir
+					<:"d"<:setDir
+				;
 				move=>else..state.move;
 			};
 		};
+		#let jumpGate1;
+		{
+			let callList(list,setUp){
+				move=>const(0x10);
+				red;
+				move=>const(+{jump}..compile[0]);
+				or;
+				set jump+3;
+				#setUp=setUp||{null;null};
+				setUp;
+				let i=-1;
+				def let state;
+				repeat list..length:{
+					let foo=list[i+=1];
+					#foo..splice(0,0,{$move=>state..state.move})
+					jump->foo;
+				};
+			};
+			let list;
+			callList()<:({}::{
+				:self;
+				#list=self;
+				def:{:w;
+					move=>snake.pos.y;get;
+					decrement();
+					move=>snake.pos.y;set;
+					if 1;
+					move=>const(0x10);
+					and;
+					move=>gameEnd..state.move;
+					if;//if y<0
+					jump->gameEnd;
+					jump->..return;
+				};
+				def:{:a;
+					move=>snake.pos.x;get;
+					decrement();
+					move=>snake.pos.x;set;
+					if 1;
+					move=>const(0x10);
+					and;
+					move=>gameEnd..state.move;
+					if;//if y<0
+					jump->gameEnd;
+					jump->..return;
+				};
+				def:{:s;
+					move=>snake.pos.y;get;
+					increment();
+					move=>snake.pos.y;set;
+					if 1;
+					move=>const(12);
+					xor;
+					move=>gameEnd..state.move;
+					if;//if y!=12
+					jump->..return;
+					jump->gameEnd;
+				};
+				def:{:d;
+					move=>snake.pos.x;get;
+					increment();
+					move=>snake.pos.x;set;
+					if 1;
+					move=>const(0x10);
+					xor;
+					move=>gameEnd..state.move;
+					if;//if x!=16
+					jump->..return;
+					jump->gameEnd;
+				};
+				$move=>gameEnd..state.move;
+			});
+			{:getPosChar;
+				move=>pos.y;get;
+				move=>const(0x10);red;
+				move=>pos.x;or;
+				move=>pos.char;set;
+			};
+			def list;
+			delete list;
+			def let UpdateScreen{
+				move=>snake.tail;get;
+				set jump+3;
+				jump+2;
+				null;
+				null;//move curser to head
+				" ";
+				move=>pos.char;get;
+				set jump+3;
+				jump+2;
+				null;
+				null;//move curser to tail
+				" ";
+			};
+			def jumpGate1{
+				jump->..return;
+				$move=>mainLoop..state.move;
+				jump->mainLoop;
+				$move=>..state.move;
+			};
+			let shuffleSnakeParts,growSnake;
+			def:{:ifNotTouchApple;
+				:if;
+				let then,else;
+				#then=shuffleSnakeParts;
+				#else=growSnake;
+				let ifEqual(prop){
+					move=>apple[""...prop];get;if;move=>pos[""...prop];
+					xor;move=>snake.len;
+					if;
+					jump->else;
+				};
+				ifEqual("x");
+				ifEqual("y");
+				def then;
+				move=>else..return..state.move;
+				jump->else..return;
+				move=>pos.x;
+				$move=>snake.len;
+				def else;
+			};
+			#shuffleSnakeParts{
+				virtual{//assert: move=>snake.len
+					!move=>snake.len;
+					jump -1;//ERROR
+				};
+				{:ifLenGreaterThan1
+					get;if 1;
+					move=>const(0x10);blue;
+					move=>..this..return..state.move;
+					if;
+				};
+				move=>const(0x10);red;//alu == {move=>snake[snake.len]}
+				move=>snake-2;
+				set jump +3;
+				null;
+				null;
+				null;$move=>0xmin;//assert move=>snake.head-1
+				def:{:loop;
+					if 1;if 0;0x20000000;
+					get jump -1;nor;if;//if not past tail
+					jump->loop;
+				};
+				$move=>snake-1;
+			};
+			#growSnake{
+				virtual{//assert: move=>snake.len
+					!move=>snake.len;
+					jump -1;//ERROR
+				};
+				get;
+				{:spaghetti1_setHead;
+					move=>const(0x10);red;
+					move=>const(0x1000);
+					let next,setReturner,setReturner.state;
+					#def let next.state;
+					set jump+3;
+					or;//assert alu == {move<=head}
+					jump->next;
+					{:spaghetti2;
+						let moveFromHead,moveToHead;
+						$move=>snake+0;
+						null#def moveToHead;
+						$move=>0xmin;
+						set;
+						jump->moveFromHead;
+						$move=>setReturner.state..state.move;
+						set jump+3#def setReturner;
+						move=>snake+0;
+						jump=>moveToHead;$move=>0xmin;
+						null#def moveFromHead;
+						$move=>snake+0;
+						jump->next..return;
+					};
+					def next{
+						$move=>next.state..state.move;
+						move=>pos.char;get;
+						#def setReturner.state;
+						jump->setReturner;
+					};
+					$move=>snake+0;
+				};
+				move=>snake.len;get;
+				increment();
+				move=>snake.len;set;
+			};
+		};
 		move=>mainLoop..state.move;
-		jump->mainLoop;
+		jump->jumpGate1+1;
 	};
+	def gameEnd;
 	def data;
 	def heap;
 };
@@ -215,9 +362,9 @@
 			let code=cases[i*2+cases.code](case,+i,this);//v,i,a
 			move=>const(lastCase^(lastCase=cases[i*2+cases.case]));
 			xor;
-			repeat !code.noMoveState:move=>code..return..state.move;
+			repeat !code.noMoveState:move=>returner..return..state.move;
 			if;//if value!=case
-			jump->code..return;
+			jump->returner..return;
 			def code;
 			#i+=1;
 			def returner;
