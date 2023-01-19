@@ -1,0 +1,105 @@
+#"0xmin";#"len";
+#"table";
+let tape{
+	ram=>..this;
+	let cell(obj,value)={
+		repeat value:def value;
+		#;
+		obj<=>..this;
+	};
+	let add(obj){
+		def obj;
+		#return = obj;
+	};
+};
+let instructions{
+	let Bridge()={
+		let last=this,next=this;
+		move=>0;
+		jump->..return;
+		def let:jump_end<=>constructor.jump_end;
+		jump+1#def let portal;//:{@jump+1} | {jump+2} | {jump+3}
+		jump->next;
+		jump->last;
+		#(last=bridges[-1]).next=..this;
+		#set bridges..splice(-0,0)<:{$def this;};
+	}::{
+		//let ..prototype{
+			let jump_next{!jump+1}¬..compile;
+			let jump_last{!jump+2}¬..compile;
+			let jump_end{!jump+3}¬..compile;
+		//};
+	};
+	let bridges{};
+	let jumpMax=+0b01010101;//85;//85
+	let jumpMin=-0b10101010;//-170
+	let longJump(jumpTo)={//:*->@
+		jump->jumpTo;
+		#set longJumpList..splice(-0,0)<:{
+			()=>{
+				let jumpBy<->jumpTo-..this;
+				let doLongJump=!((jumpMax>jumpBy)&&(jumpMin<jumpBy));
+				repeat !+doLongJump:#set ..this<=>{jump->jumpTo};
+				repeat +doLongJump:#set ..this<=>{
+					let jumpCommand;
+					let endJump=Bridge.jump_end;
+					repeat (jumpBy>0):...let set{
+						#jumpCommand<=>Bridge.jump_next;
+						let startBridge=getNextBridge(..this,startBridge);
+					};
+					repeat (jumpBy<0):...let set{
+						#jumpCommand<=>Bridge.jump_last;
+						let startBridge=getPreviousBridge(..this,startBridge);
+					};
+					{:getCommand;jump+2;def jumpCommand;move=>jumpCommand;get};
+					let bridge=startBridge;
+					repeat (jumpBy>0):...(){
+						repeat (jumpTo-bridge.next):...(){
+							move=>bridge.portal;set;
+							#bridge=bridge.next;
+						};
+					};
+					move=>bridge.portal;
+					//assert '@move->bridge.jump_end' is possible
+					move=>bridge.jump_end;get;
+					move=>bridge.portal;set;
+					move=>bridge..return..state.move;
+					!jump->startBridge;
+				};
+			}
+		};
+	};
+	let getNextBridge(pos,startBridge){#;
+		let reps=bridges..length;
+		let i=0;
+		repeat +reps:{#;
+			repeat(bridges[i]>pos):reps=0;
+			i+=1;
+		};
+		return=bridges[i-1];
+	};
+	let getPreviousBridge(pos,startBridge){#;
+		let reps=brides..length;
+		let i<->reps-1;
+		repeat +reps:{#;
+			repeat(bridges[i]<pos):reps=0;
+			i-=1;
+		};
+		return=bridges[i+1];
+	};
+	let longJumpList{};//:(#(){})[]
+	let compile(){#;
+		..compile;
+		longJumpList();
+		..compile;
+		#return = ..this;
+	};
+};
+#def instructions::{...(){
+	let a="hello\h";
+	longJump(a);
+	repeat 4{repeat 0xe0 null;Bridge();};
+	def a;
+	repeat 4{repeat 0xe0 null;Bridge();};
+	#..this.compile();
+}};
