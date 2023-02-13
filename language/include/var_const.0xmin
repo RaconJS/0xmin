@@ -5,7 +5,7 @@
 	const:{...const[]};
 };
 #let: var(val)={//val:int|{@}
-	#val||={};
+	#val=val||{};
 	#def: val;//#set: return = val;
 	#set: constructor..splice(-0,0,{#def: this});
 };

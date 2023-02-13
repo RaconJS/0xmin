@@ -21,9 +21,9 @@
 			let scale=3;
 			let i=-1;
 			//repeat 2:#part(vec(0xmin.Math.random()*scale,0xmin.Math.random()*scale)):>addPart();
-			#part(vec(5.0,1)):>addPart();
-			#part(vec(8.0,2)):>addPart();
-			#part(vec(2,5.0)):>addPart();
+			#part(vec(8-2,6.0),vec(0,0.1)):>addPart();
+			#part(vec(8+2,6.0),vec(0,-0.1)):>addPart();
+			//#part(vec(4,5.0)):>addPart();
 			call doStep;
 			jump->main;
 			hlt;
@@ -275,13 +275,13 @@
 			//assume: div uses r0 to r5
 			let ret = 6;//:[%]
 			let dist = 7;//:%float
-			let g = float(0.8);
+			let g = float(2.0);
 			r ret = pop;
 			r dist = pop;
 			{
 				//1/x**3
 				//dist -> x**3 -> 1/x -> 
-				r dist += float(1/0x10);
+				r dist += float(0x8/0x100);
 				push g;
 				push r dist;
 				call div;

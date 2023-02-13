@@ -1,4 +1,4 @@
-#"len";//#"table";
+#"0xmin";#"len";//#"table";
 import lib "var_const.0xmin";
 let count = var("99");
 move 1;
