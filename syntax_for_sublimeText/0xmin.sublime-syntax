@@ -378,7 +378,7 @@ contexts:
       push: internalScope
     - match: \.
       scope: dotOperator.0xmin
-    - match: '\b(?:static|void|virtual)\b' #1st part of line along with '@$#'
+    - match: '\b(?:void|virtual)\b' #1st part of line along with '@$#'
       scope: keyword.control
     - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
       scope: keyword.control
@@ -420,7 +420,7 @@ contexts:
       captures:
         1: support.constant
         2: keyword.control
-    - match: '\b(?:var|const|let|def|set|undef)\b'
+    - match: '\b(?:let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|caller)\b'
       scope: variable.parameter
@@ -441,7 +441,7 @@ contexts:
     - match: '{{assembly_operators}}'
       scope: support.constant.operator.0xmin
     - match: '{{operators_functionCallArgs}}'
-      scope: keyword.argumentJoiner.0xmin
+      scope: support.constant.argumentJoiner.0xmin
     - match: '{{objectExtentionSymbol}}'
       scope: keyword.objectExtender.0xmin
     - match: '{{operators}}'

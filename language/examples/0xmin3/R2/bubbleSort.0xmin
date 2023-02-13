@@ -129,7 +129,6 @@ let main{
 };
 {//the actual program memory
 	jump->main;
-	//import lib "heap.0xmin";
 	def bubbleSort;
 	def myList;
 	def printMyList;
