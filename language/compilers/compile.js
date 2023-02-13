@@ -1111,7 +1111,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								let newVal=parent.code[name];
 								if(newVal instanceof AssemblyLine){
 									let code=newVal;
-									let number=code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
+									let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 									value.type="label";
 									let type= code.dataType=="char"?"string":"number";
 									value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
@@ -1136,6 +1136,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					!(statement[index+3]=="{"||functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{")
 					||(functionCallTypes.includes(word)&&statement[index+1]=="(")
 				){
+					if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"calling a undefined value. cannot do '#()()', try '#(¬)()' or '1()'"));
 					//function call: 'foo()' to 'foo=>()<:{}<:{}'
 					let startIndex=index;
 					let callType="";
@@ -1158,7 +1159,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						//argsObj==NaN -> don't use pipeline
 						if(statement[index]==":>"){//pipeLine
 							index++;
-							argsObj.obj[value.name]=value;
+							if(value?.name!=undefined)argsObj.obj[value.name]=value;
 							argsObj.list.push(value);
 							({value,index}=await contexts.expression_short({index,statement,scope,argsObj}));
 						}else break;
@@ -1167,7 +1168,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				else if(word=="::"){//extend object 'foo(){}::{}'
 					//extention operator '::{}' or '::(){}' or '::label'
 					index++;
-					if(!value)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
+					if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
 					if(({index,value}=await contexts.declareFunctionOrObject({
 						index,statement,scope,
 						startValue:value,shouldEval
@@ -2055,7 +2056,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//also used in meta (#) phase represent the value.
 			type="data";//: 'data' | 'command'
 			args=[];//:(Value|HiddenLine|number)[];
-			binaryValue=undefined;//:number
+			binaryValue=undefined;//?:number
 			dataType=undefined;//?: 'number' | 'char'; optional used with e.g.'String.char(5)' in '"text";'
 			dataValue=undefined;//?:number
 			get command(){throw Error("compiler error:@ command is obsilete")};//
@@ -3213,7 +3214,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							if(!isNaN(+v1)&&a[i-1]!="r"){
 								v1="0x"+(0x1fffffff&v1).toString(16);
 							}
-							failed||=(v1!==v1)?Error(["1st","2nd","3rd"][i]+" argument: '"+(v?v.name?.toString?.():v)+"' is undefined"):false;
+							failed||=(v1!==v1)?Error(
+								["1st","2nd","3rd"][i]+" argument: '"+
+								(
+									v.label?.name?v.label.name+"' is undefined":
+									(v?v.name?.toString?.():v)+"' is undeclared"
+								)
+							)
+							:false;
 							return v1+["", " "][+(i==0)]
 						})
 						.flat()
