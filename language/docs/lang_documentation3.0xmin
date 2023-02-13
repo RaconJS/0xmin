@@ -574,6 +574,27 @@ long_expressions;{
 			//foo1:(a,b)->x; foo2:(x,c)->y
 			foo1(a,b):>c:>foo2();
 			{let a:>Vector3(3,4,5);}
+		examples
+			let foo,bar,baz,a;
+			1;
+				#foo() <: a:>bar();
+				//same as
+				#foo()<:(a:>bar());
+				//same as
+				#foo(bar(a))
+				//this is because a:>bar() is a single expression and pipelines look for single expressions.
+			2;
+				#foo()<:bar()<:baz()<:a;
+				//same as
+				#foo()<:(bar()<:(baz()<:a));
+				//same as
+				#foo(bar(baz(a)));
+			3;
+				#foo():>bar():>baz()<:a;
+				//same as
+				#((foo()):>bar()):>baz()<:a
+				//same as
+				#baz(bar(foo()),a);
 	};
 	objectExtending using ::;{
 		'::' operator
@@ -589,6 +610,15 @@ long_expressions;{
 		};
 		used to concatnate objects '{}' or add a function block '(){}';
 	};
+	objectAssigning;{
+		'{...}' and '(...)...{...}' operators
+		You can assign the contense of a variable by adding an object or function expression after it.
+		e.g.
+		let foo(arg1,arg2)=>{...doStuff};
+		let bar{...doStuff};
+		At the moment they act exactly the same as the '::' operator.
+		The only difference is that it cannot be done with the syntax '{}{}'. This allows for '{{}{}}' to be parsed as '{{};{}}'
+	}
 	brackets;{
 		Can use: () {} [] aswell as #() #{} #[];
 		The '#' (aka the meta) symbol can be put infront of a bracket in a long or short expression to distinguish it from function syntax

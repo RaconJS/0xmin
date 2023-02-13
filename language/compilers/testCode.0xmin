@@ -1,5 +1,9 @@
-#"tptasm";#"table";
+#"0xmin";#"table";
 //{}:>(){}::{}()<:{};
-let a=#(asd,ww){};
-#a::(qwe){};
-debugger a"label.code.length";
+let foo(a){
+	debugger "'foo'";
+};
+let bar(a){
+	debugger "'bar'";
+};
+let a;#foo()<:a:>bar();
