@@ -545,7 +545,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 };
 def let program{
 	let main=parse(lamda,lamda);
-	sp = 0x800;
+	sp = 0x800;//this is for the emulator
 	call main;
 	let counterLabel;
 	def let end{
