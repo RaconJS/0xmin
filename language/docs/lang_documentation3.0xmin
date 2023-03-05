@@ -455,7 +455,7 @@ virtual;{
 		jump -> 2;
 		!move +2;//doesn't change the move pointer so does not throw an error.
 		null;
-	}
+	};
 	{//In practice the '!' modifyer is normally used to store commands as a variables, as it can do this without changing cpuState
 		//e.g.
 		jump 2;
@@ -473,35 +473,66 @@ move->move 2;//does not change
 
 code blocks;{
 	a codeBlock is made using curly brackets;
+	The global scope is similar to a inbuilt code block;
 	e.g. { ...doStuff; } //
-	It contains a list of instructions;
+	It contains a list of assembly instructions for the assignment ('$') and assembly ('@') phases of compilation;
 	when parsed in the metacode phase:
-		It is turned into a list of numbers (aka 0 code), assembly code(aka @ code), functions(aka # code),and compiler code(aka $ code).
-	Code blocks can be named. This can be used to make loops.
+		It is turned into a list of numbers (aka 0 code), assembly code (aka @ code), functions (aka # code),and compiler code(aka $ code).
+	Code blocks can be named. This can be useful for referenceing a block within itself, while keeping it self contained.
 	e.g.
-	{:blockName;
-		jump->blockName;
+	{	
+		{:block;
+			{
+				let block.b=2;
+			};
+			jump b;
+		};
 	};
-
+	This naming syntax can also be useful for making loops
+	e.g.
+	{
+		#def:{:blockName;//note that blocks are not assigned memory locations by default. 
+			...doStuff;
+			jump->blockName;//without the '#def' this would through an $error.
+		};
+	};
+	Using named blocks without #def can be usefull for making multi-dimentional arrays. 
+	e.g.
+	{
+		let matrix={
+			{1;0;0};
+			{0;1;0};
+			{0;0;1}
+		};
+		let twoMatrixies={
+			matrix;
+			matrix
+		};
+	};
 };
 function blocks;{
-	function is made by a pair of normal brackets () followed by an optional function type =,=>,<=,<-,-> folloed by a code block {}. the normal brackets contain a list of parameters.
-	all parameters are stored in a scope inbetween the function instance and the parent scope of the function.
-	e.g.
+	//function is made by a pair of normal brackets '()' followed by an optional function type =,=>,<=,<-,-> followed by curly brackets '{}'. the normal brackets contain a list of parameters.
+	//All parameters and special function variables, like return and this, are stored in a scope inbetween the function instance and the parent scope of the function.
+	//e.g.
 		let Foo = #(a,b)={a;b};
-		here we make a 'Foo' class. the '=' is what makes it a class.
-		we can also do:
+		
+		//Here we make a 'Foo' class. In this context the '=' symbol is what makes it a class.
+		//The '#' stops the compiler from doing 'Foo=()'.
+		//We can also do:
+	//e.g.
 		let Foo(a,b)={a;b};
-		For more consise syntax; This 2nd example is slightly different than the first one in what it does.
+		//For more consise syntax; This 2nd example is slightly different than the first one in what it does.
+	//e.g.
+		let foo(a,b){a;b};
 
-	by default functions return the code block.
-	this can be changed by assigning a value to the inbuilt 'return' label.
+	//by default functions return the code block.
+	//this can be changed by assigning a value to the inbuilt 'return' label.
 
-	note:
+	//note:
 		#let a = #(){};
-	is exactly the same as
+		//is exactly the same as
 		#let a;#let a[0] = #(){};
-
+	//When you call an object (aka a label), all the functions and objects inside it are 
 };
 single_expressions;{
 	expressions have the form:

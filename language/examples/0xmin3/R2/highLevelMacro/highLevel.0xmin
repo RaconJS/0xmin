@@ -1,0 +1,113 @@
+#"tptasm";
+(){
+	let fibinacii=function()<:(){
+		let reps:>int();
+		print("how many iterations?");
+		input(reps);
+		let a=int(0),b:>int(1),carry=int();
+		for(
+			(){let i=int(0)},
+			(){i.lessThan(reps)},
+			(){i.increment()}
+		)<:(){
+			let halfString:>string("n:",i.add(1));
+			print(halfString<:", f(n):"<:b);
+			carry.set(a);
+			a.set(b);
+			b.set(carry.add(b));
+		};
+	};
+	let list:>array()<:{1;2;3};
+	let myMatrix=mat({{1;0};{0;1}});
+	fibinacii();
+};
+...run(){
+	...labelsof codeof ({}::{
+		...codeof{
+			let static{import lib "var_const.0xmin"};
+			let heap{import lib "heap.0xmin"};
+			let Data;//:¬{} for non-litteral labels (e.g. variables)
+			let symbols{let Data=Data;};
+			let blockScope(block)<-{
+				#def:{}::{
+					//#do()<:(){...doStuff}¬.end();
+					let var(label,start,size){
+						let labelConstruct(function){
+							repeat !!function:{
+								call function;
+								repeat !+function..defs..length:static.var(function);
+							};
+						};
+						#pushToStack..splice(-0,0,{
+							repeat size:{
+								let i=0;
+								push #(values[i]||0);
+								#i+=1;
+							};
+							...labelConstruct(label.construct);
+						});
+						#pushToStack..splice(-0,0,{
+							...labelConstruct(label.deconstruct);
+						});
+						#return = stackLen;
+						#stackLen+=size;
+					}::{
+						let pushToStack;
+						let popFromStack;
+						let stackLen=0;
+					};
+					def var.pushToStack;
+					block();
+					def var.popFromStack{
+						let numOfVars;
+						let i=0;
+						repeat var.pushToStack..length{
+							#i+=1;
+						};
+						sp += var.stackLen;
+					};
+				};
+			};
+			Data(){}::{
+				let handleArgs(dataType,args,this)={
+					let carry;
+					repeat !(args[0][¬symbols.Data]):{//int(1,x) ==> int(x,1);
+						#carry = args[0];
+						#arguments[0] = value;
+						#value = carry;
+					};
+					#return{
+						repeat!:let this=this;
+					};
+				};
+				let ..supertype{
+					let super(dataType,this,arguments)={debugger;
+						let temp = constructor.handleArgs(dataType,arguments,this);//mutates arguments
+						#arguments.this = temp.this;
+					};
+				};
+			};
+			let int(value)<-{
+				#super(arguments,this);
+				#..splice(-0,0,{
+					r0 = 1;
+					call heap.malloc;
+					push r0;
+				});
+			}::{
+				let size=1;
+			}:>Data();
+			let function(){
+				;
+			};
+			{
+				def heap.memory;//might be heap.memoryData???
+				def heap.malloc;
+				def heap.free;
+			};
+			#..this{#let:
+				int=int;
+			};
+		};
+	});
+};

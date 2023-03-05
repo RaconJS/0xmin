@@ -14,6 +14,7 @@
 //TODO: @0xmin: add support for long jumps
 //TODO: allow "->" "=>" operators (that return a HiddenLine) inside expression_short
 //TODO: add 0xminMath.random(seed)
+//TODO: add JSON object exporting
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -363,7 +364,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				if(state.phase==""||state.phase=="#"){
 					let keywords={"void":false,"virtual":false,"static":false};
-					({index}=contexts.keyWordList({index,statement,scope,keywords}));
+					let found,oldIndex=index;
+					({index,found}=contexts.keyWordList({index,statement,scope,keywords}));
+					if(!found&&statement[index-1]==":"){index=oldIndex}//allows '#:' to work
 					Object.assign(state,keywords);
 					if(keywords["void"]||keywords["virtual"]||keywords["static"])
 						({index}=contexts.phaseSetter({index,statement,scope,state}));
@@ -902,9 +905,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			return{index};
 		},
-		async parameters({index=0,statement,scope,functionObj}){//'a,b,c' in '(a,b,c){};'
+		async parameters({index=0,statement,scope}){//'a,b,c' in '(a,b,c){};'
 			//does not include brackets
-			const params=functionObj.parameters=[];
+			const params=[];
 			for(const param of statement){
 				const statement=param;//statement == e.g. [ 'a' , ',' ]
 				let index=0;
@@ -922,6 +925,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}
 				}
 			}
+			return {parameters:params};
 			//UNFINISHED
 		},
 		endingSymbol({index,statement}){//failed==true if ending was found
@@ -1201,29 +1205,33 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
 				)){//function declaration '(){}'
 					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
-					let functionObj={callType:""};//:Variable|temp object
-					if(shouldEval){
-						if(isExtension)functionObj=startValue.label;
-						else functionObj=new MacroFunction({type:"function",});
-						await contexts.parameters({index:0,statement:statement[index+1],scope,functionObj});
-					}
-					value=functionObj.toValue("label");
-					index+=3;//skip '(' '...' ')' in '(...){}'
+					let {parameters} = await contexts.parameters({index:0,statement:statement[index+1],scope});
+					index+=3;
+					let callType;//:Parameter[],string;
 					word=statement[index];
 					if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
-						functionObj.callType=word||functionObj.callType;//'(){} ()={}' ==> '()={}? ? ?' but '()={} (){}' ==> '()={}'
+						callType=word||"";
 						index++;
 					}
 					word=statement[index+1];//word== '...' in '(){...}'
+					let code=word;
 					let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
+						parameters,
+						callType,
 						label:new Variable({name:"(scope function)",code:word}),
 						parent:scope,
-						code:word,
+						code,
 					});
-					index+=3;
-					functionObj.code.push(functionScope);
-					functionObj.prototype??=new Variable({name:"(prototype)"});
-					functionObj.supertype??=new Variable({name:"(supertype)"});
+					let functionObj;//:Variable
+					if(shouldEval){
+						if(isExtension)functionObj=startValue.label;
+						else functionObj=new MacroFunction({type:"function",});//:Variable
+						value=functionObj.toValue("label");
+						functionObj.code.push(functionScope);
+						functionObj.prototype??=new Variable({name:"(prototype)"});
+						functionObj.supertype??=new Variable({name:"(supertype)"});
+					}
+					index+=3;//skip '(' '...' ')' in '(...){}'
 					return {index,value,failed:false};//isExtension&&!startValue};
 				}else if(word=="{"){//'{}' object declaration
 					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
@@ -1426,8 +1434,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 											case"label"://object,array,function
 												label.labels={...(value.label?.labels??{})};
 												label.code=[...(value.label?.code??[])];
-												label.parameters=value.label?.parameters??[];
-												label.callType=value.label?.callType??"";
 												break;
 											case"array":
 											label.code=[...value.array];
@@ -2225,8 +2231,6 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
-				callType="";//:'' | '=>' | '=' | '->' | '<-' etc...
-				parameters=[];//:Parameter[]
 				scope=null;//the scope that the code should be called with. the scope contains the code
 				functionPrototype=null;//:Variable
 				functionSupertype=null;//:Variable
@@ -2282,120 +2286,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			static middleScopeCode;
 			async callFunction({args,value:callingValue,callType,scope,statement}){//:{value}
-				args??={obj:{},list:[]};
-				//args: {obj;list}
-				//args.obj: {[key:"string"]:Value}
-				//args.list: Value[]
-				callType||=this.callType;//'foo()={};', 'foo()' ==> 'foo=()'
-				const argsObj=new Variable({
-					name:"(argument object)",
-					labels:{},
-					code:[]
-				});
-				for(let param of this.parameters){
-					//parem:Parameter
-					argsObj.labels[param.name]=null;
-				}
-				for(let i=0;i<args.list.length;i++){
-					let label=Variable.fromValue(args.list[i]);
-					if(i<this.parameters.length){
-						argsObj.labels[this.parameters[i].name]=label??null;
-					}
-					argsObj.code.push(label);
-				}
-				let codeBlock=this.getCode();//new code instance
+				const codeBlock=this.getCode();//:Scope[] & Statement;new code instance
 				const newLabel=new Variable({name:"<"+this.name+">",functionConstructor:this});
-				const middleLabel=new Variable({name:"(function vars)"});
-				Object.assign(middleLabel.labels,argsObj.labels);
-				const middleScope=new Scope({//allows function to use arguments without them being part of the instance object
-					label:middleLabel,
-					code:(Variable.middleScopeCode??=new Statement()),//:Statement 
-					parent:scope//temporary parent value. Is replaced in the forloop at the bottom
-				});
-				middleScope.parent=middleScope;
-				middleScope.let=middleScope;
-				middleScope.var=middleScope;
-				let instanceScope=new Scope({//weak scope
-					fromName:"callFunction",
-					parent:middleScope,
-					label:newLabel,
-					code:codeBlock
-				});
-				let returnObj=newLabel;
-				let useParentVarScope=false;//unused; TODO: fix var scope
-				//'='->strong scope, '-'->weak scope, '>'->impure,'<'->pure
-				switch(callType){
-					case"="://class
-						instanceScope.let=instanceScope;
-						instanceScope.var=instanceScope;
-						newLabel.functionPrototype=this.prototype;
-						newLabel.functionSupertype=this.pupertype;
-						middleLabel.labels["this"]=newLabel;
-						middleLabel.labels["return"]=newLabel;
-						middleLabel.labels["arguments"]=argsObj;
-						middleLabel.labels["constructor"]=this;
-					break;//pure, unpure, 
-					case"=>"://arrow function, has no special labels, impure, let scope
-						instanceScope.let=instanceScope;
-					break;
-					case"<="://'using(){}' super strong scope macro function
-						instanceScope.let=instanceScope;
-						instanceScope.var=instanceScope;
-						middleScope.parent=middleScope;//instanceScope;
-						middleLabel.labels["this"]??=callingValue.parent;
-					break;
-					case"<-"://'macro(){}' weak scoped macro function
-						//uses scope from where it was called
-						middleScope.parent=scope;
-						instanceScope.let = scope.let;
-						instanceScope.var = scope.var;
-						newLabel.functionPrototype=this.prototype;
-						newLabel.functionSupertype=this.pupertype;
-						middleLabel.labels["scope"]??=scope.label;
-						middleLabel.labels["arguments"]=argsObj;
-						middleLabel.labels["return"]=returnObj;
-					break;
-					case"->"://'weak(){}' impure function
-					break;
-					default:
-						instanceScope.let=instanceScope;
-						middleLabel.labels["arguments"]=argsObj;
-						middleLabel.labels["constructor"]=argsObj;
-						middleLabel.labels[globalScope.symbol]=middleLabel;
-						middleLabel.labels["this"]=callingValue.parent??null;
-						middleLabel.labels["return"]=returnObj;
-						middleLabel.labels["caller"]??=scope.let.label;
-					//
-				}
-				for(let codeScope of codeBlock){
-					switch(callType){
-						case"="://class, var&impure
-							middleScope.parent=codeScope;
-						break;
-						case"=>"://arrow function, let&impure
-							middleScope.parent=codeScope;
-							instanceScope.var = codeScope.var;
-						break;
-						case"<="://using, strong&pure
-						break;
-						case"->"://weak, weak&impure
-							middleScope.parent=codeScope;
-							instanceScope.let = codeScope.let;
-							instanceScope.var = codeScope.var;
-						break;
-						case"<-"://weak macro. similar to ...x, weak&pure
-						break;
-						default:// let&impure
-							middleScope.parent=codeScope;
-							instanceScope.var = codeScope.var;
-					};
-					if(codeScope instanceof Scope.CodeObj)
-						await contexts.main({statement:codeScope.code,scope:instanceScope});
-					else await evalBlock(codeScope.code,undefined,instanceScope,statement);
+				let newReturnObj;
+				for(let codeScope of codeBlock){//codeScope:Scope
+					({newReturnObj}=await codeScope.callFunction({newReturnObj,newLabel,functionLabel:this,args,value:callingValue,callType,scope,statement}));
 				}//await evalBlock(codeBlock,undefined,instanceScope,statement);
 				//if no return label created, it returns the 
-				let newReturnObj=middleLabel.labels["return"];//by default, returns newLabel
-				if(newReturnObj===undefined)newReturnObj=newLabel;
+				if(newReturnObj===undefined)newReturnObj=newLabel;//by default, returns newLabel
 				return {value:new Value({type:"label",label:newReturnObj})};
 			}
 			//Variable
@@ -2770,6 +2668,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}//requires: label,parent,code
 			made=Error();//for debugging
 			fromName;//for TESTING only
+			//as function
+				callType="";//:'' | '=>' | '=' | '->' | '<-' etc...
+				parameters=[];//:Parameter[]
+			//----
 			label=null;//label that owns this scope, label contains properties.
 			//scopes
 				parent=null;
@@ -2801,6 +2703,122 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					return parent;
 				}
 				else {this.isSearched=false;return undefined;}
+			}
+			//in Scope class
+			async callFunction({newLabel,newReturnObj,functionLabel,args,value:callingValue,callType,scope,statement}){//:{value}
+				//get args
+					args??={obj:{},list:[]};
+					//args: {obj;list}
+					//args.obj: {[key:"string"]:Value}
+					//args.list: Value[]
+					const argsObj=new Variable({
+						name:"(argument object)",
+						labels:{},
+						code:[]
+					});
+					for(let param of this.parameters){
+						//parem:Parameter
+						argsObj.labels[param.name]=null;
+					}
+					for(let i=0;i<args.list.length;i++){
+						let label=Variable.fromValue(args.list[i]);
+						if(i<this.parameters.length){
+							argsObj.labels[this.parameters[i].name]=label??null;
+						}
+						argsObj.code.push(label);
+					}
+				//----
+				callType||=this.callType;
+				const middleLabel=new Variable({name:"(function vars)"});
+				Object.assign(middleLabel.labels,argsObj.labels);
+				const middleScope=new Scope({//allows function to use arguments without them being part of the instance object
+					label:middleLabel,
+					code:(Variable.middleScopeCode??=new Statement()),//:Statement 
+					parent:globalScope,//temporary parent value. Is replaced bellow
+				});
+				middleScope.parent=middleScope;
+				middleScope.let=middleScope;
+				middleScope.var=middleScope;
+				let instanceScope=new Scope({//weak scope
+					fromName:"callFunction",
+					parent:middleScope,
+					label:newLabel,
+					code:this.code,
+				});
+				let returnObj=newLabel;
+				let useParentVarScope=false;//unused; TODO: fix var scope
+				//'='->strong scope, '-'->weak scope, '>'->impure,'<'->pure
+				switch(callType){
+					case"="://class
+						instanceScope.let=instanceScope;
+						instanceScope.var=instanceScope;
+						newLabel.functionPrototype=functionLabel.prototype;
+						newLabel.functionSupertype=functionLabel.pupertype;
+						middleLabel.labels["this"]=newLabel;
+						middleLabel.labels["return"]=newLabel;
+						middleLabel.labels["arguments"]=argsObj;
+						middleLabel.labels["constructor"]=functionLabel;
+					break;//pure, unpure, 
+					case"=>"://arrow function, has no special labels, impure, let scope
+						instanceScope.let=instanceScope;
+					break;
+					case"<="://'using(){}' super strong scope macro function
+						instanceScope.let=instanceScope;
+						instanceScope.var=instanceScope;
+						middleScope.parent=middleScope;//instanceScope;
+						middleLabel.labels["this"]??=callingValue.parent;
+					break;
+					case"<-"://'macro(){}' weak scoped macro function
+						//uses scope from where it was called
+						middleScope.parent=scope;
+						instanceScope.let = scope.let;
+						instanceScope.var = scope.var;
+						newLabel.functionPrototype=functionLabel.prototype;
+						newLabel.functionSupertype=functionLabel.pupertype;
+						middleLabel.labels["scope"]??=scope.label;
+						middleLabel.labels["arguments"]=argsObj;
+						middleLabel.labels["return"]=returnObj;
+					break;
+					case"->"://'weak(){}' impure function
+					break;
+					default:
+						instanceScope.let=instanceScope;
+						middleLabel.labels["arguments"]=argsObj;
+						middleLabel.labels["constructor"]=argsObj;
+						middleLabel.labels[globalScope.symbol]=middleLabel;
+						middleLabel.labels["this"]=callingValue.parent??null;
+						middleLabel.labels["return"]=returnObj;
+						middleLabel.labels["caller"]??=scope.let.label;
+					//
+				}
+				switch(callType||this.callType){
+					case"="://class, var&impure
+						middleScope.parent=this;
+					break;
+					case"=>"://arrow function, let&impure
+						middleScope.parent=this;
+						instanceScope.var = this.var;
+					break;
+					case"<="://using, strong&pure
+					break;
+					case"->"://weak, weak&impure
+						middleScope.parent=this;
+						instanceScope.let = this.let;
+						instanceScope.var = this.var;
+					break;
+					case"<-"://weak macro. similar to ...x, weak&pure
+					break;
+					default:// let&impure
+						middleScope.parent=this;
+						instanceScope.var = this.var;
+				};
+				if(this instanceof Scope.CodeObj)
+					await contexts.main({statement:this.code,scope:instanceScope});
+				else await evalBlock(this.code,undefined,instanceScope,statement);
+				//await evalBlock(codeBlock,undefined,instanceScope,statement);
+				//if no return label created, it returns the 
+				newReturnObj=middleLabel.labels["return"]??newReturnObj;
+				return{newReturnObj};
 			}
 			static CodeObj=class CodeObj extends Scope{}//single line of code.
 		}
