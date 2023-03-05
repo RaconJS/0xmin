@@ -1,9 +1,3 @@
 #"0xmin";#"table";
 //{}:>(){}::{}()<:{};
-let foo(a){
-	debugger "'foo'";
-};
-let bar(a){
-	debugger "'bar'";
-};
-let a;#foo()<:a:>bar();
+#:let;

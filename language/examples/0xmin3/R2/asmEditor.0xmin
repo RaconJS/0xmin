@@ -1,0 +1,396 @@
+#"tptasm";#"len";#"table";
+let allMain(){
+	def main();
+	def heap.malloc;
+	def heap.free;
+	def var,const;
+	def heap.memory;
+};
+...(){
+	let heap{import lib "heap.0xmin"};
+	import lib "var_const.0xmin";
+	let readHigh(rOut,rAddress){
+		@(0x11100001|(rOut&0xf<<8)|(rAddress&0xf<<4));
+	};
+	let: let(label,value)<-{
+		#let arguments.name;
+		repeat !!value:#let: .(""...(arguments.name=label[0][0][0]))=value;
+		repeat !value: #let: .(""...(arguments.name=label[0][0][0]));
+		#return = .(""...arguments.name);
+	};
+	let static = var;
+	let RegEnum(start)={//register enum
+		#this<->0;
+		(){
+			#return = #(arguments[0]||return)<->+..this;
+			#..this<->..this+1;
+			repeat (+return>(16-2)):throw "out of registers";
+		};
+	};
+	let getInput(out,waitCycle){//@(%out,{@}&#bool?)->out
+		let temp=out,const_0=out;
+		def:{:this;
+			repeat !!waitCycle:def waitCycle;
+			wait %temp;
+			repeat !!waitCycle: jump this if sign;
+			repeat !waitCycle:jump this..return if sign;
+			%const_0=0;
+			bump %const_0;
+			#def let waitToRecover{
+				recv %out %const_0;
+			};
+			jump->waitToRecover if !carry;
+		};
+	};
+	let print(str,const_0){
+		#const_0=const_0||0;
+		r const_0 = 0;
+		let i=-1;
+		repeat str..length{
+			send r const_0 str.(i+=1);
+		};
+	};
+};
+let main(){
+	let clearScreen{
+		let const_0=0;
+		r0 = 0;
+		send r0 "\p00\c00";
+		def let lines{
+			repeat 12 #def:{
+				repeat 16 send r0 " ";
+			}
+		};
+		send r0 "\p00\c0f";
+		return;
+	}:>var();
+	let fail{//errors
+		print("\p00\c00",clearScreen.const_0);
+		call clearScreen.lines.(-2);
+		return;
+		def let outOfMemory{
+			call fail;
+			print("\c10ERROR:\nout of memory\c0f");
+			hault;
+			return;
+		};
+	}:>var();
+	let machineCodeEditor{
+		let end;
+		let reg=RegEnum(0);
+		let screenSize{//screen that is occupied by the code
+			#def let x=16;
+			#def let y=11;
+		}<->screenSize.y;
+		let const_0:>reg();
+		let curserToCurrentLine{};//assigned later
+		let commandBar{
+			let pos="\pb0";
+			let emptyColour="\c9f";
+			let textColour ="\c1f";
+			let needsClearing:>var()::{0};//clears command bar on next key press
+			let clear{
+				print(pos...emptyColour,const_0);
+				call clearScreen.lines.(-1);
+				curserToCurrentLine;
+				return;
+			}:>var();
+		};
+		let program:>var()[0]::{//:{}
+			0#def let start;
+			0#def let length;
+			0#def let maxLength;
+			0#def let index;//:int; [[program]+[index]]
+			0#def let lineNumber;//[0-11]
+			def let read{//assigned later
+				//fills the screen with the code read from memory.
+				let colour{
+					let default = +"\c0f";
+					let page0 = +"\c07";
+					let page1 = +"\c87";
+				};
+			};//:@()->void
+
+		};//:[heap+@]
+		//current memory address = [[program]+[index]+[lineNumber]]]
+		let lineNumber=program.lineNumber;//:[int]
+		let charNumber:>var()::{0};//:[int]
+		{:tempNewProgram;
+			r0 =16;
+			[program.maxLength]=r0;
+			{
+				repeat (heap.malloc.inputs.(0)!=0):r heap.malloc.inputs.(0) = r0;
+				call heap.malloc;
+			};
+			//heap.malloc.call(0);
+			[program] = r heap.malloc.outputs.(0);
+			jump->fail.outOfMemory if == 0;
+			[program.length]=0;
+			r0 = 0;
+		};
+		let state{#repeat 2 reg();};
+		let resetState{
+			r state.(0) = 4;
+			r state.(1) = 2;
+			return;
+		}:>var();
+		let getEditAddress(register){
+			r register = [program];
+			r register += [program.index];
+			r register += [program.lineNumber];
+		};
+		let curserPosChar:>reg()::{
+			let get(){
+				r ..this = [program.lineNumber];
+				r ..this<<=4;
+				r ..this |="\p00";
+			};
+		};
+		{:start;
+			[program.index] = 0;
+			[program.index] = 0;
+			[program.lineNumber] = 0;
+			repeat 0 call program.read;
+			let const_0=0;
+			call commandBar.clear;
+			send r const_0 program.read.colour.default;
+			call resetState;
+			r const_0 = 0;
+			r curserPosChar = "\p00";
+		};
+		def:{:mainLoop;
+			let inChar:>reg();//:%char
+			let temp:>reg();//:%
+			inChar:>(regOut){:getInput;
+				let oldStack=regOut;
+				def let waitLoop{
+					let forLoop(){
+						let i<->temp;
+						r i=#(60/4*0.5|0);
+						def let loop{
+							wait r regOut;
+							jump->waitLoop..return if !sign;
+							r i-=1;
+							jump->loop if>=0;
+						};
+					};
+					send r const_0 "\c0f";
+					send r const_0 r curserPosChar;
+					send r const_0 "\x7f";//square
+					forLoop();
+					send r const_0 "\c00";
+					send r const_0 r curserPosChar;
+					send r const_0 " ";
+					forLoop();
+					jump->..this;
+				};
+				{
+					send r const_0 program.read.colour.default;
+					send r const_0 r curserPosChar;
+					bump r const_0;
+				};
+				#def let waitToRecover{
+					recv %regOut %const_0;
+					jump->waitToRecover if !carry;
+				};
+			}();
+			r temp = r inChar;
+			[commandBar.needsClearing]|=0;
+			def:{:clearBar;
+				jump->clearBar..return if==0;
+				[commandBar.needsClearing]=0;
+				call commandBar.clear;
+				send r const_0 program.read.colour.default;
+			};
+			let onNoInput,onNumberInput;
+			$onNoInput=>mainLoop;
+			def:{}::{:handleNumbers;
+				r temp-="F";
+				jump->onNoInput if>0;
+				let numberHashMap{
+					let i=-1;
+					repeat 10:@#(+(i+=1));
+					repeat ("A"-"9"-1)@#(-1&0xffff);
+					repeat 6:@#(+(i+=1));
+				}:>var();
+				r temp+=#("F"-"0");
+				jump->..return if<0;
+				r temp = [numberHashMap + r temp];
+				jump->onNumberInput if>=0;
+			};
+			{:switch;
+				r temp = r inChar;
+				let lastChar(char){
+					#return = lastChar^char;
+					#lastChar<->char;
+				};
+				let command(key,name,do){
+					//key:string,name:#string,do:{@}
+					r temp^=lastChar(+key[0]);
+					jump->var()<:{
+						let textPosCol=commandBar.pos...commandBar.textColour;
+						let emptyPosCol=commandBar.pos...commandBar.emptyColour;
+						print(textPosCol...name,const_0);
+						[commandBar.needsClearing]=1;
+						def do;
+						{
+							call commandBar.clear;
+							send r const_0 program.read.colour.default;
+							jump->mainLoop;
+						};
+					}if==0;
+				};
+				command("\t","exit")<:{return}::{#..this..splice(-1,1)};
+				command({:enter;13},"new line")<:{
+					let onNumberInput.newLine;
+					call onNumberInput.newLine;
+				};
+				command({:backSpace;8},"back")<:{
+					call onNumberInput.newLine;
+					[program.lineNumber]-=3;
+					call onNumberInput.newLine;
+				};
+			};
+			def onNumberInput{
+				push mainLoop;
+					send r const_0 r inChar;
+					let number{
+						let buffer16:>reg();
+						let highBits16:>reg();
+						let u8<->temp;
+					};
+					r number.u8<<=#(16-4);
+					r number.u8<<=4;
+					r number.buffer16<<=4 +internal;
+					r curserPosChar+=1;
+					r state.(0)-=1;
+					jump->{
+						r state.(0)=4;
+						r state.(1)-=1;
+						jump->var()<:{//set hight bits
+							r number.highBits16 = r number.buffer16;
+							jump->mainLoop;
+						}if>0;
+						{//set low bits
+							//combine highBits16 and buffer16; then write to memory
+							let editAddress<->temp;//:%
+							editAddress:>getEditAddress();
+							mask = r number.highBits16;
+							[r editAddress] = r number.buffer16;
+							mask = 0;
+							r number.highBits16=0;
+							r number.buffer16=0;
+						};
+						push mainLoop;
+						def newLine;
+						let printMemoryCell{def let block{};let editAddress;return}:>var();//assigned later
+						{:newLine;//go to next line
+							{
+								let pos<->inChar,inChar=¬;//:char
+								r pos = [lineNumber];
+								r pos <<=4;
+								r pos |="\p00";//x:0,y:lineNumber
+								send r const_0 r pos;
+								send r const_0 program.read.colour.page0;
+								let editAddress=printMemoryCell.editAddress;
+								editAddress:>getEditAddress();
+								call printMemoryCell;
+								send r const_0 program.read.colour.default;
+							};
+							[lineNumber] += 1;
+							let lineNumberReg = temp;
+							r lineNumberReg = [lineNumber];
+							{
+								r curserPosChar & = 0xff00;
+								r curserPosChar >> = 4;
+								r curserPosChar | = r lineNumberReg;
+								r curserPosChar << = 4;//x = 0; y = new line
+							};
+							r lineNumberReg-=screenSize.y;
+							let next;
+							jump -> var()<:{//handle page overflow
+								r lineNumberReg = 0;
+								[program.index]+=screenSize.y;
+								call #(program.read{
+									let editAddress<->number.buffer16;//assume: number is free;
+									editAddress:>getEditAddress();
+									r const_0=0;
+									let i<->state[0];
+									let printHalf(posChar)={
+										let maxI = screenSize.y-1;
+										let dataPos = {let x=0,y=0};
+										r i = maxI;
+										let posCharReg<->inChar;
+										r posCharReg = #(dataPos.y<<4|posChar);
+										def:{:forLoop;
+											send r const_0 r posCharReg;
+											repeat 1 $def printMemoryCell.block;//not sure what changed when '$def' is added, but it results in more code
+											r editAddress+=1;
+											{:next;
+												r posCharReg += #(1<<4);
+												r i-=1;
+												jump->forLoop if>=0;
+												//return;
+											};
+										};
+									}::{
+										let ..prototype{
+											let printHexChar{
+												let char<->state[1];//state[1] are free here
+												r char=0;
+												r temp<<<=4;//circular shift
+												r char<<=4 + internal;
+												send r const_0 [var("0123456789ABCDEF")+r char];
+											};
+											let printHexChar4{
+												repeat 4 printHexChar;
+											};
+											#printMemoryCell.block{
+												#printMemoryCell.editAddress<->editAddress;
+												{
+													temp:>readHigh(editAddress);
+
+													printHexChar4;//repeat 4 printHexChar;
+												};{
+													r temp = [r editAddress];
+													printHexChar4;//repeat 4 printHexChar;
+												};
+											};
+										};
+									};
+									send r const_0 colour.page0;//"\c07";
+									printHalf(+"\p00");
+									send r const_0 colour.page1;//"\c87";
+									printHalf(+"\p08");
+									send r const_0 colour.default;//"\c0f";
+									send r const_0 "\p00";
+									return;
+								});
+								jump->next;
+							}if==0;
+							def next;delete next;
+							$#(curserToCurrentLine{//go to next line
+								let pos<->state[0],state=¬;//:char
+								r pos = [lineNumber];
+								r pos <<=4;
+								r pos |="\p00";//x:0,y:lineNumber
+								send r const_0 r pos;
+							});
+							{
+								r temp = [program.lineNumber];
+							};
+							call resetState;
+						};
+						return;//jump->mainLoop;
+					}:>var()if==0;
+				return;
+			};
+		};
+		return#def end;
+	}:>var();
+	{
+		call machineCodeEditor;
+		hault;
+	};
+};
+def allMain();
