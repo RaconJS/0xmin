@@ -1955,7 +1955,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.replaceAll(/^["'`]|["'`]$/g,"\"")
 						.replaceAll(/\\[cp]/g, "\\x")
 						.replaceAll(/\\[hae]/g,"\n")
-						.replaceAll(/\\([^cphae])/g,"$1")
+						.replaceAll(/\\([^cphae"'`])/g,"$1")
 						.replaceAll(/\\ /g," ")
 						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
 						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
@@ -1964,7 +1964,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					try{
 						string=JSON.parse(string);
 					}catch(error){
-						console.error("str:",string);
+						console.error("str:",[[string]]);
 						throw error;
 					}
 					return new Value({type:"string",string,array});
@@ -2217,29 +2217,29 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		};
 		class Variable extends DataClass{// codeObj/label
 			constructor(data){super();Object.assign(this,data??{})}
-			//as value
+			static objectNum=0;
+			//as value, isn't used much yet
 				type="label";//:"label"|"string"|"number"|???
 			//as object
 				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},pointer*
 				name=undefined;///@string
-				labels={};//aka properties
-				static objectNum=0;
+				labels={};//{[string|Symbol]:Variable|null|undefined}; aka properties; undefined:write only, null:can be read and written empty label
 				symbol=Symbol(Variable.objectNum++);
-				prototype=null;///instanceof Variable
-				supertype=null;///instanceof Variable
+				prototype=null;//:Variable? ; used in prototype chain similar to javascript `object.__proto__`
+				supertype=null;//:Variable? ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
 				securityLevel=0;//used with '..secure'
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
 				scope=null;//the scope that the code should be called with. the scope contains the code
-				functionPrototype=null;//:Variable
-				functionSupertype=null;//:Variable
-				functionConstructor;
+				functionPrototype=null;//:Variable?
+				functionSupertype=null;//:Variable?
+				functionConstructor;//:Variable?;
 			//as assembly
 				returnLineNumber;//:number; defined in collectCode
 				returnCpuState;//:CpuState
 				relAddress=0;//number UNUSED
-				lineNumber=undefined;
+				lineNumber=undefined;//:number|NaN|undefined; Is used as the number value of a variable. Is returned from '+label'
 				cpuState;//:CpuState
 				defs=[];//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
@@ -2285,6 +2285,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return codeBlock;
 			}
 			static middleScopeCode;
+			//Variable
 			async callFunction({args,value:callingValue,callType,scope,statement}){//:{value}
 				const codeBlock=this.getCode();//:Scope[] & Statement;new code instance
 				const newLabel=new Variable({name:"<"+this.name+">",functionConstructor:this});
@@ -2452,7 +2453,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							value= new Variable({
 								name:"(failed compilation)",
 								labels:{
-									error:new Value.String(e).toType("label").label,
+									error:new Value.String("\""+e+"\"").toType("label").label,//BODGED: not sure "\""+e+"\""
 								}
 							}).toValue("label");
 						};
