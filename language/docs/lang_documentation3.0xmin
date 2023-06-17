@@ -1,3 +1,5 @@
+//comment
+/*multi line comment*/
 #"0xmin";
 //keywords
 	#void;
@@ -86,7 +88,7 @@
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
 	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
 	a:> b:> foo(c,{...d}) <:e <:f //using pipelining operators
-	foo(bar(baz)); or bar(baz):>foo()
+	foo(bar(baz)); /*or*/ bar(baz):>foo()
 //object declarations
 	{}
 	#{}
@@ -517,6 +519,7 @@ function blocks;{
 		let Foo = #(a,b)={a;b};
 		
 		//Here we make a 'Foo' class. In this context the '=' symbol is what makes it a class.
+		//It is not important here but this function returns an array with 2 items in it.
 		//The '#' stops the compiler from doing 'Foo=()'.
 		//We can also do:
 	//e.g.
@@ -532,7 +535,29 @@ function blocks;{
 		#let a = #(){};
 		//is exactly the same as
 		#let a;#let a[0] = #(){};
-	//When you call an object (aka a label), all the functions and objects inside it are 
+	//When you call an object (aka a label), all the functions and objects inside the array part are called.
+	//each function uses it's own parameters but they all share the same arguments, return value and function instance object.
+	//e.g.
+		let bar = {(a){a};(b,c){b;c}};
+		def bar(1,2);
+		//gives the same result as
+		let bar = {(a,b){a;a;b}};
+		bar(1,2);
+		//gives the same result as
+		let bar = {{{(a){a}}};(b,c){b;c}};
+		def bar(1,2);
+	
+	//function variables
+	#(){
+		scope;//macro only
+		return;
+		arguments;//the list of arguments provided, as well as containing a namespace for the aguments.
+		constructor;//is the original function;
+		this;//same as this in javascript, except if the function is called without a parent (i.e. 'foo()' instead of 'bar.foo()') then then it returns the var scope where the function was origionally made.
+		//If the function type is a class then this returns the new function instance.
+		caller;
+
+	}
 };
 single_expressions;{
 	expressions have the form:
@@ -691,6 +716,14 @@ long_expressions;{
 		};
 	};
 	proceedence{
+		priorities{//from highest to lowest
+			1: . //dot operator and function calls
+			2: single argument operators including e.g. (+a) (-a) (*a) (/a) !a (¬a) (~a)
+			3: :> <: //e.g. 'a:>foo()<:b' is evaluated in the order 'a,b,foo,foo(a,b)'
+			4: all other operators including e.g. :: + - * / ...
+			5: ¬ // the 'a+b ¬.c' operator
+			6: = <=> <-> <- -> <= => //the last 4 are for in 0xmin assembly
+		};
 		except for assignment operators (=,<=>,<->) everything has the same priority.
 		e.g. a+b*c is parsed as (a+b)*c
 		assignment operators are always done last, and have the same priority
