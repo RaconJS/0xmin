@@ -2523,33 +2523,36 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					//flat maps all statements in a function. (Makes recursion easier)
 					"flat":async({label})=>{
 						const symbol=Symbol();
-						function* forEachStatement(statement){
+						let highestRecurLevel=0;
+						function* forEachStatement(statement,recurLevel){
+							highestRecurLevel=Math.max(highestRecurLevel,recurLevel);
 							for(let word of statement){
 								if(word instanceof Statement){
 									yield word;
-									yield* forEachStatement(word);
+									yield* forEachStatement(word,recurLevel+1);
 								}
 								else if (typeof word=="string"){
 									yield new Value({string:word,type:"string"}).toType("label").label;
 								}
 							}
 						};
-						function* forEachLabel(label){
+						function* forEachLabel(label,recurLevel){
+							highestRecurLevel=Math.max(highestRecurLevel,recurLevel);
 							if(label[symbol])return;
 							label[symbol]=1;
 							let label1;
 							for(let label1 of label.code){
 								if(label1 instanceof Variable){
 									yield label1;
-									yield* forEachLabel(label1);
+									yield* forEachLabel(label1,recurLevel+1);
 								}
 								else if(label1 instanceof Statement){
 									yield label1.toLabel();
-									yield* forEachStatement(label1);
+									yield* forEachStatement(label1,recurLevel+1);
 								}
 								else if (label1 instanceof Scope){
 									yield label1.code.toLabel();
-									yield* forEachStatement(label1.code);
+									yield* forEachStatement(label1.code,recurLevel+1);
 								}
 								else {
 									yield label1;
@@ -2560,7 +2563,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return new Variable({
 							type:"array",
 							name:"(flat)",
-							code:[...forEachLabel(label)],
+							code:[...forEachLabel(label,1)],
+
 						}).toValue("label");
 					},
 					//convert string to number
@@ -2705,7 +2709,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				else {this.isSearched=false;return undefined;}
 			}
-			//in Scope class
+			//Scope
 			async callFunction({newLabel,newReturnObj,functionLabel,args,value:callingValue,callType,scope,statement}){//:{value}
 				//get args
 					args??={obj:{},list:[]};
@@ -2762,6 +2766,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					break;//pure, unpure, 
 					case"=>"://arrow function, has no special labels, impure, let scope
 						instanceScope.let=instanceScope;
+						newLabel.functionPrototype=functionLabel.prototype;
+						newLabel.functionSupertype=functionLabel.pupertype;
 					break;
 					case"<="://'using(){}' super strong scope macro function
 						instanceScope.let=instanceScope;
@@ -2792,7 +2798,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						middleLabel.labels["caller"]??=scope.let.label;
 					//
 				}
-				switch(callType||this.callType){
+				switch(callType){
 					case"="://class, var&impure
 						middleScope.parent=this;
 					break;
@@ -3476,6 +3482,7 @@ let buildSettings={makeFile:true}
 	//possible names: 
 	//  0xmin Assembly Small Macro language or (ZASM)
 	//  0xmin @ssembly $mall #acro language or (0@$#)
+	//'0 starts with a 'Z'
 	//compilation phases:
 	//meta
 	//memory/lineNumber assignment + CPU state emulating
