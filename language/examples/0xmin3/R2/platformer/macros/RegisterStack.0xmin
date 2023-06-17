@@ -37,7 +37,7 @@ let registerStack{#;
 			found = data[+i]&&(+data[+i].value==+value&&+data[+i].isConst);
 			i+=1;
 		};
-		if(+found)<:()=>{
+		if(+found)<:(){
 			#newObj=data[i-1];
 		}<:(){
 			#newObj=var(value);
@@ -70,7 +70,7 @@ let registerStack{#;
 		//unfinished
 		//let args=foo..arguments;
 	}
-	set blockScope(block)=>{//def block();
+	set blockScope(block){//def block();
 		#if(block==blockScope)<:(){
 			#block={};
 		};//stop infinite recursion

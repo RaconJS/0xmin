@@ -1,4 +1,4 @@
-#"tptasm";#"len";#"table";
+#"tptasm";#"len";//#"table";
 let lamda(){//01010011
 	/*(//hello_world
 		v
@@ -15,6 +15,7 @@ let lamda(){//01010011
 			v^<<^<< << <<^<< << p//d 1100100
 		v n
 	)*/
+	
 		(and>or>t>f>+>*>
 			(a>b>a)(or (and t f) t (+ f f) (* t f)) p n
 			//(* (f>x>f(f(f x))) t)(a>p) n
@@ -25,9 +26,16 @@ let lamda(){//01010011
 		(a>b>b)//f
 		(a>b>(f>x>a f (b f x)))//+
 		(a>b>(f>x>a (x>b f x) x))//*
+	/* //factorial
+	(*>Z>is0>dec> Z !>n>(is0 n(a>f>x>f x)(a>*n(!!(dec n))))(a>a))
+	(a>b>(f>x>a (x>b f x) x))//*
+	(a>a a)//Z
+	(n>n(a>a>b>b)(a>b>a))//is0
+	(n>n(a>a>b>b)(a>b>a))//dec
+	*/
 }::{//p = print
-	def let val{"0"};
-	def let .["p"] {r1=0;send r1 [val]};
+	def let val{"0";def let charPos="\p00"};
+	def let .["p"] {r1=0;send r1 [val.charPos];send r1 [val];[val.charPos]+=1;};
 	def let .["<<"] {[val]<<=1};
 	def let .[">>"] {[val]>>=1};
 	def let .["^"] {[val]^=1};
@@ -311,7 +319,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 			delete this;
 			//$undef mainFoo;
 		};//:0xmin[]
-		repeat !line:#:{}[]ERROR;
+		repeat !line:throw "ERROR";//#:{}[]ERROR;
 		#i=0;
 	};
 	let oldI=i;
@@ -324,7 +332,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 		repeat (word=="("): {//zero cost abstraction
 			#i+=1;
 			repeat !!line[i][1]
-				#:{}[]ERROR;//silent error
+				throw "silent error";//#:{}[]ERROR;//silent error
 			recur output.maxRecur: 
 			repeat !!line[i]: #returnValue=parse(line[i][0],0,function,1,output);
 			#i+=2;
@@ -363,8 +371,8 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 		let word=line[i];
 		repeat ( (args<2) && !!word && (word!="(") && (word!=">")):{//word
 			let value=function.scope[""...word];
-			repeat !value:debugger (""...word);
-			repeat !value#:{}[];//ERROR:value not defined
+			//repeat !value:debugger (""...word);
+			repeat !value:throw "value '"...word..."' not defined";//#:{}[];//ERROR:value not defined
 			#returnValue=function.addArg(value,function,output);
 			#args+=1;
 			#i+=1;
@@ -513,6 +521,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 						//move arg reference from stack to heap
 						let fooInstance=FunctionInstance=()<->temp;
 						r fooInstance = [sp+stack_functionInstance];
+						def let ..this.onCallStart{let startReg = registers.context+3;};
 						call [r fooInstance + fooInstance.function];//foo.function:[{@}]
 					};
 					//stack [foo,arg,ret,parent,ret1,ans]
@@ -536,6 +545,7 @@ let parse(code,i,function,hasRecur,output)={//:(#(){...lambda code},builtInFunct
 					sp+=1;//skip arg;
 					[sp] = r ans;//replace context with ans
 					//assert: stack = [ans]
+					def let ..this.onCallEnd{let startReg = registers.context+3;};
 				jump->r ret;
 			};
 			let makeContextInstance= ..prototype.makeContextInstance;
@@ -549,13 +559,17 @@ def let program{
 	call main;
 	let counterLabel;
 	def let end{
-		let printStr(str,clearReg){
-			let i=-1;
-			repeat !!clearReg r0=0;
-			repeat str..length:send r0 #(0xffff&str[i+=1]);
+		let setUpRegs (){//is used as a macro
+			repeat !reg #reg = 0;
+			repeat !isRegClear: r reg = 0;
 		};
-		let printHexFromMemory(intAddress,clearReg)={//:#([int])=>{@}
-			repeat !!clearReg r0=0;
+		let printStr(str,reg,isRegClear){
+			...run setUpRegs;
+			let i=-1;
+			repeat str..length:send r reg #(0xffff&str[i+=1]);
+		};
+		let printHexFromMemory(intAddress,reg,isRegClear)={//:#([int])=>{@}
+			...run setUpRegs;
 			let int=1;//:%
 			let char=2;//:% & [0x0-0xf]
 			%int=[intAddress];
@@ -564,13 +578,30 @@ def let program{
 				r char=#("0"&0xffff>>4);
 				r int<<4;
 				r char<<=4 +internal;
-				send r0 r char;
-			}
+				send r reg r char;
+			}debugger this..length;
 		};
-		//printStr("\n\c0fmemory used:",{});
-		//printHexFromMemory(counterLabel);
+		//printStr("\n\c0fmemory used:",0);
+		//printHexFromMemory(counterLabel,0);
 		hault;
 		jump->0;
+		repeat 1 {//desplay info
+			let startReg = parse..prototype.newFoo.onCallStart.startReg;
+			def let logData()={call constructor}::{
+				let stackSize;
+				r startReg = 0x800;
+				r startReg -= sp;
+				[stackSize] = r startReg;
+				printStr("\c0f\pa0"...{repeat 16:" "}..."\pa0heap size:",startReg,{});
+				printHexFromMemory(counterLabel,startReg,{});
+				printStr("\pb0"...{repeat 16:" "}..."\pb0stack size:",startReg,{});
+				printHexFromMemory(stackSize,startReg,{});
+				return;
+				0 #def stackSize;
+			};
+			parse..prototype.newFoo.onCallStart..splice(0,0,{logData()});
+			parse..prototype.newFoo.onCallEnd..splice(0,0,{logData()});
+		}
 	};
 	def main;
 	#let counter;
