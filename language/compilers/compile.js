@@ -896,7 +896,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			({index,value}=await contexts.expression({statement,index,scope,includeBrackets:false}));
 			const label=Variable.fromValue(value);
 			if(label){
-				if(state["let"]|state["labelsof"])Object.assign(scope.let.label.labels,label.labels);
+				if(state["let"]|state["labelsof"]){
+					Object.assign(scope.let.label.labels,label.labels);
+					scope.label.prototype??=label.prototype;
+					scope.label.supertype??=label.supertype;
+					scope.label.securityLevel??=label.securityLevel;
+					scope.label.functionPrototype??=label.functionPrototype;
+					scope.label.functionSupertype??=label.functionSupertype;
+					scope.label.functionConstructor??=label.functionConstructor;
+					scope.label.functionSupertype??=label.functionSupertype;
+				}
 				if(state["set"]|state["codeof"])scope.label.code.push(...label.code);
 				if(state["def"]|state["run"]){
 					const source=label.getCode_source();
@@ -1434,6 +1443,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 											case"label"://object,array,function
 												label.labels={...(value.label?.labels??{})};
 												label.code=[...(value.label?.code??[])];
+												label.prototype=value.label.prototype;
+												label.supertype=value.label.supertype;
+												label.securityLevel=value.label.securityLevel;
+												label.functionPrototype=value.label.functionPrototype;
+												label.functionSupertype=value.label.functionSupertype;
+												label.functionConstructor=value.label.functionConstructor;
+												label.functionSupertype=value.label.functionSupertype;
 												break;
 											case"array":
 											label.code=[...value.array];

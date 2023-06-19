@@ -1,10 +1,12 @@
 //TODO: clean this up into a propper library
 #"tptasm";
 {}:>(){}::{}()<:{};
-//import lib"heap.0xmin"};
-def let m_class(class,objectSize,classConstructor,classDeconstructor)={
+
+let m_class(class,objectSize,classConstructor,classDeconstructor)={
 	let errorMsg=#(msg){("missing package: \""...msg..."\"")};
-	repeat!(heap&&heap.malloc&&heap.ref&&heap.unref):throw errorMsg("import lib \"heap.0xmin\"");
+	repeat!(heap&&heap.malloc&&heap.ref&&heap.unref):{
+		throw errorMsg("import lib \"heap.0xmin\"");
+	};
 	//m_class = Class comstructing Macro
 	//class:#Struct,constructor:#(label?,arguments?:any)->{@}
 	let m_class=this..constructor;
@@ -186,7 +188,6 @@ def let m_class(class,objectSize,classConstructor,classDeconstructor)={
 			let block_new = self;
 			self..proto=self..constructor..prototype;
 			let assigner;
-			let output;
 			{
 				let rMemory = heap.malloc.inputs[0];
 				r rMemory = this[¬this..constructor.sizeSymbol];
@@ -200,42 +201,16 @@ def let m_class(class,objectSize,classConstructor,classDeconstructor)={
 					[nextAddress] += r address;
 				};
 				repeat 1 call heap.malloc;
-				#output=rMemory;//:%Object* aka %heap.Page*
 				def assigner;
-				:definer;
-				def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
+				let output=rMemory;//:%Object* aka %heap.Page*
 				this..constructor.setUp(this..constructor.addRef_block,this);
 				call this..constructor.addRef_block.referenceOthers;
+				//assume: this:%
+				repeat ((+this==+this)&&(+this!=+output)):%this=%output;
+				:definer;
+				def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
 			};
-		}::{
-			let ..prototype{
-				let assign(bar){//bar:{@}
-					let block_new = this.block_new;
-					let this=this.this;
-					block_new.assigner<=>(bar || {
-						#let i=this[¬size]-1;
-						repeat argsLen:{
-							[r rMemory+i]=pop;//r arguments.(i);//argument
-							#i=i-1;
-						};
-					});
-				}::{
-					let ..prototype{
-						let static(){//bar:{@}
-							let block_new = this.block_new;
-							let this=this.this;
-							assigner<=>(bar || {
-								#let i=this[¬size]-1;
-								repeat argsLen:{
-									[r rMemory+i]=pop;//r arguments.(i);//argument
-									#i=i-1;
-								};
-							});
-						};
-					};
-				};
-			};
-		};
+		}
 		let ref(){
 			call this..constructor.addRef_block;
 			let reg_this<->this;
@@ -251,6 +226,59 @@ def let m_class(class,objectSize,classConstructor,classDeconstructor)={
 			repeat (+delRefInput!=+reg_this):%delRefInput = %reg_this;
 			call this..constructor.delRef_block;
 		};
+		let assign_fromStack(){//block:{@}
+			let block_new = this.block_new;
+			let this=this.this;
+			block_new.assigner<=>(block || {
+				#let i=this[¬size]-1;
+				let size = this[¬this..constructor.sizeSymbol];
+				repeat this[¬this..constructor.sizeSymbol]:{
+					[r rMemory+i]=pop;//r arguments.(i);//argument
+					#i=i-1;
+				};
+			});
+		}
+		let assign_fromObj(tuple){//tuple:(class() | {@}) & #tree(int)
+			throw "UNFINISHED";
+			let block_new = this.block_new;
+			let this=this.this;
+			let maxRecur = +tuple..flat;
+			let objIndex = -1;
+			let forEach={
+				let: setProperty(property){
+					[this+(objIndex+=1)] = property[0];
+				};
+				let main(){
+					let isObject = obj[i+=1]==obj[i];
+					repeat !isObject setProperty(obj[i]);
+					let labels = obj[i]..labels;
+					repeat (labels..length==0) recur maxRecur code(obj[i]);
+					repeat labels..length recur maxRecur labels(obj[i],labels);
+				};
+				let code(obj)=>{
+					let i=-1;
+					repeat obj..length ...run main;
+				};
+				let label(obj,labels)=>{
+					let i1=-1;
+					let setProperty(){
+						[this+] = property;
+					};
+					repeat labels..length ...(){
+						let i=labels[i1+=1];
+						...run main;
+					};
+				};
+			};
+			block_new.assigner<=>(block || {
+				#let i=this[¬size]-1;
+				let flattend = tuple..flat;
+				repeat argsLen:{
+					[r rMemory+i]=pop;//r arguments.(i);//argument
+					#i=i-1;
+				};
+			});
+		};
 		{
 			//stack to stack
 			#new::(){
@@ -262,9 +290,11 @@ def let m_class(class,objectSize,classConstructor,classDeconstructor)={
 		};
 	};
 };
+...let set m_class;
 repeat 0 {:examples;
 	let Int:>m_class(1);
-	let Vec2(this,x,y)={#def let x=x||0,y=y||0;}:>m_class();
+	let Tripple:>m_class(3);//function is required to assign values using the 'class.static' method.
+	let Vec2(this,x,y)={#def let x:>Int=(x),y = y||0;}:>m_class();
 	let LinkedNode(this,data,next,last)={
 		def let next:>DoubleyLinkedNode.Ref().nullable();
 		def let data=data||{};
@@ -284,27 +314,26 @@ repeat 0 {:examples;
 		let ..prototype{
 			let deref(){
 				let i=-1;
-				debugger this[0]..length;
 				//repeat this..length: this[i+=1].deref();
 			};
 		};
 	};
-	def let point=Vec2.static=((),2,4);
+	import lib "heap.0xmin";
+	def let point=Vec2.static=({},2,4);
 	{
-		let a = Vec2=()<->;
-		let array = m_class()<:()={
-			def let size;
-			def let data;
+		let a = Vec2=()<->heap.regsUsed;
+		let tuple_5 = m_class()<:()={
 			repeat 5 Vec2.Ref().nullable;
-		}::{
-			let push(item,index){
-				[this+index]=item;
-			};
-		}<->10;
-		a.new():>(new)->{def:new;#a<->new.output}();
-		[a+a.x]=2;
-		[a+a.y]=3;
+		}¬()<->a+1;
+		a.new();
+		[%a+a.x]=2;
+		[%a+a.y]=3;
+		tuple_5.new();
+		[%tuple_5+tuple_5[0]] = %a;
+		a.ref();
+		[%a.x]+=3;
 		a.deref();
+		tuple_5.deref();
 	};
 	let Tuple = m_class()<:(this,vals)={
 		#vals=vals||{};

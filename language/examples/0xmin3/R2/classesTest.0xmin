@@ -1,0 +1,12 @@
+let class{
+	let heap{import lib "heap.0xmin"};
+	import lib "R2/class.0xmin";
+};
+import lib "var_const.0xmin";
+repeat 0 let a=class({()={
+	constructor.Ref().nullable()
+}})()<->class.regsUsed;
+debugger class({})..constructor;
+//a.new();
+def var,const,class;
+def class.heap.memory;

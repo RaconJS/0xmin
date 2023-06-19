@@ -13,6 +13,7 @@ void #set:(){//documentation
 			isUsed:@bool;
 			data:@any[];//+page == +page.data
 		};
+		regsUsed:#int & %;
 		malloc:Function(%int length)->%Page*;
 		free:Function(%Page*)->void;
 		clear:Function(%Page*,%Page*?,%Page*?)->void;
@@ -20,7 +21,6 @@ void #set:(){//documentation
 		resize:Function(%Page*,%int16)->%bool|%int16;
 		ref:#(%Page*)->{@};
 		unref:#(%Page*,{@}?,!!label?)->{@};
-		nextRegister:%;
 		memory{
 			@Page;//start page
 			#list of intended actions{
@@ -34,7 +34,7 @@ void #set:(){//documentation
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{
 	#let: free,malloc,clear,memset,resize;//@functions
-	#let nextRegister;//:%
+	#let: regsUsed = 3;//:int & %
 	#let: ref,unref;//#()->{@}
 	#let: memory;
 	//each of the functions has a '.call(...args)' method
