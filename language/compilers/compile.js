@@ -702,7 +702,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
 				}
 				startValue=value??startValue;
-				value??=startValue;
+				//value??=startValue;
 				//startValue=value??startValue;
 				if(!hadStartValue && startValue!=value){
 					console.error(startValue,value)
