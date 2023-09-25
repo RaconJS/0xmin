@@ -114,7 +114,7 @@
 			#def mainLoop;
 			//repeat (16*12):" ";
 			"\pff";
-		}::{
+		}¬::{
 			let callBase=call;
 			let call(reps){
 				def let data=Data();
@@ -217,7 +217,7 @@
 			$set endLoopState=>move;
 			$set endLoop;
 			move=>ans;get;
-		}::{
+		}¬::{
 			1 #def let defaultInput;
 			let baseCall=call;
 			#set call=#(len){

@@ -1,12 +1,284 @@
+#"tptasm";#"table";
+let main(){
+	let trees{repeat string..length: null} :> var();
+	printStr("\c0f\p00heap example:" ... 0);
+	treeHead.new();
+	%tree = %treeHead;
+	{:inisialiseTreesOnHeap;
+		let trees_i;
+		$trees_i => trees;
+		repeat string..length{
+			setVal(tree, "char", strItter());
+			tree.new();
+			[trees_i] = %tree;
+			$trees_i => trees_i 1;
+		};
+		:self;
+		#self[-1]..splice(0,1);//don't need the last `tree.new();`
+	};
+	{:linkNodes;
+		let link(parent, child, intoIndex){
+			let a = parent;
+			let b = child;
+			let tree_a;
+			let tree_b;
+			virtual{
+				ram => trees;
+				repeat a:ram => 1;
+				$tree_a;
+				ram => trees;
+				repeat b:ram => 1;
+				$tree_b;
+			};
+			let reg_a <-> temp1;
+			let reg_b <-> temp2;
+			%reg_a = [tree_a];
+			%reg_b = [tree_b];
+			[%reg_a + (intoIndex + 1)] = %reg_b;
+		};
+		link(0, 1, 0);//h/e
+		link(0, 2, 0);//l
+			link(2, 3, 0);//l
+				link(3, 4, 0);//o
+			link(2, 5, 0);//" "
+		link(0, 6, 0);//w
+			link(6, 7, 0);//o
+			link(6, 8, 0);//r
+				link(8, 9, 0);//l
+			link(6, 10, 0);//d
+		#(){
+			"h"::{
+				"e";
+				"l"::{
+					"l"::{
+						"o";
+					};
+				};
+				"w"::{
+					"o";
+					"r"::{
+						"l";
+					};
+					"d";
+				}
+			};
+		};
+	};
+	{:unrefTrees;
+		let trees_i;
+		$trees_i => trees;
+		repeat (trees..length&&1):{
+			%tree = [trees_i];
+			tree.deref();
+			$trees_i => trees_i 1;
+		};
+	};
+	{:extraHeapUse;
+		r0 = 40;
+		call class.malloc;
+	};
+	{
+		let startStack:>var(0);
+		[startStack] = sp;
+		//[startStack] += 1;
+		%displayTree.outputs.foo = var()<:{
+			let tree = tree<->displayTree.outputs.foo.input;
+			let regState = RegState(displayTree.outputs.foo.regState);
+			let const_0 = regState();
+			let indent = regState();
+			%indent = [startStack];
+			%indent -= sp;
+			%const_0 = 0;
+			%indent >>= 1;
+			send %const_0 "\n";
+			send %const_0 "A";
+			let loop;
+			jump -> loop..return if == 0;
+			def:loop{
+				send %const_0 "|";
+				%indent -= 1;
+				jump -> loop if > 0;
+			};
+			send %const_0 [%tree + tree.char];
+			delete loop;
+			return;
+		};
+	};
+	call displayTree;
+};
+let RegState(regState)={
+	let regsLen = 14;
+	()={
+		#return = regsFree[""...(¬regsFree..labels ¬ [0])].use();
+		repeat !return throw "out of registers";
+	};
+	let regsFree;
+	let regsUsed;
+	#{
+		let i=-1;
+		repeat regsLen:def (¬+(i += 1)) :: {
+			let free(){
+				repeat !regsFree["" ... +..this] {
+					let regsFree["" ... +..this] = ..this;
+					delete regsUsed["" ... +..this];
+				};
+				#return = ..this;
+			};
+			let use(){
+				repeat regsFree["" ... +..this] {
+					delete regsFree["" ... +..this];
+					let regsUsed["" ... +..this] = ..this;
+				};
+				#return = ..this;
+			};
+			#free();
+		};
+	};
+	#use(regState);
+}::{
+	let forEachInput(regState,foo){
+		//regState: (RegState|regsUsed:int[]|int)?
+		repeat (regState..constructor == constructor): regState = regState.regsUsed;
+		let i = -1;
+		repeat (regState..constructor != constructor && regState)
+			repeat regState..length:...foo;
+		#return = this;
+	};
+	let ..prototype{let
+		checkFree(regState){
+			let newState;
+			repeat !this.isFree(regState):throw "regState missmatch" regState;
+		},
+		isFree(regState){//returns true if regState.isUsed is a subset of ..this.regsFree .
+			let return = this..constructor(this);
+			let i = -1;
+			repeat (return && regState.regsUsed..length):{
+				return.use()
+				repeat this.freeRegs..indexOf(regState.regsUsed[i += 1]) == -1;
+			};
+		},
+		use(regState){
+			let foo = #(){#this.regsFree["" ... regState[i]].use()};
+			...forEachInput;
+		},
+		free(regState){
+			let foo = #(){#this.regsUsed["" ... regState[i]].free()};
+			...forEachInput;
+		};
+	};
+};
 let class{
-	let heap{import lib "heap.0xmin"};
+	import lib "heap.0xmin";
 	import lib "R2/class.0xmin";
 };
 import lib "var_const.0xmin";
-repeat 0 let a=class({()={
-	constructor.Ref().nullable()
-}})()<->class.regsUsed;
-debugger class({})..constructor;
-//a.new();
-def var,const,class;
-def class.heap.memory;
+let setVal(obj, prop, val) => {
+	%obj += obj.(""...prop);
+	[%obj] = val;
+	%obj -= obj.(""...prop);
+};
+let setIndex(obj, index, val) => {
+	%obj += index;
+	[%obj] = val;
+	%obj -= index;
+};
+let const_0=0;//:%0
+let printStr(str){
+	r const_0 = 0;
+	let i = -1;
+	repeat str..length send r0 str.(i += 1);
+};
+let waitForNextPress(){
+	printStr("press any key");
+	port r const_0;
+	port r const_0 ?;	
+};
+let string = "hello world!";
+let strItter = #() = {#;
+	return = string[constructor.n];
+	constructor.n += 1;
+}::{let n=0};
+let treeHead = class(() = {
+	0 #def let char;
+	constructor.Ref().nullable();
+	constructor.Ref().nullable();
+	constructor.Ref().nullable();
+})() <-> class.regsUsed;
+let tree <=> treeHead;
+let temp1 <-> treeHead+1;
+let temp2 <-> treeHead+2;
+#tree <-> treeHead+1;
+//UNFINISHED: does displayTree does not work entirly
+let displayTree = #(head){
+	let outputs{
+		let foo{
+			let input;//assigned later;
+			let regState = RegState().use({
+				0; 1; 2; 3;//
+				4; 5; 6; 7;//used by this function
+			}).free(4);
+		};
+	};
+	//head:Tree & %[]heap*,foo:%{@}*
+	push 0;//end of stack
+	let Struct_regToStack(data) = {
+		...let set data;
+		#data <=> this;
+	} :: {
+		let ..prototype{
+			let push(){
+				let i = -1;
+				repeat this..length @push %this.(i+=1);
+			};
+			let pop(){
+				let i = -1;
+				repeat this..length @pop %this.(i+=1);
+			};
+		};
+	};
+	let foo <-> head + 1;
+	#outputs.foo <-> foo;
+	let data{
+		let tree,i;
+		#tree <=> head;
+		#def tree <-> head + 2;
+		#def i <-> head + 3;
+	} :> Struct_regToStack = ();
+	let temp <-> head + 4;
+	#outputs.foo.input <-> data.tree;
+	%data.tree = %head;
+	%data.i = 1;
+	def: {:recursion;
+		...labelsof data;
+		def let loop{
+			call %foo;
+			%temp = [%tree + %i];//tree: %(null|(Tree&{@}*))
+			jump -> ..return if == 0;
+			data.push();//if not null then search this one
+			%tree = %temp;
+			%i = 1;
+			jump -> loop;
+		};
+		#def data.pop()<=>{
+			%i = pop;
+			jump -> recursion..return if == 0;
+			%tree = pop;
+		};
+		%i += 1;
+		let ittersLeft <-> temp;
+		%ittersLeft = tree..length;
+		%ittersLeft -= %i;
+		delete ittersLeft;
+		jump -> loop;
+	};
+	return;
+}(tree);
+#var()<:displayTree;
+main();
+{
+	def let end;
+	hault;
+	jump -> end;
+	def var,const,class;
+	def class.heap.memory;
+};
