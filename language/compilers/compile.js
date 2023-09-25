@@ -689,7 +689,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			},
 			//short expression
 			async main_assembly_expression_short({statement,index,scope,startValue=undefined}){//Value=>Value|HiddenLine
-				let word=statement[index];//'label' ==> 'label+1' or 'label => label+2'
+				let word=statement[index];//'' or 'label' ==> 'label+1' or 'label => label+2'
 				let value;
 				let hadStartValue=startValue!=undefined;
 				if(word=="["){//UNFINISHED: needs to be redone
@@ -701,6 +701,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}else{
 					({value,index}=await contexts.expression_short({statement,index,scope,includeBrackets:false}));
 				}
+				startValue=value??startValue;
+				value??=startValue;
 				//startValue=value??startValue;
 				if(!hadStartValue && startValue!=value){
 					console.error(startValue,value)
@@ -1441,15 +1443,16 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 									if(word=="<=>"){//set object
 										switch (value.type){
 											case"label"://object,array,function
+												if(!value.label)throw Error(throwError({statement,index,scope},"???"))
 												label.labels={...(value.label?.labels??{})};
 												label.code=[...(value.label?.code??[])];
-												label.prototype=value.label.prototype;
-												label.supertype=value.label.supertype;
-												label.securityLevel=value.label.securityLevel;
-												label.functionPrototype=value.label.functionPrototype;
-												label.functionSupertype=value.label.functionSupertype;
-												label.functionConstructor=value.label.functionConstructor;
-												label.functionSupertype=value.label.functionSupertype;
+												label.prototype=value.label?.prototype;
+												label.supertype=value.label?.supertype;
+												label.securityLevel=value.label?.securityLevel;
+												label.functionPrototype=value.label?.functionPrototype;
+												label.functionSupertype=value.label?.functionSupertype;
+												label.functionConstructor=value.label?.functionConstructor;
+												label.functionSupertype=value.label?.functionSupertype;
 												break;
 											case"array":
 											label.code=[...value.array];
