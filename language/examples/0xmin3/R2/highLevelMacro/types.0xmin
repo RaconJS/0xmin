@@ -1,0 +1,187 @@
+#"tptasm";
+#"ZASM3: 12023/3/5";
+let copy(ref,data){
+	#ref<=>data;
+	#ref<->data;
+	#ref..proto=data..proto;
+	#ref..super=data..super;
+	#ref..prototype=data..prototype;
+	#ref..supertype=data..supertype;
+	#ref..constructor=data..constructor;
+	#return = ref;
+};
+let IF(condision,then,else){//...(IF(x==2)<:(){}<:(){});
+	repeat !!condision:#return = then;
+	repeat !condision:#return = else;
+};
+let Type(label,data) = {#;
+	let newType=label;
+	repeat !!data:#copy(newType,data);
+	repeat !newType..prototype:let newType..prototype;
+	newType..prototype..proto = constructor.prototype;
+	newType::(label){#;
+		#return=label=label||this;
+		#let set return..proto = constructor..prototype;
+		#let set return..super = constructor..supertype;
+		#let set return..constructor = constructor..constructor;
+		let return[¬constructor];
+		//return = copy(label,this);
+	};
+	#return = newType;
+}::{:Type;
+	#let prototype{
+		...let{
+			let size=1;
+			let constuct(){#return = constructor;}::{};
+			let deconstruct(){#return = constructor;}::{};
+		};
+		let static:>Type()<:(label){
+			#return=label=label||this;
+		}¬::{
+			let ..prototype{
+				let:new(){
+					#memory.static.var(this);
+				};
+			};
+		};
+		let register:>Type()<:(label){
+			#return=label=label||this;
+
+		}¬::{
+			let ..prototype{
+				let:new(regState){
+					repeat (this.size==1):#this<->regState.next();
+				};
+				let array:>Type()<:(){};
+				#array::{
+					let ..prototype{
+						#let ..proto = array..proto;
+					};
+				};
+			};
+		};
+		let heap:>Type()<:(label){
+			#return=label=label||this;
+			#label{
+			}
+		}¬::{
+			let ..prototype{
+				let toReg(this,regNum){
+					let block;
+					...IF(this[¬register],//can't have '%'
+						(//with '%'
+							IF(this[¬stack],
+								(){//:[sp+%]
+									#block={r regNum = [sp+r this]};
+								}
+							)
+							<:IF(this[¬heap]||this.[¬static],
+								(){//:[%]
+									#block={r regNum = [r this]};
+								}
+							)
+							<:(){//:%
+								#block={r regNum = r this};
+							}
+						),
+						(//without '%'
+							IF(this[¬stack],
+								(){//:[sp+#]
+									#block={r regNum = [sp+(this-this.stackState)]};
+								},
+							)
+							<:IF(this[¬static]||this[¬heap],
+								(){//:[+#] on (heap|static)
+									#block={r regNum = [this]};
+								},
+							)
+							<:(){//:+#
+								#block={r regNum = this};	
+							}
+
+						)
+					);
+					repeat this.pointerLevel:#block::{r regNum = [r regNum]};
+					def block;
+				};
+				let: new(){
+					//:#->@()->r0 & heap.Page & [%0] on heap
+					r0 = this.size;
+					call memory.heap.malloc;
+					call this.constuct;
+					let out = 0;//:%
+				};
+				let: delete(){
+					toReg(this,0);
+					call this.deconstuct;
+					call memory.heap.free;
+				};
+				let resize(getSize){//:#(#(%)->{@})->{}
+					toReg(this,0);
+					getSize(1);
+					call memory.heap.resize;
+				};
+			}
+		};
+	};
+	let memory{
+		def let static{
+			{
+				def let vars;
+				let var(obj){//(x:lbl|{@}?)->x|@{}
+					repeat !obj:#obj={};
+					#vars{def obj};
+					#return=obj;
+				}::{
+					let int(obj){//({int}?)->x|{0}
+						repeat !obj:#obj=0;
+						#vars{def ¬+obj};
+						#return=obj;
+					};
+				};
+				let ..this.var=var,..this.int=int;
+			};
+			{
+				def let consts;
+				let const(obj){//#(x:#{...int[]}|)->{int}&{@}
+					#return=obj;
+					repeat !obj..defs..length:...(){//if obj isn't defined
+						let found=¬;
+						let i=0;
+						repeat (!found&&consts..length):{
+							let isSame;
+							let j=0;
+							let objB=consts[i];
+							repeat (!!isSame&&int..length):{
+								repeat(+objB[j]!=+obj[j]):#delete isSame;
+								#j+=1;
+							};
+							repeat!!isSame:#found=return=objB;
+							#i+=1;
+						};
+						repeat !found:{
+							obj
+							return = obj;
+						};
+					};
+				}::{
+					let int(int){
+
+					};
+				};
+				let ..this.const = const;
+			};
+		};
+		def let heap{import lib "heap.0xmin"};
+		def let stack{};
+	};
+};
+let int:>Type()<:{}¬::{
+	#let ..prototype{
+		let size=1;
+		let value;
+	};
+};
+let vec2;
+let a:>int().heap();
+let pos=vec2(2,5);
