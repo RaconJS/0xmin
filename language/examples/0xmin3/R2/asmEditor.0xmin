@@ -100,12 +100,13 @@ let main(){
 			0#def let start;
 			0#def let length;
 			0#def let maxLength;
-			0#def let index;//:int; [[program]+[index]]
-			0#def let lineNumber;//[0-11]
+			0#def let index;//:int; [[program]+[index]+[lineNumber]]
+			0#def let lineNumber;//[0-11] //line on page
 			def let read{//assigned later
 				//fills the screen with the code read from memory.
 				let colour{
 					let default = +"\c0f";
+					let currentLine = +"\c0f";//UNUSED
 					let page0 = +"\c07";
 					let page1 = +"\c87";
 				};
@@ -124,6 +125,12 @@ let main(){
 			};
 			//heap.malloc.call(0);
 			[program] = r heap.malloc.outputs.(0);
+			{:populate;
+				[r heap.malloc.outputs.(0)+0]=0x1;
+				[r heap.malloc.outputs.(0)+1]=0x2;
+				[r heap.malloc.outputs.(0)+2]=0x4;
+				[r heap.malloc.outputs.(0)+3]=0x8;
+			};
 			jump->fail.outOfMemory if == 0;
 			[program.length]=0;
 			r0 = 0;
@@ -202,11 +209,11 @@ let main(){
 				call commandBar.clear;
 				send r const_0 program.read.colour.default;
 			};
-			let onNoInput,onNumberInput;
+			let onNoInput,onNumberInput,onCharCommand;
 			$onNoInput=>mainLoop;
 			def:{}::{:handleNumbers;
 				r temp-="F";
-				jump->onNoInput if>0;
+				jump->onCharCommand if>0;
 				let numberHashMap{
 					let i=-1;
 					repeat 10:@#(+(i+=1));
@@ -218,44 +225,87 @@ let main(){
 				r temp = [numberHashMap + r temp];
 				jump->onNumberInput if>=0;
 			};
-			{:switch;
-				r temp = r inChar;
-				let lastChar(char){
-					#return = lastChar^char;
-					#lastChar<->char;
+			let printMemoryCell{def let block{};let editAddress;return}:>var();//assigned later
+			{:commands;
+				let Command(){
+					let lastChar(char){
+						#return = lastChar^char;
+						#lastChar<->char;
+					};
+					let command(key,name,do){
+						//key:string,name:#string,do:{@}
+						r temp^=lastChar(+key[0]);
+						jump->var()<:{//assert: temp is a free register here;
+							let textPosCol=commandBar.pos...commandBar.textColour;
+							let emptyPosCol=commandBar.pos...commandBar.emptyColour;
+							print(textPosCol...name,const_0);
+							[commandBar.needsClearing]=1;
+							def do;
+							{
+								call commandBar.clear;
+								send r const_0 program.read.colour.default;
+								jump->mainLoop;
+							};
+						}if==0;
+					};
+					r temp = r inChar;
 				};
-				let command(key,name,do){
-					//key:string,name:#string,do:{@}
-					r temp^=lastChar(+key[0]);
-					jump->var()<:{
-						let textPosCol=commandBar.pos...commandBar.textColour;
-						let emptyPosCol=commandBar.pos...commandBar.emptyColour;
-						print(textPosCol...name,const_0);
-						[commandBar.needsClearing]=1;
-						def do;
-						{
-							call commandBar.clear;
-							send r const_0 program.read.colour.default;
-							jump->mainLoop;
+				{:switch;
+					...Command;
+					command("\t","exit")<:{return}::{#..this..splice(-1,1)};//note: ..splice(-1,1) removes the last element from the command instance.
+					command({:enter;13},"new line")<:{
+						let onNumberInput.newLine;
+						call onNumberInput.newLine;
+					};
+					command({:backSpace;8},"back")<:{
+						let onNumberInput.printLine;
+						call onNumberInput.printLine;
+						r curserPosChar-=0x10;
+						[program.lineNumber]-=1;
+						:block;
+						jump-> block..return if>=0;
+						[program.lineNumber]+=screenSize.y;
+						[program.index]-=screenSize.y;
+						repeat 0 call program.read;
+						r curserPosChar=#(screenSize.y-1<<4|"\p00");
+						//call onNumberInput.newLine;
+					};
+					jump->mainLoop;
+				};
+				def onCharCommand{//assert input char was a character above the ascii character "F"
+					...Command;
+					let helpCommand;
+					command("h","help")<:{call helpCommand};
+					command("H","help")<:{call helpCommand};
+					#helpCommand{
+						let pressAnyKeyToContinue(){
+							//commandBar.pos...commandBar.textColour...
+							print("press any key");
+							def:{:loop;//note: 'loop' refers to the block scope.
+								wait r const_0;
+								jump->loop if sign;
+							};
 						};
-					}if==0;
-				};
-				command("\t","exit")<:{return}::{#..this..splice(-1,1)};
-				command({:enter;13},"new line")<:{
-					let onNumberInput.newLine;
-					call onNumberInput.newLine;
-				};
-				command({:backSpace;8},"back")<:{
-					call onNumberInput.newLine;
-					[program.lineNumber]-=3;
-					call onNumberInput.newLine;
+						print("\p00"...program.read.colour.default..."commands"...{"\n"});//there is a but with contactnation of "\n"
+						     //0123456789ABCDEF
+						print("0-9 A-F: text\n");
+						print("enter: next line");
+						print("delete:last line");
+						print("tab: exit editor");
+						print("h/H: help menu\n");
+						pressAnyKeyToContinue();
+						call clearScreen;
+						//assume: the command will redraw the command bar.
+						return;
+					}:>var();
+					jump->mainLoop;
 				};
 			};
 			def onNumberInput{
 				push mainLoop;
 					send r const_0 r inChar;
 					let number{
-						let buffer16:>reg();
+						let buffer16:>reg();//is also lowBits16
 						let highBits16:>reg();
 						let u8<->temp;
 					};
@@ -269,34 +319,52 @@ let main(){
 						r state.(1)-=1;
 						jump->var()<:{//set hight bits
 							r number.highBits16 = r number.buffer16;
+							r number.buffer16 = 0;
 							jump->mainLoop;
 						}if>0;
-						{//set low bits
-							//combine highBits16 and buffer16; then write to memory
-							let editAddress<->temp;//:%
-							editAddress:>getEditAddress();
-							mask = r number.highBits16;
-							[r editAddress] = r number.buffer16;
-							mask = 0;
-							r number.highBits16=0;
-							r number.buffer16=0;
-						};
 						push mainLoop;
 						def newLine;
-						let printMemoryCell{def let block{};let editAddress;return}:>var();//assigned later
 						{:newLine;//go to next line
-							{
-								let pos<->inChar,inChar=¬;//:char
-								r pos = [lineNumber];
-								r pos <<=4;
-								r pos |="\p00";//x:0,y:lineNumber
-								send r const_0 r pos;
-								send r const_0 program.read.colour.page0;
-								let editAddress=printMemoryCell.editAddress;
-								editAddress:>getEditAddress();
-								call printMemoryCell;
-								send r const_0 program.read.colour.default;
-							};
+							#printLine{
+								def let writeToMemory{
+									#def let fillInGaps{//note: '{#def let x}' is the same as '{def let x}'
+										r state.(0)<<=2;//*4 bits
+										r number.buffer16<<=r state.(0);
+										r state.(1)-=1;//1*4 bits
+										jump->..return if==0;
+										r state.(0)-=#(4<<2);
+										jump->writeToMemory..return if ==0;//if no values typed then don't edit the memory
+										r number.highBits16=r number.buffer16;
+										r number.buffer16=0;
+										//assume: state is reset before it is read again;
+									};
+									{//set low bits and writes the whole line to memory
+										//combine highBits16 and buffer16; then write to memory
+										let editAddress<->temp;//:%
+										editAddress:>getEditAddress();
+										mask = r number.highBits16;
+										[r editAddress] = r number.buffer16;
+										mask = 0;
+										r number.highBits16=0;
+										r number.buffer16=0;
+									};
+								};
+								def let printLine{:printLine;
+									let pos<->inChar,inChar=¬;//:char
+									r pos = [lineNumber];
+									r pos <<=4;
+									r pos |="\p00";//x:0,y:lineNumber
+									send r const_0 r pos;
+									send r const_0 program.read.colour.page0;
+									let editAddress=printMemoryCell.editAddress;
+									editAddress:>getEditAddress();
+									call printMemoryCell;
+									send r const_0 program.read.colour.default;
+								};
+								call resetState;
+								return;
+							}:>var();
+							call printLine;
 							[lineNumber] += 1;
 							let lineNumberReg = temp;
 							r lineNumberReg = [lineNumber];
@@ -308,23 +376,28 @@ let main(){
 							};
 							r lineNumberReg-=screenSize.y;
 							let next;
+							let updatePage;
 							jump -> var()<:{//handle page overflow
+								:self;
+								#updatePage = self;
+								delete self;
 								r lineNumberReg = 0;
 								[program.index]+=screenSize.y;
+								[lineNumber]=0;
 								call #(program.read{
 									let editAddress<->number.buffer16;//assume: number is free;
 									editAddress:>getEditAddress();
 									r const_0=0;
 									let i<->state[0];
 									let printHalf(posChar)={
-										let maxI = screenSize.y-1;
+										let maxI = screenSize.y-1;//for(let i = x.length; i >= 0; i--)
 										let dataPos = {let x=0,y=0};
 										r i = maxI;
 										let posCharReg<->inChar;
 										r posCharReg = #(dataPos.y<<4|posChar);
 										def:{:forLoop;
 											send r const_0 r posCharReg;
-											repeat 1 $def printMemoryCell.block;//not sure what changed when '$def' is added, but it results in more code
+											repeat 1 $def printMemoryCell.block;//BUG: '$:' seems to only takes in short expression where as '$def:' takes in a long expression
 											r editAddress+=1;
 											{:next;
 												r posCharReg += #(1<<4);
@@ -349,7 +422,6 @@ let main(){
 												#printMemoryCell.editAddress<->editAddress;
 												{
 													temp:>readHigh(editAddress);
-
 													printHexChar4;//repeat 4 printHexChar;
 												};{
 													r temp = [r editAddress];
@@ -370,7 +442,7 @@ let main(){
 							}if==0;
 							def next;delete next;
 							$#(curserToCurrentLine{//go to next line
-								let pos<->state[0],state=¬;//:char
+								let pos<->temp,temp=¬;//:char
 								r pos = [lineNumber];
 								r pos <<=4;
 								r pos |="\p00";//x:0,y:lineNumber

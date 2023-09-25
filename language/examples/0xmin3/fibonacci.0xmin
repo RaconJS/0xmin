@@ -1,4 +1,4 @@
-#"text";#"len";
+#"0xmin";#"len";
 //NEEDS_TESTING
 //fibonacci sequence
 //does not work. Also works differently on emulator and in TPT

@@ -1,3 +1,4 @@
+#"0xmin";
 let for(start,condision,next,do){
 	#let return;
 	def start;
