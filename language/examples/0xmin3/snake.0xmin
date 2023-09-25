@@ -70,7 +70,7 @@
 		};
 		#let jumpGate1;
 		{
-			let callList(list,setUp){
+			let callList(list,setUp){//`list[i]()` ; A type of branch function
 				move=>const(0x10);
 				red;
 				move=>const(+{jump 0}..compile[0]);
@@ -181,15 +181,16 @@
 								$move=>0xmin;
 								def let clearFlag{if;null};
 								!jump->this.if0;
+								$move=>..state.move;
 							};
 						};
 						def let tailVar=jumpVar();
 						move=>const(0x10000);or;
 						move=>const(0x100f0);and;//alu = move grid=>grid[tail.y] 
 						move=>const(0x1000);
-						let do;
+						let do;//BUG FOUND HERE
 						set jump+3;
-						or;
+						or;//alu = move grid<=grid[tail.y]
 						set jump+3;
 						null;$move=>0xmin;
 						jump->do;
