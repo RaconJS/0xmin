@@ -1,0 +1,82 @@
+//15:18 20/9/23
+//this is the first program that heavilly uses the paradime where the location off the move pointer is unknown
+#"0xmin";#"table";
+let cellStruct{
+	virtual #def:()->{
+		ram=>0xmin;
+		0#def let last;
+		0#def let this;
+		0#def let next;
+	}();
+	#..compile;
+};
+let cellEnd = 0x20000000;
+let loop{
+	//store: stores the alu in a 
+	let storeVar(){//get/set from alu <-> []ram
+		//: #() -> {set: @(alu)->mutate []ram, get: @[]ram-> mutate alu} 
+		let get,set;//note since the 'get' comes first, the compiler treats 'set' as a label instead of a keyword
+		def: set{
+				set jump+3;
+				jump->..return;
+			$move=>get..state.move #def let getter;
+				if;//if false ; reads and ignores the next line 'value'
+				null;
+				get jump-1;
+				jump->get..return;
+			$move=>..state.move;//mechanic note: '..state' refers to the '#:set{...}' label
+		};
+		#get{
+			if;
+			null;
+			jump->set.getter;
+		};
+	};
+	let floatingConst(value){
+		def let get{
+			#value = value || 0;
+			if;
+			null;
+			if;
+			value;
+			get jump -1;
+	 	};
+	};
+	let setAndStore(getter,extraFloatingVar){//alu => *move, *move=>getter
+		get;
+		def let temp = storeVar();
+		repeat !!extraFloatingVar: def extraFloatingVar = storeVar();
+		getter;
+		set;//assert: *move => getter's value;
+		temp.get;//assert: alu => original *move;
+	};
+	let replace_move_const(const){
+		setAndStore(floatingConst(const));
+	};
+	{
+		...labelsof cellStruct;
+		$move=>0xmin;
+		$move=>last;
+		let oldVals{//:storeVar[]
+			let last;
+			let this;
+			let next;
+		};
+		replace_move_const(0x10000000,oldVals.last);
+		red;
+		move=>next;
+		replace_move_const(0x2,oldVals.next);
+		or;
+	};
+};
+def loop;
+//rule110
+// 00 01 11 10 AC
+//0 0  1  1  0
+//1 1  1  0  1
+//B
+//
+//B xor C
+// 00 01 11 10 AC
+//0 0  1  1  0
+//1 1  0  0  1

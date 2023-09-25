@@ -1,0 +1,8 @@
+#"code";
+let foo(v){
+	bar(v)[-1]
+};//:v>v a>a
+let bar(v){v()};
+a()<:b ¬()<:c ¬()<:d;
+{...code}[-1];//{...code}
+let a = {$;...code};//()

@@ -1,0 +1,33 @@
+#"0xmin";
+let floatMove{
+	let var(label)={
+		let call(start,end)={
+			(end){
+				:block;
+				if;
+				null;
+				jump->end;
+				set jump +3;
+				null;if;null;
+				if;get;
+				jump->start;
+			}
+		};
+		let get_start, set_start;
+		let get_end, set_end;
+		let: get, set;
+		def get_start;
+		if;
+		null;
+		jump 2;
+		def set_start;
+		set jump +3;
+		jump->..return;
+		jump #def set_end;
+		if;//false
+		0 #def label;
+		get jump -1;
+		jump #def get_end;
+	};
+	let set
+};
