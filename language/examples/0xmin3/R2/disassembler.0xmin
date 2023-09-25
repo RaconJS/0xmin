@@ -1,0 +1,159 @@
+#"tptasm";#"table";
+//
+//@: operation arg1 arg2
+//arg: {has []?;has %?;has int}
+import lib "var_const.0xmin";
+let address = 0;//:%@*
+let valueBlueBits = 1;
+let valueRedBits = 2;//:%@
+let data {
+	0#def let valueBlueBits;
+	0#def let valueRedBits;
+
+	0#def let oper;
+	0#def let R1;
+	0#def let R2;
+	0#def let RB;
+	0#def let I1;
+	0#def let I2;
+	0#def let opandType;
+
+	0#def let operType;//:enum(P,SPS)
+	def let fromRam{//[ ]
+		0#def let isFromRam;
+		0#def let arg1;
+		0#def let has_addOrSub;//[X +/- Y]
+		0#def let isSub;//- Y
+		0#def let arg1;//X
+		0#def let arg2;//Y
+	};
+	//mov P S
+	0#def let arg1;//P
+	0#def let arg2;//S
+}:>var();
+//0x00800000 -> '[X +/- Y]'
+//0x00008000 -> '- Y'
+//
+//code, string, r1Shift, r2Shift, rBShift, i1Shift, i2Shift
+let opandTypeHashTable{//:({arg1;arg2;arg1InRam} & []data*[])[]
+	...codeof{
+		...labelsof data;
+		{@;R1;R2;0};//0: R1 R2
+		{@;R1;fromRam;R2};//1: R1 [R2]
+		{@;R1;I1;0};//2: R1 U16_I1
+		{@;R1;fromRam;I1};//3: R1 [U16_I1]
+		{@;fromRam;R2;R1};//4: [R1] R2
+		{@;fromRam;R2;I1};//5: [U16_I1] R2
+		{@;fromRam;I1;R1};//6: [R1] U16_I1
+		{@;fromRam;I2;I1};//7: [U16_I1] U4_I2
+		//note: 8-F are the same except `1:X [Y]` -> `9:X [RB+Y]`
+	};
+}:>var();
+let Opcode(name,P_S_PS){
+	let i=-1;
+	repeat name..length send name[i+=1];
+	jump -> P_S_PS;
+	repeat (4-name..length) null;
+};
+let a;
+let opcodeTypeHashTable{
+	//e.g. 'P += S'
+	//map(opcode => {enum(P,S,PS);@[4];@return})
+}:>var();
+let jumpHashTable:>var();
+let opcodeNameMap{let
+	add = "+=", 
+	adds = "+",
+}:>var();
+let opcodeTypes{
+	def let P{};
+	def let S{};
+	def let PS{};
+};
+let opcodes = #(){
+	adc 	PS 	add with carry 	yes 	1 	0x25000000;
+	adcs 	PS 	non-storing add with carry 	yes 	1 	0x2D000000;
+	add 	PS 	add 	yes 	1 	0x24000000;
+	adds 	PS 	non-storing add 	yes 	1 	0x2C000000;
+	and 	PS 	bitwise AND 	yes 	1 	0x21000000;
+	ands 	PS 	non-storing bitwise AND 	yes 	1 	0x29000000;
+	bump 	P 	send attention request 	no 	1 	0x38000000;
+	call 	S 	call subroutine 	no 	2 	0x3E000000;
+	cmb 	PS 	compare with borrow 	yes 	1 	0x2F000000;
+	cmp 	PS 	compare 	yes 	1 	0x2E000000;
+	hlt 	0 	halt execution 	no 	1 	0x30000000;
+	ja 	S 	jump if above 	no 	1 	0x3100000F;
+	jae 	S 	jump if above or equal 	no 	1 	0x31000003;
+	jb 	S 	jump if below 	no 	1 	0x31000002;
+	jbe 	S 	jump if below or equal 	no 	1 	0x3100000E;
+	jc 	S 	jump if carry set 	no 	1 	0x31000002;
+	je 	S 	jump if equal 	no 	1 	0x31000008;
+	jg 	S 	jump if greater 	no 	1 	0x3100000B;
+	jge 	S 	jump if greater or equal 	no 	1 	0x3100000D;
+	jl 	S 	jump if lower 	no 	1 	0x3100000C;
+	jle 	S 	jump if lower or equal 	no 	1 	0x3100000A;
+	jmp 	S 	jump unconditionally 	no 	1 	0x31000000;
+	jn 	S 	jump never 	no 	1 	0x31000001;
+	jna 	S 	jump if not above 	no 	1 	0x3100000E;
+	jnae 	S 	jump if not above or equal 	no 	1 	0x31000002;
+	jnb 	S 	jump if not below 	no 	1 	0x31000003;
+	jnbe 	S 	jump if not below or equal 	no 	1 	0x3100000F;
+	jnc 	S 	jump if carry unset 	no 	1 	0x31000003;
+	jne 	S 	jump if not equal 	no 	1 	0x31000009;
+	jng 	S 	jump if not greater 	no 	1 	0x3100000A;
+	jnge 	S 	jump if not greater or equal 	no 	1 	0x3100000C;
+	jnl 	S 	jump if not lower 	no 	1 	0x3100000D;
+	jnle 	S 	jump if not lower or equal 	no 	1 	0x3100000B;
+	jno 	S 	jump if overflow unset 	no 	1 	0x31000005;
+	jns 	S 	jump if sign unset 	no 	1 	0x31000007;
+	jnz 	S 	jump if not zero 	no 	1 	0x31000009;
+	jo 	S 	jump if overflow set 	no 	1 	0x31000004;
+	js 	S 	jump if sign set 	no 	1 	0x31000006;
+	jz 	S 	jump if zero 	no 	1 	0x31000008;
+	mov 	PS 	copy value 	yes 	1 	0x20000000;
+	nop 	0 	do nothing 	no 	1 	0x31000001;
+	or 	PS 	bitwise OR 	yes 	1 	0x22000000;
+	ors 	PS 	non-storing bitwise OR 	yes 	1 	0x2A000000;
+	pop 	P 	pop from stack 	yes 	2 	0x3D000000;
+	push 	S 	push to stack 	yes 	2 	0x3C000000;
+	recv 	PS 	check for raw data 	yes 	1 	0x3B000000;
+	ret 	0 	return from subroutine 	no 	2 	0x3F000000;
+	rol 	PS 	rotate left 	yes 	1 	0x32000000;
+	ror 	PS 	rotate right 	yes 	1 	0x33000000;
+	sbb 	PS 	subtract with borrow 	yes 	1 	0x27000000;
+	sbbs 	PS 	compare with borrow 	yes 	1 	0x2F000000;
+	send 	PS 	send raw data 	no 	1 	0x3A000000;
+	shl 	PS 	shift left 	yes 	1 	0x34000000;
+	scl 	PS 	chained shift left 	yes 	1 	0x36000000;
+	shr 	PS 	shift right 	yes 	1 	0x35000000;
+	scr 	PS 	chained shift right 	yes 	1 	0x37000000;
+	sub 	PS 	subtract 	yes 	1 	0x26000000;
+	subs 	PS 	compare 	yes 	1 	0x2E000000;
+	swm 	S 	set write mask 	yes 	1 	0x28000000;
+	test 	PS 	non-storing bitwise AND 	yes 	1 	0x29000000;
+	wait 	P 	check for attention request 	yes 	1 	0x39000000;
+	xor 	PS 	bitwise XOR 	yes 	1 	0x23000000;
+	xors 	PS 	non-storing bitwise XOR 	yes 	1 	0x2B000000;
+}[0]:>(opcodes){
+	let i = -1, opcode;
+	let jumpOpcode = Opcode("",{
+		:chooseJumpType;
+		r0 = [data.valueBlueBits];
+		r0 &= 0xf;
+		r0 += jumpHashTable;
+		jump -> r0;
+	});
+	repeat a..length:...codeof{
+		let type = ""...(opcode = opcodes[i+=1])[1];//"P", "S", "PS"
+		let opcode = Opcode(opcodeNameMap[""...opcode[0]]||(""...opcode[0]),[""...type]);
+		let isJump = opcode.name[0] == "j";
+		#def let opcodeTypeHashTable[opcode[-1]..asNumber / 0x01000000] =
+			!!+isJump&&{}||opcode
+		;
+		repeat (""...opcode[0][0] == "j"): jumpType 
+	};
+};
+//assert: [%address] == (%valueRedBits<<16)|%valueBlueBits;
+{:main;
+	;
+};
