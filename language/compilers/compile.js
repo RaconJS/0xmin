@@ -503,7 +503,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 								if(statement[index]=="$"){state.phase="$";index++;}
 								if(state.phase=="$")({index}=await contexts.main_hidden({statement,index,scope:newScope}));
 								if(statement[index]=="#"){state.phase="#";index++;}
-								if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope}));
+								if(state.phase=="#")({index}=await contexts.main_meta({statement,index,scope:newScope,virtualLine}));
 								;
 								newScope.data_phase=state.phase;
 							}
@@ -547,7 +547,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(word==":")index++;
 				return {index,found,keywords};
 			},
-			async main_meta({statement,index,scope}){//'#' ==> '# let set a;'
+			async main_meta({statement,index,scope,virtualLine}){//'#' ==> '# let set a;'
 				const metaState={
 					"let":false,
 					"set":false,
@@ -616,7 +616,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
 							value.label.unDefine();
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true},true);//note: uses 'unshift' mode so that the '$' instructions are in the right order
+							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true,virtualLine},true);//note: uses 'unshift' mode so that the '$' instructions are in the right order
 							//scope.label.code.push(value.label);
 							value.label.defs.push(scope.parent.label);
 						}else{
@@ -680,11 +680,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				}
 				return{index};
 			},
-			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true}={},useUnshift=false){
+			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true,virtualLine=undefined}={},useUnshift=false){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name?.toString?.()+"' is not declared"));
 				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
-				if(useUnshift)scope.label.code.unshift(newLineObj);
+				if(useUnshift){loga(!!virtualLine,scope.label.code.indexOf(virtualLine))
+					if(virtualLine)scope.label.code.splice(scope.label.code.indexOf(virtualLine)+1,0,newLineObj);//allows 'virtual' to apply to '#def' e.g. 'virtual #def x'
+					else scope.label.code.unshift(newLineObj);
+				}
 				else scope.label.code.push(newLineObj);
 			},
 			//short expression
