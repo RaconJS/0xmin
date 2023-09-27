@@ -684,7 +684,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//done in the line Assignment phase
 				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name?.toString?.()+"' is not declared"));
 				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
-				if(useUnshift){loga(!!virtualLine,scope.label.code.indexOf(virtualLine))
+				if(useUnshift){
 					if(virtualLine)scope.label.code.splice(scope.label.code.indexOf(virtualLine)+1,0,newLineObj);//allows 'virtual' to apply to '#def' e.g. 'virtual #def x'
 					else scope.label.code.unshift(newLineObj);
 				}
