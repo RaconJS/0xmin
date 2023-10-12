@@ -1,19 +1,11 @@
-//15:18 20/9/23
-//this is the first program that heavilly uses the paradime where the location off the move pointer is unknown
-#"0xmin";#"table";
-let cellStruct{
-	virtual #def:()->{
-		ram=>0xmin;
-		0#def let last;
-		0#def let this;
-		0#def let next;
-	}();
-	#..compile;
-};
-let cellEnd = 0x20000000;
-let loop{
-	//store: stores the alu in a 
-	let storeVar(){//get/set from alu <-> []ram
+//started: 15:18 20/9/23
+//finished: 22:27 5/10/23 (it works fully)
+//add perfect screen looping 22:53 
+//thisCell is the first program that heavilly uses the paradime where the location off the move pointer is unknown
+#"0xmin";#"len";#"table";
+... labelsof{//floating pointer paradime functions
+	//store: stores the alu in a static local variable, accessable by the 'jump' pointer
+	let storeAlu(){//get/set from alu <-> []ram
 		//: #() -> {set: @(alu)->mutate []ram, get: @[]ram-> mutate alu} 
 		let get,set;//note since the 'get' comes first, the compiler treats 'set' as a label instead of a keyword
 		def: set{
@@ -21,55 +13,424 @@ let loop{
 				jump->..return;
 			$move=>get..state.move #def let getter;
 				if;//if false ; reads and ignores the next line 'value'
-				null;
+				null;//value
 				get jump-1;
 				jump->get..return;
 			$move=>..state.move;//mechanic note: '..state' refers to the '#:set{...}' label
 		};
 		#get{
-			if;
-			null;
+			let ifState = ¬;
+			let ifFlag(ifState){
+				repeat (! ! ifState && ! + ifState):undef if_if;
+				repeat !!ifState:undef if_null;
+				#return = this
+			};
+			def let if_if{if};
+			def let if_null{null};
 			jump->set.getter;
 		};
 	};
-	let floatingConst(value){
+	let floatingConst(value,ifState){
+		//ifState: 1|0|undefined
+		//where undefined = #();
 		def let get{
 			#value = value || 0;
-			if;
-			null;
-			if;
+			{
+				repeat (!ifState || !!+ifState) if;
+				repeat !ifState null;
+			};
+			if;//if false
 			value;
 			get jump -1;
 	 	};
 	};
-	let setAndStore(getter,extraFloatingVar){//alu => *move, *move=>getter
+	//swap: #({@},Store?)->{@} ;optionally stores *move, sets: alu=> *move and then *move => getter()
+	let swap(getter,extraFloatingVar){//alu => *move, *move=>getter
 		get;
-		def let temp = storeVar();
-		repeat !!extraFloatingVar: def extraFloatingVar = storeVar();
-		getter;
-		set;//assert: *move => getter's value;
-		temp.get;//assert: alu => original *move;
-	};
-	let replace_move_const(const){
-		setAndStore(floatingConst(const));
-	};
-	{
-		...labelsof cellStruct;
-		$move=>0xmin;
-		$move=>last;
-		let oldVals{//:storeVar[]
-			let last;
-			let this;
-			let next;
+		def let temp = storeAlu();
+		repeat !!extraFloatingVar:{
+			let temp = storeAlu();
+			def extraFloatingVar <=> temp;
 		};
-		replace_move_const(0x10000000,oldVals.last);
-		red;
-		move=>next;
-		replace_move_const(0x2,oldVals.next);
-		or;
+		getter;//:store
+		set;//assert: *move => getter's value;
+		temp.get.ifFlag(());//assert: alu => original *move;
+	};
+	let swap_const(const,extraFloatingVar){
+		swap(floatingConst(const,1),extraFloatingVar);
 	};
 };
+let cellStruct{
+	virtual #def:()->{
+		ram=>0xmin;
+		0x20000000#def let last;
+		0x20000000#def let thisCell;
+		0x20000000#def let next;
+	}();
+	#..compile;
+};
+let cellEnd = 0x20000000;
+let startCell{
+	...codeof cellStruct;
+};
+let resetLoop;
+let loop{
+	...run(){
+		...labelsof cellStruct;//last,thisCell,next
+		$move=>0xmin;
+		$move=>thisCell;
+		//assume: alu = new value for last cell
+		let newVals{
+			let last;
+			let thisCell;
+		};
+		def newVals.last = storeAlu();
+		let oldVals{//:storeAlu[]
+			let last;
+			let thisCell;
+			let next;
+		};
+		let a,b,c;
+		
+		...codeof labelsof{:getB_storeOldValues;
+			let const_2;
+			{
+				move=>last;
+				swap_const(0x2,oldVals.last);//30 shift
+				$const_2=>last;
+			};
+			let const_0,const_lowTag;{//const_0
+				move=>next;
+				swap_const(0x20000000,oldVals.next);//30 shift
+				$const_0=>next;
+				$const_lowTag=>next;
+			};
+			let const_switchTags,dynamic_temp;
+			{
+				move=>thisCell;get;
+				def b = storeAlu();
+				swap_const(0x30000000,oldVals.thisCell);//30 shift
+				$const_switchTags=>thisCell;
+				$dynamic_temp=>thisCell;
+			};
+		};
+		def let getAandC{
+			//convention note: 'if 1' and 'if 0' act exactly the same as 'if'. They are only used to annotate the code.
+			//  'if 1' aka 'if;//if true' means the if flag is assumed to be true at this line and so the next line will run;
+			//  'if 0' aka 'if;//if false' means the if flag is assumed to be false at this line and so the next line will be skiped.
+			def let getA{//uses: const_switchTags,const_2,const_0
+				//assume: alu == thisCell
+				move=>const_2;
+				def:{:block;//uses: const_switchTags
+					let resetTag;
+					if 1;blue;if;
+					jump->resetTag;
+					#def:{:else;//else a = 0
+						move=>const_0;get;
+						move=>block..return..state.move;
+						jump->block..return;
+						$move=>else..state.move;
+					};
+					def resetTag{:then;
+						move=>const_switchTags;
+						xor;
+					};
+					//assert: ifFlag == true
+				};
+				def let temp_a = storeAlu();
+				{:get_carry_bit_from_neighbouring_cell;//uses: const_0
+					oldVals.last.get.ifFlag(1);
+					move=>const_0;
+					if 1;red;move=>const_switchTags;if;
+					{
+						let then;
+						jump->then;
+						{:else;
+							:when_is0;
+							move=>const_0;get;
+							delete const_0;
+							move=>const_switchTags;
+							delete const_switchTags;
+						};
+						jump->then..return;
+						def then{
+							:when_is1;
+							get;
+						};
+						//assert: move=>const_switchTags
+						//assert: const_switchTags=>dynamic_temp
+					};
+				};
+				{:combineParts;
+					//assume: move=>temp
+					set;
+					temp_a.get.ifFlag(1);
+					or;
+				};
+				def a = storeAlu();
+			};
+			def let getC{//uses: const_lowTag,const_2,temp
+				move=>const_lowTag;floatingConst(0x10000000,1);set;
+				oldVals.thisCell.get.ifFlag(1);
+				def oldVals.thisCell = storeAlu();
+				or;
+				move=>const_2;
+				red;//assert: this cannot fail
+				#let temp_c = dynamic_temp;//thisCell's memory location is worked out
+				move=>temp_c;
+				set;
+				{:or1;
+					oldVals.next.get.ifFlag(1);
+					def oldVals.next = storeAlu();
+					let then1,else0;
+					if 1;
+					move=>const_lowTag;
+					and;
+					move=>temp_c;
+					if;
+						jump->then1;
+					def else0{
+						get;
+						jump->then1..return;
+					};
+					def then1{
+						floatingConst(1,0);
+						or;
+					};
+				};
+				//assert: alu == c
+				def c = storeAlu();
+			};
+		};
+		let rule110;
+		def:{:block;
+			jump->rule110;
+			def let rule110.end;
+		};
+		#rule110{:rule124;//reverse of rule 110
+			$move=>end..state.move;
+			move=>const_lowTag;
+			let const_0;
+			//note: floatingConst(x,()) is the same as floatingConst(x). the '()' is used to note that the ifFlag is known to be any value
+			$const_0=>move;floatingConst(0x20000000,());set;
+			let temp{let dynamic1,dynamic2,static};
+			$temp.dynamic1 => dynamic_temp;
+			$set: temp.dynamic2 => const_0;//note '$: a=>b;' is the same as '$set: a=>b;'
+			delete const_2,const_lowTag,const_switchTags;
+			//assert: alu == c
+			//the order is [a,b,c]
+			let AxorB;
+			//the syntax highlighting does not work with 'def{:block;}' so 'def:{:block;}' is normally used instead
+			def
+			{:AandBandNotC;
+				let doCell(storedVariable,restore,operation){
+					storedVariable.get.ifFlag(());
+					repeat !!restore:restore;
+					if;//if true ; clears if flag
+					move=>temp.dynamic1;
+					operation;
+					move=>const_0;if;jump+2;get;
+					move=>temp.dynamic1;
+					set;
+				};
+				//assume: move=>const_0, alu == c
+				move=>const_0;get;
+				move=>temp.dynamic1;set;
+				doCell(c,(),{set;nor});
+				//assert: alu == ~c
+				doCell(a,a = storeAlu(),{and});
+				doCell(b,b = storeAlu(),{and});
+				move=>const_0;or;
+				move=>temp.dynamic1;
+			};
+			//assert: alu == a&b&~c
+			set;//assert: temp.dynamic == a&b&~c
+			def AxorB{
+				move=>temp.dynamic2;
+				$temp.dynamic2=>move;
+				//assume: move=>temp.dynamic1
+				a.get.ifFlag(1);set;
+				b.get.ifFlag(1);if;xor;move=>temp.dynamic1;if;jump+2;get;
+				or;
+			};
+			delete temp;
+			move=>end..state.move;
+			jump->end;
+			$move=>..state.move;
+		};
+		//assert:alu == next value for thisCell
+		{:checkForEnd;
+			move=>thisCell;set;
+			def newVals.thisCell = storeAlu();
+			move=>last;newVals.last.get.ifFlag(1);set;
+			move=>next;oldVals.next.get.ifFlag(1);set;
+			move 1;
+			floatingConst(+{null}..compile[0],1);//same as 'floatingConst(0);' which is turned into 31 when the '.filt' file is run
+			if 1;xor;if;{
+				let ifNullThen,ifCellThen;
+				jump->ifCellThen;
+				def ifNullThen{
+					//when at end of line of cells
+					//assert: alu = null, move => next
+					{:checkForExtending;
+						let extendCells;
+						floatingConst(1,0);
+						move=>thisCell;
+						if;and;if;jump+2;jump->extendCells..return;
+						def extendCells{
+							move=>next+1;
+							floatingConst(0x20000000,0);
+							set;if 1;
+							move=>thisCell;
+						};
+					};
+					//assert: move=>thisCell
+					def resetLoop;
+					$move=>..state.move;
+				};
+				def ifCellThen;
+			};
+		};
+		//assert:alu == next value for thisCell
+		{:setUpRamForNextLoop;
+			move=>thisCell;oldVals.thisCell.get.ifFlag(0);set;
+		};
+		//assert: [last] is new value
+		//assert: [thisCell] is old value
+		//assert: [next] is old value
+		{:handleLooping;
+			{
+				newVals.thisCell.get.ifFlag(1);
+				move=>next;
+				//for next struct
+				$move=>thisCell;
+				jump->..this;
+			};
+		};
+		//assert:alu == next value for thisCell
+		{:dataAndFunctions;
+			def rule110;
+			def let ..this.output;
+		};
+	};
+}; 
+let startCellBlock{
+	let endValue = 0x003ff000;
+	virtual {
+		$set def ..this.endValue #def let endBlock;
+		0#def let ..this.last;
+		0#def let ..this.thisCell;
+		0#def let ..this.next;
+	};
+};
+let output{let end};
+#resetLoop{
+	//assert:if flag == false
+	$move=>cellStruct.thisCell;
+	floatingConst(startCellBlock.endValue,());//assume: {null} is the same as {0x14} in exicution time
+	if 1;
+	def let loopBackToStart{
+		//assume: if flag == false
+		$move=>cellStruct.thisCell;	
+		xor;xor;move=>cellStruct.last;if;
+		$move=>cellStruct.thisCell;	
+		jump->..this;
+		{
+			//assert: move => cellStruct.last -2;
+			move 2;
+			$move=>cellStruct.last;
+			{//UNFINISHED
+				$move=>startCellBlock.last;
+				jump->output;
+				#def output.end;
+				move=>startCellBlock.last;
+				$move=>cellStruct.last;
+			};
+			get;
+			move=>cellStruct.thisCell;
+			jump->loop;
+		};
+	};
+};
+#output{
+	let data{
+		0x2#def let const_2;
+		0x20000000#def let const_red;
+		null#def let temp;
+		def let printSection{
+			0x1//0x00004000
+			#def let shift;
+			0x00002000#def let endTag;
+			0x3fffe000#def let section;
+		};
+		#def let pos{
+			let screenYLength = 12;
+			1;
+			(1<<(screenYLength-1))#def let startValue;//screenYLength
+		};
+	};
+	...labelsof data;
+	$move=>end..state.move;
+	{
+		def :{:handleScreenLooping;
+			move=>pos;get;if;
+			move=>const_2;blue;
+			move=>pos;set;
+			if;jump->handleScreenLooping..return;
+			{:loopScreen;
+				"\p00";
+				move=>pos.startValue;
+				get;
+				move=>pos;
+				set;
+			};
+		};
+		{
+			move=>startCellBlock.thisCell;get;
+			;
+			move=>printSection.shift;red;
+			move=>printSection.endTag;or;
+			move=>printSection.section;and;if 1;//assume temp as the red tag
+			move=>temp;set;
+			let skipLoop;
+			move=>const_2;red;move=>temp;set;if;jump+2;jump->skipLoop;
+			def:{
+				move=>const_red;and;if;
+				{let then,else;
+					jump->then;
+					" "#def else;
+					jump->then+1;
+					"#"#def then;
+				};
+				move=>temp;get;if;
+				:loop;//language note: this label refers to the parent block.
+				move=>const_2;red;
+				move=>temp;set;
+				if;jump->loop;
+			};
+			def skipLoop;
+			//"\n";
+		};
+	};
+	move=>end..state.move;
+	jump->end;
+	#loop.output..splice(0,0,{def ..this});
+};
+let cells;
+repeat 1 move 0xff; 
+move=>startCellBlock.last;
+get;
+move=>startCellBlock.thisCell;
 def loop;
+def output.data;
+def startCellBlock{
+	endValue;
+	0x20000000;
+	0x30000000;
+	repeat 1 0x20000000;
+	null;
+};
+#output.install();
 //rule110
 // 00 01 11 10 AC
 //0 0  1  1  0
