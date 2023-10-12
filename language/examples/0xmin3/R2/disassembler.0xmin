@@ -50,10 +50,13 @@ let opandTypeHashTable{//:({arg1;arg2;arg1InRam} & []data*[])[]
 	};
 }:>var();
 let Opcode(name,P_S_PS){
+	let name = name;
 	let i=-1;
 	repeat name..length send name[i+=1];
-	jump -> P_S_PS;
-	repeat (4-name..length) null;
+	repeat !!P_S_PS: {
+		jump -> P_S_PS;
+		repeat (4-name..length) null;//make sure all Opcodes objects are the same length so they can be indexed in an array
+	};
 };
 let a;
 let opcodeTypeHashTable{
@@ -61,16 +64,24 @@ let opcodeTypeHashTable{
 	//map(opcode => {enum(P,S,PS);@[4];@return})
 }:>var();
 let jumpHashTable:>var();
-let opcodeNameMap{let
-	add = "+=", 
+let opcodeNameMap{let//:#map string->string
+	//UNSURE: the symbol used for this command may need to be replaced with a better one
+	adc  = "+R=",//UNSURE
+	adcs = "+R",//UNSURE
+	add  = "+=",
 	adds = "+",
+	and  = "&=",
+	ands = "&",
+	bump = "!",//UNSURE
+	call = "#",//UNSURE
+	cmb  = "<",//UNSURE
 }:>var();
 let opcodeTypes{
 	def let P{};
 	def let S{};
 	def let PS{};
 };
-let opcodes = #(){
+let opcodes = #(){//:{@}[]
 	adc 	PS 	add with carry 	yes 	1 	0x25000000;
 	adcs 	PS 	non-storing add with carry 	yes 	1 	0x2D000000;
 	add 	PS 	add 	yes 	1 	0x24000000;
@@ -136,24 +147,32 @@ let opcodes = #(){
 	xors 	PS 	non-storing bitwise XOR 	yes 	1 	0x2B000000;
 }[0]:>(opcodes){
 	let i = -1, opcode;
-	let jumpOpcode = Opcode("",{
+	let jumpHandler{
 		:chooseJumpType;
 		r0 = [data.valueBlueBits];
 		r0 &= 0xf;
-		r0 += jumpHashTable;
-		jump -> r0;
-	});
-	repeat a..length:...codeof{
-		let type = ""...(opcode = opcodes[i+=1])[1];//"P", "S", "PS"
-		let opcode = Opcode(opcodeNameMap[""...opcode[0]]||(""...opcode[0]),[""...type]);
-		let isJump = opcode.name[0] == "j";
-		#def let opcodeTypeHashTable[opcode[-1]..asNumber / 0x01000000] =
-			!!+isJump&&{}||opcode
-		;
-		repeat (""...opcode[0][0] == "j"): jumpType 
+		r0 += jumpHashTable;//jumpHashTable: @{jump->{@}}[]
+		jump -> r0;//
 	};
-};
+	def jumpHandler;
+	repeat opcodes..length:...codeof{
+		:opcode;
+		let opcode_rawString = opcodes[i+=1];
+		let opcode.name = opcode_rawString[0];
+		let opcode.type = ""...opcode_rawString[1];//"P", "S", "PS", "0"
+		let opcode.number = opcode_rawString[-2]..asNumber;
+		
+		let opcodeObj = Opcode(opcodeNameMap[opcode.name]);//:{@} ; {print ()}
+		let opcodeObj.type = type,opcodeObj.opcode = opcode_rawString;
+		let isJump = opcode.name[0] == "j";
+		repeat !!+isJump:
+			#set jumpHashTable[opcode.number&0xf] = opcodeObj;
+		repeat !+isJump:
+			#set opcodeTypeHashTable[opcode.number / 0x01000000] = opcodeObj;
+	};
+}():>var()[0];
 //assert: [%address] == (%valueRedBits<<16)|%valueBlueBits;
 {:main;
 	;
 };
+def var;
