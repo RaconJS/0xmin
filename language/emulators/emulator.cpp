@@ -164,6 +164,15 @@ using namespace std ;
 filt30* ram;
 int ramLen;
 filt30 getCPU_output();
+void expandRamIfNeeded(int index){
+	auto oldRamSize = ramLen;
+	if(false)if(index > ramLen){//doesn't currently work
+		ramLen += 2 * (index - ramLen);//assert change in size is between [0,255*2]
+		ram = (filt30*) realloc(ram, sizeof(filt30) * ramLen);
+		std::fill(ram + oldRamSize * sizeof(filt30), ram + ramLen*sizeof(filt30), filt30(0));
+	}
+	//return ram[index];
+}
 class R2Terminal{
 	private: filt30 spairFilts[2];
 	public:
@@ -520,6 +529,7 @@ class NumberDisplay{
 	}cpuDisplay;
 	void CPU0xmin3::onUpdate(){//main emulator
 		//pointers
+			expandRamIfNeeded(max(jump+jump_next+2,move+move_next));
 			filt30 get_jump=ram[jump];//for 'get jump -1;'
 			jump+=jump_next;
 			if(jump>=ramLen||jump<0){
