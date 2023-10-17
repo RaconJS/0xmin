@@ -1,5 +1,5 @@
 //tptasm/R2
-let main{};//the {} does nothing, i just use it to denote Objects instead of labels.
+let main{};//language note: the {} does nothing, i just use it to denote Objects instead of labels.
 jump->main;
 ...let:{import this "heap.0xmin";};
 let Function(block)={
