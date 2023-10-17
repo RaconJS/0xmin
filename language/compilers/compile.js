@@ -1960,12 +1960,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(rawString&&"\"'`".includes(rawString[0])){
 					let includeAllWhiteSpace=rawString[0]=="`";
 					let array=rawString.substr(1,rawString.length-2)//(string|char)[]
+						.replaceAll(/\\([^cphaetnrux])/g,"$1")
 						.replaceAll("\\t", "\t")
 						.replaceAll("\\n", "\n")
 						.replaceAll("\\r", "\r")
 						.replaceAll(/\\u(....)/g,(v,v1)=>String.fromCharCode(+v1||0))
 						.replaceAll(/\\x(..)/g,(v,v1)=>String.fromCharCode(+("0x"+v1)||0))
-						.replaceAll(/\\([^cphae])/g,"$1")
 						.match(/\\[cp][\s\S]{2}|\\[hae]|[\s\S]/g)//color'\c00',position'\p000',accept/confirm '\a',hault'\h'
 					;
 					array=(array??[])//:string[]
@@ -1977,11 +1977,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						.replaceAll(/^["'`]|["'`]$/g,"\"")
 						.replaceAll(/\\[cp]/g, "\\x")
 						.replaceAll(/\\[hae]/g,"\n")
-						.replaceAll(/\\([^cphae"'`])/g,"$1")
+						.replaceAll(/\\([^uxcphaenrux"'`])/g,"$1")
 						.replaceAll(/\\ /g," ")
 						.replaceAll(/\\x(..)/g, (v,m1,i,a)=>(10000+(+("0x"+m1))+"").replace(/^./,"\\u"))
 						.replaceAll(/\n/g,includeAllWhiteSpace?"\\n": "")
 						.replaceAll(/\t/g,includeAllWhiteSpace?"\\t": "")
+						.replaceAll(/\r/g,includeAllWhiteSpace?"\\r": "")
 					;
 					try{
 						string=JSON.parse(string);
