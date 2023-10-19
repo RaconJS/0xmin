@@ -1012,7 +1012,13 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(shouldEval)value=new Value({string,type:"string",array});
 			}else if(!({index,value,failed}=await contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
 			else if("([".includes(word)){//'(label)'
-				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
+				index++;
+				let statements = statement[index];
+				let value;
+				for(const statement of statement[index]){//'(1,2,3) == 3' '[1,2,3] == 3'
+					({value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
+				}
+				index+=2;
 				value??=null;//'()' ==> `undefined`. Used for 'foo(());'
 			}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
 				const operator=contexts.operators_Left[word];//:function (Value) => Value
