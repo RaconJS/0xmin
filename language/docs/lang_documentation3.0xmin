@@ -547,17 +547,18 @@ function blocks;{
 		let bar = {{{(a){a}}};(b,c){b;c}};
 		def bar(1,2);
 	
-	//function variables
-	#(){
-		scope;//macro only
-		return;
-		arguments;//the list of arguments provided, as well as containing a namespace for the aguments.
-		constructor;//is the original function;
-		this;//same as this in javascript, except if the function is called without a parent (i.e. 'foo()' instead of 'bar.foo()') then then it returns the var scope where the function was origionally made.
-		//If the function type is a class then this returns the new function instance.
-		caller;
-
-	}
+	{//function variables
+		#(){
+			scope;//macro only
+			return;
+			arguments;//the list of arguments provided, as well as containing a namespace for the aguments.
+			constructor;//is the original function;
+			this;//same as this in javascript, except if the function is called without a parent (i.e. 'foo()' instead of 'bar.foo()') then then it returns the var scope where the function was origionally made.
+			//If the function type is a class then this returns the new function instance.
+			caller;
+		};
+		//these labels refer to 
+	};
 };
 single_expressions;{
 	expressions have the form:
@@ -565,7 +566,7 @@ single_expressions;{
 	single argument operators are included in expressions as well as indexing and function calls.
 	datatypes;{
 		label;{
-			casting: ¬x ;
+			casting: ¬x ; //converts
 		}
 		string;{
 			casting: (""...x) ;
@@ -581,7 +582,7 @@ single_expressions;{
 			casting: can not cast to array;
 			array is a poorly supported type.
 			It is mainly used in: debugger object..labels;
-		}
+		};
 	}
 	internal properties;{
 		Every label has internal properties;
@@ -670,10 +671,18 @@ long_expressions;{
 		'{...}' and '(...)...{...}' operators
 		You can assign the contense of a variable by adding an object or function expression after it.
 		e.g.
-		let foo(arg1,arg2)=>{...doStuff};
+		let doStuff(){};
+		let foo(arg1,arg2)=>{...doStuff};//function
 		let bar{...doStuff};
+		let baz;
+		baz{...doStuff};
 		At the moment they act exactly the same as the '::' operator.
 		The only difference is that it cannot be done with the syntax '{}{}'. This allows for '{{}{}}' to be parsed as '{{};{}}'
+		{//e.g.
+			let bar{#bar = 2};
+			Note that in  the 'bar' label is created before the block '{}' is parsed meaning 'bar' can be referenced inside the block.
+			In this case 'bar' will have the value '2' by the end of the let statement.
+		};
 	}
 	brackets;{
 		Can use: () {} [] aswell as #() #{} #[];
@@ -686,6 +695,8 @@ long_expressions;{
 		e.g. in tptasm: {
 			r0 = #(4*3);//compiles to: mov r0 12
 		}
+		e.g. #(1,2,3)//TODO: decide what this syntax should do
+		In lists of values like the line above, the last value will be returned, i.e. 3.
 	};
 	{:operators;
 		¬;{
@@ -714,6 +725,31 @@ long_expressions;{
 				a + b * c ¬()
 				is the same as: ( (a + b * c)() )
 		};
+		boolean operators && || ^^;{
+			'||' or;{
+				Evaluates both arguents first. Then, returns the first value if it is "truthy", and the second if it is "falsy".
+				Note: like javascript '||' returns one of the arguments.
+				Note: unlike javascript both arguments will be evaluated even if the fist one is "truthy"
+			|| //or: returns the second argument if the first one is falsey
+			&& //and: returns the second argument if the first one is truthy
+			^^ //xor: returns '0' if both inputs are truthy, other wise acts like '||'
+			e.g.
+			a ^^ b
+		};
+		boolean operator 'not' !;{
+
+		};
+		bitewise 'nor' ~;{
+			e.g.
+			#:(a ~ b)
+			is the same as
+			#:~(a | b)
+			note that ~a is still bitewise not
+			e.g.
+			#:a & ~ b ~ c
+			is the same as
+			#:(a) & ( ~((~ b) | c) )
+		}
 	};
 	proceedence{
 		priorities{//from highest to lowest
@@ -724,11 +760,16 @@ long_expressions;{
 			5: ¬ // the 'a+b ¬.c' operator
 			6: = <=> <-> <- -> <= => //the last 4 are for in 0xmin assembly
 		};
+		all of these operators evaluate the left side argument first.
 		except for assignment operators (=,<=>,<->) everything has the same priority.
+		{//in let statements
+			e.g. let .("foo") = 2;
+			in #let statements, the name of the label is parsed first
+		}
 		e.g. a+b*c is parsed as (a+b)*c
 		assignment operators are always done last, and have the same priority
 		e.g. a+b=c+d=e+f is parsed as  (a) = #(b = #(c))
-	}
+	};
 };
 compilation_settings;{
 	These include the following:
