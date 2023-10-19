@@ -1,11 +1,4 @@
 #"0xmin";#"table";
 //{}:>(){}::{}()<:{};
-//let a{1;2};
-//$a{3};
-//jump->1->3;
-jump 4<-6;
-#let a = 1||();
-debugger (¬(""..."\c00"))..length;//should return 1; actually returns 3 ; TODO fix concatnation BUG
-debugger (¬(""...¬"\c00"))..length;//should return 1; actually returns 1
 //BUG: '= 1||()' the compiler enters infinite loop without the '+'
-//debugger((¬) = 1||#())"value";
+#let:a <=> 1||(1,1,1);
