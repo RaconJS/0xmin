@@ -49,12 +49,17 @@ function compile {
 			#'-o name.filt'
 			elif [[ $operator == "-o" ]]; then
 				if [[ $((i + 1)) < $ELEMENTS ]];then
-					outFileName=$val1;
-					externalOutFile=true;
-					if $isUsingOutFileNameToExicute; then
-						runFileName=$val1;
-					fi
+					val1=$val1;
+				else
+					val1=a.filt;
 				fi
+
+				outFileName=$val1;
+				externalOutFile=true;
+				if $isUsingOutFileNameToExicute; then
+					runFileName=$val1;
+				fi
+
 				i=$(($i + 1));
 				continue;
 			#'-s $runSpeed_in_fps'
@@ -71,6 +76,14 @@ function compile {
 				fi
 				i=$(($i + 1));
 				continue;
+			elif [[ $operator == "-help" || $operator == "--help" ]]; then
+				echo compiles and runs .0xmin files
+				echo flags: -o filename.filt -\> output
+				echo -\e filename.filt -\> runs program on the 0xmin emulator
+				echo -r -\> compiles and then runs .0xmin program
+				echo -s -\> speed of the emulator in ticks per second
+				echo -sm -\> speed multiplier, makes emulator run at x\*60 ticks per second
+
 			#default
 			else
 			inputFileName=$val;
