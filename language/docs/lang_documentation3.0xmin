@@ -252,8 +252,17 @@ $;{
 		#let:/*takes in as arguments: a single expression, followed by a long expression. The short expression becomes the 1st argument in the long expression e.g.*/let (["short"..."expression"]) * long + expression;
 		/*. This is then used for the new label.*/
 		special cases:
-			{let a = a + 2} -> {let b=a+2;let a=b;delete b}:/*If the next symbol is*/ = /*then it creates the label after the long expression. e.g.*/let a=a+1;/*Other wise it creates the label before evaluating the long expression. e.g.*/let a::{def let a.b=2;};
-			{def let a:>foo()} -> {let a;#set a:>foo();def a;}:/*:> is ignored in the first short expression. This is to allow type conversions. e.g.*/let a :> float(2);/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
+			//case 1
+			{let a = a + 2} -> {let b=a+2;let a=b;delete b}:
+				/*If the next symbol is*/ = /*then it creates the label after the long expression.*/
+				/*e.g.*/let a=a+1;
+				/*Other wise it creates the label before evaluating the long expression.*/
+				/*e.g.*/let a::{def let a.b=2;};
+			//case 2
+			{def let a:>foo()} -> {let a;#set a:>foo();def a;}:
+				/*:> is ignored in the first short expression. This is to allow type conversions.*/
+				/*e.g.*/let a :> float(2);
+				/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
 	//----
 	#let set: label;//creates a new label only if it does not already exist in this block scope.
 	#let set: label.property;//only creates a new property if it does not exist.
@@ -558,6 +567,117 @@ function blocks;{
 			caller;
 		};
 		//these labels refer to 
+		//e.g.
+			{
+				let 
+					varScope,
+					blockScope,
+					callerScope,
+					ownerObject,
+					otherFoo,
+					foo
+				;
+				#varScope{
+					{
+						:block;
+						#blockScope = block;
+						#foo(){
+							let 
+								scope = scope,
+								return = return,
+								arguments = arguments,
+								constructor = constructor,
+								this = this,
+								caller = caller,
+								__this = ..this
+						};
+					};
+				};
+				#ownerObject{
+					let method_foo = foo;
+				};
+				#otherFoo = foo;
+				//note: all things done with foo will have the exact same results with otherFoo, except from debug label naming.
+				let callerVarScope{
+					let callerBlockScope = {
+						:self;
+						#callerScope = self;
+						delete self;
+						//note: '¬()' is the 'null' label
+						#baz = foo(1,2,3);
+							#baz.scope;//¬()
+							#baz.return;//baz
+							#baz.arguments;//{1;2;3}
+							#baz.constructor;//the global object
+							#baz.caller;//callerScope
+							#baz.__this;//varScope
+							//note:
+								//If a function type is set, then 'foo()' will use the function type specified in it's delcaration.
+								//e.g. 'foo=()' overrides the function type with '=', which turns it into a class.
+						#baz = ownerObject.method_foo(1,2,3);
+							#baz.scope;//¬()
+							#baz.return;//baz
+							#baz.arguments;//{1;2;3}
+							#baz.constructor;//the global object
+							#baz.caller;//callerScope
+							#baz.__this;//varScope
+						//note: in general:'a.b()' gives same result as 'b()' except 'this':
+							//The 'this' label refers to the object it was the property of.
+							//This is the same similar to the 'this' keyword in javascript.
+						#baz = foo=(1,2,3);//called as a class
+							#baz.scope;//¬()
+							#baz.return;//baz
+							#baz.arguments;//{1;2;3}
+							#baz.constructor;//foo
+							#baz.caller;//¬()
+							#baz.this;//baz //this stays the same even if called as a method
+							#baz.__this;//baz
+						#baz = ownerObject.method_foo=(1,2,3);
+							#baz.this;//baz
+							//the rest are the same
+						#baz = foo=>(1,2,3);//called as an arrow function
+							#baz.scope;//¬()
+							#baz.return;//¬()
+							#baz.arguments;//¬()
+							#baz.constructor;//¬()
+							#baz.caller;//¬()
+							#baz.__this;//varScope
+						#baz = foo->(1,2,3);//called as a weak scoped function.
+							#baz.scope;//¬()
+							#baz.return;//¬()
+							#baz.arguments;//¬()
+							#baz.constructor;//¬()
+							#baz.caller;//¬()
+							#baz.__this;//varScope
+							//same as foo() except that 'let x' would assign to 'blockScope' instead of the function instance
+						#baz = foo<-(1,2,3);//called as a macro
+							#callerScope.scope;//callerScope
+							#callerScope.return;//baz
+							#callerScope.arguments;//{1;2;3}
+							#callerScope.constructor;//the global scope
+							#callerScope.caller;//callerScope
+							#callerScope.__this;//callerVarScope
+							//description of general idea & use of marcos e.g. 'foo<-()':
+								//macro 'foo<-()' functions: are similar to '...foo' except with more tools to modify the scope that calls the function
+									//Their code is run almost directly in the scope, similar to '...foo' but they still have access to 'foo..prototype'.
+									//They can reference the caller scope so they can modify it.
+								//labels in macros are assigned to the scope they were called from, instead of where they were defined
+						#baz = foo<=(1,2,3);//called as a strong scoped function.
+							#baz.scope;//¬()
+							#baz.return;//¬()
+							#baz.arguments;//¬()
+							#baz.constructor;//¬()
+							#baz.caller;//¬()
+							#baz.__this;//baz
+							//Labels defined outside of this function cannot be accessed.
+							//It is intended for:
+								//easier to read code,
+								//making functions more pure functions code
+								//providing a sandbox to run and test functions that mutate parent scopes
+						//note: e.g. 'foo<=(x,y,z)' aka 'foo() but only using x,y, and z'
+					};
+				}
+			}
 	};
 };
 single_expressions;{
