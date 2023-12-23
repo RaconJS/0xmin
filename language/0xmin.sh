@@ -27,7 +27,7 @@ function compile {
 			operator=$val
 			val1=${args[$((i+1))]}
 			#'-run true' runs the .filt file afterwards on the emulator
-			if [[ "$operator" = "-run" || "$operator" = "-r" ]]; then
+			if [[ "$operator" = "-run" || "$operator" = "-r" ]]; then #0xmin -r file.0xmin
 				isRunningFile=true #$val1;
 				#if [[ $((i + 1)) < $ELEMENTS ]];then 
 					if [[ $externalOutFile == false ]];then #for pipelineing compiler into emulator
@@ -78,12 +78,16 @@ function compile {
 				continue;
 			elif [[ $operator == "-help" || $operator == "--help" ]]; then
 				echo compiles and runs .0xmin files
-				echo flags: -o filename.filt -\> output
-				echo -\e filename.filt -\> runs program on the 0xmin emulator
-				echo -r -\> compiles and then runs .0xmin program
-				echo -s -\> speed of the emulator in ticks per second
-				echo -sm -\> speed multiplier, makes emulator run at x\*60 ticks per second
-
+				echo
+				echo flags: -o filePath.filt -\> output
+				echo
+				echo -\e filePath.filt -\> runs program on the 0xmin emulator
+				echo
+				echo -r filePath.0xmin -\> compiles and then runs .0xmin program
+				echo
+				echo -s -\> speed of the emulator in ticks per second. e.g. \`0xmin -\e a.filt -s 10\`
+				echo
+				echo -sm -\> speed multiplier, makes emulator run at x\*60 ticks per second. e.g. \`0xmin -\e a.filt -sm 10\`
 			#default
 			else
 			inputFileName=$val;
