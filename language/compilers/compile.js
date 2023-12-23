@@ -2482,7 +2482,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return value;
 					},
 					//note: name might change
-					"code_assembly":async({label})=>new Variable({name:"code_assembly",code:assemblyCompiler.collectCode(label).filter(v=>v instanceof AssemblyLine)}).toValue("label"),
+					"code_assembly":async({label})=>await assemblyCompiler.collectCode(label).toValue("label"),
 					//change object state
 						"seal":async({label})=>{//TODO: finnish ..seal and ..freeze
 							Object.seal(label.labels);
