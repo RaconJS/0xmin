@@ -18,7 +18,8 @@ void #set:(){//documentation
 		free:Function(%Page*)->void;
 		clear:Function(%Page*,%Page*?,%Page*?)->void;
 		memset:Function(%Page*,%int16,%int13)->void;
-		resize:Function(%Page*,%int16)->%bool|%int16;
+		resize:Function(%Page*,%int16)->%int16;
+		realloc:Function(%Page*,%int16,%(@()->%bool)*,%int16)->%bool|%Page;
 		ref:#(%Page*)->{@};
 		unref:#(%Page*,{@}?,!!label?)->{@};
 		memory{
@@ -33,7 +34,7 @@ void #set:(){//documentation
 };
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{
-	#let: free,malloc,clear,memset,resize;//@functions
+	#let: free,malloc,clear,memset,resize,realloc;//@functions
 	#let: regsUsed = 3;//:int & %
 	#let: ref,unref;//#()->{@}
 	#let: memory;
@@ -94,6 +95,10 @@ void #let set: heap{
 			#let set: foo.call(x,y,z){
 				...let set: heap_Call(foo,x||foo.inputs[0],y||foo.inputs[1],z||foo.inputs[2]);
 			};
+			repeat (len==4)
+			#let set: foo.call(x,y,z,w){
+				...let set: heap_Call(foo,x||foo.inputs[0],y||foo.inputs[1],z||foo.inputs[2],w||foo.inputs[3]);
+			};
 		};
 	};
 	#let: Page()={
@@ -148,7 +153,7 @@ void #let set: heap{
 		...let data;
 		...let outputs;
 		#let: page=nextReg();//:%Page*
-		#set: page..splice(0,page..length);
+		#set: page..splice(0,-0);
 		#set: page{...let set Page();};
 		#let: compiledPage=#(page..compile);
 		#let: pageSize=nextReg();//:%int; size of the current page
@@ -225,7 +230,7 @@ void #let set: heap{
 		#let: data{};
 		#let: outputs{};
 		#let: page=inputs.pointer;//:%Page*
-		#set: page..splice(0,page..length);
+		#set: page..splice(0,-0);
 		#set: page{...let set Page();};
 		#let: compiledPage=#(page..compile);
 		%page-=compiledPage..length;
@@ -335,15 +340,230 @@ void #let set: heap{
 		[clear.data.blueHalf]=0;
 		return;
 	}::{void #call.addCaller(..this,3);};
-	#set:resize{
+	#set:resize{//similar to realloc except it doesn't change the pointer if there isn't any space
 		#let: nextReg=enum(0);
 		#let: inputs{
-			#def let: page=nextReg();//input
-			#def let: size=nextReg();
+			#def let: page=Page()<->nextReg();//input
+			#def let: size=nextReg();//size of new block
 		};
 		#let: outputs{
-			#def let: pageSize;
+			#def let: newSize=0;//returns 0 if no page found
 		};
+		...let inputs;
+		...let outputs;
+
+		//UNFINISHED
+	}::{void #call.addCaller(..this,4);};
+	#set:realloc{
+		...#(){:setUpMeta;
+			#(){:pseudocode_for_interface;
+				//expands memory in both directions or finds new block
+				#let realloc(object,size,offset){//:({},int,int)->{}
+					repeat offset: 0;
+					...set: object..splice(0xmin.Math.max(-offset, 0), size);
+					:newObject;
+					#let: sizeLeft <-> size - newObject..length;
+					repeat sizeLeft: 0;
+					delete: newObject,sizeLeft;
+				};
+			};
+			#let: nextReg = enum(0);
+			#let: inputs{
+				#def let: page = Page.pointer=() <-> nextReg();//input
+				#def let: size = nextReg();//size of new block
+				#def let: onMovePage = nextReg();//function pointer to call if there is a reallocation
+				#def let: offset = nextReg();//data offset. Is the new index for the current data, relative to the new page.
+			};
+			#let: outputs{
+				#def let: newPage = 0;//returns 0 if no page found
+			};
+			...let: inputs;
+			...let: outputs;
+			let nextPage = Page.pointer=() <-> nextReg();//:%Page*
+			let pageSize = nextReg();//:%int
+			let maxIndexNeeded = nextReg();//:%int ; is the size - offset
+			let relocate{
+				${:ifBlock;
+					%onMovePage |= 0;
+					jump -> ifBlock..return if == 0;//handles %onMovePage == null
+					call %onMovePage;//function '%onMovePage' should leave only 1 reference to '%page'
+					let ..this.returner;
+					jump -> returner if != 0;//bool
+				};
+				let nextReg = enum(0xmin.Math.max(free.nextReg.n,malloc.nextReg.n));
+				let temp = nextReg();
+				let tempRegs{//arnt mutated by malloc or free
+					#def let oldPage = Page.pointer=() <-> nextReg();
+					#def let offset = nextReg();
+				};
+				%tempRegs.offset = %offset;
+				%tempRegs.oldPage = %page;
+				%malloc.inputs.(0) = %size;
+				call malloc;
+				let newPage = malloc.outputs.(0);
+				let page = ¬,size = ¬, onMovePage = ¬, offset = ¬;//sets variables to null
+				//assume: %page == %malloc.outputs.(0)
+				{:moveData;
+					#let nextReg = enum(newPage + 1);
+					...let: tempRegs;
+					let startI_oldPage <-> nextReg();
+					let startI_newPage <-> nextReg();
+					%startI_oldPage = %oldPage;
+					%startI_newPage = %newPage;
+					let i = offset;
+					%temp = %offset;
+					#offset = temp;
+					%i = #(-1&0xffff);
+					${:ifBlock;
+						let rightShiftData;
+						%offset |= 0;
+						jump -> rightShiftData if >= 0;
+						#def let: leftShiftData{//assert: offset < 0
+							%startI_oldPage -= %offset;
+							%i -= %offset;
+						};
+						jump -> ifBlock..return;
+						#def: rightShiftData{//assert: offset > 0
+							%startI_newPage += %offset;
+						};
+					};
+					delete offset;//assert: +i == +offset
+					%i += [%oldPage - (Page.size-oldPage.next)];
+					%i -= %oldPage;
+					//assert: %i = sizeof oldPage
+					let copyingOverHighBits;//:#const bool
+					let readHigh(rOut,rAddress){
+						@(0x11100001|(rOut&0xf<<8)|(rAddress&0xf<<4));
+					};
+					let loopN(numOfRepsPerCheck,hasFirstCheck,hasNoLengthCheck)={
+						let reps = numOfRepsPerCheck;//:#int
+						repeat !!hasFirstCheck %i -= #(reps - 1) !store;
+						repeat !!hasFirstCheck jump -> ..return if < 0;
+						repeat !!hasNoLengthCheck jump -> moveData..return if == 0;
+						${:loop;
+							repeat reps:{
+								repeat !!copyingOverHighBits:{
+									%startI_oldPage += %i;
+									readHigh(temp,startI_oldPage);
+									%startI_oldPage -= %i;
+									mask = %temp;
+								};
+								%temp = [%startI_oldPage + %i];
+								[%startI_newPage + %i] = %temp;
+								%i -= 1;
+							};
+							jump -> loop if >= 0;
+						};
+						jump -> moveData..return if < 0;
+						i += reps;
+					};
+					loopN(8,{},{});
+					loopN(1,(),{});
+					repeat !!copyingOverHighBits mask = 0;
+					repeat (nextReg.n > tempRegs[0]) throw "heap source code error: using too many registers";
+				};
+				{:callingFree;
+					%free.inputs.(0) = %tempRegs.oldPage;
+					let tempRegs.newPage <-> tempRegs.oldPage;
+					delete tempRegs.oldPage;
+					%tempRegs.newPage = %newPage;
+					call free;
+				};
+				%outputs.newPage = tempRegs.newPage;
+				return #def returner;
+			};
+		};
+		${:extendForward;
+			//checks for max size
+			{:getPageSize;
+				%nextPage = [%page - #(Page.size - page.next)];
+				%pageSize = %nextPage;
+				%pageSize -= %page;
+			};
+			%maxIndexNeeded = %size;
+			%maxIndexNeeded -= %offset;
+			%pageSize -= %maxIndexNeeded !store;
+			jump -> extendForward..return if >= 0;//return if page is already big enough i.e. if(%pageSize >= %size)
+			repeat 0 jump -> shrinkPage if < 0;//UNFINISHED
+			[%nextPage + nextPage.isUsed] |= 0 !store;
+			jump -> relocate if != 0;
+			{:whenFree;
+				let doublePageSize <-> pageSize;//size of both pages combined
+				%doublePageSize = [%nextPage + nextPage.next];
+				%doublePageSize -= %page;
+				%doublePageSize -= %maxIndexNeeded !store;
+				jump -> relocate if < 0;//note: do not need to consider merging more pages since consecitive empty pages should be imposible
+			};
+			{:merge2Pages;
+				let temp <-> pageSize;
+				let newNextPage = Page.pointer=() <-> maxIndexNeeded;
+				%newNextPage += %page;
+				delete maxIndexNeeded;
+				[%page - #(Page.size - page.next)] = %newNextPage;
+				%nextPage = [%nextPage + nextPage.next];
+				${:updateNextNextPage;
+					:block;
+					%nextPage += 1 !store;//assume: there are 0x8000 memory locations
+					jump -> block..return if sign;//prevents mutating memory outside the end of the heap.
+					[%nextPage + nextPage.last] = %page;
+					[%nextPage + nextPage.last] -= Page.size;
+				};
+				{//construct newNext
+					[%newNextPage + newNextPage.next] = %nextPage;
+					[%newNextPage + newNextPage.last] = %page;
+					[%newNextPage + newNextPage.isUsed] = 0;
+				};
+				repeat 0 jump -> extendForward..return;//not needed since it is the same as '@jump => ram 1';
+			};
+		};
+		repeat 0: ${:extendBackward;//There is probably a way to DRY this part
+			let lastPage = Page.pointer=() <-> nextPage;
+			let minIndexNeeded = offset;
+			//checks for max size
+			{:getPageSize;
+				%lastPage = [%page - #(Page.size - page.last)];
+				%pageSize = %lastPage;
+				%pageSize -= %page;
+			};
+			let resizeThisPage;
+			%minIndexNeeded |= 0;
+			jump -> resizeThisPage if < 0;
+			%pageSize -= %minIndexNeeded !store;
+			jump -> extendForward..return if >= 0;//return if page is already big enough i.e. if(%pageSize >= %size)
+			[%lastPage + lastPage.isUsed] |= 0 !store;
+			jump -> relocate if != 0;
+			{:whenFree;
+				let doublePageSize <-> pageSize;//size of both pages combined
+				%doublePageSize = [%lastPage + lastPage.last];
+				%doublePageSize -= %page;
+				%doublePageSize -= %maxIndexNeeded !store;
+				jump -> relocate if < 0;//note: do not need to consider merging more pages since consecitive empty pages should be imposible
+			};
+			def resizeThisPage{
+				let temp <-> pageSize;
+				let newLastPage = Page.pointer=() <-> maxIndexNeeded;
+				%newLastPage += %page;
+				delete maxIndexNeeded;
+				[%page - #(Page.size - page.last)] = %newLastPage;
+				%lastPage = [%lastPage + lastPage.last];
+				${:updateNextNextPage;
+					:block;
+					%lastPage += 1 !store;//assume: there are 0x8000 memory locations
+					jump -> block..return if sign;//prevents mutating memory outside the end of the heap.
+					[%lastPage + lastPage.last] = %page;
+					[%lastPage + lastPage.last] -= Page.size;
+				};
+				{//construct newNext
+					[%newLastPage + newLastPage.next] = %page;
+					[%newLastPage + newLastPage.last] = %lastPage;
+					[%newLastPage + newLastPage.isUsed] = 0;
+				};
+				repeat 0 jump -> extendBackward..return;//not needed since it is the same as '@jump => ram 1';
+			};
+		};
+		#nextReg.n <-> relocate.nextReg.n;
+		return;
+		def relocate;
 		//UNFINISHED
 	}::{void #call.addCaller(..this,3);};
 	//garbidge collection

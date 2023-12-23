@@ -1,0 +1,52 @@
+#"tptasm";
+#"table";
+let heap{
+	import lib "heap.0xmin";
+	#..splice(0,-0);
+	{
+		//def memory;
+		def malloc;
+		def free;
+		def realloc;
+		let memory = memory,
+			malloc = malloc,
+			free = free,
+			realloc = realloc,
+			ref = ref,
+			unref = unref,
+		;
+	};
+	delete;
+	...let .[0];
+};
+...let heap;
+jump->heap..return;
+def heap;
+null;//main program
+r0 = 4;
+call malloc;//malloc.call(0);
+mask = 0xff00; r1=0x0000; [r0 + 0] = r1;
+mask = 0x00ff; r1=0x0000; [r0 + 1] = r1;
+mask = 0x0000; r1=0xff00; [r0 + 2] = r1;
+mask = 0x0000; r1=0x00ff; [r0 + 3] = r1;
+mask = 0x0000;
+push r0;
+{
+	r0 = 16;
+	call malloc;
+	push r0;
+		r0 = 3;
+		call malloc;
+	pop r0;
+	call free;
+};
+pop r0;
+r1 = 10;
+r2 = 0;
+r3 = 0;
+call realloc;//realloc.call(0);
+call free;//free.call(0);
+hlt;
+let end;
+jump->end #def end;
+def heap.memory;
