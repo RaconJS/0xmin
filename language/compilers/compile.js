@@ -465,7 +465,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						else if(word=="..."
 							&&["", "#"].includes(state.phase)
 						){
-							({index}=await contexts.main_injectCode({index,statement,scope}));
+							({index}=await contexts.main_injectCode({index,statement,scope,injectScope:newScope}));
 						}
 						else if(word=="import"
 							&&["", "@", "$", "#"].includes(state.phase)
@@ -887,7 +887,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			},
 		//----
 		//'...scope;
-		async main_injectCode({statement,index,scope}){
+		async main_injectCode({statement,index,scope,injectScope}){
 			if(statement[index]!="...")return{index,failed:true};
 			index++;
 			//'...let: obj;' ==> insert properties of object
@@ -911,8 +911,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					scope.label.functionConstructor??=label.functionConstructor;
 					scope.label.functionSupertype??=label.functionSupertype;
 				}
-				if(state["set"]|state["codeof"])scope.label.code.push(...label.code);
-				if(state["def"]|state["run"]){
+				if(state["set"]|state["codeof"])injectScope.label.code.push(...label.code);
+				if(state["def"]|state["run"]){//TODO: find a way to use injectScope with `...run` while allowing `:a;virtual ...run(){:b;};` to have `a==b`
 					const source=label.getCode_source();
 					await evalBlock(source,undefined,scope,statement);
 				}
