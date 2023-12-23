@@ -1,0 +1,135 @@
+#"tptasm";#"len";
+let var(obj)={
+	#constructor::{obj};
+	#return = obj
+};
+let random{
+	let state{repeat 1:...set{$;¬0xc0389;¬0x662c}};//:@int[2]
+	let tempState = {repeat 2:$¬0};
+	let resetState{
+		//state = s[0]+(s[1]<<16)
+		[state.(0)] = 1;
+		[state.(1)] = 2;
+		return;
+	};
+	let setSeed{//:@(pop[8])->void
+		sp += 1;
+		let i=-1;
+		repeat state..length [state.(i+=1)] = pop;
+		jump -> [sp - (1+state..length)];
+	};
+	//main function
+	...(){//:@()-> (>> +internal)int
+		let regsUsed = {repeat 2:{};}::{let next = #(){:a;#a<->3}};
+		let temp = 0;//:%int
+		let s0 = 0;//:%int
+		let s1 = 1;//:%int
+		let longShift(n,obj,L_R,temp){
+			let i = -1;
+			repeat obj..length: {
+				#i+=1;
+				repeat (+i==0):{
+					repeat!+L_R:[obj.(i)] <<= n;
+					repeat +L_R:[obj.(-1-i)] >>= n;
+				};
+				repeat (+i!=0):{
+					repeat!+L_R:[obj.(i)] <<= n + internal;
+					repeat +L_R:[obj.(-1-i)] >>= n + internal;
+				};
+			};
+		};
+		let copy(objA,objB){//A = B
+			let i = -1;
+			repeat (objA..length != objB..length) throw "length missmatch";
+			repeat objA..length {
+				%temp = [objA.(i+=1)];
+				[objB.(i)] = %temp;
+			};
+		};
+		let longOperation(oper,objA,objB){//:#(#()->{@},{@},{@})->{@} ; A = B
+			let i = -1;
+			repeat (objA..length != objB..length) throw "length missmatch";
+			repeat objA..length {
+				%temp = [objB.(i+=1)];
+				oper(objA[i],temp);//oper:#(@a,%b)->@ & [a] &= %b;
+			};
+		};
+		let longOperation1(oper,objA){
+			let i = -1;
+			repeat objA..length {
+				oper(objA[i+=1]);//oper:#(@a,%b)->@ & [a] &= %b;
+			};
+		};
+		let longXor = #(a,b){...let set longOperation(
+			(a,b){@[a]^=%b}
+		,a,b)};//a ^= b
+		let s = state;
+		{
+			copy(s,tempState);
+			longShift(13,tempState,0,temp);
+			longXor(s,tempState);
+		};
+		{
+			copy(s,tempState);
+			longShift(15,tempState,1,temp);
+			longShift(2,tempState,1,temp);
+			longXor(s,tempState);
+		};
+		{
+			copy(s,tempState);
+			longShift(5,tempState,0,temp);
+			longXor(s,tempState);
+		};
+		{
+			//(a){[a]^=0xffff;}:>longOperation1(s);
+			(a){[a] >>>= 5;}:>longOperation1(s);
+			%temp = [s.(0)];
+			%temp >>= 16;
+		};
+		return;
+	};
+	{
+		def tempState;
+		def state;
+		def resetState;
+		def setSeed;
+	};
+}:>var();
+let loopN(maxi,i_reg,do){
+	repeat (maxi>0):{
+		r i_reg = #(maxi - 1);
+		${:loop;
+			do;
+			r i_reg -= 1;
+			jump -> loop if >= 0;
+		};
+	};
+};
+{:main;
+	let const_0 = random.regsUsed.next()+2;//:%int = 0
+	let i <-> const_0+1;//:%int
+	let j <-> i+1;//:%int
+	let k <-> 1;//:%int
+	r const_0 = 0;
+	loopN(0,i)<:{call random;};
+	send r const_0 "\c0f";
+	loopN(20,i)<:{
+		send r const_0 "\p00";
+		loopN(12,j)<:{
+			call random;
+			r0 <<= 16 + internal;
+			loopN(16,k)<:{
+				r0&=0x8000 !store;
+				let else;
+				jump -> else if == 0;
+				send r const_0 "\c7f";//white
+				jump -> else..return;
+				#def else{send r const_0 "\c8f"};//black
+				send r const_0 " ";
+				r0<<=1;
+			};
+		};
+	};
+	hlt;
+};
+def var;
