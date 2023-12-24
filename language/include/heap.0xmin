@@ -39,7 +39,7 @@ void #let set: heap{
 	#let: ref,unref;//#()->{@}
 	#let: memory;
 	//each of the functions has a '.call(...args)' method
-	#let: call;
+	#let: Call;
 	#let set: memoryData(){
 		#def: malloc;
 		#def: free;
@@ -53,10 +53,8 @@ void #let set: heap{
 		};
 	};
 	#;
-	#set: call(foo){//call functionName,args
-		#let: args={...set arguments;};
-		#set: args..splice(0,1);//remove foo
-		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-args..length);
+	#set: Call(foo,inputRegs){//call functionName,args
+		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-inputRegs..length);
 		#let: i=0;
 		repeat (foo.nextReg.n):{
 			@push %i;
@@ -64,9 +62,9 @@ void #let set: heap{
 		};
 		{//set inputs
 			#let: i=0;
-			repeat args..length:{//assume {def a}[0] == {$def a;$set a}
-				repeat #(+args[+i]!=+foo.inputs[+i])
-					@ %(foo.inputs[+i])=%(args[+i]);
+			repeat inputRegs..length:{//assume {def a}[0] == {$def a;$set a}
+				repeat #(+inputRegs[+i]!=+foo.inputs[+i])
+					@ %(foo.inputs[+i])=%(inputRegs[+i]);
 				#set: i=i+1;
 			};
 		};
@@ -81,23 +79,9 @@ void #let set: heap{
 	}::{
 		#let: addCaller(foo,len){
 			//repeat (len==1)
-			#let: foo.call=2;
-			#let: heap_Call=call;
-			repeat (len==1)
-			#let: foo.call(x){
-				...let set: heap_Call(foo,x||foo.inputs[0]);
-			};
-			repeat (len==2)
-			#let set: foo.call(x,y){
-				...let set: heap_Call(foo,x||foo.inputs[0],y||foo.inputs[1]);
-			};
-			repeat (len==3)
-			#let set: foo.call(x,y,z){
-				...let set: heap_Call(foo,x||foo.inputs[0],y||foo.inputs[1],z||foo.inputs[2]);
-			};
-			repeat (len==4)
-			#let set: foo.call(x,y,z,w){
-				...let set: heap_Call(foo,x||foo.inputs[0],y||foo.inputs[1],z||foo.inputs[2],w||foo.inputs[3]);
+			#let: heap_Call=Call;
+			#let: foo.call(){
+				...let set: heap_Call(foo,arguments);
 			};
 		};
 	};
@@ -221,7 +205,7 @@ void #let set: heap{
 		%pointer+=compiledPage..length;
 		return;
 		#def: data;
-	}::{void #set: call.addCaller(..this,1);};
+	}::{void #set: Call.addCaller(..this,1);};
 	#set: free{
 		#let: nextReg=enum(0);//get next free register
 		#let: inputs{//:#
@@ -265,7 +249,7 @@ void #let set: heap{
 		};
 		return;
 		#def: data;
-	}::{void #set: call.addCaller(..this,1);};
+	}::{void #set: Call.addCaller(..this,1);};
 	#set: sizeOf(pageInput){
 		#let: lengthOutput=pageInput;
 		//%pageInput=%lengthOutput;
@@ -324,7 +308,7 @@ void #let set: heap{
 		%page+=offset;
 		return;
 		#def: data;
-	}::{void #set: call.addCaller(..this,1);};
+	}::{void #set: Call.addCaller(..this,1);};
 	#set: memset{
 		#let: nextReg=enum(0);
 		#let: inputs{
@@ -339,7 +323,7 @@ void #let set: heap{
 		[clear.data.redHalf]=0;
 		[clear.data.blueHalf]=0;
 		return;
-	}::{void #call.addCaller(..this,3);};
+	}::{void #Call.addCaller(..this,3);};
 	#set:resize{//similar to realloc except it doesn't change the pointer if there isn't any space
 		#let: nextReg=enum(0);
 		#let: inputs{
@@ -353,9 +337,9 @@ void #let set: heap{
 		...let outputs;
 
 		//UNFINISHED
-	}::{void #call.addCaller(..this,4);};
+	}::{void #Call.addCaller(..this,4);};
 	#set:realloc{
-		...#(){:setUpMeta;
+		...labelsof{:setUpMeta;
 			#(){:pseudocode_for_interface;
 				//expands memory in both directions or finds new block
 				#let realloc(object,size,offset){//:({},int,int)->{}
@@ -377,6 +361,11 @@ void #let set: heap{
 			#let: outputs{
 				#def let: newPage = 0;//returns 0 if no page found
 			};
+			#let: defaultInputValues{
+				();();0;0;
+			};
+		};
+		... labelsof{:setUpVariables
 			...let: inputs;
 			...let: outputs;
 			let nextPage = Page.pointer=() <-> nextReg();//:%Page*
@@ -472,7 +461,7 @@ void #let set: heap{
 				%outputs.newPage = tempRegs.newPage;
 				return #def returner;
 			};
-		};
+		}
 		${:extendForward;
 			//checks for max size
 			{:getPageSize;
@@ -565,7 +554,7 @@ void #let set: heap{
 		return;
 		def relocate;
 		//UNFINISHED
-	}::{void #call.addCaller(..this,3);};
+	}::{void #Call.addCaller(..this,4);};
 	//garbidge collection
 		#set: ref(r_address){//#([%Page.data])->{@}
 			//can be used when adding a reference
