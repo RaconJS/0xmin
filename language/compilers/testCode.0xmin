@@ -6,27 +6,7 @@ debugger (4,2,3);
 debugger (¬(""..."\c00"))..length;
 #"code";
 :global;
-virtual...run(){:a;debugger(a==global);1;};
-virtual ...codeof {1};
-let b;
-let c{
-	#let a (){//This has been done for every function type
-		#let 
-			scope = scope,
-			return = return,
-			arguments = arguments,
-			constructor = constructor,
-			caller = caller,
-			this = this,
-			__this = ..this
-		;
-		debugger scope"'scope: '+label?.name";
-		debugger return"'return: '+label?.name";
-		debugger arguments"'arguments: '+label?.name";
-		debugger constructor"'constructor: '+label?.name";
-		debugger caller"'caller: '+label?.name";
-		debugger this"'this: '+label?.name";
-		debugger __this"'__this: '+label?.name";
-	};
-	#a();
-};
+virtual ...run(){:a;debugger(a==global);1;};
+virtual ...codeof {3};
+let v(){};
+debugger {#let v()};//fixed now is passed as 2 shortExpressions 'v' and '()' instead of 'v()'
