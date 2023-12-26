@@ -1,4 +1,4 @@
-#"tptasm";#"len";#"table";
+#"tptasm";#"len";//#"table";
 let allMain(){
 	def main();
 	def heap.malloc;
@@ -49,6 +49,26 @@ let allMain(){
 		repeat str..length{
 			send r const_0 str.(i+=1);
 		};
+	}::{
+		let number{
+			let charSet = var("0123456789ABCDEF");
+			let register(reg,length,reg_char,const_0){
+				#const_0=const_0||0;
+				let char<->state[1];//state[1] are free here
+				r char=0;
+				r temp<<<=4;//circular shift
+				r char<<=4 + internal;
+				send r const_0 [+r char];
+			};
+			let hex(reg,length,reg_char,const_0){
+				#const_0=const_0||0;
+				let char<->state[1];//state[1] are free here
+				r char=0;
+				r temp<<<=4;//circular shift
+				r char<<=4 + internal;
+				send r const_0 [print.number.charSet+r char];
+			};
+		}
 	};
 };
 let main(){
@@ -141,10 +161,15 @@ let main(){
 			r state.(1) = 2;
 			return;
 		}:>var();
-		let getEditAddress(register){
+		let getEditAddress(register)={
 			r register = [program];
 			r register += [program.index];
 			r register += [program.lineNumber];
+
+		}::{
+			let a = var({
+				;
+			});
 		};
 		let curserPosChar:>reg()::{
 			let get(){
@@ -153,19 +178,30 @@ let main(){
 				r ..this |="\p00";
 			};
 		};
+		let reloadWholeScreen{
+			call program.read;
+			call commandBar.clear;
+			send r const_0 program.read.colour.default;
+			return;
+		}:>var();
 		{:start;
 			[program.index] = 0;
 			[program.index] = 0;
 			[program.lineNumber] = 0;
-			repeat 0 call program.read;
+			call reloadWholeScreen;
 			let const_0=0;
-			call commandBar.clear;
-			send r const_0 program.read.colour.default;
 			call resetState;
 			r const_0 = 0;
 			r curserPosChar = "\p00";
 		};
 		def:{:mainLoop;
+			{:autoClearBar;
+				[commandBar.needsClearing]|=0;
+				jump->autoClearBar..return if==0;
+				[commandBar.needsClearing]=0;
+				call commandBar.clear;
+				send r const_0 program.read.colour.default;
+			};
 			let inChar:>reg();//:%char
 			let temp:>reg();//:%
 			inChar:>(regOut){:getInput;
@@ -202,13 +238,6 @@ let main(){
 				};
 			}();
 			r temp = r inChar;
-			[commandBar.needsClearing]|=0;
-			def:{:clearBar;
-				jump->clearBar..return if==0;
-				[commandBar.needsClearing]=0;
-				call commandBar.clear;
-				send r const_0 program.read.colour.default;
-			};
 			let onNoInput,onNumberInput,onCharCommand;
 			$onNoInput=>mainLoop;
 			def:{}::{:handleNumbers;
@@ -228,22 +257,19 @@ let main(){
 			let printMemoryCell{def let block{};let editAddress;return}:>var();//assigned later
 			{:commands;
 				let Command(){
-					let lastChar(char){
-						#return = lastChar^char;
-						#lastChar<->char;
-					};
 					let command(key,name,do){
 						//key:string,name:#string,do:{@}
-						r temp^=lastChar(+key[0]);
+						r temp ^= #(+key[0]) !store;
+						let function;
 						jump->var()<:{//assert: temp is a free register here;
+							:block;
+							#function = block;
 							let textPosCol=commandBar.pos...commandBar.textColour;
 							let emptyPosCol=commandBar.pos...commandBar.emptyColour;
 							print(textPosCol...name,const_0);
 							[commandBar.needsClearing]=1;
 							def do;
 							{
-								call commandBar.clear;
-								send r const_0 program.read.colour.default;
 								jump->mainLoop;
 							};
 						}if==0;
@@ -252,7 +278,7 @@ let main(){
 				};
 				{:switch;
 					...Command;
-					command("\t","exit")<:{return}::{#..this..splice(-1,1)};//note: ..splice(-1,1) removes the last element from the command instance.
+					command("\t","exit")<:{return}::{#function..splice(-1,1)};//note: ..splice(-1,1) removes the last element from the command instance.
 					command({:enter;13},"new line")<:{
 						let onNumberInput.newLine;
 						call onNumberInput.newLine;
@@ -275,6 +301,14 @@ let main(){
 				def onCharCommand{//assert input char was a character above the ascii character "F"
 					...Command;
 					let helpCommand;
+					command("r","running")<:{
+						let i=-1;
+						repeat 14:push r #(i=i+1);
+						call [program];
+						#i=i+1;
+						repeat 14:pop r #(i=i-1);
+
+					};
 					command("h","help")<:{call helpCommand};
 					command("H","help")<:{call helpCommand};
 					#helpCommand{
@@ -322,6 +356,7 @@ let main(){
 							r number.buffer16 = 0;
 							jump->mainLoop;
 						}if>0;
+						r state.(1)=1;
 						push mainLoop;
 						def newLine;
 						{:newLine;//go to next line
@@ -330,7 +365,7 @@ let main(){
 									#def let fillInGaps{//note: '{#def let x}' is the same as '{def let x}'
 										r state.(0)<<=2;//*4 bits
 										r number.buffer16<<=r state.(0);
-										r state.(1)-=1;//1*4 bits
+										r state.(1)-=1;//1*16 bits
 										jump->..return if==0;
 										r state.(0)-=#(4<<2);
 										jump->writeToMemory..return if ==0;//if no values typed then don't edit the memory
@@ -413,7 +448,7 @@ let main(){
 												r char=0;
 												r temp<<<=4;//circular shift
 												r char<<=4 + internal;
-												send r const_0 [var("0123456789ABCDEF")+r char];
+												send r const_0 [print.number.charSet+r char];
 											};
 											let printHexChar4{
 												repeat 4 printHexChar;

@@ -610,6 +610,7 @@ function blocks;{
 							#baz.arguments;//{1;2;3}
 							#baz.constructor;//the global object
 							#baz.caller;//callerScope
+							#baz.this;//callerVarScope
 							#baz.__this;//varScope
 							//note:
 								//If a function type is set, then 'foo()' will use the function type specified in it's delcaration.
@@ -620,6 +621,7 @@ function blocks;{
 							#baz.arguments;//{1;2;3}
 							#baz.constructor;//the global object
 							#baz.caller;//callerScope
+							#baz.this;//ownerObject
 							#baz.__this;//varScope
 						//note: in general:'a.b()' gives same result as 'b()' except 'this':
 							//The 'this' label refers to the object it was the property of.
