@@ -955,6 +955,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true}){
 			//'(a, b, c) <:{} <:{}'
 			//always includes brackets
+			if(argsObj == contexts.noPipeLineing)argsObj = undefined;
 			argsObj??={//:ArgsObj
 				obj:{},//:{[name:String]:Value}
 				list:[],//:Value[]
@@ -1071,7 +1072,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				value??=null;
 				return{value,index};
 			},
-			noPipeLineing:Symbol(),
+			noPipeLineing:Symbol("noPipeLineing"), //used in '#let' to allow 'let a:>foo()' == 'let a{} :> foo();'
 			getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
 			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
 				let word=statement[index];
@@ -2544,7 +2545,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					}),
 					//flat maps all statements in a function. (Makes recursion easier)
 					"flat":async({label})=>{
-						const symbol=Symbol();
+						const symbol=Symbol("isSearched");
 						let highestRecurLevel=0;
 						function* forEachStatement(statement,recurLevel){
 							highestRecurLevel=Math.max(highestRecurLevel,recurLevel);
