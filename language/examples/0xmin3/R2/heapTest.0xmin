@@ -1,5 +1,5 @@
 #"tptasm";
-#"table";
+//#"table";
 let heap{
 	import lib "heap.0xmin";
 	#..splice(0,-0);

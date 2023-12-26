@@ -19,7 +19,7 @@ void #set:(){//documentation
 		clear:Function(%Page*,%Page*?,%Page*?)->void;
 		memset:Function(%Page*,%int16,%int13)->void;
 		resize:Function(%Page*,%int16)->%int16;
-		realloc:Function(%Page*,%int16,%(@()->%bool)*,%int16)->%bool|%Page;
+		realloc:Function(%Page*,%int16,%(@()->bool & flag(if == 0))*,%int16)->%bool|%Page;
 		ref:#(%Page*)->{@};
 		unref:#(%Page*,{@}?,!!label?)->{@};
 		memory{
@@ -56,17 +56,21 @@ void #let set: heap{
 	#set: Call(foo,inputRegs){//call functionName,args
 		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-inputRegs..length);
 		#let: i=0;
-		repeat (foo.nextReg.n):{
+		repeat (foo.nextReg.n):{//TODO: don't push the input inputRegs
 			@push %i;
 			#set: i=i+1;
 		};
 		{//set inputs
 			#let: i=0;
-			repeat inputRegs..length:{//assume {def a}[0] == {$def a;$set a}
-				repeat #(+inputRegs[+i]!=+foo.inputs[+i])
-					@ %(foo.inputs[+i])=%(inputRegs[+i]);
+			repeat foo.inputs..length:{//assume {def a}[0] == {$def a;$set a}
+				repeat !!inputRegs[+i]
+				repeat #(+inputRegs[+i] != +foo.inputs[+i])
+					@ %(foo.inputs[+i]) = %(inputRegs[+i]);
+				repeat (!inputRegs[+i] && !!foo.inputs[+i].default)
+					@ %(foo.inputs[+i]) = #(foo.inputs[+i].default);
 				#set: i=i+1;
 			};
+			repeat !inputRegs[i];
 		};
 		call foo;
 		repeat (foo.nextReg.n):{
@@ -355,17 +359,14 @@ void #let set: heap{
 			#let: inputs{
 				#def let: page = Page.pointer=() <-> nextReg();//input
 				#def let: size = nextReg();//size of new block
-				#def let: onMovePage = nextReg();//function pointer to call if there is a reallocation
-				#def let: offset = nextReg();//data offset. Is the new index for the current data, relative to the new page.
+				#def let: onMovePage = nextReg()::{let default = 0};//function pointer to call if there is a reallocation
+				#def let: offset = nextReg()::{let default = 0};//data offset. Is the new index for the current data, relative to the new page.
 			};
 			#let: outputs{
 				#def let: newPage = 0;//returns 0 if no page found
 			};
-			#let: defaultInputValues{
-				();();0;0;
-			};
 		};
-		... labelsof{:setUpVariables
+		... labelsof{:setUpVariables;
 			...let: inputs;
 			...let: outputs;
 			let nextPage = Page.pointer=() <-> nextReg();//:%Page*

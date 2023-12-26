@@ -20,306 +20,306 @@
 	}
 };
 {}:>(){}::{}()<:{};
-...let set(){
-	#def let m_class(class,objectSize,classConstructor,classDeconstructor)={
-		let errorMsg=#(msg){("missing package: \""...msg..."\"")};
-		repeat!(heap&&heap.malloc&&heap.ref&&heap.unref):{
-			throw errorMsg("import lib \"heap.0xmin\"");
-		};
-		//m_class = Class comstructing Macro
-		//class:#Struct,constructor:#(label?,arguments?:any)->{@}
-		let m_class=this..constructor;
-		#class::{
-			#class..proto=m_class..prototype;
-			#class..prototype=m_class.prototype;
-			#class..constructor=m_class;
-			#class[¬m_class.sizeSymbol]=argsLen;
-			//#..splice(0,0,{});
-			()={
-				repeat !!arguments[0]:{#;
-					return=#(arguments[0]<->this)::{//'let newFoo:>Foo=()'
-						#;
-						//..splice(0,-0);
-						...codeof this;
-						...labelsof this;
-					};
-					return..proto=..proto;
-					return..super=..super;
-					return..prototype=..prototype;
-					return..supertype=..supertype;
-					return..constructor=class;
+#def let m_class(class,objectSize,classConstructor,classDeconstructor)={
+	let errorMsg=#(msg){("missing package: \""...msg..."\"")};
+	let m_class=this..constructor;
+	repeat!(heap&&heap.malloc&&heap.ref&&heap.unref):{
+		throw errorMsg("import lib \"heap.0xmin\"");
+	};
+	//m_class = Class comstructing Macro
+	//class:#Struct,constructor:#(label?,arguments?:any)->{@}
+	#class::{
+		#class..proto=m_class..prototype;
+		#class..prototype=m_class.prototype;
+		#class..constructor=m_class;
+		#class[¬m_class.sizeSymbol]=objectSize;
+		//#..splice(0,0,{});
+		()={
+			repeat !!arguments[0]:{#;
+				return=#(arguments[0]<->this)::{//'let newFoo:>Foo=()'
+					#;
+					//..splice(0,-0);
+					...codeof this;
+					...labelsof this;
 				};
-				repeat !return[¬m_class..prototype.static] {
-					let compiledObj = ..compile;
-					repeat !!size let return[¬m_class.sizeSymbol] = objectSize;
-					repeat !size let return[¬m_class.sizeSymbol] = compiledObj..length;	
-				};
+				return..proto=..proto;
+				return..super=..super;
+				return..prototype=..prototype;
+				return..supertype=..supertype;
+				return..constructor=class;
 			};
-			let delRef_block{//defined later
-				let input <-> 0;
-				m_class.delRefInput..splice(-0,0,{input});//:this() & {@} on heap
+			repeat !return[¬m_class..prototype.static] {
+				let compiledObj = ..compile;
+				repeat !!objectSize let return[¬m_class.sizeSymbol] = objectSize;
+				repeat !objectSize let return[¬m_class.sizeSymbol] = compiledObj..length;	
 			};
-			let addRef_block{};
 		};
-		#let set class..prototype::{
+		let delRef_block{//defined later
+			let input <-> 0;
+			m_class.delRefInput..splice(-0,0,{input});//:this() & {@} on heap
 		};
-		#return=class;
-	}::{
-		let delRefInput<->0;
-		let sizeSymbol;
-		let getSize(obj,recurNum){
-			let maxRecur = +obj..flat;
-			let size=0;
-			forEachLabel(obj){#;
-				let i=-1;
-				let hasSize = !!obj[¬sizeSymbol];
-				repeat !!hasSize #size<->size+obj[¬sizeSymbol];
-				repeat !hasSize repeat obj..length {#;
-					recur maxRecur #forEachLabel(obj[i+=1]);
-					
-				};
-			};
-			#return = size;
-		};
-		virtual{
-			ram=>0xmin;
-			def let delRefInput.list{ram=>delRefInput};//:%[]
-		};
-		let ..prototype{
-			//intended use: e.g. 'let newFoo = Foo.static=()'
-			let sizeSymbol = sizeSymbol;
-			let static(label){//:@[this] aka {@}
-				#repeat !label: :label;
-				#arguments[0] = label;
-				#return=this=(arguments[0],arguments[1],arguments[2]);//this=(...arguments);
-				#let: return[¬static];
-				#let: return.new = #(){throw "Cannot call new on a static object."};
-				#let: return.addRef=#(){throw "Cannot call new on a static object."};
-				#let: return.delRef_block=¬;
+		let addRef_block{};
+	};
+	#let set class..prototype::{
+	};
+	#return=class;
+}::{
+	let delRefInput<->0;
+	let sizeSymbol;
+	let getSize(obj,recurNum){
+		let maxRecur = +obj..flat;
+		let size=0;
+		forEachLabel(obj){#;
+			let i=-1;
+			let hasSize = !!obj[¬sizeSymbol];
+			repeat !!hasSize #size<->size+obj[¬sizeSymbol];
+			repeat !hasSize repeat obj..length {#;
+				recur maxRecur #forEachLabel(obj[i+=1]);
 				
-				repeat !!return[¬m_class..prototype.static] {
-					let new = 
-				};
 			};
-			let Ref(label){#;//reference
-				//intended use: 'let Foo()={def let a:>Bar.Ref();}'
-				:ref;//reference
-				repeat !label:label = ref;
-				repeat !!label:#label<=>ref;
-				repeat !!label:#label..proto=Ref..prototype;
-				//m_class()<:()={Ref()}
-				//used for class().unref();
-				//label has type [class*] on heap
-				def let label[¬Ref] = label{
-					//{ref:Foo;pointer:static Foo*;class = Foo}
-					//value can only used for References to static objects.
-					let class = this,pointer;
-					@pointer;
-				};//this object is a reference of.
-				return = label;
-			}::{
-				let nullValue = 0;
-				let ..prototype{
-					let setValue(newPointer){
-						#let ref = this[¬Ref];
-						#ref[0]={@(ref.pointer=newPointer)}[0];
-						#return = this;
-					};
-					let getValue(){
-						#return = this[¬Ref].pointer;
-					};
-					let nullable(label){#;
-						let this[¬Ref].canBeNull = 1;
-						this.setValue(nullValue);
-						#return = this;
-					};
-				};
+		};
+		#return = size;
+	};
+	virtual{
+		ram=>0xmin;
+		def let delRefInput.list{ram=>delRefInput};//:%[]
+	};
+	let ..prototype{
+		//intended use: e.g. 'let newFoo = Foo.static=()'
+		let sizeSymbol = sizeSymbol;
+		let static(label){//:@[this] aka {@}
+			#repeat !label: :label;
+			#arguments[0] = label;
+			#return=this=(arguments[0],arguments[1],arguments[2]);//this=(...arguments);
+			#let: return[¬static];
+			#let: return.new = #(){throw "Cannot call new on a static object."};
+			#let: return.addRef=#(){throw "Cannot call new addRef a static object."};
+			#let: return.delRef_block=¬;
+			
+			repeat !!return[¬m_class..prototype.static] {
+				let new = 
 			};
-			let ptr(label,vals){//:@[%this] aka %{@}*
-				#repeat !label: :label;
-				let label[¬ptr];
-				#return=this=(label,vals);
-			};
-			let setUp(block,objInstance){
-				#repeat !this.blockDefinisions:def let this.blockDefinisions={
-					:self;
-					jump->self..return;
-					let class = this;
-					let object = class=();
-					let size = object[¬class..constructor.sizeSymbol];
+		};
+		let Ref(label){#;//reference
+			//intended use: 'let Foo()={def let a:>Bar.Ref();}'
+			:ref;//reference
+			repeat !label:label = ref;
+			repeat !!label:#label<=>ref;
+			repeat !!label:#label..proto=Ref..prototype;
+			//m_class()<:()={Ref()}
+			//used for class().unref();
+			//label has type [class*] on heap
+			def let label[¬Ref] = label{
+				//{ref:Foo;pointer:static Foo*;class = Foo}
+				//value can only used for References to static objects.
+				let class = this,pointer;
+				@pointer;
+			};//this object is a reference of.
+			return = label;
+		}::{
+			let nullValue = 0;
+			let ..prototype{
+				let setValue(newPointer){
+					#let ref = this[¬Ref];
+					#ref[0] = {@(ref.pointer = newPointer)}..compile[0];
+					#return = this;
 				};
-				:self;
-				repeat !block[¬setUp]:{
-					let block[¬setUp];
-					#this.blockDefinisions::{
-						repeat (block==class.delRef_block) def class.delRef_block{
-							//note: `(¬)` == null, `()` == undefined
-							//assume: sp: [%(stack:{@})] (a register that contains pointer to an element on the stack)
-							let reg_this<->0;//:%this* & %[]sp where: this:{@}
-							let input = reg_this;
-							let isFirstRef;//:#{}|#(¬)
-							def let pushRefAtStart;//:{@} ;
-							heap.unref(reg_this)<:{
-								def classDeconstructor->(class)||{};
-								let i=-1 +1;
-								let forEachItem = object..flat;
-								repeat (forEachItem..length-1):{
-									let item = forEachItem[i+=1];
-									let ref=item[¬Ref];
-									repeat !!ref:{:block;
-										repeat !!isFirstRef #pushRefAtStart{push r reg_this};
-										let reg_ref<->reg_this;//:%[this + x] & %{@}*
-										repeat !isFirstRef r reg_this=[sp];
-										r reg_ref = [r reg_this+item];
-										repeat ref.canBeNull jump->block..return if==0;
-										call ref.class.delRef_block.pushRefAtStart;//: reg_ref:>
-										#isFirstRef=¬;
-									};
-								};
-								pop r reg_this;
-								:unrefRefs;
-								repeat !!isFirstRef #unrefRefs<=>{};
-							};
-							return;
-						};
-						repeat (block==class.addRef_block) def class.addRef_block{
-							let reg_this<->0,input=reg_this;//:%this* & %{@}*
-							let reg_ref<->1;//:%Ref & %{@}* & [%[{@}+]]:{@}
-							let i=-1 +1;//skip inisial object in `..flat`
-							heap.ref(reg_this);
-							let forEachItem = object..flat;
-							def let referenceOthers;
-							def let addRefs={
-								repeat (forEachItem..length-1):{
-									let item = forEachItem[i+=1];
-									let ref = item[¬Ref];
-									repeat !!ref:{:block;
-										%reg_ref = [%reg_this+item];
-										repeat ref.canBeNull jump->block..return if==0;
-										heap.ref(reg_ref);
-									};
-								};
-							};
-							return;
-						};
-					};
+				let getValue(){
+					#return = this[¬Ref].pointer;
+				};
+				let nullable(label){#;
+					let this[¬Ref].canBeNull = 1;
+					this.setValue(nullValue);
+					#return = this;
 				};
 			};
 		};
-		let prototype{
-			//intended use: e.g. 'let Foo=()={ram=>1;}:>m_class();Foo=().static();'
-			let new(){//:#()->{(pop @)[]->output:%Context*,output:%Context*}
+		let ptr(label,vals){//:@[%this] aka %{@}*
+			#repeat !label: :label;
+			let label[¬ptr];
+			#return=this=(label,vals);
+		};
+		let setUp(block,objInstance){
+			#repeat !this.blockDefinisions:def let this.blockDefinisions={
 				:self;
-				let this=this;
-				let block_new = self;
-				#self..proto=self..constructor..prototype;
-				let assigner;
-				{
-					let rMemory = heap.malloc.inputs[0];
-					r rMemory = this[¬this..constructor.sizeSymbol];
-					let rMemory = heap.malloc.outputs[0];
-					repeat 0 {:malloc;
-						//quicker O(1) way of allocating memory. Uses the heap as a stack.
-						let address= rMemory+1;//[%]*
-						r address=r rMemory;
-						r rMemory = [nextAddress];
-						r rMemory += heap..return;
-						[nextAddress] += r address;
-					};
-					repeat 1 call heap.malloc;
-					def assigner;
-					let output=rMemory;//:%Object* aka %heap.Page*
-					this..constructor.setUp(this..constructor.addRef_block,this);
-					repeat (this..constructor.addRef_block..length>0)
-						call this..constructor.addRef_block.referenceOthers;
-					//assume: this:%
-					repeat ((+this==+this)&&(+this!=+output)):%this=%output;
-					:definer;
-					def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
-				};
+				jump->self..return;
+				let class = this;
+				let object = class=();
+				let size = object[¬class..constructor.sizeSymbol];
 			};
-			let ref(){
-				call this..constructor.addRef_block;
-				let reg_this<->this;
-				this..constructor.setUp(this..constructor.addRef_block,this);
-				let delRefInput = this..constructor.addRef_block.input;
-				repeat (+delRefInput!=+reg_this):%delRefInput = %reg_this;
-				call this..constructor.addRef_block;
-			};
-			let deref(){
-				let reg_this<->this;
-				this..constructor.setUp(this..constructor.delRef_block,this);
-				let delRefInput = this..constructor.delRef_block.input;
-				repeat (+delRefInput!=+reg_this):%delRefInput = %reg_this;
-				call this..constructor.delRef_block;
-			};
-			let assign_fromStack(){//block:{@}
-				let block_new = this.block_new;
-				let this=this.this;
-				block_new.assigner<=>(block || {
-					#let i=this[¬size]-1;
-					let size = this[¬this..constructor.sizeSymbol];
-					repeat this[¬this..constructor.sizeSymbol]:{
-						[r rMemory+i]=pop;//r arguments.(i);//argument
-						#i=i-1;
-					};
-				});
-			};
-			let assign_fromObj(tuple){//tuple:(class() | {@}) & #tree(int)
-				throw "UNFINISHED";
-				let block_new = this.block_new;
-				let this=this.this;
-				let maxRecur = +tuple..flat;
-				let objIndex = -1;
-				let forEach={
-					let: setProperty(property){
-						[this+(objIndex+=1)] = property[0];
-					};
-					let main(){
-						let isObject = obj[i+=1]==obj[i];
-						repeat !isObject setProperty(obj[i]);
-						let labels = obj[i]..labels;
-						repeat (labels..length==0) recur maxRecur code(obj[i]);
-						repeat labels..length recur maxRecur labels(obj[i],labels);
-					};
-					let code(obj)=>{
-						let i=-1;
-						repeat obj..length ...run main;
-					};
-					let label(obj,labels)=>{
-						let i1=-1;
-						let setProperty(){
-							[this+] = property;
+			:self;
+			repeat !block[¬setUp]:{
+				let block[¬setUp];
+				#this.blockDefinisions::{
+					repeat (block==class.delRef_block) def class.delRef_block{
+						//note: `(¬)` == null, `()` == undefined
+						//assume: sp: [%(stack:{@})] (a register that contains pointer to an element on the stack)
+						let reg_this<->0;//:%this* & %[]sp where: this:{@}
+						let input = reg_this;
+						let isFirstRef;//:#{}|#(¬)
+						def let pushRefAtStart;//:{@} ;
+						heap.unref(reg_this)<:{
+							def classDeconstructor->(class)||{};
+							let i=-1 +1;
+							let forEachItem = object..flat;
+							repeat (forEachItem..length-1):{
+								let item = forEachItem[i+=1];
+								let ref=item[¬Ref];
+								repeat !!ref:{:block;
+									repeat !!isFirstRef #pushRefAtStart{push r reg_this};
+									let reg_ref<->reg_this;//:%[this + x] & %{@}*
+									repeat !isFirstRef r reg_this=[sp];
+									r reg_ref = [r reg_this+item];
+									repeat ref.canBeNull jump->block..return if==0;
+									call ref.class.delRef_block.pushRefAtStart;//: reg_ref:>
+									#isFirstRef=¬;
+								};
+							};
+							pop r reg_this;
+							:unrefRefs;
+							repeat !!isFirstRef #unrefRefs<=>{};
 						};
-						repeat labels..length ...(){
-							let i=labels[i1+=1];
-							...run main;
+						return;
+					};
+					repeat (block==class.addRef_block) def class.addRef_block{
+						let reg_this<->0,input=reg_this;//:%this* & %{@}*
+						let reg_ref<->1;//:%Ref & %{@}* & [%[{@}+]]:{@}
+						let i=-1 +1;//skip inisial object in `..flat`
+						heap.ref(reg_this);
+						let forEachItem = object..flat;
+						def let referenceOthers;
+						def let addRefs={
+							repeat (forEachItem..length-1):{
+								let item = forEachItem[i+=1];
+								let ref = item[¬Ref];
+								repeat !!ref:{:block;
+									%reg_ref = [%reg_this+item];
+									repeat ref.canBeNull jump->block..return if==0;
+									heap.ref(reg_ref);
+								};
+							};
 						};
+						return;
 					};
 				};
-				block_new.assigner<=>(block || {
-					#let i=this[¬size]-1;
-					let flattend = tuple..flat;
-					repeat argsLen:{
-						[r rMemory+i]=pop;//r arguments.(i);//argument
-						#i=i-1;
-					};
-				});
-			};
-			repeat 0 {
-				//stack to stack
-				#new::(){
-					push r rMemory;
-				};
-			};
-			let del(){//:pop[this:Context*]
-				call heap.free;
 			};
 		};
 	};
-	#return = m_class;
-}();
+	let prototype{
+		//intended use: e.g. 'let Foo=()={ram=>1;}:>m_class();Foo=().static();'
+		let new(){//:#()->{(pop @)[]->output:%Context*,output:%Context*}
+			:self;
+			let this=this;
+			let block_new = self;
+			#self..proto=self..constructor..prototype;
+			let assigner;
+			{
+				let rMemory = heap.malloc.inputs[0];
+				r rMemory = #(this[¬this..constructor.sizeSymbol]);
+				let rMemory = heap.malloc.outputs[0];
+				repeat 0 {:malloc;
+					//quicker O(1) way of allocating memory. Uses the heap as a stack.
+					let address= rMemory+1;//[%]*
+					r address=r rMemory;
+					r rMemory = [nextAddress];
+					r rMemory += heap..return;
+					[nextAddress] += r address;
+				};
+				repeat 1 call heap.malloc;
+				def assigner;
+				let output=rMemory;//:%Object* aka %heap.Page*
+				this..constructor.setUp(this..constructor.addRef_block,this);
+				repeat (this..constructor.addRef_block..length>0)
+					call this..constructor.addRef_block.referenceOthers;
+				//assume: this:%
+				repeat ((+this==+this)&&(+this!=+output)):%this=%output;
+				:definer;
+				def classConstructor(definer)||{};//using $(¬)() throws an 'undeclared label' error
+			};
+		};
+		let ref(){
+			call this..constructor.addRef_block;
+			let reg_this<->this;
+			this..constructor.setUp(this..constructor.addRef_block,this);
+			let delRefInput = this..constructor.addRef_block.input;
+			repeat (+delRefInput!=+reg_this):%delRefInput = %reg_this;
+			call this..constructor.addRef_block;
+		};
+		let deref(){
+			let reg_this<->this;
+			this..constructor.setUp(this..constructor.delRef_block,this);
+			let delRefInput = this..constructor.delRef_block.input;
+			repeat (+delRefInput!=+reg_this):%delRefInput = %reg_this;
+			call this..constructor.delRef_block;
+		};
+		let assign_fromStack(){//block:{@}
+			let block_new = this.block_new;//:class()().new()
+			let this=this.this;
+			block_new.assigner<=>(block || {
+				#let i=this[¬size]-1;
+				let size = this[¬this..constructor.sizeSymbol];
+				repeat this[¬this..constructor.sizeSymbol]:{
+					[r rMemory+i]=pop;//r arguments.(i);//argument
+					#i=i-1;
+				};
+			});
+		};
+		let assign_fromObj(tuple){//tuple:(class() | {@}) & #tree(int)
+			throw "UNFINISHED";
+			let block_new = this.block_new;
+			let this = this.this;
+			let maxRecur = +tuple..flat;
+			let objIndex = -1;
+			let forEach = {
+				let: setProperty(property){
+					[this+(objIndex+=1)] = property[0];
+				};
+				let main(){
+					let isObject = obj[i+=1] == obj[i];
+					repeat !isObject setProperty(obj[i]);
+					let labels = obj[i]..labels;
+					repeat (labels..length==0) recur maxRecur code(obj[i]);
+					repeat labels..length recur maxRecur labels(obj[i],labels);
+				};
+				let code(obj)=>{
+					let i=-1;
+					repeat obj..length ...run main;
+				};
+				let label(obj,labels)=>{
+					let i1=-1;
+					let setProperty(){
+						[this+] = property;
+					};
+					repeat labels..length ...(){
+						let i=labels[i1+=1];
+						...run main;
+					};
+				};
+			};
+			block_new.assigner <=> (block || {
+				#let i = this[¬size]-1;
+				let flattened = tuple..code_assembly;
+				repeat (i >= 0 && flattened..length):{
+					repeat !!flattened[i]:
+						[r rMemory+i] = flattened[i];//r arguments.(i);//argument
+					#i = i-1;
+				};
+			});
+		};
+		repeat 0 {
+			//stack to stack
+			#new::(){
+				push r rMemory;
+			};
+		};
+		let del(){//:pop[this:Context*]
+			call heap.free;
+		};
+	};
+};
 repeat 0 {:examples;
+	import lib "heap.0xmin";
+	#let m_class.heap = heap;
 	let Int:>m_class(1);
 	let Tripple:>m_class(3);//function is required to assign values using the 'class.static' method.
 	let Vec2(this,x,y)={#def let x:>Int=(x),y = y||0;}:>m_class();
@@ -346,7 +346,6 @@ repeat 0 {:examples;
 			};
 		};
 	};
-	import lib "heap.0xmin";
 	def let point=Vec2.static=({},2,4);
 	{
 		let a = Vec2=()<->heap.regsUsed;
