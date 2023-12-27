@@ -1,13 +1,45 @@
 #"tptasm";#"len";
 let main;
 #main(){
+	let terminal;
+	call terminal;
+	#terminal{
+		let reg = RegEnum(0);
+		let const_0 = reg();
+		let string = reg();
+		%const_0 = 0;
+		wait %const_0;
+		bump %const_0;
+	}:>static();
+	let systemCalls{
+		let 
+			basic{let
+				read,//(address:pop int30*) -> push int16[2]
+				write,//(address:pop int30*, int30*)
+				run,//
+			},
+			heap{let 
+				malloc,free,ref,unref;
+			},
+			file{
+				let new,move,delete;
+			},
+			write,
+			interupt,
+			pause,
+			exit,
+			run,
+		;
+	}:>(commnadList){
+
+	};
 	let filSystem;
 	let init_newFileSystem{
 		return;
 	}:>static();
 	call init_newFileSystem;
 	...run(){//classes
-		let Vector(this,type,values){
+		let Vector(this,type,values)={
 			let type = type;
 			#this[¬constructor.sizeSymbol] = values..length;
 			def let values = values||{};
@@ -21,7 +53,7 @@ let main;
 				};
 			};
 		};
-		let File(this){//File:[]heap*
+		let File(this)={//File:[]heap*
 			#def let name:>Vector.Ref();//: string & @()->mutate terminal & {@;{@send}[];return}
 			#def let parent:>File.Ref().nullable()::{
 				def let index{0};
@@ -116,16 +148,23 @@ let main;
 	}::{
 		let number{
 			let charSet = "0123456789ABCDEF";
-			let register(regInt,reg_char,const_0){
+			let register(regInput,reg_char,const_0){
 				#const_0 = const_0 || 0;
 				r const_0 = 0;
-				repeat 4 hex(reg,reg_char,const_0);
+				#let temp = regInput;
+				repeat 4 {
+					r char = 0;
+					r temp <<<= 4;//circular shift
+					r char <<= 4 + internal;
+					send r const_0 r char;
+				};
 			};
 			let hexChar(regInt,reg_char,const_0){
 				#const_0 = const_0 || 0;
 				r char =0;
 				r temp <<<= 4;//circular shift
 				r char <<= 4 + internal;
+
 				send r const_0 [print.number.charSet:>static() + r char];
 			};
 		};
@@ -147,7 +186,28 @@ let main;
 		};
 	};
 	let RegState(start)={//register enum
-		repeat 16:{};
+		next;
+		let registers = {
+			let i = -1;
+			repeat 16:Register(i+=1,1);
+			delete i;
+		};
+	}::{
+		let ..prototype{
+			let modifyState()<-{
+				caller
+			};
+			let next(regsNeeded){
+
+			};
+			let copy()
+			let use(regsNeeded){//<T>(T)->RegState
+				//regsNeeded:RegState|Register|number|
+			};
+			let Register(number,isFree)={
+				#let isFree = isFree||1;
+			};
+		};
 	};
 	let type;{#;
 		//UNFINISHED
