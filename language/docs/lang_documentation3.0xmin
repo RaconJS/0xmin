@@ -238,9 +238,9 @@
 	};
 };
 $;{
-	$undef:label;
-	$set:label; 
-	$def:array;
+	$undef:label;//removes all defs of the label.
+	$set:label;//assigns the lineNumber of label, or it can run a '$' expression to assign 'label's lineNumber. It can also add a 'def'
+	$def:array;//inserts the code of 'array' into the block
 };
 #;{
 	#let set def;//are executed in that order
@@ -279,7 +279,7 @@ $;{
 	#set: 1 + 2 * 4;//evaluates an expression operators are done in order exept for the assignment operators: '=', '<=>' and '<->'
 	#def: label;/*inserts label into the scope's code array;*/
 
-	/*note: at the moment:*/ #def:label; /*is syntactic sugar for:*/ $undef: label;$set: label;$def: label;//in that order
+	/*note: at the moment:*/ #def:label; /*is syntactic sugar for:*/ $undef: label;$set: label;$def: label;//in that order except it only inserts one line into the block instead of three
 	/*the */#def/*(just like the 3:*/$undef set def:/*), applies the to the final value, meaning:*/#def: foo();/*is the same as:*/#let: bar=foo();#def: bar;
 	expressions;(
 		//value types:
@@ -683,12 +683,18 @@ function blocks;{
 	};
 };
 single_expressions;{
-	expressions have the form:
+	expressions can have the form:
 	+!~ (long_expression) .a.b()()[4]..length()<:a<:b;
 	single argument operators are included in expressions as well as indexing and function calls.
 	datatypes;{
+		symbol;{
+			casting: ¬x ; //converts value into a symbol value.
+			//this type acts like a normal label except, when it is used as an array index '[¬x]', it turnes a private property.
+		}
 		label;{
-			casting: ¬x ; //converts
+			casting: ¬ x ; //converts value into a symbol which acts the same as a label
+			//tip: labels can be thought of as similar to the Javascript Object type.
+			//UNFINISHED
 		}
 		string;{
 			casting: (""...x) ;
@@ -696,6 +702,7 @@ single_expressions;{
 		}
 		number;{
 			casting: +x or !x;
+			bitewise operators can be used for casting aswell;
 			note that booleans have the number datatype so doing !!x will cast a truthy value to 1 and a falsy value to 0;
 			!!label returns 1 if the label exists;
 			!!+label returns 1 if the labels number value is not 0;
@@ -859,7 +866,7 @@ long_expressions;{
 			a ^^ b
 		};
 		boolean operator 'not' !;{
-
+			returns 0 if a value is "truthy" and 0 if it is "falsy"
 		};
 		bitewise 'nor' ~;{
 			e.g.
@@ -871,6 +878,44 @@ long_expressions;{
 			#:a & ~ b ~ c
 			is the same as
 			#:(a) & ( ~((~ b) | c) )
+		};
+		assignment operators = <=> <->;{
+			//UNFINISHED: TODO: check this entire section on all 3 assignment types
+			= 'assignment';{
+				Replaces the label with a new label.
+				//this is very similar to assignment in JavaScript with objects
+			};
+			<=> 'contence assignment';{
+				<=> Replaces the contence of a label without changing any label references.
+				Can be used for assiging instances of a class to a label while keeping its lineNumber.
+				label <=> newLabel;
+				
+				All properties except for the number value (+label) and any references or (label..defs) are coppied from the value being assigned.
+				This includes values accessed with:{
+					a . b;
+					a .. b;
+					a [b];
+				};
+				This does not replace:{
+
+				}
+				e.g.{
+					let a = {1;2;3;let foo,bar};
+					let b = {2;4;6;let foo};
+					def a;
+					#a<=>b;
+
+				}
+			};
+			<-> 'number assignment';{
+				Reassigns the numeric value of a label.
+				let a = {let prop = 3} <-> 2;
+				#+a;// 2
+				let b <-> 4;
+				a<->b;
+				+a;// 4
+				a.prop;// 3
+			}
 		}
 	};
 	proceedence{
@@ -892,6 +937,11 @@ long_expressions;{
 		assignment operators are always done last, and have the same priority
 		e.g. a+b=c+d=e+f is parsed as  (a) = #(b = #(c))
 	};
+};
+internal language structure;{
+	{
+
+	}
 };
 compilation_settings;{
 	These include the following:
