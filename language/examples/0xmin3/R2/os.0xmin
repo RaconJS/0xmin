@@ -1,38 +1,89 @@
 #"tptasm";#"len";
 let main;
+debugger {0-1}..compile"label.code";
 #main(){
 	let terminal;
 	call terminal;
 	#terminal{
 		let reg = RegEnum(0);
 		let const_0 = reg();
+		let char = reg();
 		let string = reg();
+		%string = sp;
+		%string += 1;
 		%const_0 = 0;
-		wait %const_0;
-		bump %const_0;
+		def let getString{
+			{:getInput;
+				let loop;
+				wait %const_0;
+				jump -> loop if sign;
+				bump %const_0;
+				def loop;
+				recv %char %const_0;
+				jump -> loop if !carry;
+			};
+			%char -= "\n" !store;
+			if == 0 jump -> static()<:{
+				:callCommand;
+				let commands = {
+					{"read"};
+					{"write"};
+					{"run"};
+				};
+				{:matchCommand;
+					[%string] - "r" !store;
+				};
+				let clearCommand{
+					send %const_0 "\p00";
+					send %const_0 "\c0f";
+					let i <-> char;
+					%i = 16;
+					${:forLoop;
+						{:do;
+							send %const_0 " ";
+						};
+						%i -= 1;
+						jump -> loop if >= 0;
+					};
+				};
+				jump -> ..this;
+			};
+			push %char;
+			jump -> ..this;
+		};
 	}:>static();
-	let systemCalls{
+	let systemCalls = #(Command){
 		let 
 			basic{let
 				read,//(address:pop int30*) -> push int16[2]
 				write,//(address:pop int30*, int30*)
 				run,//
-			},
+			}:>Command(),
 			heap{let 
 				malloc,free,ref,unref;
-			},
+			}:>Command(),
 			file{
 				let new,move,delete;
-			},
+			}:>Command(),
+		;
+		...labelsof{let 
 			write,
 			interupt,
 			pause,
 			exit,
 			run,
-		;
-	}:>(commnadList){
-
-	};
+		}:>Command();
+	}()<:(commands,fullCommandList){
+		#return = commands;
+		let i = -1;
+		repeat commands..labels..length{
+			let name = commands..labels[i+=1];
+			let label = commands.[""...name];
+			let label.name = name;
+			#static(label);
+		};
+		#fullCommandList..splice(-0,0,label);
+	}
 	let filSystem;
 	let init_newFileSystem{
 		return;
@@ -186,23 +237,41 @@ let main;
 		};
 	};
 	let RegState(start)={//register enum
+		//start: startAt:(number & %) | startAs:RegState
 		next;
 		let registers = {
 			let i = -1;
 			repeat 16:Register(i+=1,1);
 			delete i;
 		};
+		let typeFound;
+		repeat !!start:
+			repeat 
 	}::{
 		let ..prototype{
 			let modifyState()<-{
 				caller
 			};
 			let next(regsNeeded){
-
+				let nextReg = ¬;
+				repeat (regsNeeded..constructor == RegState):{
+					let regsNeeded = regsNeeded;
+					let i = -1;
+					repeat regsNeeded..length:
+						this.registers
+				};
 			};
-			let copy()
+			let copy(){
+				#return = RegState(this);
+			}
 			let use(regsNeeded){//<T>(T)->RegState
 				//regsNeeded:RegState|Register|number|
+				repeat (regsNeeded..constructor == RegState):{
+					let regsNeeded = regsNeeded;
+					let i = -1;
+					repeat regsNeeded..length:
+						this.registers
+				};
 			};
 			let Register(number,isFree)={
 				#let isFree = isFree||1;

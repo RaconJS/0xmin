@@ -55,8 +55,8 @@
 	:> <: //pipeLineing/external arguments
 	... //concat
 	:: //extend object or function
-	( ) [ ] { } //brackets
-	"" '' ``; //strings
+	( ) [ ] { } //brackets: expression '()', index '[]', code block '{}'
+	"" '' ``; //multi-line strings
 //defenite brackets
 	#() #[] #{} //normal meta-expression brackets. The '#' is normally highlighted as white to indicate this.
 //function delcarations
@@ -68,12 +68,12 @@
 	()=>{}//block scope function (aka arrow function)
 	()<={}//strong scope function. Is like a sandbox
 	()->{}//weak scope function
-	()<-{}//
+	()<-{}//macro scope function (aka macro/injection function)
 //function extensions for existing variables
 	foo (){}
 	foo::(){}
 	foo ()={}
-	foo::()={}//etc... can put '::' to make extention functions/object more explicit
+	foo::()={}//etc... can put '::' to make extention functions/object more explicit visually
 	foo ()=>{}
 	foo ()<={}
 	foo ()->{}
@@ -88,7 +88,7 @@
 	foo(a,b,c,{...d},e,f)//can pass in objects/functions as arguments as well
 	foo(a,b) <:c <:{...d} <:e <:f //same function call, just with some external arguments
 	a:> b:> foo(c,{...d}) <:e <:f //using pipelining operators
-	foo(bar(baz)); /*or*/ bar(baz):>foo()
+	foo(bar(baz)); /*or*/ bar(baz):>foo() /*or*/ foo()<:bar(baz)
 //object declarations
 	{}
 	#{}
@@ -96,7 +96,7 @@
 	obj{}
 	obj::{}
 //@ / $ expressions
-	//number can be any of: +123,-123,*123,/123
+	//number can be any of: 123, +123,-123,*123,/123
 	label;
 	label +123;
 	label label;
@@ -694,6 +694,16 @@ single_expressions;{
 		label;{
 			casting: ¬ x ; //converts value into a symbol which acts the same as a label
 			//tip: labels can be thought of as similar to the Javascript Object type.
+			casting from;{
+				//polly fills for type casts
+				let numberToLabel(number){
+					#return = {};
+					#return :: {
+						#..constructor = 0xmin.Number;
+					};
+					#return <-> number;
+				};
+			}
 			//UNFINISHED
 		}
 		string;{
@@ -939,9 +949,33 @@ long_expressions;{
 	};
 };
 internal language structure;{
-	{
-
+	the inbuilt global 0xmin object:{
+		properties:
+		0xmin.Math;
+		//UNFINISHED
+		//TODO add feature
+		0xmin.class;
+		0xmin.class.Number;
+		0xmin.class.String;
+		0xmin.class.Symbol;
+		0xmin.class.AssemblyLine;
+		0xmin.class.SyntaxTree;
+		//UNFINISHED
+	};
+	function structure;{
+		let a (){};
+		//a is stored as an array of functions
+		//it is similar to the polly fill
+		let a {(){}};
+		//UNFINISHED
+	};
+	statement structure and the syntax tree;{
+		//UNFINISHED
 	}
+	assembly line structure;{
+		//UNFINISHED
+	};
+
 };
 compilation_settings;{
 	These include the following:
@@ -993,7 +1027,7 @@ compilation_settings;{
 		let a,b,c;
 		a:>b:>foo(c);
 	};
-	objectExtending using ::;{
+	objectExtending using ::;{//IS_NOW_IMPLEMENTED
 		'::' operator
 		#let: foo(a,b,c){
 			...doStuff;
@@ -1007,6 +1041,16 @@ compilation_settings;{
 		e.g. in 'foo(){...stuff}' '(){...stuff}' is the extension function, that adds onto the end of the 'foo' object.
 		Currently '#obj{...}{...};' can be done to extend an object. This would be changed to '#obj{}::{};'
 	};
+	0xmin.class type;{
+		allow detecting data types.
+		e.g.
+		let a = 3;
+		#a..constructor == 0xmin.class.Number;// true
+		let a = {@move 3};
+		#a[1] = 3;
+		#a[0]..constructor == 0xmin.class.Assembly;// true
+		#a[1]..constructor == 0xmin.class.Number;// true
+	}
 	new,var,const;{
 		new, var, const would be an inbuilt version of the Data object;
 		{
