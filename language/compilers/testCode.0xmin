@@ -1,12 +1,8 @@
 #"0xmin";#"table";
 //{}:>(){}::{}()<:{};
 //BUG: '= 1||()' the compiler enters infinite loop without the '+'
-#let:a <=> 1||(1,1,1);
-debugger (4,2,3);
-debugger (¬(""..."\c00"))..length;
-#"code";
+debugger ((""..."\c00"))"value";
 :global;
 virtual ...run(){:a;debugger(a==global);1;};
 virtual ...codeof {3};
 let v(){};
-debugger {#let v()};//fixed now is passed as 2 shortExpressions 'v' and '()' instead of 'v()'
