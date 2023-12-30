@@ -6,7 +6,6 @@
 //TODO
 //UNUSED
 
-//TODO: BUG: fix char line numbers
 //TODO: BUG: fix '||=' bug
 //TODO: #add '#"text";' for text output
 //TODO: #add '$void'
@@ -2020,7 +2019,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				return new Value.Number(bool);
 			}
 			toValueString(value=this){//:Value
-				let string;//:number
+				let string,array;//:number
 				if(value.type=="number"){string=""+value.number}
 				else if(value.type=="label"){if(value.label)string=value.label.code.reduce((s,v)=>{
 					if(v instanceof AssemblyLine)
@@ -2028,9 +2027,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					else if(v.dataType=="number")s+=String.fromCharCode(v.dataValue|0)
 					return s;
 				},"");}
-				else if(value.type=="string")string=value.string;
+				else if(value.type=="string"){string=value.string;array=value.array;}
 				else if(value.type=="array")throw Error("compiler error: the array Value-type is not fully supported yet.");
-				return new Value({type:"string",string,array:[...(string??"").split("")]});
+				return new Value({type:"string",string,array:array??[...(string??"").split("")]});
 			}
 			toType(type){
 				switch(type){
