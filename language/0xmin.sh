@@ -77,11 +77,15 @@ function compile {
 				i=$(($i + 1));
 				continue;
 			elif [[ $operator == "-help" || $operator == "--help" ]]; then
-				echo compiles and runs .0xmin files
+				echo compiles .0xmin files
 				echo
-				echo flags: -o filePath.filt -\> output
+				echo \`0xmin sourceCode.0xmin -o outputFile.filt\`
 				echo
-				echo -\e filePath.filt -\> runs program on the 0xmin emulator
+				echo flags:
+				echo -o filePath.filt -\> output
+				echo
+				printf '%s ' -\e filePath.filt -\> runs program on the 0xmin emulator
+				echo
 				echo
 				echo -r filePath.0xmin -\> compiles and then runs .0xmin program
 				echo

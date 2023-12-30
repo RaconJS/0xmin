@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
+#search words: TODO, UNFINISHED
 function main {
-	echo Welcome to the 0xmin installer.
-	echo I would recommend reading this program\'s code first before continueing installing.
+	#TODO: test and UI
+	#TODO: complete file
+	echo Welcome to the 0xmin setup helper.
+	echo This program is meant to be an alternative to moveing and installing files manually.
 	yes_or_no continue\? || exit
-	echo dependancies: nodejs version 16+, sublimeText, the-powder-toy
+	echo 1/2: dependancies: nodejs version 16+, sublimeText, the-powder-toy
 	
-	echo checking for nodejs
+	echo 1-1/2: checking for nodejs
 	if ! command -v nodejs; then
 	    echo nodejs is missing
 	    yes_or_no install nodejs\? && installNode
@@ -18,9 +21,9 @@ function main {
 		fi
 	fi
 
-	echo unpack 0xmin files:
+	echo 2/2: unpack 0xmin files:
 
-	echo checking for sublimeText
+	echo 2-1/2: checking for sublimeText
 	yes_or_no unpack the package for Sublime Text\? && (
 		sublimetext="~/.config/sublime-text-3";
 		if test -f $sublimetext;then
@@ -31,6 +34,8 @@ function main {
 		read -e -p "enter new file path for the sublimetext syntax package" sublimetext
 		unpack_for_sublimetext $sublimetext
 	)
+	echo 2-2/2: checking for the the-powder-toy
+	echo this section is UNFINISHED. Please move across the appropriate files into ThePowderToy 
 }
 function unpack_for_sublimetext {
 	echo unpacking Sublime Text files
