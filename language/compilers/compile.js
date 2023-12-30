@@ -5,6 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
+
 //TODO: BUG: fix char line numbers
 //TODO: BUG: fix '||=' bug
 //TODO: #add '#"text";' for text output
@@ -217,6 +218,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		}
 	//----
 	//extra classes
+		//these classes need to exist before contexts is defined
 		class Operator_numeric{
 			//numOfArgs: 1|2;
 			///operation: () => number;
@@ -371,7 +373,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					if(keywords["void"]||keywords["virtual"]||keywords["static"])
 						({index}=contexts.phaseSetter({index,statement,scope,state}));
 				}
-				//TODO: 'virtual': allow the: 'virtual...(){  }' paturn to work
+				//TODO: 'virtual': allow the: 'virtual...(){  }' pattern to work
 				let virtualLine;
 				if(state.virtual)newScope.label.code.push(virtualLine=new HiddenLine.Virtual({scope:newScope}));
 				commands:{
@@ -885,643 +887,644 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				index=statement.length;
 				return {index};
 			},
+			//'...scope;
+			async main_injectCode({statement,index,scope,injectScope}){
+				if(statement[index]!="...")return{index,failed:true};
+				index++;
+				//'...let: obj;' ==> insert properties of object
+				//'...set: obj;' ==> insert code of block
+				//'...def: foo;' ==> run code source in scope
+				const state={"let":false,"set":false,"def":false,"run":false,"codeof":false,"labelsof":false};
+				let found;
+				({index,found}=contexts.keyWordList({keywords:state,statement,index,scope}));
+				if(!found){state["let"]=state["set"]=state["def"]=true;}
+				let value;
+				({index,value}=await contexts.expression({statement,index,scope,includeBrackets:false}));
+				const label=Variable.fromValue(value);
+				if(label){
+					if(state["let"]|state["labelsof"]){
+						Object.assign(scope.let.label.labels,label.labels);
+						scope.label.prototype??=label.prototype;
+						scope.label.supertype??=label.supertype;
+						scope.label.securityLevel??=label.securityLevel;
+						scope.label.functionPrototype??=label.functionPrototype;
+						scope.label.functionSupertype??=label.functionSupertype;
+						scope.label.functionConstructor??=label.functionConstructor;
+						scope.label.functionSupertype??=label.functionSupertype;
+					}
+					if(state["set"]|state["codeof"])injectScope.label.code.push(...label.code);
+					if(state["def"]|state["run"]){//TODO: find a way to use injectScope with `...run` while allowing `:a;virtual ...run(){:b;};` to have `a==b`
+						const source=label.getCode_source();
+						await evalBlock(source,undefined,scope,statement);
+					}
+				}
+				return{index};
+			},
 		//----
-		//'...scope;
-		async main_injectCode({statement,index,scope,injectScope}){
-			if(statement[index]!="...")return{index,failed:true};
-			index++;
-			//'...let: obj;' ==> insert properties of object
-			//'...set: obj;' ==> insert code of block
-			//'...def: foo;' ==> run code source in scope
-			const state={"let":false,"set":false,"def":false,"run":false,"codeof":false,"labelsof":false};
-			let found;
-			({index,found}=contexts.keyWordList({keywords:state,statement,index,scope}));
-			if(!found){state["let"]=state["set"]=state["def"]=true;}
-			let value;
-			({index,value}=await contexts.expression({statement,index,scope,includeBrackets:false}));
-			const label=Variable.fromValue(value);
-			if(label){
-				if(state["let"]|state["labelsof"]){
-					Object.assign(scope.let.label.labels,label.labels);
-					scope.label.prototype??=label.prototype;
-					scope.label.supertype??=label.supertype;
-					scope.label.securityLevel??=label.securityLevel;
-					scope.label.functionPrototype??=label.functionPrototype;
-					scope.label.functionSupertype??=label.functionSupertype;
-					scope.label.functionConstructor??=label.functionConstructor;
-					scope.label.functionSupertype??=label.functionSupertype;
-				}
-				if(state["set"]|state["codeof"])injectScope.label.code.push(...label.code);
-				if(state["def"]|state["run"]){//TODO: find a way to use injectScope with `...run` while allowing `:a;virtual ...run(){:b;};` to have `a==b`
-					const source=label.getCode_source();
-					await evalBlock(source,undefined,scope,statement);
-				}
-			}
-			return{index};
-		},
-		async parameters({index=0,statement,scope}){//'a,b,c' in '(a,b,c){};'
-			//does not include brackets
-			const params=[];
-			for(const param of statement){
-				const statement=param;//statement == e.g. [ 'a' , ',' ]
-				let index=0;
-				for(let i=0;i<statement.length&&index<statement.length;i++){
-					let word=statement[index];
-					if(word=="..."){//'...otherArgs,' trailing parameter, 
-						throw Error(throwError({index,statement,scope},"#", "trailing parameters are not supported yet."));
-					}
-					if(word.match(nameRegex)){
-						params.push(new Parameter({name:word}));
-						break;
-					}
-					else{//'foo(,,){}'
-						params.push(new Parameter());//empty space. does not create a parameter.
+		//expression & expression_short
+			async parameters({index=0,statement,scope}){//'a,b,c' in '(a,b,c){};'
+				//does not include brackets
+				const params=[];
+				for(const param of statement){
+					const statement=param;//statement == e.g. [ 'a' , ',' ]
+					let index=0;
+					for(let i=0;i<statement.length&&index<statement.length;i++){
+						let word=statement[index];
+						if(word=="..."){//'...otherArgs,' trailing parameter, 
+							throw Error(throwError({index,statement,scope},"#", "trailing parameters are not supported yet."));
+						}
+						if(word.match(nameRegex)){
+							params.push(new Parameter({name:word}));
+							break;
+						}
+						else{//'foo(,,){}'
+							params.push(new Parameter());//empty space. does not create a parameter.
+						}
 					}
 				}
-			}
-			return {parameters:params};
-			//UNFINISHED
-		},
-		endingSymbol({index,statement}){//failed==true if ending was found
-			//'#()' or '#{}' ==> '()' '{}'
-			//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
-			let failed=false;
-			if("@$#".includes(statement[index])){
-				if("([{".includes(statement[index+1]))index++;
-				else failed=true;
-			}if(endingStringList.includes(statement[index]))failed=true;
-			return {index,failed:failed??index>=statement.length};
-		},
-		async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true}){
-			//'(a, b, c) <:{} <:{}'
-			//always includes brackets
-			if(argsObj == contexts.noPipeLineing)argsObj = undefined;
-			argsObj??={//:ArgsObj
-				obj:{},//:{[name:String]:Value}
-				list:[],//:Value[]
-			};
-			const addArg=value=>{
-				if(value!==undefined){
-					if(value){
-						argsObj.list.push(value);
-						//argsObj.obj[value.name]=value.label;
-					}
-					else{//'foo(());'
-						argsObj.list.push(null);
+				return {parameters:params};
+				//UNFINISHED
+			},
+			endingSymbol({index,statement}){//failed==true if ending was found
+				//'#()' or '#{}' ==> '()' '{}'
+				//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
+				let failed=false;
+				if("@$#".includes(statement[index])){
+					if("([{".includes(statement[index+1]))index++;
+					else failed=true;
+				}if(endingStringList.includes(statement[index]))failed=true;
+				return {index,failed:failed??index>=statement.length};
+			},
+			async arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true}){
+				//'(a, b, c) <:{} <:{}'
+				//always includes brackets
+				if(argsObj == contexts.noPipeLineing)argsObj = undefined;
+				argsObj??={//:ArgsObj
+					obj:{},//:{[name:String]:Value}
+					list:[],//:Value[]
+				};
+				const addArg=value=>{
+					if(value!==undefined){
+						if(value){
+							argsObj.list.push(value);
+							//argsObj.obj[value.name]=value.label;
+						}
+						else{//'foo(());'
+							argsObj.list.push(null);
+						}
 					}
 				}
-			}
-			if(includeBrackets){
-				if(statement[index]=="("){
-					const argBlock=statement[index+1];
-					index+=3;
-					if(shouldEval)
-					for(const statement of argBlock){
-						let {value,index}=await contexts.expression({index:0,statement,scope,includeBrackets:false});
+				if(includeBrackets){
+					if(statement[index]=="("){
+						const argBlock=statement[index+1];
+						index+=3;
+						if(shouldEval)
+						for(const statement of argBlock){
+							let {value,index}=await contexts.expression({index:0,statement,scope,includeBrackets:false});
+							addArg(value);
+						}
+					}else throw Error("compiler error: contexts.arguments() starts at '('")
+					//'<:{}' => block argument
+					for(let i=0;i<statement.length&&index<statement.length;i++){
+						if("@$#".includes(statement[index])){index++;break;}
+						if(statement[index]!="<:"){
+							break;
+						}
+						index++;
+						let value;
+						({value,index}=await contexts.expression_short({index,statement,scope,shouldEval}));
 						addArg(value);
 					}
-				}else throw Error("compiler error: contexts.arguments() starts at '('")
-				//'<:{}' => block argument
-				for(let i=0;i<statement.length&&index<statement.length;i++){
-					if("@$#".includes(statement[index])){index++;break;}
-					if(statement[index]!="<:"){
-						break;
-					}
-					index++;
-					let value;
-					({value,index}=await contexts.expression_short({index,statement,scope,shouldEval}));
-					addArg(value);
 				}
-			}
-			return {index,argsObj};
-		},
-		async expression_short({index,statement,scope,argsObj=undefined,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
-			if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
-			if(!statement[index])return{index};
-			//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
-			let word=statement[index];
-			let value,array,failed;
-			if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index,failed};
-			word=statement[index];
-			if(word instanceof Array)throw Error ("compiler type error???: do not know how 'let word:Array;' is handled by the code");
-			if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {//'+123' or '-123'
-				let number=value;
-				if(shouldEval)value=new Value({number,type:"number"});
-			}else if(({index,value,array}=await contexts.string({index,statement,scope})).value!=undefined) {
-				//'"abc"'
-				let string=value;
-				if(shouldEval)value=new Value({string,type:"string",array});
-			}else if(!({index,value,failed}=await contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
-			else if("([".includes(word)){//'(label)'
-				({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
-				value??=null;//'()' ==> `undefined`. Used for 'foo(());'
-			}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
-				const operator=contexts.operators_Left[word];//:function (Value) => Value
-				index++;
-				({index,value}=await contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false}));
-				if(shouldEval)value=operator(value);
-				return {index,value};
-			}else if(word.match(nameRegex)){//'label'
-				if(shouldEval){
-					value=new Value();
-					value.name=word;
-					let {label,parent}=scope.findLabel(value.name)??{};
-					value.label=label;
-					value.parent=parent;
-					value.refType="name";
-				}
-				index++;
-			}else{
-				//value=new Value();
-				if(!TESTING)return {index,value:undefined};
-			}
-			({index,value}=await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets}));
-			if(false)if(statement[index]==":"){
-				index++;
-				({index,value}=await contexts.typeSystem({value,index,statement,scope,shouldEval}));
-			};
-			return {index,value};
-		},
-		//test for function declaration: stops 'a = ()=>{}' turning into: ['a=()', '=>', '{}']
-		//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
-		//note: for functions it is advised to use '#(){}' instead of '(){}' to prevent this
-		//expression_short:
-			async getIndexedPropertyName({index,statement,scope}){
-				let name,failed=false;
-				({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
-				if(name){
-					if(name.type=="label"){
-						if(name.refType=="symbol")name=name.label?.symbol??undefined;//'a[¬b]'
-						else name=name.label?.lineNumber;
-					}
-					else if(name.type=="number")name=name.number;
-					else if(name.type=="string")name=name.string;
-					else{failed=true}
-				}else failed=true;
-				return {index,name,failed};
+				return {index,argsObj};
 			},
-			async expression_fullExtend({value,index,statement,scope,argsObj=undefined,shouldEval=true,noSquaredBrackets=false}){
-				for(let i=index;i<statement.length;i++){//'.property'
-					if(index>=statement.length)break;
-					let word=statement[index];
-					let oldIndex=index;
-					if(word=="["&&noSquaredBrackets)break;
-					({value,index}=await contexts.extend_value({index,statement,scope,value,argsObj,shouldEval}));
-					if(index==oldIndex)break;
-				}
-				value??=null;
-				return{value,index};
-			},
-			noPipeLineing:Symbol("noPipeLineing"), //used in '#let' to allow 'let a:>foo()' == 'let a{} :> foo();'
-			getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
-			async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
+			async expression_short({index,statement,scope,argsObj=undefined,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
+				if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
+				if(!statement[index])return{index};
+				//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
 				let word=statement[index];
-				if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
-					//'()'-> null, '' -> undefined
-					if(value===undefined||value?.type=="undefined"){//TODO: add undefined and null types to the Value class
-						//sets default labels from scopes
-						//'(..b)' ==> 'this..b' var scope's label
-						//'(.b)' and '(.(b))' ==> 'b' let scope's label
-						//'([b])' ==> 'b'; weak scope's label
-						if(word=="..")value=scope.var.label.toValue("label");
-						if(word==".")value=scope.let.label.toValue("label");
-						if(word=="[")value=scope.label.toValue("label");
-					}
-					else if(value===null){}
-					let isInternal=word=="..";
-					let parent=value?.label;
-					value=new Value({parent});
-					let oldIndex=index;
-					let name,nameFound=false;
-					if(word!="["){index++;word=statement[index]??"";}
-					//optional expression
-					if(word.match(nameRegex)){//'a.b' ?
-						name=word;
-						nameFound=true;
-						index++;
-					}if(!nameFound){//'a.123' ?
-						({index,value:name}=await contexts.number({index,statement,scope}));
-						if(name!==undefined)nameFound=true;
-					}if(!nameFound&&["(", "["].includes(word)){//'a.("b")' or 'a["b"]' ?
-						({index,name,failed:nameFound}=await contexts.getIndexedPropertyName({index,statement,scope}));
-						nameFound=!nameFound;
-					}
-					if(!nameFound){
-						throw Error(throwError({index,statement,scope},"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name"));
-					}else{
-						value.name=name;
-					}
-					if(shouldEval)if(parent){
-						if(isInternal){//'a..b';
-							if(name=="constructor")name="construtor_";//javascript did not like having 'constructor' as a normal property
-							const labels=getInternals(value,{index,statement,scope}).labels;
-							const label=labels[name];//?:internal object
-							if(labels.hasOwnProperty(name))({value}=await label.callFunction({args:undefined,value,scope,statement}));
-							else{
-								throw Error(throwError({index,statement,scope},"# keyword","'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
-							}
-						}//'a.b'
-						else {
-							if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
-							if(typeof name=="number"){//'a[b]'
-								value.refType="array";
-								name=contexts.getIndexNumber(name,parent)??0;
-								value.number=name;
-								let newVal=parent.code[name];
-								if(newVal instanceof AssemblyLine){
-									let code=newVal;
-									let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
-									value.type="label";
-									let type= code.dataType=="char"?"string":"number";
-									value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
-									
-									if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
-										value=value.toType("number");
-										//TODO: throw error if index out of range
-									}
-								}
-								else value.label=
-									newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
-									newVal instanceof Variable?newVal:
-									newVal instanceof Scope?newVal.label:
-									newVal instanceof CodeLine?undefined:
-									newVal instanceof Statement?newVal.toLabel():
-								undefined;
-							}
-						}
-					}
-					return {index,value};
-				}else if("("==word&&//'foo()'; parses: 'foo=>()=>{}' ==> 'foo=>() => {}'; 'foo()=>{}' ==> 'foo ()=>{}'; 'foo=>#()=>{}' ==> 'foo => #()=>{}'
-					!(statement[index+3]=="{"||functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{")
-					||(functionCallTypes.includes(word)&&statement[index+1]=="(")
-				){
-					if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"calling a undefined value. cannot do '#()()', try '#(¬)()' or '1()'"));
-					//function call: 'foo()' to 'foo=>()<:{}<:{}'
-					let startIndex=index;
-					let callType="";
-					if(functionCallTypes.includes(word)){
-						callType=word;
-						index++;
-					}
-					//'foo=>()=>{}' ==> 'foo => #()=>{}'let argsObj;
-					({index,argsObj}=await contexts.arguments({index,statement,scope,callType,argsObj,shouldEval}));
-					if(shouldEval)
-					if(value.type=="label"&&value.label!=undefined){
-						({value}=await value.label.callFunction({args:argsObj,value,scope,callType,statement}));
-					}
-					argsObj.obj={};
-					argsObj.list=[];
-					return {index,value};
-				}else if(word==":>"&&argsObj!=contexts.noPipeLineing){
-					argsObj??=new ArgsObj({obj:{},list:[]});
-					for(let i=index;i<statement.length;i++){
-						//argsObj==NaN -> don't use pipeline
-						if(statement[index]==":>"){//pipeLine
-							index++;
-							if(value?.name!=undefined)argsObj.obj[value.name]=value;
-							argsObj.list.push(value);
-							({value,index}=await contexts.expression_short({index,statement,scope,argsObj}));
-						}else break;
-					}
-				}
-				else if(word=="::"){//extend object 'foo(){}::{}'
-					//extention operator '::{}' or '::(){}' or '::label'
+				let value,array,failed;
+				if(({index,failed}=contexts.endingSymbol({statement,index})).failed)return{index,failed};
+				word=statement[index];
+				if(word instanceof Array)throw Error ("compiler type error???: do not know how 'let word:Array;' is handled by the code");
+				if(({index,value}=await contexts.number({index,statement,scope})).value!=undefined) {//'+123' or '-123'
+					let number=value;
+					if(shouldEval)value=new Value({number,type:"number"});
+				}else if(({index,value,array}=await contexts.string({index,statement,scope})).value!=undefined) {
+					//'"abc"'
+					let string=value;
+					if(shouldEval)value=new Value({string,type:"string",array});
+				}else if(!({index,value,failed}=await contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
+				else if("([".includes(word)){//'(label)'
+					({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
+					value??=null;//'()' ==> `undefined`. Used for 'foo(());'
+				}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
+					const operator=contexts.operators_Left[word];//:function (Value) => Value
 					index++;
-					if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
-					if(({index,value}=await contexts.declareFunctionOrObject({
-						index,statement,scope,
-						startValue:value,shouldEval
-					})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected form: `label :: { }' or 'label :: ( ){ }'"));
-				}
-				return {index,value};
-			},
-			async typeSystem({index,statement,scope,value,shouldEval=true}){
-				({index}=await contexts.expression_short({index,statement,scope,shouldEval:false}));
-				return {index,value};
-			},
-			delcare_typeChecks({index,statement,scope},isExtension,startValue){
-				if(isExtension){//'obj{}'
-					//type checking
-					//TODO: replace the following with throwError errors
-					if(startValue==undefined)throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not defined"));
-					if(!(startValue instanceof Value))throw Error("compiler type error:");
-					if(startValue.type!="label")throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not a label"));
-					if(!startValue.label){
-						startValue.label=new Variable({name:startValue.name});
-					}
-				}
-			},
-			async declareFunctionOrObject({index,statement,scope,startValue=undefined,shouldEval=true}){
-				const isExtension=!!startValue;
-				let value=startValue;
-				let word=statement[index];
-				if(word=="("&&(
-					statement[index+3]=="{"||
-					functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
-				)){//function declaration '(){}'
-					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
-					let {parameters} = await contexts.parameters({index:0,statement:statement[index+1],scope});
-					index+=3;
-					let callType;//:Parameter[],string;
-					word=statement[index];
-					if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
-						callType=word||"";
-						index++;
-					}
-					word=statement[index+1];//word== '...' in '(){...}'
-					let code=word;
-					let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
-						parameters,
-						callType,
-						label:new Variable({name:"(scope function)",code:word}),
-						parent:scope,
-						code,
-					});
-					let functionObj;//:Variable
+					({index,value}=await contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false}));
+					if(shouldEval)value=operator(value);
+					return {index,value};
+				}else if(word.match(nameRegex)){//'label'
 					if(shouldEval){
-						if(isExtension)functionObj=startValue.label;
-						else functionObj=new MacroFunction({type:"function",});//:Variable
-						value=functionObj.toValue("label");
-						functionObj.code.push(functionScope);
-						functionObj.prototype??=new Variable({name:"(prototype)"});
-						functionObj.supertype??=new Variable({name:"(supertype)"});
+						value=new Value();
+						value.name=word;
+						let {label,parent}=scope.findLabel(value.name)??{};
+						value.label=label;
+						value.parent=parent;
+						value.refType="name";
 					}
-					index+=3;//skip '(' '...' ')' in '(...){}'
-					return {index,value,failed:false};//isExtension&&!startValue};
-				}else if(word=="{"){//'{}' object declaration
-					contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
 					index++;
-					if(shouldEval){
-						//makes block scope
-						let newScope=await evalBlock(
-							statement[index],
-							scope,
-							isExtension
-								?new ObjectScope({fromName:"declareFunctionOrObject/object",parent:scope,label:startValue.label,code:statement[index]})
-								:undefined
-							,undefined//not recursive
-						);
-						value=startValue??new Value({type:"label",label:newScope.label});
-					}
-					index+=2;
-					return {index,value,failed:false};//failed:isExtension&&!startValue};
-				}else {
-					return {index,value,failed:true};
-				}
-			},
-		//---
-		operators_Left:{
-			"+":(value)=>value?value.toType("number"):new Value.Number(NaN),
-			"-":(value)=>value?-value.toType("number"):new Value.Number(NaN),
-			"~":(v)=>new Value.Number(~v?.number),
-			"!":(v)=>{v??=new Value();let ans=v.toBool();ans.number=!ans.number;return ans;},
-			"¬":(v)=>{//:Value
-				if(v===null||v===undefined){//'¬()' and '(¬)' --> empty, undeclared label
-					return new Value({type:"label",label:null});
-				}
-				v=new Value(v??{});
-				if(v.type=="label"){
-					v.refType="symbol";
-					return v;
-				}
-				else {
-					return v.toType("label");//TODO: unsure about this mechanic
-				}
-			},
-			//"...":(v)=>new Value.Number(~v.number),
-		},
-		operators:{
-			"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
-			"-":new Operator_numeric((a,b)=>a-b,0,a=>-a),
-			"*":new Operator_numeric((a,b)=>a*b),
-			"/":new Operator_numeric((a,b)=>a/b,0,a=>1/a),
-			">>>":new Operator_numeric((a,b)=>a>>>b),
-			">>":new Operator_numeric((a,b)=>a>>b),
-			"<<":new Operator_numeric((a,b)=>a<<b),
-			"**":new Operator_numeric((a,b)=>a**b),
-			"%":new Operator_numeric((a,b)=>a%b),
-			"^":new Operator_numeric((a,b)=>a^b),
-			"&":new Operator_numeric((a,b)=>a&b),
-			"|":new Operator_numeric((a,b)=>a|b),
-			"~":new Operator_numeric((a,b)=>~(a|b),0,a=>~a),
-
-			">=":new Operator_numeric((a,b)=>a>=b),
-			"<=":new Operator_numeric((a,b)=>a<=b),
-			">":new Operator_numeric((a,b)=>a>b),
-			"<":new Operator_numeric((a,b)=>a<b),
-
-			"==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.equality(v1,v2))),
-			"!=":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
-			"===":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
-			"!==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
-			//"!":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!b2)),
-
-			"&&":new Operator_bool(b=>b,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
-			"||":new Operator_bool(b=>!b,(b1,b2,v1,v2)=>b1?v1:v2),
-			"^^":new Operator_bool(b=>true,(b1,b2,v1,v2)=>b1?b2?new Value.Number(0):v1:b2?v2:new Value.Number(0)),//xor
-
-			"...":{do({args,hasEquals,index,statement,scope}){//(args:mut Value[],bool)=>void, mutates args
-				//concat operator
-				//'"a"...{1;"b"}' ==> `"a"+"\x01"+"b"` : 'string...label'
-				//'"a"...14' ==> `"a" + "14"` : 'string...number'
-				//'"a"..."b"' ==> `"a" + "b"` : 'string...string'
-				//if left argument is not a string then both arguments are converted into labels and it returns: '{...codeof a;...codeof b}'
-				let arg1=args.pop();
-				let arg0=args.pop();
-				if(arg1===undefined)throw Error(throwError({index,statement,scope},"#expression syntax","concatnation operator \"a...b\" missing 2nd argument"));
-				if(arg0){//'a...b' 2 args
-					let ans;
-					switch(arg0.type){
-						case"string"://ans:Value<string>
-						if(arg1===null)arg1=new Value();
-						arg1=arg1.toType("string");
-						ans=new Value({
-							type:"string",
-							array:[...arg0.array,...arg1.array],
-							string:arg0.string+(arg1.string??""),
-						});
-						break;
-						default://ans:Value<label>
-						ans=new Variable({code:[
-							...(arg0.toType("label").label?.code??[]),
-							...(arg1.toType("label").label?.code??[]),
-						]}).toValue("label");
-
-					}
-					args.push(ans);
-				}else if(arg1){//'...a' 1 arg
-					throw Error(throwError({index,statement,scope},"#expression syntax","'...a' aka spread operator is not supported yet"));
-					//args.push(...arg1); UNFINISHED
 				}else{
-					throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments. 0 arguments provided"));
-					//no args -> silent error
+					//value=new Value();
+					if(!TESTING)return {index,value:undefined};
 				}
-			}},
-			//note: ¬ is done inside the expression function and in left_operators
-		},
-		truthy(value){//(Value)=>bool
-			"use strict";
-			if(!(value instanceof Value))return false;
-			if(value.type=="number")return !!value.number;
-			else if(value.type=="label")return !!value.label;
-			else if(value.type=="string")return !!value.string;
-			else if(value.type=="array")return !!value.array;
-			else return false;
-		},
-		async expression({index,statement,scope,startValue=undefined,includeBrackets=false,shouldEval=true}){//a + b
-			let value=new Value();
-			const argsObj=new Variable({code:[]});
-			const args=argsObj.code;//:Value[]
-			const operatorRegex=/[+\-*/]/;//:Regex
-			if(startValue !=undefined){
-				args.push(startValue);
-			}
-			let word=statement[index];
-			let nextIndex=index;
-			if(includeBrackets){
-				if(includeBrackets && !"([{".includes(word)){
-					return {index,value:undefined};//expression not found
-				}
-				nextIndex=index+3;//including brackets
-				statement=statement[index+1];
-				index=0;
-				//label,number,array:[function]
-				statement=statement[index];
-				if(!shouldEval){
-					return {index};
-				}
-			}
-			//UNFINISHED
-			let nameLast=false;
-			for(let i=index;i<statement.length&&index<statement.length;i++){
-				let word=statement[index],value,failed;
-				//ignore '#' in '#(' or '#{'
-				if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
-				else if(["=", "<=>", "<->"].includes(word)){
+				({index,value}=await contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets}));
+				if(false)if(statement[index]==":"){
 					index++;
-					let firstArg=args.pop();
-					let assignmentType;
-					if(firstArg instanceof Operator){//'a += b'
-						assignmentType=firstArg;
-						firstArg=args.pop();
-						if(!(firstArg instanceof Value))throw Error(throwError({index,statement,scope},"syntax",
-							" not allowed to assign an expression to an operator e.g. '+ += 2' is not allowed."
-						));
-					}
-					let value;//don't need to do `index++` here
-					({value,index}=await contexts.expression({statement,index,scope,includeBrackets:false}));
-					//value??=new Value();
-					{
-						if(assignmentType==undefined&&word=="="){//evals 'a = b'
-							//let doAssignMent=0||firstArg.parent.labels.hasOwnProperty(firstArg.name);
-							let isNotNull=firstArg instanceof Value;
-							let newLabel;{//:Variable
-								//mutation
-								newLabel=isNotNull?Variable.fromValue(value):null;
-							}
-							if(firstArg.type=="label"&&firstArg.parent){
-								//overwrites variable 'a.b=2;' or 'a=2;'
-								//refType:'property' | 'array' | 'name' | 'internal' | 'symbol'
-								if(firstArg.refType=="array"){
-									//if(isNotNull&&(firstArg.type=="label"?firstArg.label:true))//stop assinging to undecleared labels.
-										firstArg.parent.code[firstArg.number]=newLabel;
-										if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
-								}
-								else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
-								else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' and 'a= ¬();' ==> a is an empty label (aka null)
-								value=isNotNull?newLabel?.toValue?.("label")??new Value():null;
-							}else{
-								//sets properties of existing variable
-								if(firstArg.type=="label"){
-									value.label=newLabel;
-								}
-								else{
-								}
-							}
-							args.push(value);
+					({index,value}=await contexts.typeSystem({value,index,statement,scope,shouldEval}));
+				};
+				return {index,value};
+			},
+			//expression_short:
+				async getIndexedPropertyName({index,statement,scope}){
+					let name,failed=false;
+					({index,value:name}=await contexts.expression({index,statement,scope,includeBrackets:true}));
+					if(name){
+						if(name.type=="label"){
+							if(name.refType=="symbol")name=name.label?.symbol??undefined;//'a[¬b]'
+							else name=name.label?.lineNumber;
 						}
-						else if(word=="<=>"||word=="<->"){
-							if(firstArg instanceof Value){
-								if(firstArg.type=="label"&&firstArg.label){//label:Variable
-									let label=firstArg.label//firstArg.parent.labels[firstArg.name];
-									if(word=="<=>"){//set object
-										switch (value.type){
-											case"label"://object,array,function
-												if(!value.label)throw Error(throwError({statement,index,scope},"???"))
-												label.labels={...(value.label?.labels??{})};
-												label.code=[...(value.label?.code??[])];
-												label.prototype=value.label?.prototype;
-												label.supertype=value.label?.supertype;
-												label.securityLevel=value.label?.securityLevel;
-												label.functionPrototype=value.label?.functionPrototype;
-												label.functionSupertype=value.label?.functionSupertype;
-												label.functionConstructor=value.label?.functionConstructor;
-												label.functionSupertype=value.label?.functionSupertype;
-												break;
-											case"array":
-											label.code=[...value.array];
-											break;
-											case"string":
-											label.code=[...value.array];
-											break;
+						else if(name.type=="number")name=name.number;
+						else if(name.type=="string")name=name.string;
+						else{failed=true}
+					}else failed=true;
+					return {index,name,failed};
+				},
+				async expression_fullExtend({value,index,statement,scope,argsObj=undefined,shouldEval=true,noSquaredBrackets=false}){
+					for(let i=index;i<statement.length;i++){//'.property'
+						if(index>=statement.length)break;
+						let word=statement[index];
+						let oldIndex=index;
+						if(word=="["&&noSquaredBrackets)break;
+						({value,index}=await contexts.extend_value({index,statement,scope,value,argsObj,shouldEval}));
+						if(index==oldIndex)break;
+					}
+					value??=null;
+					return{value,index};
+				},
+				noPipeLineing:Symbol("noPipeLineing"), //used in '#let' to allow 'let a:>foo()' == 'let a{} :> foo();'
+				getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
+				async extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
+					let word=statement[index];
+					if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
+						//'()'-> null, '' -> undefined
+						if(value===undefined||value?.type=="undefined"){//TODO: add undefined and null types to the Value class
+							//sets default labels from scopes
+							//'(..b)' ==> 'this..b' var scope's label
+							//'(.b)' and '(.(b))' ==> 'b' let scope's label
+							//'([b])' ==> 'b'; weak scope's label
+							if(word=="..")value=scope.var.label.toValue("label");
+							if(word==".")value=scope.let.label.toValue("label");
+							if(word=="[")value=scope.label.toValue("label");
+						}
+						else if(value===null){}
+						let isInternal=word=="..";
+						let parent=value?.label;
+						value=new Value({parent});
+						let oldIndex=index;
+						let name,nameFound=false;
+						if(word!="["){index++;word=statement[index]??"";}
+						//optional expression
+						if(word.match(nameRegex)){//'a.b' ?
+							name=word;
+							nameFound=true;
+							index++;
+						}if(!nameFound){//'a.123' ?
+							({index,value:name}=await contexts.number({index,statement,scope}));
+							if(name!==undefined)nameFound=true;
+						}if(!nameFound&&["(", "["].includes(word)){//'a.("b")' or 'a["b"]' ?
+							({index,name,failed:nameFound}=await contexts.getIndexedPropertyName({index,statement,scope}));
+							nameFound=!nameFound;
+						}
+						if(!nameFound){
+							throw Error(throwError({index,statement,scope},"index:`"+oldIndex+"` of '"+statement.join(" ")+"'"+" does not return a property name"));
+						}else{
+							value.name=name;
+						}
+						if(shouldEval)if(parent){
+							if(isInternal){//'a..b';
+								if(name=="constructor")name="construtor_";//javascript did not like having 'constructor' as a normal property
+								const labels=getInternals(value,{index,statement,scope}).labels;
+								const label=labels[name];//?:internal object
+								if(labels.hasOwnProperty(name))({value}=await label.callFunction({args:undefined,value,scope,statement}));
+								else{
+									throw Error(throwError({index,statement,scope},"# keyword","'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
+								}
+							}//'a.b'
+							else {
+								if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
+								if(typeof name=="number"){//'a[b]'
+									value.refType="array";
+									name=contexts.getIndexNumber(name,parent)??0;
+									value.number=name;
+									let newVal=parent.code[name];
+									if(newVal instanceof AssemblyLine){
+										let code=newVal;
+										let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
+										value.type="label";
+										let type= code.dataType=="char"?"string":"number";
+										value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
+										
+										if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
+											value=value.toType("number");
+											//TODO: throw error if index out of range
 										}
 									}
-									else if(word=="<->"){//set number
-										label.lineNumber=value?value.toNumber().number:undefined;
-									}
+									else value.label=
+										newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
+										newVal instanceof Variable?newVal:
+										newVal instanceof Scope?newVal.label:
+										newVal instanceof CodeLine?undefined:
+										newVal instanceof Statement?newVal.toLabel():
+									undefined;
 								}
-								//UNFINISHED: needs code for array assignment
-								args.push(firstArg);
 							}
 						}
-					}
-					break;
-				}
-				else if(args.length>0&&!({index,value}=await contexts.declareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
-					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope}));
-				}else if(word=="¬" && args.length>0){//extend value 'a+1¬.b'==> '(a+1).b'
-					index++;let value=args.pop();
-					({value,index}=await contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
-					args.push(value);
-				}else if(contexts.operators.hasOwnProperty(word)){//'+-*/'
-					index++;
-					if(shouldEval){
-						let hasEquals,value;
-						//get second arg
-						const operator=contexts.operators[word];//:Operator_bool|Operator_numeric
-						if(statement[index]=="="){hasEquals=true;index++}
-						if(operator instanceof Operator_bool){
-							let arg1=args.pop(value),bool1=contexts.truthy(arg1);
-							if(operator.is2Args){
-								let shouldEval=operator.needsSecondArg(bool1);
-								({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
-								value=operator.operator(bool1,contexts.truthy(value),arg1,value);
-							}else value=operator.operator(bool1,null,arg1,null);
-							args.push(value);
+						return {index,value};
+					}else if("("==word&&//'foo()'; parses: 'foo=>()=>{}' ==> 'foo=>() => {}'; 'foo()=>{}' ==> 'foo ()=>{}'; 'foo=>#()=>{}' ==> 'foo => #()=>{}'
+						!(statement[index+3]=="{"||functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{")
+						||(functionCallTypes.includes(word)&&statement[index+1]=="(")
+					){
+						if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"calling a undefined value. cannot do '#()()', try '#(¬)()' or '1()'"));
+						//function call: 'foo()' to 'foo=>()<:{}<:{}'
+						let startIndex=index;
+						let callType="";
+						if(functionCallTypes.includes(word)){
+							callType=word;
+							index++;
 						}
-						else {//operator:Operator_numeric
+						//'foo=>()=>{}' ==> 'foo => #()=>{}'let argsObj;
+						({index,argsObj}=await contexts.arguments({index,statement,scope,callType,argsObj,shouldEval}));
+						if(shouldEval)
+						if(value.type=="label"&&value.label!=undefined){
+							({value}=await value.label.callFunction({args:argsObj,value,scope,callType,statement}));
+						}
+						argsObj.obj={};
+						argsObj.list=[];
+						return {index,value};
+					}else if(word==":>"&&argsObj!=contexts.noPipeLineing){
+						argsObj??=new ArgsObj({obj:{},list:[]});
+						for(let i=index;i<statement.length;i++){
+							//argsObj==NaN -> don't use pipeline
+							if(statement[index]==":>"){//pipeLine
+								index++;
+								if(value?.name!=undefined)argsObj.obj[value.name]=value;
+								argsObj.list.push(value);
+								({value,index}=await contexts.expression_short({index,statement,scope,argsObj}));
+							}else break;
+						}
+					}
+					else if(word=="::"){//extend object 'foo(){}::{}'
+						//extention operator '::{}' or '::(){}' or '::label'
+						index++;
+						if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
+						if(({index,value}=await contexts.declareFunctionOrObject({
+							index,statement,scope,
+							startValue:value,shouldEval
+						})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected form: `label :: { }' or 'label :: ( ){ }'"));
+					}
+					return {index,value};
+				},
+				async typeSystem({index,statement,scope,value,shouldEval=true}){
+					({index}=await contexts.expression_short({index,statement,scope,shouldEval:false}));
+					return {index,value};
+				},
+				delcare_typeChecks({index,statement,scope},isExtension,startValue){
+					if(isExtension){//'obj{}'
+						//type checking
+						//TODO: replace the following with throwError errors
+						if(startValue==undefined)throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not defined"));
+						if(!(startValue instanceof Value))throw Error("compiler type error:");
+						if(startValue.type!="label")throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not a label"));
+						if(!startValue.label){
+							startValue.label=new Variable({name:startValue.name});
+						}
+					}
+				},
+				async declareFunctionOrObject({index,statement,scope,startValue=undefined,shouldEval=true}){
+					//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
+					//note: for functions it is advised to use 'a = #()={}' instead of 'a=() = {}' to prevent this
+					const isExtension=!!startValue;
+					let value=startValue;
+					let word=statement[index];
+					if(word=="("&&(
+						statement[index+3]=="{"||
+						functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
+					)){//function declaration '(){}'
+						contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
+						let {parameters} = await contexts.parameters({index:0,statement:statement[index+1],scope});
+						index+=3;
+						let callType;//:Parameter[],string;
+						word=statement[index];
+						if(functionCallTypes.includes(word)){//e.g. '=>' in '()=>{}'
+							callType=word||"";
+							index++;
+						}
+						word=statement[index+1];//word== '...' in '(){...}'
+						let code=word;
+						let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
+							parameters,
+							callType,
+							label:new Variable({name:"(scope function)",code:word}),
+							parent:scope,
+							code,
+						});
+						let functionObj;//:Variable
+						if(shouldEval){
+							if(isExtension)functionObj=startValue.label;
+							else functionObj=new MacroFunction({type:"function",});//:Variable
+							value=functionObj.toValue("label");
+							functionObj.code.push(functionScope);
+							functionObj.prototype??=new Variable({name:"(prototype)"});
+							functionObj.supertype??=new Variable({name:"(supertype)"});
+						}
+						index+=3;//skip '(' '...' ')' in '(...){}'
+						return {index,value,failed:false};//isExtension&&!startValue};
+					}else if(word=="{"){//'{}' object declaration
+						contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
+						index++;
+						if(shouldEval){
+							//makes block scope
+							let newScope=await evalBlock(
+								statement[index],
+								scope,
+								isExtension
+									?new ObjectScope({fromName:"declareFunctionOrObject/object",parent:scope,label:startValue.label,code:statement[index]})
+									:undefined
+								,undefined//not recursive
+							);
+							value=startValue??new Value({type:"label",label:newScope.label});
+						}
+						index+=2;
+						return {index,value,failed:false};//failed:isExtension&&!startValue};
+					}else {
+						return {index,value,failed:true};
+					}
+				},
+			//---
+			operators_Left:{
+				"+":(value)=>value?value.toType("number"):new Value.Number(NaN),
+				"-":(value)=>value?-value.toType("number"):new Value.Number(NaN),
+				"~":(v)=>new Value.Number(~v?.number),
+				"!":(v)=>{v??=new Value();let ans=v.toBool();ans.number=!ans.number;return ans;},
+				"¬":(v)=>{//:Value
+					if(v===null||v===undefined){//'¬()' and '(¬)' --> empty, undeclared label
+						return new Value({type:"label",label:null});
+					}
+					v=new Value(v??{});
+					if(v.type=="label"){
+						v.refType="symbol";
+						return v;
+					}
+					else {
+						return v.toType("label");//TODO: unsure about this mechanic
+					}
+				},
+				//"...":(v)=>new Value.Number(~v.number),
+			},
+			operators:{
+				"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
+				"-":new Operator_numeric((a,b)=>a-b,0,a=>-a),
+				"*":new Operator_numeric((a,b)=>a*b),
+				"/":new Operator_numeric((a,b)=>a/b,0,a=>1/a),
+				">>>":new Operator_numeric((a,b)=>a>>>b),
+				">>":new Operator_numeric((a,b)=>a>>b),
+				"<<":new Operator_numeric((a,b)=>a<<b),
+				"**":new Operator_numeric((a,b)=>a**b),
+				"%":new Operator_numeric((a,b)=>a%b),
+				"^":new Operator_numeric((a,b)=>a^b),
+				"&":new Operator_numeric((a,b)=>a&b),
+				"|":new Operator_numeric((a,b)=>a|b),
+				"~":new Operator_numeric((a,b)=>~(a|b),0,a=>~a),
+
+				">=":new Operator_numeric((a,b)=>a>=b),
+				"<=":new Operator_numeric((a,b)=>a<=b),
+				">":new Operator_numeric((a,b)=>a>b),
+				"<":new Operator_numeric((a,b)=>a<b),
+
+				"==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.equality(v1,v2))),
+				"!=":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.equality(v1,v2))),
+				"===":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+ Operator_bool.strictEquality(v1,v2))),
+				"!==":new Operator_bool(b=>true,(b1,b2,v1,v2)=>new Value.Number(+!Operator_bool.strictEquality(v1,v2))),
+				//"!":new Operator_bool(v=>true,(b1,b2,v1,v2)=>new Value.Number(+!b2)),
+
+				"&&":new Operator_bool(b=>b,(b1,b2,v1,v2)=>!b1?v1:v2),//bool1,bool2,value1,value2
+				"||":new Operator_bool(b=>!b,(b1,b2,v1,v2)=>b1?v1:v2),
+				"^^":new Operator_bool(b=>true,(b1,b2,v1,v2)=>b1?b2?new Value.Number(0):v1:b2?v2:new Value.Number(0)),//xor
+
+				"...":{do({args,hasEquals,index,statement,scope}){//(args:mut Value[],bool)=>void, mutates args
+					//concat operator
+					//'"a"...{1;"b"}' ==> `"a"+"\x01"+"b"` : 'string...label'
+					//'"a"...14' ==> `"a" + "14"` : 'string...number'
+					//'"a"..."b"' ==> `"a" + "b"` : 'string...string'
+					//if left argument is not a string then both arguments are converted into labels and it returns: '{...codeof a;...codeof b}'
+					let arg1=args.pop();
+					let arg0=args.pop();
+					if(arg1===undefined)throw Error(throwError({index,statement,scope},"#expression syntax","concatnation operator \"a...b\" missing 2nd argument"));
+					if(arg0){//'a...b' 2 args
+						let ans;
+						switch(arg0.type){
+							case"string"://ans:Value<string>
+							if(arg1===null)arg1=new Value();
+							arg1=arg1.toType("string");
+							ans=new Value({
+								type:"string",
+								array:[...arg0.array,...arg1.array],
+								string:arg0.string+(arg1.string??""),
+							});
+							break;
+							default://ans:Value<label>
+							ans=new Variable({code:[
+								...(arg0.toType("label").label?.code??[]),
+								...(arg1.toType("label").label?.code??[]),
+							]}).toValue("label");
+
+						}
+						args.push(ans);
+					}else if(arg1){//'...a' 1 arg
+						throw Error(throwError({index,statement,scope},"#expression syntax","'...a' aka spread operator is not supported yet"));
+						//args.push(...arg1); UNFINISHED
+					}else{
+						throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments. 0 arguments provided"));
+						//no args -> silent error
+					}
+				}},
+				//note: ¬ is done inside the expression function and in left_operators
+			},
+			truthy(value){//(Value)=>bool
+				"use strict";
+				if(!(value instanceof Value))return false;
+				if(value.type=="number")return !!value.number;
+				else if(value.type=="label")return !!value.label;
+				else if(value.type=="string")return !!value.string;
+				else if(value.type=="array")return !!value.array;
+				else return false;
+			},
+			async expression({index,statement,scope,startValue=undefined,includeBrackets=false,shouldEval=true}){//a + b
+				let value=new Value();
+				const argsObj=new Variable({code:[]});
+				const args=argsObj.code;//:Value[]
+				const operatorRegex=/[+\-*/]/;//:Regex
+				if(startValue !=undefined){
+					args.push(startValue);
+				}
+				let word=statement[index];
+				let nextIndex=index;
+				if(includeBrackets){
+					if(includeBrackets && !"([{".includes(word)){
+						return {index,value:undefined};//expression not found
+					}
+					nextIndex=index+3;//including brackets
+					statement=statement[index+1];
+					index=0;
+					//label,number,array:[function]
+					statement=statement[index];
+					if(!shouldEval){
+						return {index};
+					}
+				}
+				//UNFINISHED
+				let nameLast=false;
+				for(let i=index;i<statement.length&&index<statement.length;i++){
+					let word=statement[index],value,failed;
+					//ignore '#' in '#(' or '#{'
+					if(({index,failed}=contexts.endingSymbol({statement,index})).failed)break;
+					else if(["=", "<=>", "<->"].includes(word)){
+						index++;
+						let firstArg=args.pop();
+						let assignmentType;
+						if(firstArg instanceof Operator){//'a += b'
+							assignmentType=firstArg;
+							firstArg=args.pop();
+							if(!(firstArg instanceof Value))throw Error(throwError({index,statement,scope},"syntax",
+								" not allowed to assign an expression to an operator e.g. '+ += 2' is not allowed."
+							));
+						}
+						let value;//don't need to do `index++` here
+						({value,index}=await contexts.expression({statement,index,scope,includeBrackets:false}));
+						//value??=new Value();
+						{
+							if(assignmentType==undefined&&word=="="){//evals 'a = b'
+								//let doAssignMent=0||firstArg.parent.labels.hasOwnProperty(firstArg.name);
+								let isNotNull=firstArg instanceof Value;
+								let newLabel;{//:Variable
+									//mutation
+									newLabel=isNotNull?Variable.fromValue(value):null;
+								}
+								if(firstArg.type=="label"&&firstArg.parent){
+									//overwrites variable 'a.b=2;' or 'a=2;'
+									//refType:'property' | 'array' | 'name' | 'internal' | 'symbol'
+									if(firstArg.refType=="array"){
+										//if(isNotNull&&(firstArg.type=="label"?firstArg.label:true))//stop assinging to undecleared labels.
+											firstArg.parent.code[firstArg.number]=newLabel;
+											if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
+									}
+									else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
+									else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' and 'a= ¬();' ==> a is an empty label (aka null)
+									value=isNotNull?newLabel?.toValue?.("label")??new Value():null;
+								}else{
+									//sets properties of existing variable
+									if(firstArg.type=="label"){
+										value.label=newLabel;
+									}
+									else{
+									}
+								}
+								args.push(value);
+							}
+							else if(word=="<=>"||word=="<->"){
+								if(firstArg instanceof Value){
+									if(firstArg.type=="label"&&firstArg.label){//label:Variable
+										let label=firstArg.label//firstArg.parent.labels[firstArg.name];
+										if(word=="<=>"){//set object
+											switch (value.type){
+												case"label"://object,array,function
+													if(!value.label)throw Error(throwError({statement,index,scope},"???"))
+													label.labels={...(value.label?.labels??{})};
+													label.code=[...(value.label?.code??[])];
+													label.prototype=value.label?.prototype;
+													label.supertype=value.label?.supertype;
+													label.securityLevel=value.label?.securityLevel;
+													label.functionPrototype=value.label?.functionPrototype;
+													label.functionSupertype=value.label?.functionSupertype;
+													label.functionConstructor=value.label?.functionConstructor;
+													label.functionSupertype=value.label?.functionSupertype;
+													break;
+												case"array":
+												label.code=[...value.array];
+												break;
+												case"string":
+												label.code=[...value.array];
+												break;
+											}
+										}
+										else if(word=="<->"){//set number
+											label.lineNumber=value?value.toNumber().number:undefined;
+										}
+									}
+									//UNFINISHED: needs code for array assignment
+									args.push(firstArg);
+								}
+							}
+						}
+						break;
+					}
+					else if(args.length>0&&!({index,value}=await contexts.declareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
+						({value,index}=await contexts.expression_fullExtend({value,index,statement,scope}));
+					}else if(word=="¬" && args.length>0){//extend value 'a+1¬.b'==> '(a+1).b'
+						index++;let value=args.pop();
+						({value,index}=await contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
+						args.push(value);
+					}else if(contexts.operators.hasOwnProperty(word)){//'+-*/'
+						index++;
+						if(shouldEval){
+							let hasEquals,value;
+							//get second arg
+							const operator=contexts.operators[word];//:Operator_bool|Operator_numeric
+							if(statement[index]=="="){hasEquals=true;index++}
+							if(operator instanceof Operator_bool){
+								let arg1=args.pop(value),bool1=contexts.truthy(arg1);
+								if(operator.is2Args){
+									let shouldEval=operator.needsSecondArg(bool1);
+									({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
+									value=operator.operator(bool1,contexts.truthy(value),arg1,value);
+								}else value=operator.operator(bool1,null,arg1,null);
+								args.push(value);
+							}
+							else {//operator:Operator_numeric
+								({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
+								args.push(value);
+								operator.do({args,hasEquals, index,statement,scope});
+							}
+						}else{
+							({index}=await contexts.expression_short({index,statement,scope,shouldEval}));
+						}
+					}
+					else if(!nameLast){//not: 'name name'
+						if(!endingStringList.includes(word)){//word.match(nameRegex)||["(", "[", "{"].includes(word)){
+							let value;
 							({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
 							args.push(value);
-							operator.do({args,hasEquals, index,statement,scope});
 						}
-					}else{
-						({index}=await contexts.expression_short({index,statement,scope,shouldEval}));
 					}
 				}
-				else if(!nameLast){//not: 'name name'
-					if(!endingStringList.includes(word)){//word.match(nameRegex)||["(", "[", "{"].includes(word)){
-						let value;
-						({index,value}=await contexts.expression_short({index,statement,scope,shouldEval}));
-						args.push(value);
-					}
+				value=args[0];
+				if(includeBrackets)return {index:nextIndex,value};
+				else{
+					return {index,value};
 				}
-			}
-			value=args[0];
-			if(includeBrackets)return {index:nextIndex,value};
-			else{
-				return {index,value};
-			}
-		},
+			},
+		//----
 	};
 	const assemblyCompiler={
 		async main(label,logErrors,dataObj){//(Variable) => Variable / MachineCode
@@ -3207,22 +3210,22 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				else{
 					for(let i in optionals){//optionals[number]:string & symbol
 						if(!optionals.hasOwnProperty(i))continue;
-						let optional=this.optionals[i];
+						let optionalObj=this.optionals[i];//:{}
 						let fail=true;
-						if(!optional){}
-						if(!(operator in optional.map)){
-							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+i+"' with the '"+operator+"' instruction"));
-							//TODO: add 'try doing ...' to this error message
+						if(!optionalObj || !optionalObj.map.hasOwnProperty(operator)){
+							let possibilitiesList = Object.keys(this.optionals).filter(i=>this.optionals[i].map.hasOwnProperty(operator));
+							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+i+"' with the '"+operator+"' instruction. You can try using one of: "+possibilitiesList));
+							//TODO: add symbol types to the 'try doing ...' to this error message
 						}
-						if(optional&&(
-							optional.defaultSymbols.includes(optionals[i])||//if valid symbol used with keyword
-							(optional.useArray&&optional.map[operator]?.[1]==optionals[i])
+						if(optionalObj&&(
+							optionalObj.defaultSymbols.includes(optionals[i])||//if valid symbol used with keyword
+							(optionalObj.useArray&&optionalObj.map[operator]?.[1]==optionals[i])
 						)){
-							if(optional.useArray)operator=optional.map[operator][0]??operator;
-							else operator=optional.map[operator]??operator;
+							if(optionalObj.useArray)operator=optionalObj.map[operator][0]??operator;
+							else operator=optionalObj.map[operator]??operator;
 						}
 						else{
-							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+optionals[i]+"' symbol with '"+i+"'"));
+							throw Error(throwError({statement,index,scope},"@ syntax", "cannot use '"+optionals[i]+"' symbol with '"+i+"' option for the '"+operator+"' operator."));
 						}
 					}
 				}
