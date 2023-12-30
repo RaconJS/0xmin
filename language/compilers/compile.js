@@ -2948,7 +2948,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"store":{
 					map:{"add":"adds", "addc":"addcs", "sub":"subs", "sbb":"sbbs", "and":"ands", "xor":"xors", "or":"ors"},
 					defaultSymbols:["", "!"],
-				},"internal":{
+				},
+				"internal":{
 					map:{"shl":"scl", "shr":"scr"},
 					defaultSymbols:["", "+"],
 				},
@@ -2957,6 +2958,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					defaultSymbols:["", "+"],
 				},
 			});
+			operatorsToCheckForNoStore=Object.freeze([
+				"+", "-", "&", "|", "^",
+			]);
 			operators=Object.freeze({//name:{map:default name
 				"+":"add",
 				"-":"sub",
@@ -3109,16 +3113,22 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				if(value){arg.push(value);}
 				return {index};
 			}
-			asm_operator({statement,index,scope,operator}){//#:string|undefined
+			asm_operator({statement,index,scope,operator,optionals}){//#:string|undefined
 				let word=statement[index];
 				let hasOperator=false;
 				if(!hasOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
 					let oper1=word;
 					index++;
-					if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b' ==> 'a + b'
+					if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b'
 						index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
 					}
-					if(oper1=="="||oper1=="=>"){//%register = pop;
+					else{//'a + b' --> 'a + = b !store'
+						let operName = this.operators[oper1];
+						if(this.operatorsToCheckForNoStore.includes(oper1)){
+							optionals["store"] = "!";
+						}
+					}
+					if(oper1=="="||oper1=="=>"){//'%register = pop;'
 						word=statement[index];
 						if(["pop", "recv", ""].includes(word)){
 							oper1=word;
@@ -3162,7 +3172,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				for(let i=0;i<9;i++){
 					let arg;
 					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
-					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator}));
+					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator,optionals}));
 					({index}=this.asm_optionalStatement({statement,index,scope,optionals}));
 					if(args.length<2){
 						;({index,arg}=await this.asm_arg({statement,index,scope}));
@@ -3428,7 +3438,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	//
 	let outputFile=outputAsBinary()?parts.asBinary():parts.asAssembly();
 	let outputBinary=outputAsBinary()?new Uint32Array(outputFile):
-		"_Model \""+compileData.model+"\"\n"//R216K2A
+		""//"_Model \""+compileData.model+"\"\n"//R216K2A
 		+"%include \"common\"\n"
 		+"start:\n\t"
 		+outputFile.join("\n\t");

@@ -1,187 +1,161 @@
 #"tptasm";#"len";
 let main;
-debugger {0-1}..compile"label.code";
 #main(){
 	let terminal;
 	call terminal;
 	#terminal{
 		let reg = RegEnum(0);
 		let const_0 = reg();
-		let char = reg();
 		let string = reg();
-		%string = sp;
-		%string += 1;
-		%const_0 = 0;
-		def let getString{
-			{:getInput;
-				let loop;
-				wait %const_0;
-				jump -> loop if sign;
-				bump %const_0;
-				def loop;
-				recv %char %const_0;
-				jump -> loop if !carry;
-			};
-			%char -= "\n" !store;
-			if == 0 jump -> static()<:{
-				:callCommand;
-				let commands = {
-					{"read"};
-					{"write"};
-					{"run"};
+		let regState1 = reg.copy();
+		{
+			%string = sp;
+			%string += 1;
+			%const_0 = 0;
+			let callCommand;
+			def let getString{
+				let reg = RegEnum(regState1);
+				let char = reg();
+				${:getInput;
+					let loop;
+					wait %const_0;
+					jump -> getInput if sign;
+					bump %const_0;
+					def loop;
+					recv %char %const_0;
+					jump -> loop if !carry;
 				};
-				{:matchCommand;
-					[%string] - "r" !store;
-				};
-				let clearCommand{
-					send %const_0 "\p00";
-					send %const_0 "\c0f";
-					let i <-> char;
-					%i = 16;
-					${:forLoop;
-						{:do;
-							send %const_0 " ";
-						};
-						%i -= 1;
-						jump -> loop if >= 0;
-					};
-				};
+				%char -= "\n" !store;
+				send %const_0 %char; 
+				if == 0 jump -> callCommand;
+				push %char;
 				jump -> ..this;
 			};
-			push %char;
-			jump -> ..this;
-		};
-	}:>static();
-	let systemCalls = #(Command){
-		let 
-			basic{let
-				read,//(address:pop int30*) -> push int16[2]
-				write,//(address:pop int30*, int30*)
-				run,//
-			}:>Command(),
-			heap{let 
-				malloc,free,ref,unref;
-			}:>Command(),
-			file{
-				let new,move,delete;
-			}:>Command(),
-		;
-		...labelsof{let 
-			write,
-			interupt,
-			pause,
-			exit,
-			run,
-		}:>Command();
-	}()<:(commands,fullCommandList){
-		#return = commands;
-		let i = -1;
-		repeat commands..labels..length{
-			let name = commands..labels[i+=1];
-			let label = commands.[""...name];
-			let label.name = name;
-			#static(label);
-		};
-		#fullCommandList..splice(-0,0,label);
-	}
-	let filSystem;
-	let init_newFileSystem{
-		return;
-	}:>static();
-	call init_newFileSystem;
-	...run(){//classes
-		let Vector(this,type,values)={
-			let type = type;
-			#this[¬constructor.sizeSymbol] = values..length;
-			def let values = values||{};
-		}:>m_class()::{
-			let ..prototype = {
-				:prototype;
-				let prototype..proto = ..prototype;
-				delete prototype;
-				let new(reg_size){
-					malloc.call(reg_size);
+			def callCommand{
+				let reg = RegEnum(regState1);
+				let commandNumber = reg();
+				let commandType{
+					let echo{
+						let oldSp;
+						sp += 1;
+						call [sp - 1];
+						sp - [oldSp];
+						jump -> ..return if == 0;
+						print.number.register({:inputReg}<->0,{:char}<->1,{:const0}<->2,{:i}<->3);
+						send r3 "\n";
+						sp = [oldSp];
+						0 #def oldSp;
+					}:>StackFunction():>static();
+					let regTypeToStackType{
+						push r0;
+					}:>StackFunction():>static();
 				};
-			};
-		};
-		let File(this)={//File:[]heap*
-			#def let name:>Vector.Ref();//: string & @()->mutate terminal & {@;{@send}[];return}
-			#def let parent:>File.Ref().nullable()::{
-				def let index{0};
-			};
-			#def let type{
-				0;
-				let types = {
-					def let
-					folder,
-					file,
+				let commands = {
+					#()={
+						command:{//consume: all registers
+							let commandData:{
+								let index:int.ordinal&const;
+								let string:string&const;
+								let argsLength:int.cardinal&const;
+							};
+							...({@} & @(pop [argsLength])->void & mutate terminal,heap)
+						};
+					};
+					let regs = {
+						let reg = RegEnum(0);
+						let arg1 = reg();
+						let arg2 = reg();
+					};
+					let read{
+						let commandData{
+							let argsLength = 1;
+						};
+						...labelsof regs;
+						%arg1 = pop;
+						push [%arg1];
+					};
+					let write{
+						let commandData{
+							let argsLength = 2;
+						};
+						...labelsof regs;
+						%arg1 = pop;
+						%arg2 = pop;
+						push [%arg1];
+					};
+					let run{
+						let commandData{
+							let argsLength = 1;
+						};
+						...labelsof regs;
+						sp += 1;
+						RegEnum(14).push();
+						push sp;
+						call [sp - 1];
+						pop sp;
+						RegEnum(14).pop();
+					};
+					let malloc{
+						let commandData{
+							let argsLength = 1;
+						};
+						...labelsof regs;
+						r0 = pop;
+						call heap.malloc;
+						push r0;
+					};
+					delete regs;
+				}::{
+					{
+						let i = -1;
+						repeat ..labels..length {
+							let name = ..labels[i+=1];
+							let label = ..this[name];
+							let label.commandData.index = +i;
+							let label.commandData.string = ""...name;
+							label:>StackFunction();
+						};
+					};
 				};
+				commands..compile;
+				{:matchCommand;
+					let match(stringObj,startIndex,do){
+						:matchObj;
+						let i = startIndex - 1;
+						repeat stringObj..length {
+							[%string + (i+=1)] - stringObj.(i);
+							if != 0 jump -> matchObj..return;
+						};
+						def do;
+						#i += 1;
+					};
+					match("r",0)<:{
+						match("ead",0)<:{
+							push commands.read:>static();
+						};
+						match("un",0)<:{
+							push commands.run:>static();
+						};
+					};
+					match("write",0)<:{
+						push commands.run:>static();
+					};
+				};
+				sp = %string;
+				jump -> ..this;
 			};
-			#def let contence{
-				let size{0};
-				#def let Vector();
-			};
-		}:>m_class()::{
-			#let ..prototype = {
-				:prototype;
-				#let prototype..proto = ..prototype;
-				delete prototype;
-				let:
-					resize{//:(pop[[]heap*,size:int])->void
-						#let: nextReg = RegEnum(0);
-						#let:
-							file <-> nextReg(),
-							size <-> nextReg(),
-							index <-> nextReg(),
-							return <-> nextReg(),
-						;
-						@:pop r return;
-						@:pop r size;//size
-						@:pop r file;//file
-						$:realloc.call(file,size);
-						#let: parent:>File() <-> size;
-						#let: contence;
-						@:r parent = [r file + file.parent];
-						@:r index = [r file + file.parent_index];
-						#let: children:>Vector(File.Ref()) <-> parent;
-						@:r children = [r parent parent.children];
-						@:[r children + r index] = r file;
-						@:push r file;
-						@:jump -> r return;
-					}:>static(),
-					addFile{@;
-						pop r1;//size
-						pop r0;//file
-						$realloc.call();
-						return;
-					}:>static(),
-					let deleteFile{@;
-						return;
-					}:>static(),
-				;
-			};
-		};
-		let Folder <=> File;
-		Folder..splice(1,0,{(){
-			let files = contence;
-			#files[1] = Vector(File.Ref());
-		}})
-	};
-	#filSystem{
-		let root:>File.static():>static()::{
-			#name.setValue()<:2;
-			#
 		};
 	}:>static();
 };
 ...(){
-	import lib "heap.0xmin";
-	import lib "R2/class.0xmin";
+	//import lib "heap.0xmin";
+	//import lib "R2/class.0xmin";
 	let Static(label)={
 		repeat !!label:#this = label;
-		#this::(obj,allowDuplicates)={
+		#this::(obj,redefine)={//:(obj:{@},#bool & (#{}|(¬))) -> obj
+			#return = obj;
 			repeat (obj..defs..length == 0 || !!allowDuplicates)
-				#constructor.memory::{def return = obj;};
+				#constructor.memory::{def return;};
 		};
 		let this.memory;
 	};
@@ -199,15 +173,23 @@ debugger {0-1}..compile"label.code";
 	}::{
 		let number{
 			let charSet = "0123456789ABCDEF";
-			let register(regInput,reg_char,const_0){
-				#const_0 = const_0 || 0;
-				r const_0 = 0;
+			let register(regInput,reg_char,reg_const_0,reg_i){
+				#reg_const_0 = reg_const_0 || 0;
+				r reg_const_0 = 0;
 				#let temp = regInput;
-				repeat 4 {
-					r char = 0;
+				repeat !!reg_i:{
+					r reg_i = 4;
+				};
+				def let loop;
+				repeat {4;1}[!!reg_i] {
+					r reg_char = 0;
 					r temp <<<= 4;//circular shift
-					r char <<= 4 + internal;
-					send r const_0 r char;
+					r reg_char <<= 4 + internal;
+					send r reg_const_0 r reg_char;
+				};
+				repeat !!reg_i:{
+					r reg_i -= 1;
+					jump -> loop if >= 0;
 				};
 			};
 			let hexChar(regInt,reg_char,const_0){
@@ -221,125 +203,46 @@ debugger {0-1}..compile"label.code";
 		};
 	};
 	let RegEnum(start)={//register enum
-		#this<->0;
+		#this<->(start||0);
 		(){
 			#return = #(arguments[0] || return)<->+..this;
 			#..this<->..this + 1;
 			repeat (+return > (16-2)):throw "out of registers";
 		};
-		let push()=>{
-			let i = -1;
-			repeat +this: @push r #(+(i+=1));
-		};
-		let pop()=>{
-			let i = this + 1;
-			repeat +this: @pop r #(+(i-=1));
-		};
-	};
-	let RegState(start)={//register enum
-		//start: startAt:(number & %) | startAs:RegState
-		next;
-		let registers = {
-			let i = -1;
-			repeat 16:Register(i+=1,1);
-			delete i;
-		};
-		let typeFound;
-		repeat !!start:
-			repeat 
 	}::{
 		let ..prototype{
-			let modifyState()<-{
-				caller
+			let push(){
+				let i = -1;
+				repeat +this: @push r #(+(i+=1));
 			};
-			let next(regsNeeded){
-				let nextReg = ¬;
-				repeat (regsNeeded..constructor == RegState):{
-					let regsNeeded = regsNeeded;
-					let i = -1;
-					repeat regsNeeded..length:
-						this.registers
-				};
+			let pop(){
+				let i = this + 1;
+				repeat +this: @pop r #(+(i-=1));
 			};
 			let copy(){
-				#return = RegState(this);
-			}
-			let use(regsNeeded){//<T>(T)->RegState
-				//regsNeeded:RegState|Register|number|
-				repeat (regsNeeded..constructor == RegState):{
-					let regsNeeded = regsNeeded;
-					let i = -1;
-					repeat regsNeeded..length:
-						this.registers
-				};
-			};
-			let Register(number,isFree)={
-				#let isFree = isFree||1;
-			};
-		};
-	};
-	let type;{#;
-		//UNFINISHED
-		let TypeClass()<-{//macro
-			#caller::{
-				return = label || this;
-				repeat !return[type] let return[type];
-				#return[type] = constructor;
+				#return = this..constructor(this);
 			};
 		}
-		let memory = {let
-			static = static,
-			heap = heap,
-		};
-		type{
-			register(label,value) = {#;
-				TypeClass();
-				repeat !!value: return<-> value;
-			}::{
-				let set ..prototype{
-					let assign(){
-
-					};
-					let free(regState){
-
-					};
-				};
-			},
-			static(label) = {#;
-				TypeClass();
-			}::{
-				let set ..prototype{
-					let assign(){
-						#return = this;
-						memory.static(this);
-					};
-					let delete(){};
-				};
-			},
-			heap(label,size) = {#
-				TypeClass();
-				return.size = size || 0;
-			}::{
-				let set ..prototype = {
-					let alloc(size){
-						repeat !!size: size = this.size;
-						memory.heap.malloc.call();
-					};
-					let realloc(){};
-					let free(){
-
-					};
-				};
-			},
-		};
+	};
+	let StackFunction(function)={//function: @(pop []) -> push []
+		#return = function;
+		let returnValue;//:[@] == @*
+		#function..splice(0,0,{
+			[returnValue] = pop;
+		});
+		#function..splice(-0,0,{
+			jump -> [returnValue];
+			@ 0 #def returnValue;
+		});
 	};
 };
 let fullProgram(){
 	def main();
-	def heap.malloc;
-	def heap.free;
-	def heap.realloc;
+	//def heap.malloc;
+	//def heap.free;
+	//def heap.realloc;
 	def static.memory;
-	def heap.memory;
+	//def heap.memory;
 };
 fullProgram();
+debugger {add,1,2}"label.code[0]"
