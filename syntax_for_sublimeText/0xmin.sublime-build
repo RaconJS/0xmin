@@ -1,5 +1,5 @@
 {
-	"shell_cmd": "~/Documents/0xmin_stff/0xmin.sh $file",
+	"shell_cmd": "~/0xmin/0xmin.sh $file",
 	"selector": "0xmin",
 	"file_patterns":["*.0xmin"],
 }

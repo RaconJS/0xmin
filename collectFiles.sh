@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#this program gathers all the external files into the repo.
 echo preparing repo for git
 echo code
 cp -r ./../compilers ./language
