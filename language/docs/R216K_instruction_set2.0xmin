@@ -10,12 +10,13 @@ a += b !store !carry;//add/adds/addc/addcs
 a -= b +carry !store;//sub/sbb/subs/sbbs
 mask = a;//swm a
 hault;//hlt
-jump -> a if>0;//ja a; all 28 jump commands; I have a list of all the conditions later;
+jump -> a;//jmp a; all 28 jump commands; I have a list of all the conditions later;
 null;//nop;
 a >>= b +internal;//chain shift or shift
 a <<= b +internal;//shl/scl
 a >>>= b;//ror; circular shift:
 a <<<= b;//rol; 
+
 bump a; port a?; port a -> "\a";//'\a'; //note: 'bump' can't use litteral Uint in bump comand because of hardware limitations
 wait a; port a;  port a <- "\a";//a = (terminal.input == "\a")? 0 to 255 : -1;
 a = port b;//recv
@@ -24,30 +25,37 @@ push a;
 a = pop;
 call a;
 return;
+a & b;//ands
+a | b;//ors
+a ^ b;//xors
+a + b !carry;//adds/addcs
+a - b +carry;//subs/sbbs
 //
-if true;//'jump -> x if true;' ==> 'jump -> x;'
-if false;
-if 0;//same as 'if==0'
-if !0;
-if carry;
-if !carry;
-if sign;
-if !sign;
-if overflow;
-if !overflow;
-if == 0;
-if != 0;
-if > 0;
-if < 0;
-if >= 0;
-if <= 0;
+jump -> a;//jmp
+jump -> a if true;//ja  'jump -> x if true;' ==> 'jump -> x;'
+jump -> a if false;//jn
+jump -> a if 0;//jz same as 'if==0'
+jump -> a if !0;//jnz
+jump -> a if carry;//jc
+jump -> a if !carry;//jnc
+jump -> a if sign;//js
+jump -> a if !sign;//jns
+jump -> a if overflow;//jo
+jump -> a if !overflow;//jno
+jump -> a if == 0;//je
+jump -> a if != 0;//jne
+jump -> a if > 0;//jg
+jump -> a if < 0;//jl
+jump -> a if >= 0;//jge
+jump -> a if <= 0;//jle
 //jump types;
-jump -> a if > 0;
-if > 0 jump -> a;
+jump -> a if > 0;//both ways round are the same,
+if > 0 jump -> a;//same assembly code but stating the condision first
+
 //litteral
 a;
 //register; I have chosen '%' over '¬' because '%' is easier to type;
-%a;//compiles to 'r1'
+r a;%a;//compiles to 'r1'
 //pointer addressing is the same as in tptasm;
 [a];
 [%a];
@@ -55,7 +63,7 @@ a;
 [%a + %b];
 [%a - b];
 [%a - %b];
-//classes
+#(){@;//opcode classes forms
 	//class 1*
 		oper = a;
 		oper -> a;
@@ -70,19 +78,35 @@ a;
 		a oper b;//no output register
 		a oper= b;//with output register
 	//----
+};
+//the compiler supports all the regular command names from tptasm and the registers. However ',' to separate arguments are not supported
+	//e.g.
+	mov r0 [r3 + 34]
 //can use ","s to for multi-instruction assembly lines. e.g. 'move->10,get,nor,set;'
 //----
-getInput{
-	let inPort,outPort,dataOut,dataIn;
-	wait inPort;
-	if 0;
-	bump inPort;
-	recv inPort<-dataIn;
-	sendOutput{
-		send outPort->dataOut;
+{//code examples;
+	{:getInput;
+		let inPort,outPort,dataOut,dataIn;
+		{:example1;@;
+			#def let loop;
+			wait inPort;
+			if 0 jump loop;
+			bump inPort;
+			recv inPort<-dataIn;
+			{:sendOutput;
+				send outPort->dataOut;
+			};
+		};
+		{:example1;
+			wait inPort;
+			if 0;
+			bump inPort;
+			recv inPort<-dataIn;
+			{:sendOutput;
+				send outPort->dataOut;
+			};
+		};
 	};
-}
-examples:{
 	forLoop_example:{
 		//0xmin ZASM
 		let loop(reps){
@@ -128,5 +152,4 @@ examples:{
 			jmp main
 		.return
 	};
-
 };
