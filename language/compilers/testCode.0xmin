@@ -1,8 +1,9 @@
 #"0xmin";#"table";
 //{}:>(){}::{}()<:{};
 //BUG: '= 1||()' the compiler enters infinite loop without the '+'
-debugger ((""..."\c00"))"value";
-:global;
-virtual ...run(){:a;debugger(a==global);1;};
-virtual ...codeof {3};
-let v(){};
+//#"tptasm";
+//:global;
+//virtual ...run(){:a;debugger(a==global);1;};
+//virtual ...codeof {3};
+let a = {import lib "heap.0xmin"};
+debugger a..toJSON;

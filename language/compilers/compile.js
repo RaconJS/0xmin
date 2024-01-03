@@ -5,6 +5,7 @@
 //TESTING
 //TODO
 //UNUSED
+//note
 
 //TODO: BUG: fix '||=' bug
 //TODO: #add '#"text";' for text output
@@ -15,6 +16,8 @@
 //TODO: allow "->" "=>" operators (that return a HiddenLine) inside expression_short
 //TODO: add 0xminMath.random(seed)
 //TODO: add JSON object exporting
+
+//note: function logic is in `Scope` class in `async callFunction(`
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -2452,6 +2455,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				labels={//'a..b'
 					///(Variable)=>Value
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
+					"toJSON":async({label})=>new Value.String("`"+JSON.stringify(require("./JSON.js").listify(label).cloned)+"`"),
 					"length":async({label})=>new Value.Number(label.code.length),
 					"code":async({label})=>new Variable({name:"(..code)",//BODGED //extract all the function blocks from a label
 						code:[...label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""})))],
@@ -2689,12 +2693,14 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		class Scope extends DataClass{//type of codeObj
 			constructor(data){
 				super();Object.assign(this,data??{});
-				if(data?.parent){
-					this.var??=data.parent.var;
-					this.let??=data.parent.let;
+				if(!(this instanceof GlobalScope)){
+					if(data?.parent){
+						this.var??=data.parent.var;
+						this.let??=data.parent.let;
+					}
+					else throw Error("compier error: needs parent");
+					if(!(this.code instanceof Array))throw Error("compiler type error: Scope class requires `this.code` to be a source code tree;");
 				}
-				else if(!(this instanceof GlobalScope)){throw Error("needs parent")}
-				if(!(this.code instanceof Array))throw Error("compiler type error: Scope class requires `this.code` to be a source code tree;");
 			}//requires: label,parent,code
 			made=Error();//for debugging
 			fromName;//for TESTING only
@@ -2863,11 +2869,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				//#set 0xmin.settings.language("tptasm");
 				//#set 0xmin.settings.language("0xmin");
 				//#set 0xmin.settings.model="R216K2A";
-				this.mainObject=mainObject;
-				this.label.prototype=mainObject;
-				this.label.labels={"0xmin":mainObject};
 			}
-			mainObject;
 			label=new Variable({
 				scope:this,
 				name:["GlobalObject"],
@@ -3322,11 +3324,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			}
 			if(!scope){
 				if(!parentScope){
-					scope=new GlobalScope({code:block});
-					if(!globalScope){
-						globalScope=scope;
+					if(!globalScope.code){
+						scope=globalScope;
 						callStack[0]??=block;
 					}
+					else scope=new GlobalScope({code:block});
 				}else{
 					scope=new BlockScope({fromName:"evalBlock",parent:parentScope,code:block});
 				}
@@ -3363,6 +3365,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 			return assemblyCode;
 		}
 	//----
+	const globalScope=new GlobalScope({});
 	{
 		//0xmin label name conventions:
 		//info about Variable naming, can also be found in the variable class.
@@ -3385,7 +3388,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		Object.doubleFreeze(nullValue);
 	}
 	const mainObject=new Variable({name:["0xmin"],lineNumber:0,labels:Object.freeze({
-		"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0),this),assemblyCompiler.nullValue)),
+		"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0)),{code:[assemblyCompiler.nullValue]})),
 		"settings":Object.seal(new Variable({
 			name:"settings",
 			labels:Object.seal({
@@ -3400,7 +3403,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							assemblyCompiler.assembly.setLanguage(str);
 						}
 					}
-					return new Value.String(assemblyCompiler.assembly.language);
+					return new Value.String("'"+assemblyCompiler.assembly.language+"'");
 				}),//:1|0
 			}),
 		})),
@@ -3421,10 +3424,15 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),null);
 				Object.doubleFreeze(this.labels);
 			}
-		})
+		}),
+		toJSON(){return "class:0xmin"}
 	})});
+	{
+		globalScope.label.prototype=mainObject;
+		globalScope.label.labels={"0xmin":mainObject};
+		globalScope.mainObject=mainObject;
+	}
 	//'{' ==> '{ ... }'
-	let globalScope;
 	let compileData={model:"R216K2A"};
 	const callStack=[];
 	callStack.getData=function(){
