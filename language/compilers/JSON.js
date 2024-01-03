@@ -1,7 +1,8 @@
-function deReference(object){//:(any)->(unknown)[] ; is in prefix order
+function deReference(object,classList = []){//:(any,[class,name,toParameters][])->(unknown)[] ; is in prefix order
+	let classes = classList.map(v=>v[0]);
+	let classNamesUsed = new Set();
 	let refsGraph = [];//:(any & graph-like)[]; contains original objects
 	let refsTree = [];//: (any & tree-like)[]; contained cloned versions of the references structured like a lambda-calculus expression
-	let classIndexes = [];//:{name:String,index:number}[]
 	let isSearched = Symbol("isSearched");
 	function addItem(clonedValue,value){
 		const index = refsGraph.length;
@@ -15,80 +16,87 @@ function deReference(object){//:(any)->(unknown)[] ; is in prefix order
 		if(refsGraph.includes(value))
 			return refsGraph.indexOf(value);
 		switch (typeof value){
-			case"object":
+			case"undefined":
+				clonedValue = "undefined";
+				break;
+			case"object":{
+				if(value == null){
+					clonedValue = "null";
+					break;
+				}
 				let object = value;
 				if(object.toJSON){
 					object = object.toJSON();
 				}
-				let classObj;
-				let prototype = Object.getPrototypeOf(object);
-				if(!Object.hasOwn(object,"constructor")){
-					classObj = object.constructor;
-				}
-				else if(!Object.hasOwn(prototype,"constructor")){
-					classObj = prototype.constructor;
-				}
-				else throw Error("Could not find the class name of object")
-				let classIndex;
-				function handleOtherClass(){
-					if(refsGraph.includes(classObj)){
-						classIndex = refsGraph.indexOf(classObj);
+				let classObj;{
+					let prototype = Object.getPrototypeOf(object);
+					if(!Object.hasOwn(object,"constructor")){
+						classObj = object.constructor;
 					}
-					else{
-						classIndex = refsGraph.push(classObj) - 1;
-						refsTree.push([]);//:index[] ; contains references to its instance objects
-						//assert: refsGraph((refsTree[classIndex])[ x ]) instanceof classObj
-						classIndexes.push([classObj.name,classIndex]);
+					else if(prototype==Object.prototype||!Object.hasOwn(prototype,"constructor")){
+						classObj = prototype.constructor;
 					}
-					refsTree[classIndex].push(refsGraph.length);//push the index of this object
-					
+					else {
+						throw Error("Could not find the class name of object")
+					}
 				}
+				clonedObject = [];
+				clonedValue = [];//[String,tree-like]
+				index = addItem(clonedValue,object);
+				clonedValue[1] = clonedObject;
 				switch(classObj){
-					case Set:
 					case Map://json strings do not support maps and sets
-						handleOtherClass();
+						for(let [key,value] of object){
+							clonedObject.push([cloneValue(key),cloneValue(item)]);
+						}
+						break;
+					case Set:
 					case Array:
-						clonedValue = [];
 						for(let item of object){
-							clonedValue.push(cloneValue(item));
+							clonedObject.push(cloneValue(item));
 						}
 						break;
 					break;
 					default:
-						handleOtherClass();
 					case Object:
-						clonedValue = {};
-						index = addItem(clonedValue,object);
 						for(let property in object){
 							if(Object.hasOwn(object,property)){
-								clonedValue[property] = cloneValue(object[property]);
+								clonedObject.push([cloneValue(property),cloneValue(object[property])]);
 							}
 						}
-						let symbols = [];//[Symbol,tree-like value or object][]
-						clonedValue = [classObj.name+"",clonedValue,symbols];//[String,tree-like,[Symbol,tree-like][]]
 						for(let symbol of Object.getOwnPropertySymbols(object)){
-							symbols.push([cloneValue(symbol), cloneValue(object[symbol])]);
+							clonedObject.push([cloneValue(symbol), cloneValue(object[symbol])]);
 						}
-						if(symbols.length == 0)clonedValue = clonedValue[1];//get back the object on its own
-						refsTree[index] = clonedValue;
 					break;
 				}
+				clonedValue[0] = cloneValue(classObj);
 				return index;
+			}
 			case"number":
+				clonedValue = "number:" + value;break;
 			case"string":
+				clonedValue = "string:" + value;break;
 			case"symbol":
-			case"function":
-				return addItem(clonedValue,value);
+				clonedValue = "symbol:" + value.name;break;
+			default:
 			break;
+			case"function":{
+				let index = classes.indexOf(value);
+				let name = value.name ?? classList[classes.indexOf(value)]?.[1];
+				if(classNamesUsed.has(name))throw Error("repeated function/class name: '" + name + "'")
+				clonedValue = "class:" + name;
+			}
 		}
+		return addItem(clonedValue,value);
 	}(object);
 	return {
 		originals:refsGraph,
-		cloned:{refs:refsTree,classIndexes},
-		classes:classIndexes,
+		cloned:refsTree,
 	};
 }
-function parseList({refs,classIndexes},classList){
+function parseList(refs,classList){
+	let classNames = new Map();//:maps String -> class
+	classList.forEach(v=>classNames.set(v[1]??v[0].name, v[0]));
 	//assume prefix order
 	function handleObject(reference,i){
 		for(let i in reference){
@@ -99,33 +107,86 @@ function parseList({refs,classIndexes},classList){
 			}
 		}
 	}
-	for(let i = refs.length - 1; i >= 0; i--){//reference:number|Object|Array|
+	const refTypeMap = {
+		"number:"(v){return +v;},
+		"string:"(v){return ""+v;},
+		"symbol:"(v){return Symbol(v);},
+		"class:"(v){return classNames.get(v);},
+		"null"(v){return null;},
+		"undefined"(v){return undefined;},
+	};
+	generateObjects:
+	for(let i = 0; i < refs.length; i++){//reference:number|Object|Array|
 		let reference = refs[i];
-		if(typeof reference == "number"){
-			continue;
+		if(typeof reference == "string"){
+			let match = refs[i].match(/^.+:/);
+			refs[i] = refTypeMap[match[0]](refs[i].substr(match[0].length));
 		}
-		else if(reference instanceof Array && typeof reference[0] == "string"){
-			handleObject(reference[1],i);
-			for(let [symbol,value] of reference[2]){
-				if(typeof reference[1][symbol] == "number"){
-					reference[1][symbol] = refs[reference[1][i]];
-				}
-				else reference[1][symbol] = reference[1][i];
+		else if(reference instanceof Array){
+			let name = refs[reference[0]];//:String
+			let match = name.match(/^.+:/);
+			name = name.substr(match[0].length);
+			let properties = reference[1];//:[key:number,value:number][] | [value:number][]
+			let classObj = {
+				"Object":Object,
+				"Array":Array,
+				"Map":Map,
+				"Set":Set,
+			}[name]??classNames.get(name);
+			if(!classObj)throw Error("class '" + name + "' not found in class list");
+			let object;
+			switch(classObj){
+				case Array:
+					object = [];
+				break;
+				case Set:
+					object = new Set();
+				break;
+				case Map:
+					object = new Map();
+				break;
+				default:
+					object = {};
+					properties.forEach(([key,value])=>refs[i][refs[key]] = refs[value]);
+					object = new classObj(object);//dummy object
 			}
-			refs[i] = reference[1];
+			reference[2] = classObj;
+			reference[3] = object;
 		}
-		if(reference.constructor == Object || reference instanceof Array){
-			handleObject(reference,i);
+	}
+	populateObjects:
+	for(let i = 0; i < refs.length; i++){
+		let reference = refs[i];
+		if(reference instanceof Array){
+			let name = reference[0];//:String
+			let properties = reference[1];//:[key:number,value:number][] | [value:number][]
+			let classObj = reference[2];
+			let object = reference[3];
+			switch(classObj){
+				case Array:
+					properties.forEach(value=>object.push(refs[value]));
+				break;
+				case Set:
+					properties.forEach(value=>object.add(refs[value]));
+				break;
+				case Map:
+					properties.forEach(([key,value])=>object.set(refs[key], refs[value]));
+				break;
+				default:
+					properties.forEach(([key,value])=>object[refs[key]] = refs[value] instanceof Array? refs[value][3]: refs[value]);
+			}
 		}
 	}
 	//refs[i] = Object.assign(new classList[i](),reference[1]);
-	return refs[0];
+	return refs[0][3];
 }
 let a = {a:5};
-let b = {a,c:new class asd{}};
+class asd{};
+let b = {a,c:new asd};
 a.b = b;
-console.log(parseList(deReference(a).cloned,[new class asd{}]));
-if(0)module.exports={
+//console.log(deReference(a).cloned);
+//console.log(parseList(deReference(a).cloned,[[class asd{},"asd"]]));
+if(1)module.exports={
 	listify:deReference,
 	parseList:parseList,
 };
