@@ -13,15 +13,16 @@ void #set:(){//documentation
 			isUsed:@bool;
 			data:@any[];//+page == +page.data
 		};
+		#type Object: Page.data* on heap;
 		regsUsed:#int & %;
-		malloc:Function(%int length)->%Page*;
-		free:Function(%Page*)->void;
-		clear:Function(%Page*,%Page*?,%Page*?)->void;
-		memset:Function(%Page*,%int16,%int13)->void;
-		resize:Function(%Page*,%int16)->%int16;
-		realloc:Function(%Page*,%int16,%(@()->bool & flag(if == 0))*,%int16)->%bool|%Page;
-		ref:#(%Page*)->{@};
-		unref:#(%Page*,{@}?,!!label?)->{@};
+		malloc:Function(length:%int)->%Object*;
+		free:Function(%Object*)->void;
+		clear:Function(%Object*,fillWith:{@} & {int16,int13}? & []static)->void;
+		memset:Function(%Object*,%int16,%int13)->void;
+		resize:Function(%Object*,%int16)->%int16;
+		realloc:Function(%Object*,%int16,onMovePage:%(@()->bool & flag(if==0))*,%int16)->%Object|onMovePage();
+		ref:#(%Object*)->{@};
+		unref:#(%Object*,{@}?,#(!!label)?)->{@};
 		memory{
 			@Page;//start page
 			#list of intended actions{
@@ -584,5 +585,78 @@ void #let set: heap{
 		};
 	//----
 	#def: memoryData();
+};
+void #set:(){//examples
+	{:general_manyForms;
+		{
+			...labelsof {import lib "heap.0xmin";};
+			let heap{import lib "heap.0xmin";};
+		};
+		{
+			heap.malloc;
+			malloc;
+		};
+		{
+			call malloc;
+			malloc.call();
+		};
+		{
+			def heap;
+			def heap.malloc;
+			def heap.memory;
+		};
+	};
+	{:example1;
+		let doStuff{@;};
+		...labelsof {import lib "heap.0xmin";};
+		{
+			let sizeOfObject = 5;
+			@ r0 = sizeOfObject;//:size of object
+			@ call malloc;
+			@ [r0 + 0] = "h";
+			@ [r0 + 1] = "e";
+			@ [r0 + 2] = "l";
+			@ [r0 + 3] = "l";
+			@ [r0 + 4] = "o";
+			@ call free;
+		};
+		{
+			# let object2 = 1;//:%(Object)*
+			@ r malloc.inputs.(0) = 40;
+			@ call heap.malloc;
+			@ r object2 = heap.malloc.outputs.(0);
+			...doStuff;
+			@ r free.inputs.(0) = r object2;
+			@ call free;
+			@ hault;
+		};
+		#def malloc;
+		#def heap.free;
+		#def heap.realloc;
+		#def memory;
+	};
+	{:example2;
+		//note: heap.anyHeapFunction.call() saves registers onto the stack to make it easier to use.
+		let heap{import lib "heap.0xmin";};
+		let object = 0;//:%
+		let size = 1;//:%
+		r size = 10;
+		heap.malloc.call(size);
+		r object = heap.malloc.outputs.(0);
+		heap.free.call(size);
+		hault;
+		def heap;
+	};
+	{
+		...labelsof {import lib "heap.0xmin";};
+		let a = 0;
+		let deconstructor = {
+			...doStuff;
+		};
+		heap.ref(a);
+		heap.unref(a,deconstructor,{});
+		def deConstructor;
+		def heap.memory;
+	};
 };
 ...let set heap;
