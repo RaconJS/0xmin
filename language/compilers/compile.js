@@ -1017,7 +1017,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					let string=value;
 					if(shouldEval)value=new Value({string,type:"string",array});
 				}else if(!({index,value,failed}=await contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
-				else if("([".includes(word)){//'(label)'
+				else if(word=="("){//'(label)'
 					({index,value}=await contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
 					value??=null;//'()' ==> `undefined`. Used for 'foo(());'
 				}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
