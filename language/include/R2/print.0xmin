@@ -1,0 +1,108 @@
+#"tptasm";#"table";
+#:#(){:documentation;
+	print{
+		#(string,%?,{}?)->{@};
+		string:#(string,%?,{}?)->{@};
+		number:{
+			#(%int)->{@};
+			register:#(%int,%?,%?,(%|{})?)->{@};
+			hexChar:#(%int,%?,(%|{})?);
+			charSet:{@}&{
+				setup:#()->{@}?
+			};
+		};
+	};
+};
+let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
+	let reinsertRegs;
+	repeat !const_0:{
+		#const_0 = 1;
+		push r const_0;
+		#reinsertRegs::{
+			pop r const_0;
+		};
+	};
+	repeat !is0: r const_0 = 0;
+	let i = -1;
+	repeat str..length{
+		send r const_0 str.(i += 1);
+	};
+	def reinsertRegs;
+}::{
+	let string = ..this;
+	let string.char(reg,const_0,is0){
+		let reinsertRegs;
+		repeat !const_0:{
+			#const_0 = 1;
+			push r const_0;
+			#reinsertRegs::{
+				pop r const_0;
+			};
+		};
+		repeat !is0: r const_0 = 0;
+		let i = -1;
+		send r const_0 r reg;
+		def reinsertRegs;
+	};
+	let saveReg(reg,default,regsToPush,regsToPop){
+		repeat !reg:{
+			#reg = default;
+			#regsToPush..splice(-0,0,{push r reg});
+			#regsToPop..splice(0,0,{pop r reg});
+		};
+		#return = reg;
+	};
+	let number{
+		let charSet = "0123456789ABCDEF";
+		let charSet.setup(){
+			repeat (charSet..defs..length==0):{
+				:block;
+				jump -> block..return;
+				def charSet;
+			};
+		};
+		let register(regInput,reg_const_0,reg_char,reg_i){//#(%,%?,%?,%?)->{@}
+			//if reg_i is provided then runs a loop at run time.
+			//reg_i: ()|%|{}<->()
+			#let temp = regInput;
+			def let regsToPush;
+			let regsToPop;
+			#reg_const_0 = saveReg(reg_const_0,(regInput+1)%14,regsToPush,regsToPop);
+			#reg_char = saveReg(reg_char,(regInput+2)%14,regsToPush,regsToPop);
+			repeat !reg_const_0.is0: r reg_const_0 = 0;
+			repeat (arguments..length >= 4):let useForLoop;//if no reg_i argument
+			repeat !!useForLoop:{
+				#reg_i = saveReg(reg_i,(regInput+3)%14,regsToPush,regsToPop);
+				r reg_i = #(4 - 1);
+			};
+			def let loop;
+			repeat {4;1}[+!!useForLoop] {
+				r reg_char = 0;
+				r temp <<<= 4;//circular shift
+				r reg_char <<= 4 + internal;
+				send r reg_const_0 [charSet + r reg_char];
+			};
+			repeat !!useForLoop:{
+				r reg_i -= 1;
+				jump -> loop if >= 0;
+			};
+			def regsToPop;
+			charSet.setup();
+		};
+		let hexChar(regInt,reg_char,const_0){
+			def let regsToPush;
+			let regsToPop;
+			saveReg(const_0,(regInput+1)%14,regsToPush,regsToPop);
+			saveReg(reg_char,(regInput+2)%14,regsToPush,regsToPop);
+			r char = 0;
+			r temp <<<= 4;//circular shift
+			r char <<= 4 + internal;
+			send r const_0 [charSet + r char];
+			r temp >>>= 4
+			def regsToPop;
+			charSet.setup();
+		};
+		$def register;
+	};
+	let register = number.register;
+};
