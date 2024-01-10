@@ -75,7 +75,7 @@ let main(){
 	};
 	{:extraHeapUse;
 		r0 = 40;
-		call class.malloc;
+		call heap.malloc;
 	};
 	{
 		let startStack:>var(0);
@@ -167,9 +167,10 @@ let RegState(regState)={
 		};
 	};
 };
+import lib "heap.0xmin";
 let class{
-	import lib "heap.0xmin";
 	import lib "R2/class.0xmin";
+	#..this<=>m_class;
 };
 import lib "var_const.0xmin";
 let setVal(obj, prop, val) => {
@@ -203,7 +204,7 @@ let treeHead = class(() = {
 	constructor.Ref().nullable();
 	constructor.Ref().nullable();
 	constructor.Ref().nullable();
-})() <-> class.regsUsed;
+})() <-> heap.regsUsed;
 let tree <=> treeHead;
 let temp1 <-> treeHead+1;
 let temp2 <-> treeHead+2;
@@ -280,5 +281,7 @@ main();
 	hault;
 	jump -> end;
 	def var,const,class;
-	def class.heap.memory;
+	def heap.memory;
+	def heap.malloc;
+	def heap.free;
 };

@@ -4,7 +4,7 @@
 	...labelsof codeof m_class{
 		#type nullObject:{@} & []heap;
 		:(Class:class,objectLength:int)->Class;
-		#type class = #(this:object,...any)->object,
+		#type class = #(this:object,...any[])->object,
 		#type heap_object:object & {
 			new:#()->@(% = +Object)->%({@} & []heap)* & Object;
 			ref:#()->{@};

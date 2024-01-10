@@ -5,9 +5,5 @@
 //:global;
 //virtual ...run(){:a;debugger(a==global);1;};
 //virtual ...codeof {3};
-//let a = {import lib "heap.0xmin"};
-//debugger a..toJSON;
-#()->{
-	1;
-	debugger [0];
-}();
+let a = {import lib "heap.0xmin"};
+debugger a..toJSON;
