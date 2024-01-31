@@ -89,7 +89,8 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					"0xmin"(v){setLanguage("0xmin")},
 					"tptasm"(v){setLanguage("tptasm")},
 					"asm"(v){setLanguage("asm")},
-					"int"(v){setLanguage("")},
+					"int"(v){setLanguage("int")},
+					"text"(v){setLanguage("text")},
 					"code"(v){labels["log_code"].lineNumber=v;},//language: raw number output
 					"table"(v){labels["log_table"].lineNumber=v},
 					"len"(v){labels["log_length"].lineNumber=v},
@@ -1684,9 +1685,9 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						}
 					}
 					if(this.assembly.language=="0xmin"){
-						cpuState.lineNumber++;
 						cpuState.jump++;
 					}
+					cpuState.lineNumber++;
 					machineCode.binaryValue=binaryValue;
 					if(!failed)({failed}=await this.stateCheck({instruction,cpuState,assemblyCode}));
 				}
@@ -1753,6 +1754,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						contexts.main_assembly=(...args)=>contexts.main_assembly_0xmin(...args);
 						assemblyCompiler.compileAssemblyLine=(...args)=>assemblyCompiler.compileAssemblyLine_0xmin(...args);
 						assemblyCompiler.assembly.instructionSet=assemblyCompiler.assembly.instructionSet_0xmin;
+						this.language="0xmin";
 						break;
 						case"tptasm":
 						{//use R2
@@ -1762,13 +1764,22 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							assemblyCompiler.assembly.instructionSet={...assembler.tptasm.operators,...assembler.tptasm.otherKeywords,};
 							//assemblyCompiler.nullValue.asmValue="dw 0";
 						}break;
+						case"text":
+						{//'#"text";'
+							contexts.main_assembly=(...args)=>contexts.main_assembly_0xmin(...args);
+							assemblyCompiler.compileAssemblyLine=(...args)=>assemblyCompiler.compileAssemblyLine_0xmin(...args);
+							assemblyCompiler.assembly.instructionSet={};
+							this.language="text";
+							//same as 'int' but using u8 instead of u30 (TODO: I am not sure if it's u30 or u32)
+						}break;
+						case"int":
 						default:
 						{//empty instruction set '#"int";'
 							//this.pointers[name="jump"]=new Pointer(name);
 							contexts.main_assembly=(...args)=>contexts.main_assembly_0xmin(...args);
 							assemblyCompiler.compileAssemblyLine=(...args)=>assemblyCompiler.compileAssemblyLine_0xmin(...args);
 							assemblyCompiler.assembly.instructionSet={};
-							this.language="0xmin";
+							this.language="int";
 						}
 					}
 				},
@@ -2489,7 +2500,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 						return value;
 					},
 					//note: name might change
-					"code_assembly":async({label})=>await assemblyCompiler.collectCode(label).toValue("label"),
+					"code_assembly":async({label})=>new Variable({name:"<compile$>",code:await assemblyCompiler.collectCode(label)}).toValue("label"),
 					//change object state
 						"seal":async({label})=>{//TODO: finnish ..seal and ..freeze
 							Object.seal(label.labels);
@@ -3438,7 +3449,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 	callStack.getData=function(){
 		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
 	};
-	let outputAsBinary=()=>assemblyCompiler.assembly.language=="0xmin";
+	let outputAsBinary=()=>["0xmin","int","text"].includes(assemblyCompiler.assembly.language);
 	let parts=inputFile;
 	parts=parseFile(parts,fileName);
 	parts=bracketPass(parts);
@@ -3454,8 +3465,12 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 		+outputFile.join("\n\t");
 	const fillText=(txt,len,space=" ",map=(t,s)=>t+s)=>map(txt,space.repeat(len-txt.length));
 	const hex30ToStr=(v,len=8)=>{v=(v|0).toString(16);return "0".repeat(len-v.length)+v;};
+	const hex8ToStr=v=>hex30ToStr(v,2);
 	const decToStr=(v,len=3)=>" ".repeat(Math.max(len,(""+NaN).length)-(v+"").length)+v;
-	const outputAsString=()=>outputFile.map(v=>(((1<<31)-1)&v).toString(16)).map(v=>"0".repeat(8-v.length)+v);
+	const outputAsString=(numOfBits=30)=>
+		assemblyCompiler.assembly.language=="text"?outputFile.map(v=>String.fromCharCode(v)).join("")
+		:outputFile.map(v=>(((1<<(numOfBits+1))-1)&v).toString(16)).map(v=>"0".repeat(Math.ceil(numOfBits/4)-v.length)+v)
+	;
 	let highestLen=parts.code.reduce((s,v)=>Math.max(v.asmValue?.length|0,s),0);
 	const outputLogTable=()=>
 		parts.code.map((v,i)=>({//v:AssemblyLine
@@ -3478,6 +3493,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					+" cmd:"+oxminDisassembler(v.value)+" ".repeat(Math.max(0,"set jump +3;".length-(oxminDisassembler(v.value)+"").length))
 				:assemblyCompiler.assembly.language=="tptasm"?
 					" asm:"+v.asm
+				:assemblyCompiler.assembly.language=="text"?
+					""+String.fromCharCode(v.value)
+				:assemblyCompiler.assembly.language=="int"?
+					""+v.data
 				:""
 			)
 			+(assemblyCompiler.assembly.language=="tptasm"?";":"")
