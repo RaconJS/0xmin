@@ -148,7 +148,7 @@
 		jump->loop if>0;
 		del(i);
 	}::{
-	#set ..prototype{let i=var();}
+		#set ..prototype{let i=var();}
 	};
 	let printHex(reg)={
 		blockScope()<:(){
@@ -249,7 +249,7 @@ let Buyables(cost,cps,numberOf,max,info)={//data:{let description:#"";let name:#
 	delete isNotActive;
 }::{let item<=>Buyables;#Buyables..splice(0,1);
 	//cost,cps,start,max
-	def item(-10,0,0,10,{let name="ask", desc="Ask your for a paperclip;";});
+	def item(-10,0,0,10,{let name="ask", desc="Ask your creator for a paperclip;";});
 	def item(30,1,0,10,{let name="email bot", desc="Set up an email bot;";});
 	def item(-1,2,0,10,{let name="null", desc="coming soon";});
 	def item(-1,5,0,10,{let name="", desc="coming soon";});

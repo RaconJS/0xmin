@@ -29,8 +29,8 @@ let set0(mem){@;
 		};
 	};
 	#let i=-1;
-	repeat str..length {@;
-		data[i+=1];-1;0;
+	#repeat str..length #def:{@;
+		$def data[i+=1];-1;0;
 	};
 	$jump(this..return);
 	#def data;
@@ -41,5 +41,5 @@ print("hello world");
 {:hault;zero;minus1;-1};
 #def zero;
 #def minus1;
-#...run compile;
+//#...run compile;
 //input;output;hault

@@ -1,12 +1,13 @@
 #"tptasm";#"table";
 #:#(){:documentation;
 	print{
-		#(string,%?,{}?)->{@};
-		string:#(string,%?,{}?)->{@};
+		#(string)->{@}; //same function as print.string
+		string:#(string,%(@0|unknown)?,{}?)->{@};
+		char:#(%char,%(@0|unknown)?,{}?)->{@};
 		number:{
-			#(%int)->{@};
-			register:#(%int,%?,%?,(%|{})?)->{@};
-			hexChar:#(%int,%?,(%|{})?);
+			#(%int)->{@}; //same function as print.number.register
+			register:#(%int,%(@0|unknown)?,%?,(%|{})?)->{@};
+			hexChar:#(%int,%(@0|unknown)?,(%|{})?);
 			charSet:{@}&{
 				setup:#()->{@}?
 			};
@@ -14,6 +15,8 @@
 	};
 };
 let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
+	//this function mutates const_0 if it is provided as an argument.
+		//Similar is true for other functions in this module
 	let reinsertRegs;
 	repeat !const_0:{
 		#const_0 = 1;
