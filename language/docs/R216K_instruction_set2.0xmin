@@ -48,6 +48,10 @@ jump -> a if > 0;//jg
 jump -> a if < 0;//jl
 jump -> a if >= 0;//jge
 jump -> a if <= 0;//jle
+jump -> a if > 0 !signed;//ja
+jump -> a if < 0 !signed;//jb
+jump -> a if >= 0 !signed;//jae
+jump -> a if <= 0 !signed;//jbe
 //jump types;
 jump -> a if > 0;//both ways round are the same,
 if > 0 jump -> a;//same assembly code but stating the condision first

@@ -2604,6 +2604,7 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 							type:"array",
 							name:"(flat)",
 							code:[...forEachLabel(label,1)],
+							lineNumber:highestRecurLevel,
 
 						}).toValue("label");
 					},
@@ -2972,6 +2973,11 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 					map:{"shl":"scl", "shr":"scr"},
 					defaultSymbols:["", "+"],
 				},
+				"signed":{
+					useArray:true,
+					map:{"jg":["ja", "!"], "jl":["jb", "!"], "jge":["jae", "!"], "jle":["jbe", "!"]},
+					defaultSymbols:["", "!"],
+				},
 			});
 			operatorsToCheckForNoStore=Object.freeze([
 				"+", "-", "&", "|", "^",
@@ -3050,6 +3056,10 @@ const oxminCompiler=async function(inputFile,fileName,language="0xmin"){//langua
 				"jne":"jne",
 				"jg":"jg",
 				"jl":"jl",
+				"ja":"ja",
+				"jb":"jb",
+				"jae":"jae",
+				"jbe":"jbe",
 				"swm":"swm",
 			});
 			flags={
