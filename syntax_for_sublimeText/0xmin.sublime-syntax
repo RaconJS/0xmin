@@ -37,6 +37,7 @@ variables:
   objectExtentionSymbol: '::'
   assembly_commands_special: '\b(?:get\s+jump\s+\-1|set\s+jump\s+\+3|or\s+input)\b'
   assembly_commands_start: '(?<=^|;|@|:|{)\s*'
+  assembly_commands_end: '(?=;|#|})'
   assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump|or_input|get_jump|set_jump)\b'
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|text|len)' #'!?(make file|log.code|log.table)'
@@ -44,6 +45,7 @@ variables:
   inbuiltProperties: '\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf|asNumber|state|flat|code_assembly|secure)\b'
   oxminFunctions: '\b(?:language|model|log_(?:code|table|length)|Math)\b'
   line_start_endLinePart: ':|(?=\S)'
+  typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
 contexts:
   main:
     - match: '^'
@@ -382,13 +384,21 @@ contexts:
       scope: keyword.control
     - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
       scope: keyword.control
+      push: 
+        - - match: '\s*(?={{number}})'
+            pop: true
+          - match: '\b\w+\b' #allows 'repeat a {}' == 'repeat a: {}' instead of 'repeat (a{})'
+            scope: source
+            pop: true
+          - match: '(?=\S|$)'
+            pop: true
     - match: '\b(?:import|throw|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
-    - match: '{{labelName}}\s*(?=(?:\([^()]*?\)\s*(?:\=)?\s*){)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:\=)?\s*){)' #'foo()={}' or 'foo:>type()::()={}'
       scope: entity.name.class
-    - match: '{{labelName}}\s*(?=(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function
-    - match: '{{labelName}}\s*(?={)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?{)' #'foo{}'
       scope: entity.name.namespace
     - match: '\)' #'foo = ()=>{}' function declaration
       push: potentialFunctionDeclaration
@@ -422,8 +432,17 @@ contexts:
       captures:
         1: support.constant
         2: keyword.control
-    - match: '(?<=\]|r[0-9]|r1[0-5]|sp|ip|\w)\s*(?:(\+)?\s*\b(carry|chain)\b|(!)?\s*\b(carry|store|internal|chain|signed)\b)' #for #"tptasm";
+
+    #for '#"tptasm";'
+    - match: '\s*(?:[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b)\s*{{assembly_commands_end}}'
       scope: support.constant #e.g. 'a >> b + internal'
+    - match: '(?<=if)\s*\b(zero|sign|overflow|carry)\b' # 'jump -> a if zero'
+      scope: support.constant
+    - match: '\b(r[0-9]|r1[0-5]|ip|sp)\b'
+      scope: support.constant
+    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask)\b'
+      scope: keyword.control
+
 
     - match: '\b(?:let|def|set|undef)\b'
       scope: keyword.declaration.meta.0xmin
