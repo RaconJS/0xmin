@@ -1,19 +1,24 @@
-#"tptasm";#"table";
+#"tptasm";
 #:#(){:documentation;
 	print{
-		#(string)->{@}; //same function as print.string
-		string:#(string,%(@0|unknown)?,{}?)->{@};
-		char:#(%char,%(@0|unknown)?,{}?)->{@};
+		type Const_0 = %@0 | mut %
+		type bool = #{}|#() & #?
+		//all print functions mutate the terminal
+		#(string)-bool>{@}; //same function as print.string
+		string:#(#string,%Const_0?,#bool?)->{@};
+		char:#(%char,%Const_0?,#bool?)->{@};
 		number:{
 			#(%int)->{@}; //same function as print.number.register
-			register:#(%int,%(@0|unknown)?,%?,(%|{})?)->{@};
-			hexChar:#(%int,%(@0|unknown)?,(%|{})?);
+			register:#(%int,%Const_0?,%?,(%|())?)->{@};
+			static:#([@],%Const_0?,%?,(%|())?)->{@};
+			hexChar:#(%int,%Const_0?,(%|())?) -> {@};
 			charSet:{@}&{
 				setup:#()->{@}?
 			};
 		};
 	};
 };
+//type #bool = #{}|#()
 let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 	//this function mutates const_0 if it is provided as an argument.
 		//Similar is true for other functions in this module
@@ -62,6 +67,26 @@ let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 				:block;
 				jump -> block..return;
 				def charSet;
+			};
+		};
+		let static(memoryAddressInput,reg_memoryData,reg_const_0,reg_char,reg_i){//#(@,%?,%?,%?,%?)->{@}
+			let hadRegInput = !!reg_memoryData;
+			repeat !+hadRegInput {
+				{:findUniqueRegister;
+					let i = 0;
+					let regArgs = {+reg_const_0;+reg_char;+reg_i};
+					repeat 14 {#;
+						repeat (regArgs..indexOf(+i) != -1):
+						i += 1;
+					};
+					#reg_memoryData = 4;
+				};
+				push r regInput;
+			};
+			r regInput = [memoryAddress];
+			register(regInput,reg_const_0,reg_char,reg_i);
+			repeat !+hadRegInput {
+				pop r regInput;
 			};
 		};
 		let register(regInput,reg_const_0,reg_char,reg_i){//#(%,%?,%?,%?)->{@}
