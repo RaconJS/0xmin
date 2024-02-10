@@ -158,7 +158,7 @@ void #let set: heap{
 			#let: failed;
 			{//isUsed==0?
 				#let: isUsed=pageSize;//:%Page*
-				%isUsed=[%page+page.isUsed];
+				[%page+page.isUsed]|0;//%isUsed=[%page+page.isUsed];
 				jump failed if !=0;
 			};
 			//assert: %page = next unused page
@@ -197,7 +197,7 @@ void #let set: heap{
 				[%b+page.isUsed]=0;
 				[%b+page.next]=%c;//b->c
 				def:{:block;
-					%c-=0x7fff;//if %c == end of heap then don't mutate
+					%c-0x7fff;//if %c == end of heap then don't mutate
 					jump->block..return if<=0;//handles end of heap
 					[%c+page.last]=%b;//b<-c
 				};

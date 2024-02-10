@@ -1,10 +1,11 @@
 #"tptasm";#"len";//#"table";
+let heapAlreadyDefined = !!heap;
 let allMain(){
 	def main();
-	def heap.malloc;
-	def heap.free;
+	repeat !+heapAlreadyDefined def heap.malloc;
+	repeat !+heapAlreadyDefined def heap.free;
 	def var,const;
-	def heap.memory;
+	repeat !+heapAlreadyDefined def heap.memory;
 };
 ...(){
 	let heap{import lib "heap.0xmin"};
@@ -279,7 +280,7 @@ let main(){
 				{:switch;
 					...Command;
 					command("\t","exit")<:{return}::{#function..splice(-1,1)};//note: ..splice(-1,1) removes the last element from the command instance.
-					command({:enter;13},"new line")<:{
+					command({:enter;"\r"},"new line")<:{
 						let onNumberInput.newLine;
 						call onNumberInput.newLine;
 					};
