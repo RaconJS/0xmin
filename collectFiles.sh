@@ -14,5 +14,5 @@ cp ~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/Saves/"a_R216K2A.
 cp ~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts/"oxminv1.lua" the_powder_toy/scripts/"oxminv1.lua"
 echo sublime text
 rm -r syntax_for_sublimeText
-cp -r ~/./.config/sublime-text-3/Packages/0xmin syntax_for_sublimeText
+cp -r ~/.config/sublime-text/Packages/0xmin syntax_for_sublimeText
 #mv Packages syntax_for_sublimeText
