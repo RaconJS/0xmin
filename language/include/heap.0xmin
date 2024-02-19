@@ -13,13 +13,20 @@ void #set:(){//documentation
 			isUsed:@bool;
 			data:@any[];//+page == +page.data
 		};
+		//use '0' for null pointers
 		#type Object: Page.data* on heap;
 		regsUsed:#int & %;
-		malloc:Function(length:%int)->%Object*;
+		alloc:Function(%Object*?,length:%int,offset:%int);//not implemented yet
+
+		malloc:Function(length:%int)->%Object*? & (%Object|#{%null*,flag(if sign,if overflow)});
 		free:Function(%Object*)->void;
+		
+		resize:Function(%Object*,%int16)-> #{%int16,flag(if sign)};
+		resizeBack:Function(%Object*,%int16)-> #{%int16,%Object*,flag(if sign)};
+		
 		clear:Function(%Object*,fillWith:{@} & {int16,int13}? & []static)->void;
 		memset:Function(%Object*,%int16,%int13)->void;
-		resize:Function(%Object*,%int16)->%int16;
+		
 		realloc:Function(%Object*,%int16,onMovePage:%(@()->bool & flag(if==0))*,%int16)->%Object|onMovePage();
 		ref:#(%Object*)->{@};
 		unref:#(%Object*,{@}?,#(!!label)?)->{@};
@@ -35,7 +42,7 @@ void #set:(){//documentation
 };
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{
-	#let: free,malloc,clear,memset,resize,realloc;//@functions
+	#let: free,malloc,clear,memset,resize,resizeBack,realloc;//@functions
 	#let: regsUsed = 3;//:int & %
 	#let: ref,unref;//#()->{@}
 	#let: memory;
@@ -102,10 +109,23 @@ void #let set: heap{
 			...set let prototype;
 		};
 	};
+	#let: Object()={
+		...let set Page();
+		$set this;
+	}::{
+		#let: prototype=..this();
+		#let: size={
+			ram => #(- Page.size);
+			$def prototype;
+		}..compile..length;
+		#let: pointer()={
+			...set let prototype;
+		};
+	};
 	//note: Page=().isUsed can used as an int to count refernces for smart pointers.
 	#let: page0=Page();//:@
 	#set: page0{//start of the heap
-		#set: next..splice(0,1,{0x7fff});
+		#set: next..splice(0,1,{0xffff});
 		#set: last..splice(0,1,{(page0);});
 	};
 	#let: enum(start,inputsLen)={
@@ -125,30 +145,37 @@ void #let set: heap{
 		};
 		#set: return = newObj;
 	};
+	#let isPageEndOfHeap(page){
+		%page - 0xffff;
+	};
+	#let skipIfEndOfHeap(nextPage,do){
+		//prevents mutating the end of the heap
+		:block;
+		isPageEndOfHeap(nextPage);
+		jump -> block..return if<=0 !signed;
+		def do;
+	};
 	//
 	//%:weak,@:let,$:break,#:this
 	#set: malloc{
 		#let: nextReg=enum(0);
 		#let: inputs{//:#
-			#def let: words=nextReg();//:%
+			#def let: words=nextReg();//:%int
 		};
 		#let: data{
-			(page0) #def let: startPage;//:Page*
+			(page0) #def let: startPage;//:@Page*
 		};
 		#let: outputs{//:#
-			#def let: pointer=0;//:%
+			#def let: pointer=Object.pointer=()<->0;//:%Object*
 		};
 		...let inputs;
 		...let data;
 		...let outputs;
-		#let: page=nextReg();//:%Page*
-		#set: page..splice(0,-0);
-		#set: page{...let set Page();};
-		#let: compiledPage=#(page..compile);
+		#let: page=Page.pointer=()<->nextReg();//:%Page*
 		#let: pageSize=nextReg();//:%int; size of the current page
 		#let: remainder=pageSize;
 		#let: spaceNeeded=words;
-		#let: extraSpace=compiledPage..length;//:int; miminum page size
+		#let: extraSpace=Page.size;//:int; miminum page size
 		%spaceNeeded += extraSpace;
 		delete words;
 		%page=[startPage];//Page* = [Page**]
@@ -157,25 +184,30 @@ void #let set: heap{
 		#def let: loop{
 			#let: failed;
 			{//isUsed==0?
-				#let: isUsed=pageSize;//:%Page*
+				:ifBlock;
 				[%page+page.isUsed]|0;//%isUsed=[%page+page.isUsed];
-				jump failed if !=0;
+				jump failed if!=0;
 			};
 			//assert: %page = next unused page
 			{//hasEnoughSpace?
-				%pageSize=[%page+page.next];
+				%pageSize+=[%page+page.next];
 				%pageSize-=%page;
 				%remainder-=%spaceNeeded;
-				jump failed if<0;
+				jump whenFound if>=0 !signed;
 			};
-			jump whenFound;
 			#def: failed{
 				%page=[%page+page.next];
-				jump->loop;
+				isPageEndOfHeap(page);
+				jump->loop if>=0;
+				{:outOfHeapMemory;
+					//out of heap memory
+					%pointer = 0;
+					%pointer - 1;//sets the sign and overflow flags for an error
+					return;
+				};
 			};
 		};
 		#def: whenFound{
-			[startPage]=%page;//moves [startPage] to increase malloc's efficiency
 			[%page+page.isUsed]=1;
 			%remainder-=extraSpace;
 			jump ..return if<=0;//if no space => dont need to rewire page pointers
@@ -189,6 +221,7 @@ void #let set: heap{
 			#let: nextPage<->spaceNeeded;
 			delete spaceNeeded;
 			%nextPage=[%page+page.next];
+			[startPage]=%nextPage;//moves [startPage] to increase malloc's efficiency
 			{//setUp page pointers;
 				//a<-->c
 				//a<->b<->c
@@ -196,9 +229,7 @@ void #let set: heap{
 				#let: a=page,b=newPage,c=nextPage;
 				[%b+page.isUsed]=0;
 				[%b+page.next]=%c;//b->c
-				def:{:block;
-					%c-0x7fff;//if %c == end of heap then don't mutate
-					jump->block..return if<=0;//handles end of heap
+				skipIfEndOfHeap(c)<:{
 					[%c+page.last]=%b;//b<-c
 				};
 				[%b+page.last]=%a;//a<-b aka: b.<- = a
@@ -207,50 +238,51 @@ void #let set: heap{
 			//setOutput
 		};
 		%pointer=%page;
-		%pointer+=compiledPage..length;
+		%pointer+=Page.size;
 		return;
 		#def: data;
 	}::{void #set: Call.addCaller(..this,1);};
 	#set: free{
 		#let: nextReg=enum(0);//get next free register
 		#let: inputs{//:#
-			#def let: pointer=nextReg();//:%Page*
+			#def let: pointer=Object.pointer=()<->nextReg();//:%Object*
 		};
 		#let: data{};
 		#let: outputs{};
-		#let: page=inputs.pointer;//:%Page*
-		#set: page..splice(0,-0);
-		#set: page{...let set Page();};
-		#let: compiledPage=#(page..compile);
-		%page-=compiledPage..length;
-		#let otherPage=nextReg();//:%Page* contains next/last page
-		#let: isUsed=nextReg();//:%bool
-		#let: joinIfFree(toOtherPage,toThis){//:#(page property,page property)=> @(%Page*,%Page*)=>void
-			//extends low_address_page into high_address_page
-			#let: end;
-			%otherPage = [%page+toOtherPage];
-			%isUsed=[%otherPage+page.isUsed];
-			jump->end if!=0;
-			//if free then join
-			//:delete isUsed
-			#let: newAddress=isUsed;//:%Page*
-			%newAddress = [%otherPage+toOtherPage];
-			[%page+toOtherPage]=%newAddress;//assert: page.toOtherPage=otherPage.toOtherPage
-			%newAddress = [%page+toThis];
-			[%otherPage+toThis]=%newAddress;//assert: otherPage.toThis=page.toThis
-			#def: end;
-		};
-		#def: joinIfFree(page.next,page.last);
-		#def: joinIfFree(page.last,page.next);
+		#let: page=Page.pointer=()<->inputs.pointer;//:%Page*
+		%page-=Page.size;
 		[%page+page.isUsed]=0;
-		def:{:moveStartingPage;
-			let startPage=isUsed;//:[%]
+		#let: newLastPage=Page.pointer=()<->nextReg();
+		#let: newNextPage=Page.pointer=()<->nextReg();
+		{:joinNeighboursIfFree;
+			{:block;
+				:extendForward;
+				%newNextPage = [%page+page.next];
+				[%newNextPage+page.isUsed]|0;
+				jump->block..return if!=0;
+				%newNextPage = [%page+page.next];
+			};
+			{:block;
+				:extendBackward;
+				%newLastPage = [%page+page.last];
+				[%newLastPage+page.isUsed]|0;
+				jump->block..return if==0;
+				%newLastPage = %page;
+			};
+		};
+		{:reconnectPages;
+			skipIfEndOfHeap(newNextPage)<:{
+				[%newLastPage+newLastPage.next] = %newNextPage;
+			};
+			[%newNextPage+newNextPage.last] = %newLastPage;
+		};
+		{:moveStartingPage;
+			let startPage=otherPage;//:[%]
 			///[startPage]=%page if %page<[startPage];
-			%startPage=[malloc.data.startPage];
-			%startPage-=%page;
+			[malloc.data.startPage] - %newLastPage;
 			jump->moveStartingPage..return if<=0;
 			//assert:%startPage>%page
-			[malloc.data.startPage]=%page;
+			[malloc.data.startPage]=%newLastPage;
 		};
 		return;
 		#def: data;
@@ -330,20 +362,91 @@ void #let set: heap{
 		return;
 	}::{void #Call.addCaller(..this,3);};
 	#set:resize{//similar to realloc except it doesn't change the pointer if there isn't any space
+		//returns fail by setting the signed flag to 1
 		#let: nextReg=enum(0);
 		#let: inputs{
-			#def let: page=Page()<->nextReg();//input
-			#def let: size=nextReg();//size of new block
+			#def let: object=Object.pointer=()<->nextReg();//:%Object* ; input
+			#def let: size=nextReg();//:%int signed; size of new block
 		};
 		#let: outputs{
-			#def let: newSize=0;//returns 0 if no page found
+			#def let: size=0;//:%int ; returns the new size of the input Object
 		};
-		...let inputs;
-		...let outputs;
-
+		//...let inputs;
+		//...let outputs;
+		let nextPage = Page.pointer=()<->nextReg();//:%Page*
+		let newPage = Page.pointer=()<->inputs.size;
+		%newPage += %inputs.object;//assert: %newPage == %object + %size
+		%nextPage = [%inputs.object - (-inputs.object.next)];
+		let difference = nextReg();//:%int
+		{:checkIfUsed;
+			:ifBlock;
+			let fail;
+			isPageEndOfHeap(nextPage);
+			jump -> fail if<=0;
+			[%nextPage + nextPage.isUsed] | 0;
+			jump -> ifBlock..return if==0;
+			def fail{:noSpaceToExpand;
+				%outputs.size = %nextPage;
+				%outputs.size -= %newPage;
+				return;
+			};
+		};
+		//assert: [%nextPage] is free
+		{
+			let nextNextPage = Page.pointer=()<->nextReg();
+			%nextNextPage = [%nextPage+nextPage.next];
+			%inputs.object -= Page.size;
+			let inputPage = Page.pointer=() <-> inputs.object;
+			let mergePagesFully;
+			{:checkForSpaceToInsertPage;
+				%difference = %nextNextPage;
+				%difference -= %newPage;//check for enough space for inputs.size
+				%difference - Page.size;//check for enough space to insert a new page
+				jump -> mergePagesFully if<=0 !signed;
+			};
+			let checkForSuccess;
+			{:insertNewPage;
+				[%inputPage+inputPage.next] = %newPage;
+				skipIfEndOfHeap(nextNextPage)<:{
+					[%nextNextPage+nextNextPage.last] = %newPage;
+				};
+				[%newPage+newPage.next] = %nextNextPage;
+				[%newPage+newPage.last] = %inputPage;
+				[%newPage+newPage.isUsed] = 0;
+				jump -> checkForSuccess;//assert: sign flag == 0
+			};
+			def mergePagesFully{
+				[%inputPage+inputPage.next] = %nextNextPage;
+				skipIfEndOfHeap(inputPage)<:{
+					[%nextNextPage+nextNextPage.last] = %inputPage;
+				};
+				//assert: sign flag: 1|0
+			};
+			def checkForSuccess{
+				let temp = difference;
+				%temp = [%inputPage+inputPage.next];
+				%temp -= %inputPage;
+				%temp -= %inputPage.data;
+				%outputs.size = %temp;
+				return;
+			};
+			//assert: function has returned
+		};
+	}::{void #Call.addCaller(..this,2);};
+	#set:resizeBack{
+		//returns fail by setting the signed flag to 1
+		#let: nextReg=enum(0);
+		#let: inputs{
+			#def let: object=Object.pointer=()<->nextReg();//:%Object* ; input
+			#def let: size=nextReg();//:%int ; size of new block
+		};
+		#let: outputs{
+			#def let: size=0;//:%int ; returns the new size of the input Object
+		};
 		//UNFINISHED
-	}::{void #Call.addCaller(..this,4);};
+	}::{void #Call.addCaller(..this,2);};
 	#set:realloc{
+		//TODO: redo this whole function
 		...labelsof{:setUpMeta;
 			#(){:pseudocode_for_interface;
 				//expands memory in both directions or finds new block
@@ -358,13 +461,13 @@ void #let set: heap{
 			};
 			#let: nextReg = enum(0);
 			#let: inputs{
-				#def let: page = Page.pointer=() <-> nextReg();//input
-				#def let: size = nextReg();//size of new block
-				#def let: onMovePage = nextReg()::{let default = 0};//function pointer to call if there is a reallocation
-				#def let: offset = nextReg()::{let default = 0};//data offset. Is the new index for the current data, relative to the new page.
+				#def let: page = Page.pointer=() <-> nextReg();//:%Object* ; input
+				#def let: size = nextReg();//:%int ; size of new block
+				#def let: onMovePage = nextReg()::{let default = 0};//:%{@}*?|0 ; function pointer to call if there is a reallocation
+				#def let: offset = nextReg()::{let default = 0};//:%int ; data offset. Is the new index for the current data, relative to the new page.
 			};
 			#let: outputs{
-				#def let: newPage = 0;//returns 0 if no page found
+				#def let: newPage = 0;//:%Object* ; returns 0 if no page found
 			};
 		};
 		... labelsof{:setUpVariables;
@@ -383,7 +486,7 @@ void #let set: heap{
 				};
 				let nextReg = enum(0xmin.Math.max(free.nextReg.n,malloc.nextReg.n));
 				let temp = nextReg();
-				let tempRegs{//arnt mutated by malloc or free
+				let tempRegs{//are not mutated by malloc or free
 					#def let oldPage = Page.pointer=() <-> nextReg();
 					#def let offset = nextReg();
 				};
@@ -391,8 +494,8 @@ void #let set: heap{
 				%tempRegs.oldPage = %page;
 				%malloc.inputs.(0) = %size;
 				call malloc;
-				let newPage = malloc.outputs.(0);
 				let page = ¬,size = ¬, onMovePage = ¬, offset = ¬;//sets variables to null
+				let newPage = malloc.outputs.(0);
 				//assume: %page == %malloc.outputs.(0)
 				{:moveData;
 					#let nextReg = enum(newPage + 1);
@@ -463,7 +566,7 @@ void #let set: heap{
 				%outputs.newPage = tempRegs.newPage;
 				return #def returner;
 			};
-		}
+		};
 		${:extendForward;
 			//checks for max size
 			{:getPageSize;
@@ -507,7 +610,7 @@ void #let set: heap{
 				repeat 0 jump -> extendForward..return;//not needed since it is the same as '@jump => ram 1';
 			};
 		};
-		repeat 0: ${:extendBackward;//There is probably a way to DRY this part
+		repeat 0 ${:extendBackward;//There is probably a way to DRY this part
 			let lastPage = Page.pointer=() <-> nextPage;
 			let minIndexNeeded = offset;
 			//checks for max size
@@ -537,10 +640,8 @@ void #let set: heap{
 				delete maxIndexNeeded;
 				[%page - #(Page.size - page.last)] = %newLastPage;
 				%lastPage = [%lastPage + lastPage.last];
-				${:updateNextNextPage;
-					:block;
-					%lastPage += 1 !store;//assume: there are 0x8000 memory locations
-					jump -> block..return if sign;//prevents mutating memory outside the end of the heap.
+				skipIfEndOfHeap(lastPage)<:{
+					:updateNextNextPage;
 					[%lastPage + lastPage.last] = %page;
 					[%lastPage + lastPage.last] -= Page.size;
 				};

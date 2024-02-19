@@ -1,5 +1,5 @@
 #"tptasm";
-//#"table";
+#"table";
 let heap{
 	import lib "heap.0xmin";
 	#..splice(0,-0);
@@ -7,10 +7,11 @@ let heap{
 		//def memory;
 		def malloc;
 		def free;
-		def realloc;
+		def resize;
 		let memory = memory,
 			malloc = malloc,
 			free = free,
+			resize = resize,
 			realloc = realloc,
 			ref = ref,
 			unref = unref,
@@ -23,29 +24,51 @@ let heap{
 jump->heap..return;
 def heap;
 null;//main program
-r0 = 4;
-call malloc;//malloc.call(0);
-mask = 0xff00; r1=0x0000; [r0 + 0] = r1;
-mask = 0x00ff; r1=0x0000; [r0 + 1] = r1;
-mask = 0x0000; r1=0xff00; [r0 + 2] = r1;
-mask = 0x0000; r1=0x00ff; [r0 + 3] = r1;
-mask = 0x0000;
-push r0;
-{
-	r0 = 16;
-	call malloc;
+repeat 0 {:reallocTest;
+	r0 = 4;
+	call malloc;//malloc.call(0);
+	mask = 0xff00; r1=0x0000; [r0 + 0] = r1;
+	mask = 0x00ff; r1=0x0000; [r0 + 1] = r1;
+	mask = 0x0000; r1=0xff00; [r0 + 2] = r1;
+	mask = 0x0000; r1=0x00ff; [r0 + 3] = r1;
+	mask = 0x0000;
 	push r0;
-		r0 = 3;
+	{
+		r0 = 16;
 		call malloc;
+		push r0;
+			r0 = 3;
+			call malloc;
+		pop r0;
+		call free;
+	};
 	pop r0;
-	call free;
+	r1 = 10;
+	r2 = 0;
+	r3 = 0;
+	call realloc;//realloc.call(0);
+	call free;//free.call(0);
 };
-pop r0;
-r1 = 10;
-r2 = 0;
-r3 = 0;
-call realloc;//realloc.call(0);
-call free;//free.call(0);
+repeat 1{:resizeTest;
+	repeat 0 {
+		r0 = 4;
+		call malloc;
+		push r0;
+			r0 = 5;
+			call malloc;
+		pop r0;
+		call free;
+	};
+	{
+		r0 = 5;
+		call malloc;
+		r1 = 20;
+		push r0;
+			hlt;
+			call resize;
+		pop r1;
+	};
+};
 hlt;
 let end;
 jump->end #def end;

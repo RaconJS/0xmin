@@ -42,7 +42,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|([&|\^])\2?|[><!]=|={1,3}|>{1,3}|<{1,3}|\*\*|[!\$%*()-+=\[\]{};:@#~\\|,/?¬]|[\s\S]/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|([&|\^])\2?|[><!]=|={1,3}|>{1,3}|<{1,3}|\*\*|[!\$%*()-+=\[\]{};:@#~\\|,/?¬]|\S|\n|\s+/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -69,7 +69,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			let wordsData=[];
 			let lines=inputFile.split(/\n[\t ]*/);//getLines is a function so that it doesn't show up in console logs
 			highestSourceLineNumber=Math.max(highestSourceLineNumber,inputFile.split("\n").length);
-			let data={line:0,column:0,file:filePath,i:0,getLines(){return lines;}};
+			let data={line:0,column:0,file:filePath,indent:0,i:0,getLines(){return lines;}};
 			words.fileName=fileName;
 			words.filePath=filePath;
 			{//do settings
@@ -106,14 +106,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			}
 			let wordsRaw=inputFile.match(wordsRegex)??[];
 			//remove comments
+			let addToIndent;
 			for(let i=0;i<wordsRaw.length;i++){
 				let n;
 				data.i=i;
 				if(n=wordsRaw[i].match(/\n/g)){
 					data.line+=n?.length??0;
-					if(n)data.column=0;
+					data.column=0;
+					if((wordsRaw[i+1]??"").match(/\s+/))data.indent=wordsRaw[i+1].length;
 				}
 				data.column+=wordsRaw[i].match(/[^\n]*$/)[0].length;
+				if("\"'`".includes(wordsRaw[i][0])){//allows indentation to be found and removed in multi-line strings
+					wordsRaw[i] = Object.assign(new String(wordsRaw[i]),{indent:data.indent});
+				}
 				if(wordsRaw[i].match(/^\/[\/*]|^\s/)){
 					//remove comments
 				}
@@ -234,7 +239,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				this.leftArgOnly=leftArgOnly;
 				this.rightArgOnly=rightArgOnly;
 			}
-			do({args,hasEquals}){//nextArgData:{statement;scope;index;etc...} 
+			do({args,hasEquals,index,statement,scope}){//:mutates args
 				///ans:number;
 				let ans,arg0=args.pop(),arg1,fistArg;
 				let number0=arg0?arg0.toNumber().number:undefined;
@@ -246,16 +251,16 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						do1Arg=false;
 						if(hasEquals){if(fistArg.type=="label"&&fistArg.parent&&fistArg.parent.labels[fistArg.name]){
 							fistArg.label.lineNumber=ans;
-							fistArg.parent.labels[fistArg.name]=Variable.fromValue(fistArg);
+							fistArg.parent.labels[fistArg.name]=Variable.fromValue(fistArg,scope);
 							args.push(fistArg);
 						}}
-						else args.push(new Value.Number(ans));
+						else args.push(new Value.Number(ans,{scope}));
 					}
 				}
 				if(do1Arg){
 					if(this.rightArgOnly)ans=this.rightArgOnly(number0);
 					else if(this.leftArgOnly)ans=this.leftArgOnly(number0);
-					args.push(new Value.Number(ans));
+					args.push(new Value.Number(ans,{scope}));
 				}
 			}
 		};
@@ -309,7 +314,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			charSet:new Array(0x7f).fill().map((v,i)=>String.fromCharCode(i))+"█",
 			string({index,statement,scope}){//is optional
 				let word=statement[index];
-				let value=Value.String(word);
+				let value=Value.String(word,word?.indent,scope);
 				if(value){
 					index++;
 					return{index,value:value.string,array:value.array};
@@ -903,7 +908,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(!found){state["let"]=state["set"]=state["def"]=true;}
 				let value;
 				({index,value}=contexts.expression({statement,index,scope,includeBrackets:false}));
-				const label=Variable.fromValue(value);
+				const label=Variable.fromValue(value,scope);
 				if(label){
 					if(state["let"]|state["labelsof"]){
 						Object.assign(scope.let.label.labels,label.labels);
@@ -1136,8 +1141,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 										let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 										value.type="label";
 										let type= code.dataType=="char"?"string":"number";
-										value.label=new Variable({type,lineNumber:number,name:"["+name+"]",code:[code]});
-										
+										value.label=newVal.toLabel();
 										if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
 											value=value.toType("number");
 											//TODO: throw error if index out of range
@@ -1344,13 +1348,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								type:"string",
 								array:[...arg0.array,...arg1.array],
 								string:arg0.string+(arg1.string??""),
+								scope,
 							});
 							break;
 							default://ans:Value<label>
 							ans=new Variable({code:[
 								...(arg0.toType("label").label?.code??[]),
 								...(arg1.toType("label").label?.code??[]),
-							]}).toValue("label");
+							],scope}).toValue("label");
 
 						}
 						args.push(ans);
@@ -1422,7 +1427,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								let isNotNull=firstArg instanceof Value;
 								let newLabel;{//:Variable
 									//mutation
-									newLabel=isNotNull?Variable.fromValue(value):null;
+									newLabel=isNotNull?Variable.fromValue(value,scope):null;
 								}
 								if(firstArg.type=="label"&&firstArg.parent){
 									//overwrites variable 'a.b=2;' or 'a=2;'
@@ -1531,12 +1536,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	};
 	const assemblyCompiler={
 		main(label,logErrors,dataObj){//(Variable) => Variable / MachineCode
+			//logErrors:bool?
+			//dataObj:Object?
 			"use strict";
 			const codeQueue=this.collectCode(label);//:CodeLine[]
-			if(dataObj)dataObj.codeQueue=codeQueue;//dataObj:Object?
-			const {assemblyCode}=this.assignMemory(codeQueue,label,logErrors);//:Variable
+			if(dataObj)dataObj.codeQueue=codeQueue;
+			const {assemblyCode}=this.assignMemory(codeQueue,label,logErrors,dataObj);//:Variable
 			//(Variable) -> Variable
 			const machineCode=this.compileAssembly(assemblyCode);//(Variable) -> MachineCode
+			if(dataObj)dataObj.machineCode=machineCode;
 			return machineCode;
 		},
 		//$ phase
@@ -1573,7 +1581,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				variable.isSearched=false;
 				return codeQueue;
 			},
-			assignMemory(codeQueue,label,logErrors){
+			assignMemory(codeQueue,label,logErrors,dataObj){
 				"use strict";
 				logErrors??=true;
 				if(!(codeQueue instanceof Array))throw Error("compiler type error: 'codeQueue' is not a normal Array.");
@@ -1583,6 +1591,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				let startingCpuState=new CpuState({relativeTo:label});
 				let cpuState=new CpuState();
 				const assemblyCode=new MachineCode();
+				if(dataObj){//dataObj:Object?
+					dataObj.assemblyCode = assemblyCode;
+				}
 				let passed=0;//has done a curtain number of reps
 				passed=false;//ISTESTING
 				for(let i=0;i<codeQueue.length;i++){
@@ -1973,8 +1984,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			static Number=//Value.Number
 			class Number extends Value{constructor(number,data={}){super({number,type:"number",...data});}}
 			static String=//Value.String
-			function Value_String(rawString){//(string)->Value.String?
+			function Value_String(rawString,indent=0,scope){//(string,number)->Value.String?
 				if(rawString&&"\"'`".includes(rawString[0])){
+					{//removes indentation in multilineStrings
+						rawString = rawString.replaceAll(/\n(\s+)/g,(v,match1)=>"\\n"+match1.substr(indent,match1.length-indent));
+					}
 					let includeAllWhiteSpace=rawString[0]=="`";
 					let array=rawString.substr(1,rawString.length-2)//(string|char)[]
 						.replaceAll("\\t", "\t")
@@ -2006,7 +2020,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						console.error("str:",[[string]]);
 						throw error;
 					}
-					return new Value({type:"string",string,array});
+					return new Value({type:"string",string,array,scope});
 				}else{
 					return undefined;
 				}
@@ -2050,7 +2064,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					case"number":return this.toNumber();break;
 					case"string":return this.toValueString();break;
 					//case"array":return this.array;break;
-					case"label":return Variable.fromValue(this)?.toValue?.("label")??Object.assign(this,{type:"label"});break;
+					case"label":return Variable.fromValue(this,this.scope)?.toValue?.("label")??Object.assign(this,{type:"label"});break;
 				}
 			}
 			toJS(){//UNUSED
@@ -2109,6 +2123,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			cpuStateAfter;//:CpuState; the cpuState after this line is run;
 			moveBy;//:number; relAddress part of instruction. used for state checking
 			hasChecks=true;
+			scope;//:Scope; used for finding source code line number
+			getNumber(){
+				return this.binaryValue??this.dataValue|0;
+			}
+			toLabel(){
+				let type=this.dataType=="char"?"string":"number";
+				let number=this.getNumber();
+				return new Variable({type,lineNumber:number,name:"["+name+"]",code:[this],scope:this.scope});
+			}
 		}
 		class R2Line extends CodeLine{
 			constructor(data){super();Object.assign(this,data??{})}
@@ -2307,7 +2330,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					return code;
 				}
 			}
-			getCode(n=0){//: Statement; can contain Scope
+			getCode(n=0){//: Statement & (Variable|Scope)[]; can contain Scope
 				let codeBlock;//(Statemnent)
 				if(this.isSearched)return codeBlock;
 				this.isSearched=true;
@@ -2373,7 +2396,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}				
 				return value;
 			}
-			static String=
+
+			static String=//Variable.String
 			class String extends Variable{
 				constructor(string,data){
 					"use strict";
@@ -2466,16 +2490,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				labels={//'a..b'
 					///(Variable)=>Value
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
-					"toJSON":({label})=>new Value.String("`"+JSON.stringify(require("./JSON.js").listify(label).cloned)+"`"),
+					"toJSON":({label,scope})=>new Value.String("`"+JSON.stringify(require("./JSON.js").listify(label).cloned)+"`",0,scope),
 					"length":({label})=>new Value.Number(label.code.length),
-					"code":({label})=>new Variable({name:"(..code)",//BODGED //extract all the function blocks from a label
-						code:[...label.getCode().map(v=>Variable.fromValue(new Value({type:"string",string:v+""})))],
-					}).toValue("label"),
-					"splice":new BuiltinFunctionFunction("splice",({label,args,value})=>{
+					"splice":new BuiltinFunctionFunction("splice",({label,args,value,scope})=>{
 						args[0]??=new Value.Number(0);
 						args[1]??=new Value.Number(0);
 						args[2]??=new Variable().toValue("label");
-						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2]).code];
+						args=[args[0].toNumber().number,args[1].toNumber().number,Variable.fromValue(args[2],scope).code];
 						//handles negative indexes
 						const getIndex=contexts.getIndexNumber;
 						let code=label.code.splice(getIndex(args[0],label),getIndex(args[1],label),...args[2]);
@@ -2486,25 +2507,38 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						let list=Object.getOwnPropertyNames(label.labels);
 						return new Value({type:"array",array:list,number:list.length});
 					},
-					"compile":({label})=>{
-						let value,data={codeQueue:undefined};
+					"compile":({label,scope})=>{
+						let value,data={codeQueue:undefined,assemblyCode:undefined,machineCode:undefined};
 						try {value=(assemblyCompiler.main(label,false,data)).toValue("label");}
 						catch(e){
 							value= new Variable({
 								name:"(failed compilation)",
+								code:data.codeQueue,
 								labels:{
-									error:new Value.String("\""+e+"\"").toType("label").label,//BODGED: not sure "\""+e+"\""
-								}
+									error:new Value.String("\""+e+"\"",0,scope).toType("label").label,//BODGED: not sure "\""+e+"\""
+								},
 							}).toValue("label");
+						};
+						value.labels = {
+							"#":label,
+							"$":data.codeQueue,
+							"@":data.assemblyCode,
+							...value.labels
 						};
 						return value;
 					},
 					//note: name might change
-					"code_assembly":({label})=>new Variable({name:"<compile$>",code:assemblyCompiler.collectCode(label)}).toValue("label"),
+					"#":({label})=>new Variable({name:"(..#code)",//BODGED //extract all the function blocks from a label
+						code:[...label.getCode().map(label_or_scope=>label_or_scope instanceof Variable?label_or_scope:label_or_scope.label)],
+					}).toValue("label"),
+					"@$":({label})=>new Variable({name:"(..@$code)",code:assemblyCompiler.collectCode(label)}).toValue("label"),
+					"$":({label})=>new Variable({name:"(..$code)",code:assemblyCompiler.collectCode(label).filter(v=>v instanceof HiddenLine)}).toValue("label"),
+					"@":({label})=>new Variable({name:"(..@code)",code:assemblyCompiler.collectCode(label).filter(v=>v instanceof AssemblyLine)}).toValue("label"),
 					//change object state
 						"seal":({label})=>{//TODO: finnish ..seal and ..freeze
 							Object.seal(label.labels);
 							Object.seal(label.code);
+							throw Error ("'label..seal' is not supported yet.")
 							return (label.sealKey=new Variable({name:"(seal)"})).toValue("label");
 						},
 						"freeze":({label})=>{
@@ -2546,17 +2580,43 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"defs":({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
 					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args})=>{
 						let ans;
-						if(!args[0].label)ans=-1;
-						else ans=label.code.indexOf(args[0].label);
-						if(ans==-1){
-							for(let i=0;i<label.code.length;i++){
-								const v =label.code[i];
-								if(v instanceof HiddenLine.Define){
-									if(v.label==args[0].label){
-										ans=i;break;
-									}
-								}
-							}
+						switch(args[0].type){
+							case "label":
+								if(!args[0].label)ans=-1;
+								else ans=
+									label.code
+										.map(v=>v instanceof HiddenLine.Define?v.label:v)
+										.indexOf(args[0].label)
+								;
+							break;
+							case "number":
+								if(isNaN(args[0].number))ans=-1;
+								else ans=
+									label.code
+										.map(v=>
+											v instanceof AssemblyLine?v.getNumber():
+											v instanceof Variable?v.lineNumber:
+											v instanceof HiddenLine.Define?v.label.lineNumber:
+											v
+										)
+										.indexOf(args[0].number)
+								;
+							break;
+							case "string":
+								if(isNaN(args[0].number))ans=-1;
+								else ans=
+									label.code
+										.map(v=>
+											v instanceof AssemblyLine?String.fromCharCode(v.getNumber()):
+											v instanceof Variable?v.toValue("string").string:
+											v instanceof HiddenLine.Define?v.label.toValue("string").string:
+											v
+										)
+										.indexOf(args[0].number)
+								;
+							break;
+							default:
+								ans=-1;
 						}
 						return new Value.Number(ans);
 					}),
@@ -2769,7 +2829,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						argsObj.labels[param.name]=null;
 					}
 					for(let i=0;i<args.list.length;i++){
-						let label=Variable.fromValue(args.list[i]);
+						let label=Variable.fromValue(args.list[i],scope);
 						if(i<this.parameters.length){
 							argsObj.labels[this.parameters[i].name]=label??null;
 						}
@@ -3409,7 +3469,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		Object.doubleFreeze(nullValue);
 	}
 	const mainObject=new Variable({name:["0xmin"],lineNumber:0,labels:Object.freeze({
-		"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0)),{code:[assemblyCompiler.nullValue]})),
+		"null":Object.doubleFreeze(Object.assign(Variable.fromValue(new Value.Number(0,{scope:globalScope}),globalScope),{code:[assemblyCompiler.nullValue]})),
 		"settings":Object.seal(new Variable({
 			name:"settings",
 			labels:Object.seal({
@@ -3424,7 +3484,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							assemblyCompiler.assembly.setLanguage(str);
 						}
 					}
-					return new Value.String("'"+assemblyCompiler.assembly.language+"'");
+					return new Value.String("'"+assemblyCompiler.assembly.language+"'",0,globalScope);
 				}),//:1|0
 			}),
 		})),
@@ -3560,7 +3620,6 @@ let buildSettings={makeFile:true}
 	//memory/lineNumber assignment + CPU state emulating
 	//assembly compiling
 	//checks for logic errors due to the CPU's state.
-	let jsFolderDir=process.argv[1].split("/");jsFolderDir.pop();jsFolderDir=jsFolderDir.join("/")
 	if(process.argv.length<3||!process.argv[2].match(/\.0xmin$|compile.js/)){
 		[
 			'...node',//node.js
@@ -3612,7 +3671,7 @@ let buildSettings={makeFile:true}
 			})
 		});
 		(async function(){
-			let [inputFile,fileName] = fileLoader;
+			let [inputFile,fileName]=fileLoader;
 			outputFile=oxminCompiler(inputFile,fileName,);
 			await fileWriter();
 			return outputFile;
