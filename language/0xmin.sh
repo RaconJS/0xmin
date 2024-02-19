@@ -101,7 +101,7 @@ function compile {
 	#code.0xmin => code.filt or code.lua
 	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
 	if [[ $isUsingOutFileNameToExicute == true ]]; then
-		nodejs $mainfolder/compilers/compile.js $inputFileName $outFileName; #(nodejs test.js);
+		nodejs $mainfolder/compilers/compile.js "$inputFileName" $outFileName; #(nodejs test.js);
 	fi
 	if [[ -f minFilt.lua && -e "$powderToyScriptsFolder" ]]; then #if file exists
 		mv minFilt.lua "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
@@ -117,4 +117,4 @@ function compile {
 	fi
 	return;
 }
-compile $@;
+compile "$@";
