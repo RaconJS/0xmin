@@ -1,4 +1,4 @@
-#"tptasm";#"len";//#"table";
+#"tptasm";#"len";#"table";
 let main;
 #main(){
 	let terminal:>static();
@@ -57,7 +57,7 @@ let main;
 				%cursorReg - maxValue;
 				if >= 0 jump -> block..return;
 				%cursorReg = 0;
-				unimplemented("UNFINISHED");
+				meta.unimplemented("UNFINISHED");
 				return;
 			}:>static();
 			let setPos(newPos){
@@ -142,7 +142,7 @@ let main;
 					sp -= 1;
 				};
 				let ..prototype.heap(){
-					unimplemented();
+					meta.unimplemented();
 					%heap.malloc.inputs.(0) = this.size;
 					call heap.malloc;
 					repeat !!this[¬RegEnum]: {
@@ -169,7 +169,7 @@ let main;
 		let syscall{:onInterupt;//@(commandNumber:%[int.ordinal]commands,%[])->%[]
 			let commands;//defined later;
 		};
-		let callProgram{//:(%{@}*,argLen:%int,args:%int[argLen]*)->void
+		let callProgram{//:(%@(...%[])->%[]*,argLen:%int,args:%int[argLen]*)->void
 			//assume: all registers free
 			let reg = RegEnum();
 			let inputs{
@@ -191,7 +191,7 @@ let main;
 						()<-{
 							%i = [%inputs.args + i];
 						}<:()<-{
-							#assert(i<14);
+							#meta.assert(i<14);
 							let tempStore = static(0);
 							#tempValues::{tempStore::{let reg = +i;}};//unreverses the order
 						}
@@ -219,7 +219,7 @@ let main;
 						()<-{
 							%i = 0;
 						}<:()<-{
-							#assert(i<14);
+							#meta.assert(i<14);
 							let tempStore = static(0);
 							#tempValues::{tempStore};
 						}
@@ -238,6 +238,7 @@ let main;
 			let malloc = heap.malloc;
 			let free = heap.free;
 			let realloc = heap.realloc;
+			let resize = heap.resize;
 			let callProgram = kernal.callProgram;
 		}::{
 			#{
@@ -265,7 +266,7 @@ let main;
 			let i:>reg();//:%int.ordinal
 			let string_end:>reg();//:%[1]{char[]*;}
 			let const_0:>reg();//:%int
-			#assert(+lenString == +i);
+			#meta.assert(+lenString == +i);
 			%string_end = %i;
 			%string_end += [%i + lenString.length];//assert: A to B === -A + B
 			%const_0 = 0;
@@ -310,24 +311,26 @@ let main;
 		let returnString(){
 			inputs.throw();
 		};
-		let match(stringObj,startIndex,do){
+		let match(stringObj,startIndex,then,else){
 			:matchObj;
 			let i = -1;
+			#then = then || {};
+			#else = then || {};
 			repeat stringObj..length {
 				#i += 1;
 				%temp = [%string + #(startIndex||0 + i)];
 				%temp - stringObj.(i);//there is no 'oper [REG+REG] U11' operation mode
-				if != 0 jump -> matchObj..return;
+				if != 0 jump -> else..return;
 			};
-			def do;
+			def then;
+			def else;
 			#i += 1;
 		}::{
-			let then;
-		};
-		let match.checkLength(length,do){
-			%string.length - length;
-			jump-> do..return if < 0;
-			def do;
+			let checkLength(length,do){
+				%string.length - length;
+				jump-> do..return if < 0;
+				def do;
+			};
 		};
 		let onInvalidCommand;
 		let commands = {
@@ -391,7 +394,7 @@ let main;
 				let arg = 1;//:%int*
 				[arg_onstatic.use()] = %arg;
 				{
-					assert(+kernal.callProgram.inputs.programEntry == 0);
+					meta.assert(+kernal.callProgram.inputs.programEntry == 0);
 					%kernal.callProgram.inputs.args = arg_onstatic;
 					%kernal.callProgram.inputs.argsLength = 1;
 				};
@@ -503,7 +506,7 @@ let main;
 					let label = ..this[0];
 					undef label;
 					#label:>static();
-					assert(!!+label..defs);
+					meta.assert(!!+label..defs);
 					let label.commandData.index = +i;
 					#label..splice(-0,0,{
 						repeat !!label.commandData.returnsVal: jump -> echoResult.use();
@@ -530,7 +533,6 @@ let main;
 					jump -> matchCommand..return;
 				}:>static();
 			};
-			#match.then = matchCommand..return;
 			match.checkLength(3)<:{
 				match("r",0)<:{
 					match("un",1)<:pushCommand()<:commands.run[¬static].use();
@@ -609,11 +611,11 @@ let main;
 					...labelsof value;
 					let foundValue, invalidValue;
 					let matchGroup(low,high){
-						%char - high;hlt;
-						if > 0 jump -> invalidValue;hlt;
-						%int4 = %char;hlt;
-						%int4 -= low;hlt;
-						if >= 0 jump -> foundValue;hlt;
+						%char - high;
+						if > 0 jump -> invalidValue;
+						%int4 = %char;
+						%int4 -= low;
+						if >= 0 jump -> foundValue;
 						//assert %char < low
 					};
 					%i = 4;
@@ -628,6 +630,9 @@ let main;
 						matchGroup(+"0",+"9");
 						//else invalid hex
 						def invalidValue{
+							//assert: %char is not a hex value
+							%i - 4;
+							if < 0 jump -> loop.break;//if length as at least 1
 							def let setUpErrorMessage;
 							output.throw()<:{
 								"invalid number:\n";
@@ -652,7 +657,7 @@ let main;
 					%i -= 1;
 					jump -> loop if >= 0;
 					def loop.break;
-					push %int16;
+					push %int16;//assert: char:%char & /\s|\b|$/
 				};
 			};
 			{:forLoop;
@@ -683,209 +688,230 @@ let main;
 			let return[¬constructor]::{};
 		};
 		RegEnum().weakScope()<:(reg){
-			${:loop_main;
-				{
-					let reg = RegEnum();
-					let const_0:>reg();
-					let char = reg();
-					let temp = reg();
-					let command;//:%string*
-					let array = command:>reg();
-					let maxLength_reg = reg();
-					#array{//:%{length:int;char[]}* & %heap.Object* & %([]heap)*
-						let length = 0;//:[% + {int}] & (index on {@}) & [% + {int;char[]}]
-						let nextItem:>reg();
-						let list = 1;//:[% + {char[]}]
-						let push = {
-							let newItem;//:%char ; assigned later
-							let temp1;
-							[%nextItem] = %newItem;
-							%nextItem += 1;
-							{:checkLength;
-								%temp1 = %..this;
-								%temp1 += %maxLength_reg;
-								%nextItem - %temp1;
-								jump -> checkLength..return if < 0;
-								RegEnum(4).blockScope()<:(){
-									%maxLength_reg <<= 1;
-									r0 = %..this;
-									r1 = maxLength_reg;
-									r2 = 0;
-									r3 = 0;
-									call heap.realloc;
-									%..this = r0;
-								}; 
-							};
-						};
-						let init = {
-							%maxLength_reg = 8 + 1;
-							r0 = %maxLength_reg;
-							call heap.malloc;
-							%..this = r0;
-							%nextItem = %..this;
-							%nextItem += list;
-						};
-						let getLength = {
-							%nextItem -= %..this;
-							%nextItem -= list;//assert: %nextItem == length of string
-							[%..this + length] = %nextItem;
-							#delete ..this.nextItem;
-						};
-						let free = {
-							r0 = %..this;
-							call heap.free;
-						};
-					};
-					def array.init;
-					%const_0 = 0;
-					...(){:TEST;
-						let loop_getString,callShell;
-						%array = static.use(intoStringWithLen("run A A"));
-						r0 = %array;
-						call printLenString;
-						jump -> callShell;
-					};
-					def loop_getString <=> reg.weakScope()<:(reg){:loop_getString;
-						let reg = RegEnum(reg);
-						let cyclePhaseLength = 30;//cycles per flash of cursor
-						let maxI <-> 0;//makes sure it flashes every 'cyclePhaseLength' cycles, inclu
-						let data{
-							let i{0}:>static();
-							let cursor = IO.cursorPos;//{"\p00"}:>static();
-							let cyclePhase{"\c0f"}:>static();//:char & ("\c0f"|"\c00")
-						};
-						let i:>reg();// in set [0..cyclePhaseLength]
-						let cyclePhase:>reg();//1|0
-						let temp:>reg();
-						let cursor:>reg();
-						%i = [data.i:>static.use()];
-						%cyclePhase = [data.cyclePhase:>static.use()];//code will work without this line
-						%cursor = [IO.cursorPos];
-						let miniProcess;
-						def let loop;
-						def getInput(temp,char,{},
-							{
-								%i -= 1;
-								:block;
-								if <= 0 jump -> static.use()<:{
-									send %const_0 %cyclePhase;
-									send %const_0 "\x7f";//draws a box for the cursor
-									send %const_0 %cursor;
-									%cyclePhase ^= 0x0f;
-									%i = maxI;
-									jump -> block..return;
-								}::{let maxI.printLen <-> ..length;};
-							},{
-								//assume: (this block) uses less than 10 clock cycles
-								let tempReg = reg.copy()();
-								IO.cursorPos.increment(1,cursor);
-								send %const_0 "\c0f";
-							}
-						)::{
-							#let maxI.loopLen <-> ..this[0]..length;
-						};
-						#maxI <-> 0xmin.Math.floor((cyclePhaseLength-maxI.printLen)/maxI.loopLen);
-						let onStringEnd{
-							//assert: %char == "\r"
-							[data.i] = %i;
-							[data.cyclePhase] = %cyclePhase;//code will work without this line
-							print(" ",const_0,{});
-							print.char(cursor,const_0,{});
-							{:insertNewLine;
-								%cursor += 0x10;
-								%cursor &= 0xfff0;
-								IO.cursorPos.increment(0,cursor);
-								send %const_0 %cursor;
-							};
-							[data.cursor] = %cursor;
-							IO:>static.use().cursorPos = %cursor;
-						};
-						{:processChar;
-							%char - "\r";
-							jump -> onStringEnd if == 0;
-							//assert: %char != "\r"
-							send %const_0 %char;
-							{:pushChar;
-								#array.push.newItem <-> char;
-								#array.push.temp1 <-> temp;
-								def array.push;
-							};
-							jump -> loop_getString.loop;
-						};
-						def onStringEnd;
-					};
-					def array.getLength;
-					def callShell <=> reg.weakScope()<:(reg){:callShell;
-						#assert(+array >= 3);
-						%shell.inputs.string = %array;
-						%shell.inputs.string += array.list;
-						%shell.inputs.string.length = [%array + array.length];
+			:loop_main;
+			{
+				let reg = RegEnum();
+				let const_0:>reg();
+				let char = reg();
+				let temp = reg();
+				let command;//:%string*
+				let array = command:>reg();
+				let maxLength_reg = reg();
+				#array{//:%{length:int;char[]}* & %heap.Object* & %([]heap)*
+					let length = 0;//:[% + {int}] & (index on {@}) & [% + {int;char[]}]
+					let nextItem:>reg();
+					let list = 1;//:[% + {char[]}]
+					let push = #(reg){
+						let newItem;//:%char ; assigned later
+						let temp1;
+						[%nextItem] = %newItem;
+						%nextItem += 1;
+						{:checkLength;
+							%temp1 = %array;
+							%temp1 += %maxLength_reg;
+							%nextItem - %temp1;
+							jump -> checkLength..return if < 0;
+							reg.blockScope()<:(reg){
+								%maxLength_reg <<= 1;
+								{:block;
+									:reallocate;
+									push %array;
+									push %maxLength_reg;
+									r0 = %array;
+									r1 = %maxLength_reg;
+									#reg<->2;
+									call heap.resize;//UNFINISHED
+									if sign jump -> static.use()<:{
 
-						%shell.inputs.throw = static.use()<:{
-							let reg = RegEnum();
-							let inputs{
-								let stringWithLength:>reg();//:%{length:int;char[length]}*
-							};
-							let string:>reg();//:%char[]*
-							let string.length:>reg();//:%int.cardinal
-							let const_0:>reg();//:%int&(0)
-							%string = %inputs.stringWithLength;
-							%string += 1;
-							%string.length = [%inputs.stringWithLength + 0];
-							%const_0 = 0;
-							print("error:",const_0,{});
-							def let printErrorString = reg.weakScope()<:(reg){
-								let i = reg();//:%int.ordinal
-								%i = 0;
-								${:loop;
-									%i += 1;
-									%i - %string.length;
-									send %const_0 [%string + %i];
-									jump -> loop if < 0;
+										r0 = [sp + 0];
+										call heap.malloc;
+										let newArray = heap.malloc.outputs.(0);
+										RegEnum().weakScope()<:(reg){:forLoop;
+											let i_reg:>reg();
+											pop %i_reg;//maxLength_reg
+											pop %array;
+											%i_reg -= 1;
+											def let loop{
+												def let do{
+													%temp1 = [%array + %i_reg];
+													[%newArray + %i_reg] = %temp1;
+												};
+												%i_reg -= 1;
+												jump -> loop if >= 0;
+											};
+										};
+										r0 = %array;
+										call free;
+										%array = ;
+										:moveData;
+										jump -> block..return;
+									};
 								};
-							};
-							reg.weakScope()<:(reg){:setCursor;
-								let temp = reg();
-								[IO.cursorPos] += %string.length;
-								%temp = 0x20;
-								[IO.cursorPos] += %temp;
-								%temp = 0xfff0;
-								[IO.cursorPos] &= %temp;
-								IO.cursorPos.increment(0,temp);
-							};
-							return;
+								%..this = r0;
+							}; 
 						};
-						call shell;
 					};
-					repeat !TEST: RegEnum(1).blockScope()<:{//saves the output (i.e. r0) from the shell
-						def array.free;
+					let init = {
+						%maxLength_reg = 8 + 1;
+						r0 = %maxLength_reg;
+						call heap.malloc;
+						%..this = r0;
+						%nextItem = %..this;
+						%nextItem += list;
+					};
+					let getLength = {
+						%nextItem -= %..this;
+						%nextItem -= list;//assert: %nextItem == length of string
+						[%..this + length] = %nextItem;
+						#delete ..this.nextItem;
+					};
+					let free = {
+						r0 = %..this;
+						call heap.free;
 					};
 				};
-				RegEnum(0).weakScope()<:(reg){
-					r0 | 0;//if shell returned null
-					:block;
-					jump -> block..return if == 0;//if no result returned
-					//returned from calling shell
-					let stringWithLength = 0;//:%{int;char[]}*
-					call printLenString.(¬static).use();
+				def array.init;
+				%const_0 = 0;
+				reg.weakScope()<:(reg){:loop_getString;
+					let reg = RegEnum(reg);
+					let cyclePhaseLength = 30;//cycles per flash of cursor
+					let maxI <-> 0;//makes sure it flashes every 'cyclePhaseLength' cycles, inclu
+					let data{
+						let i{0}:>static();
+						let cursor = IO.cursorPos;//{"\p00"}:>static();
+						let cyclePhase{"\c0f"}:>static();//:char & ("\c0f"|"\c00")
+					};
+					let i:>reg();// in set [0..cyclePhaseLength]
+					let cyclePhase:>reg();//1|0
+					let temp:>reg();
+					let cursor:>reg();
+					%i = [data.i:>static.use()];
+					%cyclePhase = [data.cyclePhase:>static.use()];//code will work without this line
+					%cursor = [IO.cursorPos];
+					let miniProcess;
+					def let loop;
+					def getInput(temp,char,{},
+						{
+							%i -= 1;
+							:block;
+							if <= 0 jump -> static.use()<:{
+								send %const_0 %cyclePhase;
+								send %const_0 "\x7f";//draws a box for the cursor
+								send %const_0 %cursor;
+								%cyclePhase ^= 0x0f;
+								%i = maxI;
+								jump -> block..return;
+							}::{let maxI.printLen <-> ..length;};
+						},{
+							//assume: (this block) uses less than 10 clock cycles
+							let tempReg = reg.copy()();
+							IO.cursorPos.increment(1,cursor);
+							send %const_0 "\c0f";
+						}
+					)::{
+						#let maxI.loopLen <-> ..this[0]..length;
+					};
+					#maxI <-> 0xmin.Math.floor((cyclePhaseLength-maxI.printLen)/maxI.loopLen);
+					let onStringEnd{
+						//assert: %char == "\r"
+						[data.i] = %i;
+						[data.cyclePhase] = %cyclePhase;//code will work without this line
+						print(" ",const_0,{});
+						print.char(cursor,const_0,{});
+						{:insertNewLine;
+							%cursor += 0x10;
+							%cursor &= 0xfff0;
+							IO.cursorPos.increment(0,cursor);
+							send %const_0 %cursor;
+						};
+						[data.cursor] = %cursor;
+						IO:>static.use().cursorPos = %cursor;
+					};
+					{:processChar;
+						%char - "\r";
+						jump -> onStringEnd if == 0;
+						//assert: %char != "\r"
+						send %const_0 %char;
+						{:pushChar;
+							#array.push.newItem <-> char;
+							#array.push.temp1 <-> temp;
+							def array.push;
+						};
+						jump -> loop_getString.loop;
+					};
+					def onStringEnd;
 				};
-				print("done");
-				RegEnum(0).weakScope()<:(reg){:insertNewLine;
-					:block;
-					let cursorReg:>reg();
-					%cursorReg = [IO.cursorPos];
-					%cursorReg += 4;
-					%cursorReg & 0xf;
-					jump -> block..return if == 0;
-					%cursorReg += 0x10;
-					%cursorReg &= 0xfff0;
-					IO.cursorPos.increment(0,cursorReg);
-					[IO.cursorPos] = %cursorReg;
-					let const_0 = 0;
-					send %const_0 %cursorReg;
+				def array.getLength;
+				reg.weakScope()<:(reg){:callShell;
+					#meta.assert(+array >= 3);
+					%shell.inputs.string = %array;
+					%shell.inputs.string += array.list;
+					%shell.inputs.string.length = [%array + array.length];
+
+					%shell.inputs.throw = static.use()<:{
+						let reg = RegEnum();
+						let inputs{
+							let stringWithLength:>reg();//:%{length:int;char[length]}*
+						};
+						let string:>reg();//:%char[]*
+						let string.length:>reg();//:%int.cardinal
+						let const_0:>reg();//:%int&(0)
+						%string = %inputs.stringWithLength;
+						%string += 1;
+						%string.length = [%inputs.stringWithLength + 0];
+						%const_0 = 0;
+						print("error:",const_0,{});
+						def let printErrorString = reg.weakScope()<:(reg){
+							let i = reg();//:%int.ordinal
+							%i = 0;
+							${:loop;
+								%i += 1;
+								%i - %string.length;
+								send %const_0 [%string + %i];
+								jump -> loop if < 0;
+							};
+						};
+						reg.weakScope()<:(reg){:setCursor;
+							let temp = reg();
+							[IO.cursorPos] += %string.length;
+							%temp = 0x20;
+							[IO.cursorPos] += %temp;
+							%temp = 0xfff0;
+							[IO.cursorPos] &= %temp;
+							IO.cursorPos.increment(0,temp);
+						};
+						return;
+					};
+					call shell;
 				};
-				jump -> loop_main;
+				RegEnum(1).blockScope()<:{//saves the output (i.e. r0) from the shell
+					def array.free;
+				};
 			};
+			RegEnum(0).weakScope()<:(reg){
+				r0 | 0;//if shell returned null
+				:block;
+				jump -> block..return if == 0;//if no result returned
+				//returned from calling shell
+				let stringWithLength = 0;//:%{int;char[]}*
+				call printLenString.(¬static).use();
+			};
+			print("done");
+			RegEnum(0).weakScope()<:(reg){:insertNewLine;
+				:block;
+				let cursorReg:>reg();
+				%cursorReg = [IO.cursorPos];
+				%cursorReg += 4;
+				%cursorReg & 0xf;
+				jump -> block..return if == 0;
+				%cursorReg += 0x10;
+				%cursorReg &= 0xfff0;
+				IO.cursorPos.increment(0,cursorReg);
+				[IO.cursorPos] = %cursorReg;
+				let const_0 = 0;
+				send %const_0 %cursorReg;
+			};
+			jump -> loop_main;
 		};
 	};
 	def let testFunction1{
@@ -967,19 +993,22 @@ let main;
 		//RegEnum: provides a simple form of register management.
 		let ..prototype{
 			let push(from,static_regStorage){//static_regStorage:({@} on static)?
-				//from: #int; number of registers to ignore starting from @r0
+				//from: #int&#{...%[]}; number of registers to ignore starting from @r0
 				//static_regStorage: {@} on static
 				# from = +from || 0;
 				let i <-> -1 + from;
 				repeat !static_regStorage:
-				repeat (this - from): @push r #(+(i+=1));
-				repeat !!static_regStorage:{
+				repeat (this - from): {
+					repeat (from..indexOf() == -1)
+					@push r #(+(i+=1));
+				};
+				repeat !!static_regStorage:...labelsof codeof{
 					let state;
 					repeat (this - from):{
 						#i = i + 1;
 						$state => static_regStorage + i;
 						repeat [%static_regStorage + i] = r i;
-					}
+					};
 				};
 			};
 			let pop(from,static_regStorage){
@@ -987,7 +1016,7 @@ let main;
 				# from = +from || 0;
 				repeat !static_regStorage:
 				repeat (this - from): @pop r #(+(i-=1));
-				repeat !!static_regStorage:{
+				repeat !!static_regStorage:...labelsof codeof{
 					let state;
 					repeat (this - from):{
 						#i = i + 1;
@@ -999,7 +1028,7 @@ let main;
 			let copy(){//:#()->RegEnum
 				#return = this..constructor(this);
 			};
-			let blockScope(do,ignore){//:#(#(RegEnum)->{@},#int?)->{@} ; allows use of all registers
+			let blockScope(do,ignore){//:#(#(RegEnum)->{@},#int?|{})->{@} ; allows use of all registers
 				this.push(ignore || ());//ignores the first (ignore) registers from popping
 				do(RegEnum(ignore || 0));
 				this.pop(ignore || ());
@@ -1030,16 +1059,6 @@ let main;
 			jump -> ..this if !carry;
 		};
 	};
-	let unimplemented(reason){//:#(reason:#string?)->{}
-		throw reason;
-	}::{
-		let test(testString){//:#(testString:#string?)->{@}
-			repeat !!testString: print(testString);
-		};//
-	};
-	let assert(bool,message){
-		repeat !+bool throw ("assertion failed" ... message);
-	};
 	let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
 		%i_reg = #(length - 1);
 		def let loop{
@@ -1058,6 +1077,33 @@ let main;
 			repeat length $doFunc(i = i + 1);
 			#delete i;
 		};
+		let assert(bool,message){
+			repeat !+bool throw ("assertion failed" ... message);
+		};
+		let unimplemented(reason){//:#(reason:#string?)->{}
+			throw reason;
+		}::{
+			let test(testString){//:#(testString:#string?)->{@}
+				repeat !!testString: print(testString);
+			};//
+		};
+		let test(code)<-{
+			...code;
+		}::{
+			let breakPoint(string){
+				repeat !!string:print(""...string);
+				@hlt;
+			};
+		};
+		let inject(refLabel,do){#;
+			return = refLabel;
+			let oldSupertype = refLabel..super;
+			refLabel..super = arguments;
+			refLabel::{
+				...run do;
+			};
+			refLabel..super = oldSupertype;
+		};
 	};
 	...labelsof (){
 		let type(type)={
@@ -1068,9 +1114,6 @@ let main;
 			};
 		}::{
 			#this<-();
-		};
-		let Register(obj){
-			obj..compile;
 		};
 		let String{
 			let Len(obj)={

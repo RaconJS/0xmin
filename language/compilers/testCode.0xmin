@@ -1,9 +1,51 @@
-#"code";
-//{}:>(){}::{}()<:{};
-//BUG: '= 1||()' the compiler enters infinite loop without the '+'
-//#"tptasm";
-//:global;
-//virtual ...run(){:a;debugger(a==global);1;};
-//virtual ...codeof {3};
-//jump 0 if > 0 signed;
-0xffffffff;
+#"len";#"tptasm";
+let a;
+virtual{
+	ram => 10;
+	1#def a;
+};
+$debugger +a;
+debugger {1;{2};3;$set:{}}..("@");
+debugger
+	(¬"
+		a
+	")..length;//4
+let showFlags(){
+	send r1 ":";
+	{:block;
+		jump -> block..return if !overflow;
+		send r1 "O";
+	};
+	{:block;
+		jump -> block..return if !carry;
+		send r1 "C";
+	};
+	{:block;
+		jump -> block..return if !0;
+		send r1 "Z";
+	};
+	{:block;
+		jump -> block..return if !sign;
+		send r1 "S";
+	};
+	send r1 "\n";
+};
+import lib "R2/print.0xmin";
+let subtract(a,b){
+	r1 = 0;
+	r0 = #(0xffff&a);
+	print(""...+a..." - "...+b);
+	r0 - (0xffff&b);
+	showFlags();
+};
+subtract(4,6);
+subtract(4,-3);
+subtract(4,-5);
+subtract(4,-4);
+subtract(6,3);
+subtract(-5,4);
+subtract(-5,6);
+subtract(-5,-3);
+subtract(-5,-6);
+subtract(0x7fff,-0x1);
+hlt;

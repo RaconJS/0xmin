@@ -436,7 +436,7 @@ contexts:
     #for '#"tptasm";'
     - match: '\s*(?:[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b)\s*{{assembly_commands_end}}'
       scope: support.constant #e.g. 'a >> b + internal'
-    - match: '(?<=if)\s*\b(zero|sign|overflow|carry)\b' # 'jump -> a if zero'
+    - match: '(?<=if)\s*(!\s*)?\b(0|sign|overflow|carry)\b' # 'jump -> a if zero'
       scope: support.constant
     - match: '\b(r[0-9]|r1[0-5]|ip|sp)\b'
       scope: support.constant
