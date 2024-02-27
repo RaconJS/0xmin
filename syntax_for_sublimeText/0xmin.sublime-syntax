@@ -43,7 +43,7 @@ variables:
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|text|len)' #'!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)'
   inbuiltProperties: '\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf|asNumber|state|flat|code_assembly|secure)\b'
-  oxminFunctions: '\b(?:language|model|log_(?:code|table|length)|Math)\b'
+  oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|model|language))?|Math(?:\s*\.\s*())?|toJSON)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
 contexts:
@@ -366,7 +366,7 @@ contexts:
 #old simple parser
   mainScope:
     - include: baseMain
-    - match: \b(0xmin|0bmin)(?:\s*\.\s*({{oxminFunctions}}))?\b
+    - match: \b(0xmin|0bmin)(?:\s*\.\s*(?:{{oxminNameSpace}}))?\b
       captures:
         1: variable.language.0xminObject.0xmin
         2: support.constant.builtin.0xmin
@@ -394,7 +394,7 @@ contexts:
             pop: true
     - match: '\b(?:import|throw|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
-    - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:\=)?\s*){)' #'foo()={}' or 'foo:>type()::()={}'
+    - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*\=\s*){)' #'foo()={}' or 'foo:>type()::()={}'
       scope: entity.name.class
     - match: '{{labelName}}\s*(?=(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function

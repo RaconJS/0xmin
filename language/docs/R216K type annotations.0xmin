@@ -1,0 +1,35 @@
+#(){
+	@           ; assembly value of instruction, userally allocated (with 'def')
+	$           ; state code
+	#           ; meta, or any label with 'label:#'
+	%           ; register
+	+           ; index
+	*           ; pointer
+	T           ; item of Type T
+	T*          ; pointer to value of type T ""
+	Array+T     ; an index from array of type 'Array', that contains item of type 'T'
+	+T          ; an index to value of type T "An index containing T"
+	Array+      ; an index from Array
+	T[]         ; array of type T
+	[]Array     ; item on (object of type T)
+	{}          ; label or empty object
+	()->T       ; function
+	#()->T      ; meta function
+	@()->T      ; assembly function
+	{}          ;
+	{@}         ; list of assembly code and sometimes data
+	{T;T1}      ; tuple or struct
+	int         ; integer
+	char        ; character
+
+	(...Args)->T ; function that takes in a list of arguments from type 'Args' and returns a value of type 'T'
+	()->mutate label ; function that mutates object 'label'
+	@(pop{A;B})->push{C}; stack based function
+};
+#(){:example;
+	@(...%[])-> %[] ; register based function
+	#()->{@} ; macro i.e. a meta function that returns a block of assembly code
+}
+#(){:example;
+
+};

@@ -1,0 +1,98 @@
+//This file is meant to explain the whole ZASM/0xmin language.
+//here are the features of the ZASM language
+//single variable type: the mighty object (aka label)
+	//parts
+		//most things are label
+		//blocks of code are labels bound to closures
+		let label = {1; 2; 3; let a = 2, b = 3, c = 4}<->2;
+		let numberPart = +label;
+		let arrayPart <=> {...codeof label};
+		let codeBlockPart <=> {...codeof label};//Blocks of code are used as arrays
+		let functionPart <=> {...codeof label};//This includes functions as well. Labels are function lists
+		let nameSpacePart = {...labelsof label};
+		let prototypeSystemParts <=> ({}<=>label)::{delete;#..splice(0,-0)};//labels also have javascript-like prototype chains
+		let classParts = {label..prototype; label..supertype};
+		let instanceObjectParts = {label..proto; label..super; label..constructor};
+	//labels also have a number of internal properties
+		//To prevent properties overlapping with inbuilt properties, all inbuilt properties are accessed with 'a..b' and normal properties are accessed with 'a.b'
+	//This makes things simpler and more consistant.
+	//There are other datatypes but whenever we try to access them, they are converted into labels first.
+	//One upshot of this is that all type conversions are explicit, making it seem strongerly typed
+		let a = +b;
+		let a = ""...b;
+		let a = ¬+b;
+		let a = !!b;
+//simpler operator proceedence
+	debugger(1 +2 *3);//9
+//simple metaFunction system
+	#"tptasm";
+	let printMacro(string){
+		push r0;
+		string..iterate()<:(char,index,list){
+			send r0 char;
+		};
+		pop r0;
+	};
+	printMacro("Hello, World!");
+	hault;
+	//If we remove the 'let printMacro(string)' part the code is still valid 0xmin code, we just need to define string.
+	{:printBlock;
+		let string = "Hello, World!";
+		push r0;
+		string..iterate()<:(char,index,list){
+			send r0 char;
+		};
+		pop r0;
+	};
+	hault;
+	//This can make refactoring to modulise code simpler.
+
+
+
+/*//ATTEMPT1
+//This file is meant to explain the whole ZASM/0xmin language.
+//settings
+	//The top of the file is where settings can be set.
+	//These settings can change things like:
+		//- The assembly language being used,
+		//- Any logs to print after the output file is built
+	//This is done using the # "setting name" syntax. This syntax only applies at the top of files.
+	//This syntax is very similar to javascipts ' "use strict"; ' pattern
+
+	//There are multiple assembly languages in ZASM depending on the computer achitecture the program is being written for.
+	//Some these include
+		#"0xmin"; //for 0xmin assembly lanuage
+		#"tptasm"; //for writing tptasm for the R216K
+		#"int"; //for writing any generic binary file, using u32
+		#"text"; //outputs a text file, using u8
+	//If you want to change the settings later in the file they can still be modified through '0xmin.settings'
+		//e.g.
+			0xmin.settings.language
+//
+	//Data can be entered using numbers or characters.
+		1;2;3;"a";"b";
+	//Whole strings can also be entered, this is the same as entering each character separatly or typing in each of the ascii codes in.
+		"Hello World!";
+	//line numbers are associated with each of these statements
+	//meta labels can be decalared just using 'let' without any assignment
+		let label;
+		//they can be "defined" to lines of code with a 'def' statement before the line it ""belongs"" to
+		def label;123;
+			//alternatively if we want to put the label after the line we can use '#def label'
+				123 #def label;
+		//Heres an 0xmin example
+			let label;
+			@label;//returns the line number of the label
+			1;
+			2;
+			3;
+			4 #def label;
+	//meta variables can be declared with 'let'
+		let number = 2;
+		let list = {1; 2; 3};
+		let string = "ABC";
+//hello world example
+	#"0xmin"; //tells the compiler we are using the assembly language for the 0xmin computer
+	"hello world";//prints "hello world" to the terminal
+	jump +0;//haults by jumping forward '+0' steps
+*/

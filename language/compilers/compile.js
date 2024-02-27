@@ -1126,6 +1126,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								const label=labels[name];//?:internal object
 								if(labels.hasOwnProperty(name))({value}=label.callFunction({args:undefined,value,scope,statement}));
 								else{
+									index--;
 									throw Error(throwError({index,statement,scope},"# keyword","'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
 								}
 							}//'a.b'
@@ -1141,7 +1142,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 										let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 										value.type="label";
 										let type= code.dataType=="char"?"string":"number";
-										value.label=newVal.toLabel();
+										value.label=newVal.toLabel(name);
 										if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
 											value=value.toType("number");
 											//TODO: throw error if index out of range
@@ -2127,7 +2128,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			getNumber(){
 				return this.binaryValue??this.dataValue|0;
 			}
-			toLabel(){
+			toLabel(name=""){
 				let type=this.dataType=="char"?"string":"number";
 				let number=this.getNumber();
 				return new Variable({type,lineNumber:number,name:"["+name+"]",code:[this],scope:this.scope});
@@ -2580,7 +2581,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"defs":({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
 					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args})=>{
 						let ans;
-						switch(args[0].type){
+						switch(args[0]?.type){
 							case "label":
 								if(!args[0].label)ans=-1;
 								else ans=
@@ -3406,6 +3407,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			if(!scope){
 				if(!parentScope){
 					if(!globalScope.code){
+						globalScope.code=block;
 						scope=globalScope;
 						callStack[0]??=block;
 					}

@@ -13,7 +13,7 @@ sudo apt install nodejs
 sudo apt install g++
 
 sudo snap install sublime-text --classic
-mv 0xmin/syntax_for_sublimeText ~/.config/sublime-text-3/Packages/0xmin
+mv 0xmin/syntax_for_sublimeText ~/.config/sublime-text/Packages/0xmin
 
 snap install the-powder-toy
 mv 0xmin/the_powder_toy/scripts/"oxmin.lua" ~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts/"oxmin.lua"
@@ -23,23 +23,24 @@ echo install autorun from "https://powdertoy.co.uk/Discussions/Thread/View.html?
 
 #The full 0xmin envirment is now installed.
 
-#example program
+#example programs
 
 	mkdir 0xmin/examples
 	cd 0xmin/examples
 	touch hello\ world.0xmin
 	echo "
-		#'0xmin';
-		'Hello, World!\h';
+#'0xmin';
+'Hello, World!\h';
 	" >> hello\ world.0xmin
 	#0xmin files can now be compiled with "0xmin sourceFileName.0xmin -o outputFile.filt"
 	0xmin hello\ world.0xmin -o hello\ world.filt
 	#0xmin machinecode files (ending in '.filt') can be run with "0xmin -e outputFile.filt"
 	0xmin -e hello\ world.0xmin
 	echo "
-		#'tptasm';
-		#import lib 'R2/print.0xmin';
-		print('Hello, World!');\nhault;
+#'tptasm';
+#import lib 'R2/print.0xmin';
+print('Hello, World!');
+hault;
 	" >> hello\ world\ for\ tptasm.0xmin
 	0xmin hello\ world\ for\ tptasm.0xmin -o hello\ world.tptasm
 	#in Sublime Text, files ending in '.0xmin', can be compiled (built) by pressing 'Ctrl' + 'b'
