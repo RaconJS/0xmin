@@ -1,4 +1,4 @@
-#"tptasm";#"len";#"table";
+#"tptasm";#"len";//#"table";
 let main;
 #main(){
 	let terminal:>static();
@@ -255,8 +255,8 @@ let main;
 	};
 	#let printLenString{//:@(%{int;char[]}*)->return
 		let lenString{
-			let length <-> 0;//:[]->int
-			let string <-> 1;//:[]->char[] & index from {int;char[]}
+			let length <-> 0;//:+int & +[]{int;char[]} & index from {int;char[]}
+			let string <-> 1;//:+char[] & +[]{int;char[]} & index from {int;char[]}
 		}<-> 0;//:%{int;char[]}*
 		let temp <-> 1;//:%
 		%temp = [%lenString + lenString.length];
@@ -698,10 +698,12 @@ let main;
 				let array = command:>reg();
 				let maxLength_reg = reg();
 				#array{//:%{length:int;char[]}* & %heap.Object* & %([]heap)*
-					let length = 0;//:[% + {int}] & (index on {@}) & [% + {int;char[]}]
+					let length = 0;//:+int & (index on {@}) & [% + {int;char[]}]
 					let nextItem:>reg();
-					let list = 1;//:[% + {char[]}]
-					let push = #(reg){
+					let list = 1;//:+char[] ; using '+ T' or '[+T]' for 'index to item of type T' types
+					let push = #(){
+						:pushFunction;
+						let reg = RegEnum(reg);
 						let newItem;//:%char ; assigned later
 						let temp1;
 						[%nextItem] = %newItem;
@@ -711,18 +713,15 @@ let main;
 							%temp1 += %maxLength_reg;
 							%nextItem - %temp1;
 							jump -> checkLength..return if < 0;
-							reg.blockScope()<:(reg){
+							reg.blockScope({array; maxLength_reg})<:(reg){:growArray;
 								%maxLength_reg <<= 1;
-								{:block;
-									:reallocate;
-									push %array;
-									push %maxLength_reg;
+								{:reallocate;
 									r0 = %array;
 									r1 = %maxLength_reg;
-									#reg<->2;
-									call heap.resize;//UNFINISHED
+									#reg <-> 2;
+									call heap.resize;
+									:block;
 									if sign jump -> static.use()<:{
-
 										r0 = [sp + 0];
 										call heap.malloc;
 										let newArray = heap.malloc.outputs.(0);
@@ -763,7 +762,7 @@ let main;
 						%nextItem -= %..this;
 						%nextItem -= list;//assert: %nextItem == length of string
 						[%..this + length] = %nextItem;
-						#delete ..this.nextItem;
+						//deletes ..this.nextItem;
 					};
 					let free = {
 						r0 = %..this;
@@ -833,9 +832,9 @@ let main;
 						//assert: %char != "\r"
 						send %const_0 %char;
 						{:pushChar;
+							def: (array.push <=> array.push());
 							#array.push.newItem <-> char;
 							#array.push.temp1 <-> temp;
-							def array.push;
 						};
 						jump -> loop_getString.loop;
 					};
@@ -980,10 +979,42 @@ let main;
 	let readHigh(rOut,rAddress){
 		@(0x11100001 | (rOut & 0xf << 8) | (rAddress & 0xf << 4));
 	};
+	let RegState(dataRegState)={//general register management
+		#this <-> (start || 0);
+		let freeRegs = {
+			let i = -1;
+			repeat 14 def ¬+(i += 1);
+			delete i;
+		};
+		let usedRegs = {};//:int[]
+		...labelsof dataRegState || {};
+		#meta.repeat(usedRegs..length)<:(i){
+			#freeRegs..splice(freeRegs..indexOf(usedRegs[i]),1);
+		};
+		(){//:({#}?)->RegState()
+			repeat (freeRegs..length == 0): throw "out of registers";
+			#return = #(arguments[0] || return) <-> +freeRegs..splice(0,1);
+			#usedRegs..splice(-0,0,{@:#(+return)});
+			#let return[¬RegEnum.type_register];
+		};
+		meta.unimplemented();
+	}::{
+		let ..prototype{
+			let push(to_regStateData){
+				let to_regState = this..constructor(to_regStateData);
+				meta.repeat(this.usedRegs..length)<:(i){
+					let reg = this.usedRegs[i];//:%
+					repeat (!!¬to_regStateData..indexOf());
+				};
+			};
+		};
+	};
 	let RegEnum(start)={//register enum
 		#this<->(start||0);
+		//assert: +this == next free regester
+		//assert: +this == number of registers used
 		(){//:({#}?)->RegEnum()
-			#return = #(arguments[0] || return)<->+..this;
+			#return = #(arguments[0] || return) <-> +..this;
 			#..this<->..this + 1;
 			#let return[¬..constructor.type_register];
 			repeat (+return > (16-2)):throw "out of registers";
@@ -992,28 +1023,26 @@ let main;
 		let type_register;
 		//RegEnum: provides a simple form of register management.
 		let ..prototype{
-			let push(from,static_regStorage){//static_regStorage:({@} on static)?
-				//from: #int&#{...%[]}; number of registers to ignore starting from @r0
-				//static_regStorage: {@} on static
-				# from = +from || 0;
+
+			let push(from_ignore,static_regStorage){
+				//from_ignore: #int & %[]? ; number of registers to ignore starting from @r0 
+				//static_regStorage: ({@} on static)?
+				#let from <-> +from_ignore || 0;
+				#let ignore <=> {...codeof from_ignore};
 				let i <-> -1 + from;
-				repeat !static_regStorage:
-				repeat (this - from): {
-					repeat (from..indexOf() == -1)
-					@push r #(+(i+=1));
-				};
-				repeat !!static_regStorage:...labelsof codeof{
-					let state;
-					repeat (this - from):{
-						#i = i + 1;
-						$state => static_regStorage + i;
-						repeat [%static_regStorage + i] = r i;
-					};
-				};
+				let state;
+				repeat (this - from)
+					repeat (from..indexOf(+i) == -1)
+						meta.if(!static_regStorage)<:(){
+							@push r #(+(i+=1));
+						}<:(){
+							$state => static_regStorage + i;
+							repeat [%static_regStorage + i] = r i;
+						};
 			};
-			let pop(from,static_regStorage){
+			let pop(from_ignore,static_regStorage){
 				let i <-> this;
-				# from = +from || 0;
+				#let from = +from_ignore || 0;
 				repeat !static_regStorage:
 				repeat (this - from): @pop r #(+(i-=1));
 				repeat !!static_regStorage:...labelsof codeof{
@@ -1028,7 +1057,15 @@ let main;
 			let copy(){//:#()->RegEnum
 				#return = this..constructor(this);
 			};
-			let blockScope(do,ignore){//:#(#(RegEnum)->{@},#int?|{})->{@} ; allows use of all registers
+			let blockScope(do_ignore,do){//:#((ignore:#int? & %[])?,do:#(RegEnum,ignoredRegs)->{@})->{@} ; allows use of all registers
+				let do,ignore;
+				meta.if(!!arguments[1])<:(){//blockScope(ignore,do)
+					#do = arguments[1];
+					#ignore = arguments[0];
+				}<:(){//blockScope(ignore,do)
+					#do = arguments[0];
+					#ignore = #();
+				};
 				this.push(ignore || ());//ignores the first (ignore) registers from popping
 				do(RegEnum(ignore || 0));
 				this.pop(ignore || ());

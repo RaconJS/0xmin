@@ -6,6 +6,7 @@ void #set:(){//documentation
 			@(...%[])->%[] & {@};    //non-macro(#) function(->) that takes in a list(...) of register names(%) that store memory addresses([]) and outputs it to a single output register(%) that stores a memory location([]).
 			call:#(...%[])->@{};     //property 'call' is a macro function that takes in no arguments
 			inputs:#{...%[]};//array of registers
+			use:#()->Function mutate heap;//def's Function, by assigning it onto the heap
 		};
 		#type Page{
 			next:@Page*;
@@ -56,7 +57,7 @@ void #let set: heap{
 			#def: memset;
 		};
 		#def set: memory{
-			0x1fffffff;
+			0x1fffffff;//this line is not needed, it just makes finding the start of the heap easier to find when debugging
 			#def: page0;
 		};
 	};
@@ -96,6 +97,13 @@ void #let set: heap{
 				...let set: heap_Call(foo,arguments);
 			};
 		};
+	};
+	#let intoHeapFunction(foo,argumentsLength){
+		#set: foo.use(){
+			#heap::{def foo};
+			#return = foo;
+		};
+		#set: Call.addCaller(foo,argumentsLength);
 	};
 	#let: Page()={
 		#def let: next{0};//:@* //pointer
@@ -241,7 +249,7 @@ void #let set: heap{
 		%pointer+=Page.size;
 		return;
 		#def: data;
-	}::{void #set: Call.addCaller(..this,1);};
+	}::{void #set: intoHeapFunction(..this,1);};
 	#set: free{
 		#let: nextReg=enum(0);//get next free register
 		#let: inputs{//:#
@@ -257,36 +265,36 @@ void #let set: heap{
 		{:joinNeighboursIfFree;
 			{:block;
 				:extendForward;
-				%newNextPage = [%page+page.next];
+				%newNextPage=[%page+page.next];
 				[%newNextPage+page.isUsed]|0;
 				jump->block..return if!=0;
-				%newNextPage = [%page+page.next];
+				%newNextPage=[%page+page.next];
 			};
 			{:block;
 				:extendBackward;
-				%newLastPage = [%page+page.last];
+				%newLastPage=[%page+page.last];
 				[%newLastPage+page.isUsed]|0;
 				jump->block..return if==0;
-				%newLastPage = %page;
+				%newLastPage=%page;
 			};
 		};
 		{:reconnectPages;
 			skipIfEndOfHeap(newNextPage)<:{
-				[%newLastPage+newLastPage.next] = %newNextPage;
+				[%newLastPage+newLastPage.next]=%newNextPage;
 			};
-			[%newNextPage+newNextPage.last] = %newLastPage;
+			[%newNextPage+newNextPage.last]=%newLastPage;
 		};
 		{:moveStartingPage;
 			let startPage=otherPage;//:[%]
 			///[startPage]=%page if %page<[startPage];
-			[malloc.data.startPage] - %newLastPage;
+			[malloc.data.startPage]-%newLastPage;
 			jump->moveStartingPage..return if<=0;
 			//assert:%startPage>%page
 			[malloc.data.startPage]=%newLastPage;
 		};
 		return;
 		#def: data;
-	}::{void #set: Call.addCaller(..this,1);};
+	}::{void #set: intoHeapFunction(..this,1);};
 	#set: sizeOf(pageInput){
 		#let: lengthOutput=pageInput;
 		//%pageInput=%lengthOutput;
@@ -345,7 +353,7 @@ void #let set: heap{
 		%page+=offset;
 		return;
 		#def: data;
-	}::{void #set: Call.addCaller(..this,1);};
+	}::{void #set: intoHeapFunction(..this,1);};
 	#set: memset{
 		#let: nextReg=enum(0);
 		#let: inputs{
@@ -360,7 +368,7 @@ void #let set: heap{
 		[clear.data.redHalf]=0;
 		[clear.data.blueHalf]=0;
 		return;
-	}::{void #Call.addCaller(..this,3);};
+	}::{void #set: intoHeapFunction(..this,3);};
 	#set:resize{//similar to realloc except it doesn't change the pointer if there isn't any space
 		//returns fail by setting the signed flag to 1
 		#let: nextReg=enum(0);
@@ -432,7 +440,7 @@ void #let set: heap{
 			};
 			//assert: function has returned
 		};
-	}::{void #Call.addCaller(..this,2);};
+	}::{void #set: intoHeapFunction(..this,2);};
 	#set:resizeBack{
 		//returns fail by setting the signed flag to 1
 		#let: nextReg=enum(0);
@@ -444,7 +452,7 @@ void #let set: heap{
 			#def let: size=0;//:%int ; returns the new size of the input Object
 		};
 		//UNFINISHED
-	}::{void #Call.addCaller(..this,2);};
+	}::{void #set: intoHeapFunction(..this,2);};
 	#set:realloc{
 		//TODO: redo this whole function
 		...labelsof{:setUpMeta;
@@ -732,8 +740,8 @@ void #set:(){//examples
 			@ hault;
 		};
 		#def malloc;
-		#def heap.free;
-		#def heap.realloc;
+		#def free;
+		//#def realloc;
 		#def memory;
 	};
 	{:example2;
@@ -760,4 +768,4 @@ void #set:(){//examples
 		def heap.memory;
 	};
 };
-...let set heap;
+void #...let set heap;
