@@ -442,7 +442,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 							let value,errorString;
 							({value,index}=contexts.expression({index,statement,scope}));
-							errorString=value.toType("string").string;
+							errorString=value?.toType?.("string")?.string??undefined;
 							throw Error(throwError({index,statement,scope},"#",errorString));
 						}
 						else if(word=="delete"//'delete a,b;' from any scope
@@ -2486,12 +2486,17 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				constructor(name,foo,data){//'a..b(1,2);'
 					super(name,()=>{},data);
 					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
-					this.#functionAsValue=new BuiltinFunction(name,foo).toValue("label");
+					this.#functionAsLabel=new BuiltinFunction(name,foo);
 				}
-				#functionAsValue;//:const Value<label> containing BuiltinFunction
+				#functionAsLabel;//:const Value<label> containing BuiltinFunction
 				callFunction({args={},value:callingValue,scope}){
-					this.#functionAsValue.parent=callingValue.parent;
-					return {value:this.#functionAsValue};
+					return {value:new Value({
+						type:"label",
+						name:this.#functionAsLabel.symbol,
+						label:this.#functionAsLabel,
+						parent:callingValue.parent,
+						scope,
+					})};
 				}
 			}
 			class InternalValue extends Value{
@@ -2650,7 +2655,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							default:
 								ans=-1;
 						}
-						return new Value.Number(ans);
+						return ans==-1?new Value({type:"label",label:null,scope}):new Value.Number(ans).toType("label");
 					}),
 					//flat maps all statements in a function. (Makes recursion easier)
 					"flat":({label})=>{
@@ -3319,7 +3324,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							instruction.dataType="number";
 							instruction.dataValue=args[0][0].number;//:number
 						}
-					}else throw Error(throwError({statement,index,scope},"#/@ syntax","invallid assembly line: expected a string, a number or a command."));
+					}else throw Error(throwError({statement,index,scope},"#/@ syntax", "invallid assembly line: expected a string, a number or a command."));
 				}
 				else{
 					for(let i in optionals){//optionals[number]:string & symbol
@@ -3371,7 +3376,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					isNaN(value=value.toType("number").number)?
 						NaN//Error("label is not assigned")
 					:""+value
-				:value instanceof Operator?this.doOperator(value,level+1)
+				:value instanceof Operator?this.doOperator(value,level+1)//TODO: remove this case
 				:[];
 			};
 			compileAssemblyLine({instruction,cpuState,assemblyCode}){//@
