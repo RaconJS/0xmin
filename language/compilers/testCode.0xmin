@@ -1,37 +1,24 @@
-#"text";#"code";
-let forEach(list,do){
-	let i = -1;
-	repeat list..length do(list[i=i+1],i,list,return);
-};
-let toString(obj){
-	let a = forEach(obj,asd(v,i){def¬(""...(¬",")[i==0]...+v)});
-	repeat !!obj[¬vec]:def¬("["...a..("@")..."]");
-	repeat !obj[¬vec]:def¬(""...+obj);
-};
-let vec()={
-	...codeof arguments;
-	let .[¬vec];
-	let dot(b){
-		let sum = return <-> 0;
-		forEach(this)<:(v,i,r)=>{#sum<->sum+(v*b[i]||0);};
-	};
-	let cross(b){
-		let ans = return <=> vec();
-		forEach(this)<:(v,i)=>{
-			#let ans[i] = this[i-1]*b[i+1¬%b..length];
-		};
-	};
-	let mul(b){
-		let ans = return <=> vec();
-		repeat !!obj[¬vec]:def¬("["...a..("@")..."]");
-		repeat !obj[¬vec]:def¬(""...+obj);
-	};
-	let toString(){
-		$"["...forEach(this,(v){$""...+v})..."]";
-	};
-};
-toString()<:
-	vec(1,2,3).dot({1;2;3})
-;
-debugger ..labels;
-debugger (|0.1);
+//#"tptasm";
+//mov [1] [2];//this compiles
+
+//operator tests
+//debugger (+>=0);
+//debugger (0+...0) //retuns a label
+
+//BUG: the inner '..splice' mutates the outer '..splice'. This is to do with the fact that '(,,..splice)' is evaluated between the '..splice' and the '(..splice)(...)' parts
+//#..splice(,,..splice);
+
+//#let state;//BUG, this does not compile
+//$state=>move;
+
+//BUG: the following does not compile
+//let a,b,c;
+//let a,b;$debugger +b;
+//$a=>b;
+//def b;$debugger +a;
+
+//adds spread operator '...a'
+#(a,b,c){debugger(a+b+c)}(...{2;5;3});
+#(a,b,c){debugger("["...a...","...b..."]")}(...{let hello,world}..labels);
+#(a,b,c){debugger(a+b)}(...2);
+#(a,b,c){debugger(""...a...","...b...","...c)}(..."ABC");

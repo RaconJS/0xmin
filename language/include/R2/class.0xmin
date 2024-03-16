@@ -298,7 +298,7 @@
 			};
 			block_new.assigner <=> (block || {
 				#let i = this[¬size]-1;
-				let flattened = tuple..("@");
+				let flattened = tuple..@;
 				repeat (i >= 0 && flattened..length):{
 					repeat !!flattened[i]:
 						[r rMemory+i] = flattened[i];//r arguments.(i);//argument

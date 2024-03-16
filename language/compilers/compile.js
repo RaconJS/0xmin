@@ -8,7 +8,6 @@
 //note
 
 //TODO: BUG: fix '||=' bug
-//TODO: #add '#"text";' for text output
 //TODO: #add '$void'
 //TODO: #@make language definitions less BODGED and more formal
 //TODO: organise asm types (tptasm,0xmin,asm etc...) into separate modules
@@ -439,7 +438,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						else if (word=="throw"
 							&&["", "$", "#"].includes(state.phase)
 						){
-							if(state.phase=="$")throw Error(throwError({index,statement,scope},"#/$ unsupported syntax","$throw is not supported yet"));
+							if(state.phase=="$")throw Error(throwError({index,statement,scope},"#/$ unsupported syntax", "$throw is not supported yet"));
 							index++;
 							let value,errorString;
 							({value,index}=contexts.expression({index,statement,scope}));
@@ -922,8 +921,16 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					if(state["set"]|state["codeof"])injectScope.label.code.push(...label.code);
 					if(state["def"]|state["run"]){//TODO: find a way to use injectScope with `...run` while allowing `:a;virtual ...run(){:b;};` to have `a==b`
-						const source=label.getCode_source();
-						evalBlock(source,undefined,scope,statement);
+						//note: .getCode_source() caused bug where `...{1}` == `...codeof{1};...run(){1}` == `1;1`
+						if(0){
+							const source=label.getCode_source();
+							evalBlock(source,undefined,scope,statement);
+						}
+						else{//TODO: figure out why 'getCode_source' was used to replace 'getCode' here in the 1st place
+							const source=label.getCode();
+							for(let functionScope of source) evalBlock(functionScope.code,undefined,scope,statement);
+							
+						}
 					}
 				}
 				return{index};
@@ -971,16 +978,21 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					obj:{},//:{[name:String]:Value}
 					list:[],//:Value[]
 				};
-				const addArg=value=>{
-					if(value!==undefined){
-						if(value){
-							argsObj.list.push(value);
-							//argsObj.obj[value.name]=value.label;
-						}
-						else{//'foo(());'
-							argsObj.list.push(null);
-						}
+				const addArg=(value,spreadArgsObj)=>{
+				}
+				const addArgs=(value,spreadArgsObj)=>{
+					spreadArgsObj??=[value];
+					if(spreadArgsObj){
+						addArg(spreadArgsObj);
 					}
+					else addArg([value]);
+					argsObj.list.push(...spreadArgsObj
+						.filter(v=>v!==undefined)
+						.map(value=>{
+							//argsObj.obj[value.name]=value.label;
+							return value??null;
+						})
+					);//null for 'foo(())'
 				}
 				if(includeBrackets){
 					if(statement[index]=="("){
@@ -988,8 +1000,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						index+=3;
 						if(shouldEval)
 						for(const statement of argBlock){
-							let {value,index}=contexts.expression({index:0,statement,scope,includeBrackets:false});
-							addArg(value);
+							let {value,index,spreadArgsObj}=contexts.expression({index:0,statement,scope,includeBrackets:false});
+							addArgs(value,spreadArgsObj);
 						}
 					}else throw Error("compiler error: contexts.arguments() starts at '('")
 					//'<:{}' => block argument
@@ -1000,8 +1012,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						}
 						index++;
 						let value;
-						({value,index}=contexts.expression_short({index,statement,scope,shouldEval}));
-						addArg(value);
+						({value,index,spreadArgsObj}=contexts.expression_short({index,statement,scope,shouldEval}));
+						addArgs(value,spreadArgsObj);
 					}
 				}
 				return {index,argsObj};
@@ -1103,11 +1115,16 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						let name,nameFound=false;
 						if(word!="["){index++;word=statement[index]??"";}
 						//optional expression
-						if(word.match(nameRegex)){//'a.b' ?
+						if(isInternal&&["@", "$", "#"].includes(word)){//'a..@' ?
 							name=word;
 							nameFound=true;
 							index++;
-						}if(!nameFound){//'a.123' ?
+						}else if(word.match(nameRegex)){//'a.b' ?
+							name=word;
+							nameFound=true;
+							index++;
+						}else if(!nameFound){//'a.123' ?
+							//UNNEEDED: the case 'a.123' is covered by 'a.b'
 							({index,value:name}=contexts.number({index,statement,scope}));
 							if(name!==undefined)nameFound=true;
 						}if(!nameFound&&["(", "["].includes(word)){//'a.("b")' or 'a["b"]' ?
@@ -1127,7 +1144,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								if(labels.hasOwnProperty(name))({value}=label.callFunction({args:undefined,value,scope,statement}));
 								else{
 									index--;
-									throw Error(throwError({index,statement,scope},"# keyword","'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
+									throw Error(throwError({index,statement,scope},"# keyword", "'"+name+"' is not an internal property. Try one of the inbuilt internal property keywords"));
 								}
 							}//'a.b'
 							else {
@@ -1136,25 +1153,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 									value.refType="array";
 									name=contexts.getIndexNumber(name,parent)??0;
 									value.number=name;
-									let newVal=parent.code[name];
-									if(newVal instanceof AssemblyLine){
-										let code=newVal;
-										let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
-										value.type="label";
-										let type= code.dataType=="char"?"string":"number";
-										value.label=newVal.toLabel(name);
-										if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
-											value=value.toType("number");
-											//TODO: throw error if index out of range
-										}
-									}
-									else value.label=
-										newVal instanceof HiddenLine.Define&&newVal.insert?newVal.label:
-										newVal instanceof Variable?newVal:
-										newVal instanceof Scope?newVal.label:
-										newVal instanceof CodeLine?undefined:
-										newVal instanceof Statement?newVal.toLabel():
-									undefined;
+									value.fromCode(parent.code[name],parent);
 								}
 							}
 						}
@@ -1195,11 +1194,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					else if(word=="::"){//extend object 'foo(){}::{}'
 						//extention operator '::{}' or '::(){}' or '::label'
 						index++;
-						if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"# syntax","extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
+						if(!value&&shouldEval)throw Error(throwError({index,statement,scope},"# syntax", "extending a undefined value in not allowed. try '{ }::{ }' or 'label::{ }'"));
 						if(({index,value}=contexts.declareFunctionOrObject({
 							index,statement,scope,
 							startValue:value,shouldEval
-						})).failed)throw Error(throwError({index,statement,scope},"# syntax","no extention block or function. expected form: `label :: { }' or 'label :: ( ){ }'"));
+						})).failed)throw Error(throwError({index,statement,scope},"# syntax", "no extention block or function. expected form: `label :: { }' or 'label :: ( ){ }'"));
 					}
 					return {index,value};
 				},
@@ -1211,9 +1210,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(isExtension){//'obj{}'
 						//type checking
 						//TODO: replace the following with throwError errors
-						if(startValue==undefined)throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not defined"));
+						if(startValue==undefined)throw Error(throwError({index,statement,scope},"# type", "operator '::', startValue is not defined"));
 						if(!(startValue instanceof Value))throw Error("compiler type error:");
-						if(startValue.type!="label")throw Error(throwError({index,statement,scope},"# type","operator '::', startValue is not a label"));
+						if(startValue.type!="label")throw Error(throwError({index,statement,scope},"# type", "operator '::', startValue is not a label"));
 						if(!startValue.label){
 							startValue.label=new Variable({name:startValue.name});
 						}
@@ -1298,7 +1297,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						return v.toType("label");//TODO: unsure about this mechanic
 					}
 				},
-				//"...":(v)=>new Value.Number(~v.number),
 			},
 			operators:{
 				"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
@@ -1338,7 +1336,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					//if left argument is not a string then both arguments are converted into labels and it returns: '{...codeof a;...codeof b}'
 					let arg1=args.pop();
 					let arg0=args.pop();
-					if(arg1===undefined)throw Error(throwError({index,statement,scope},"#expression syntax","concatnation operator \"a...b\" missing 2nd argument"));
+					if(arg1===undefined)throw Error(throwError({index,statement,scope},"#expression syntax", "concatnation operator \"a...b\" missing 2nd argument"));
 					if(arg0){//'a...b' 2 args
 						let ans;
 						switch(arg0.type){
@@ -1360,11 +1358,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 
 						}
 						args.push(ans);
-					}else if(arg1){//'...a' 1 arg
-						throw Error(throwError({index,statement,scope},"#expression syntax","'...a' aka spread operator is not supported yet"));
-						//args.push(...arg1); UNFINISHED
+					}else if(arg1){//'...a' 1 arg ; spread operator for 'foo(...args)'
+						let label=arg1.toType("label").label;
+						let spreadArgsObj;
+						if(label){
+							spreadArgsObj=label.code.map((code,i)=>new Value().fromCode(code,label,i));
+						}
+						return {spreadArgsObj};
 					}else{
-						throw Error(throwError({index,statement,scope},"#expression syntax","0xmin #syntax error: concatnation operator '...' needs two arguments. 0 arguments provided"));
+						throw Error(throwError({index,statement,scope},"#expression syntax", "0xmin #syntax error: concatnation operator '...' needs two arguments. 0 arguments provided"));
 						//no args -> silent error
 					}
 				}},
@@ -1379,14 +1381,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				else if(value.type=="array")return !!value.array;
 				else return false;
 			},
-			expression({index,statement,scope,startValue=undefined,includeBrackets=false,shouldEval=true}){//a + b
+			expression({index,statement,scope,startValue=undefined,argsObj=undefined,includeBrackets=false,shouldEval=true}){//a + b
 				let value=new Value();
-				const argsObj=new Variable({code:[]});
-				const args=argsObj.code;//:Value[]
+				const args=[];//:Value[]
 				const operatorRegex=/[+\-*/]/;//:Regex
 				if(startValue !=undefined){
 					args.push(startValue);
 				}
+				let spreadArgsObj;//:Value[]? ; used with for spread operator '...a'
 				let word=statement[index];
 				let nextIndex=index;
 				if(includeBrackets){
@@ -1494,26 +1496,27 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						index++;let value=args.pop();
 						({value,index}=contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
 						args.push(value);
-					}else if(contexts.operators.hasOwnProperty(word)){//'+-*/'
+					}else if(contexts.operators.hasOwnProperty(word)){//'+-*/' 'a+b'
 						index++;
 						if(shouldEval){
 							let hasEquals,value;
 							//get second arg
 							const operator=contexts.operators[word];//:Operator_bool|Operator_numeric
-							if(statement[index]=="="){hasEquals=true;index++}
+							if(statement[index]=="="){hasEquals=true;index++}//'+='
 							if(operator instanceof Operator_bool){
-								let arg1=args.pop(value),bool1=contexts.truthy(arg1);
+								let arg1=args.pop(),bool1=contexts.truthy(arg1);
 								if(operator.is2Args){
 									let shouldEval=operator.needsSecondArg(bool1);
 									({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
 									value=operator.operator(bool1,contexts.truthy(value),arg1,value);
-								}else value=operator.operator(bool1,null,arg1,null);
+								}else value=operator.operator(bool1,null,arg1,null);//for '!a'
 								args.push(value);
 							}
 							else {//operator:Operator_numeric
 								({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
 								args.push(value);
-								operator.do({args,hasEquals, index,statement,scope});
+								//note: argsObj is only used for '...label' operator
+								({spreadArgsObj} = operator.do({args,hasEquals,argsObj, index,statement,scope})??{});
 							}
 						}else{
 							({index}=contexts.expression_short({index,statement,scope,shouldEval}));
@@ -1528,9 +1531,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 				}
 				value=args[0];
-				if(includeBrackets)return {index:nextIndex,value};
+				if(includeBrackets)return {index:nextIndex,value,spreadArgsObj};
 				else{
-					return {index,value};
+					return {index,value,spreadArgsObj};
 				}
 			},
 		//----
@@ -1962,11 +1965,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		}
 		class Value extends DataClass{
 			constructor(data){super();Object.assign(this,data??{})}
-			fromLabel(label){//UNUSED
-				this.label=label;
-				this.type="label";
-				this.number=label.lineNumber;
-			}
 			type="label";//label|number|array|string; label == array == function
 			label;//label Object
 				name;//label name (from parent.labels)
@@ -2025,6 +2023,39 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}else{
 					return undefined;
 				}
+			}
+			fromLabel(label){//UNUSED
+				this.label=label;
+				this.type="label";
+				this.number=label.lineNumber;
+			}
+			fromCode(code,parent,name){//:Value
+				//code:(CodeLine|Variable|Scope) & []Variable().code
+				//parent:Variable
+				//name:string
+				let value = this;
+				if(code instanceof AssemblyLine){
+					let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
+					value.type="label";
+					let type= code.dataType=="char"?"string":"number";
+					value.label=code.toLabel(name);
+					if(parent instanceof MachineCode){//note: this causes MachineCode objects to be immune to mutations by '#machineCode[0]=b;'
+						value=value.toType("number");
+						//TODO: throw error if index out of range
+					}
+				}
+				else {
+					value.type = "label";
+					value.label=
+						code instanceof HiddenLine.Define&&code.insert?code.label:
+						code instanceof Variable?code:
+						code instanceof Scope?code.label:
+						code instanceof CodeLine?undefined:
+						code instanceof Statement?code.toLabel():
+						undefined
+					;
+				}
+				return value;
 			}
 			//Value.prototype.toNumber
 			toNumber(value=this){//to number type
@@ -2323,7 +2354,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					else if(this.scope instanceof FunctionScope)return this.scope.code;//'{{}}'
 					else if(this.scope instanceof Scope)return this.scope.code;//'{{}}' this.scope.code
 					else {console.error(this.scope?.constructor);throw Error("compiler type error:");}
-					return codeBlock;
 				}
 				else{//this: MacroFunction
 					const code=new bracketClassMap["{"]();
@@ -2337,7 +2367,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				this.isSearched=true;
 				this.code.reduce((s,v)=>{
 					///v: Variable ?? CodeLine|FunctionScope
-					if(v instanceof Scope)s.push(v);//pushes :FunctionScope
+					if(v instanceof FunctionScope)s.push(v);
 					//else if(v instanceof HiddenLine.Define)s.push(v.label?.getCode?.(n+1));//pushes :...FunctionScope|code tree //I am not sure about this feature, although it does make the language more intuitive
 					else if(v instanceof Variable)s.push(...v.getCode?.(n+1));//pushes :...FunctionScope|code tree
 					//else if(v instanceof CodeLine)s.push(v.code);
@@ -2351,7 +2381,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			//Variable
 			callFunction({args,value:callingValue,callType,scope,statement}){//:{value}
 				const codeBlock=this.getCode();//:Scope[] & Statement;new code instance
-				const newLabel=new Variable({name:"<"+this.name+">",functionConstructor:this});
+				const newLabel=new Variable({name:"<"+this.name?.toString?.()+">",functionConstructor:this});
 				let newReturnObj;
 				for(let codeScope of codeBlock){//codeScope:Scope
 					({newReturnObj}=codeScope.callFunction({newReturnObj,newLabel,functionLabel:this,args,value:callingValue,callType,scope,statement}));
@@ -2410,6 +2440,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			static fromValue(value,scope=undefined){//label|number|array|string
 				if(value?.type=="label")
 					return value.label;
+				scope??=value.scope;
 				if(scope!==null)scope??=globalScope;//BODGED
 				if(value?.type=="number"){
 					return new Variable({
@@ -2457,7 +2488,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					this.name+="*";//{name}* ==> 'pointer to an inbuilt'
 					this.#functionAsValue=new BuiltinFunction(name,foo).toValue("label");
 				}
-				#functionAsValue;//:const Value<label>
+				#functionAsValue;//:const Value<label> containing BuiltinFunction
 				callFunction({args={},value:callingValue,scope}){
 					this.#functionAsValue.parent=callingValue.parent;
 					return {value:this.#functionAsValue};
@@ -2528,10 +2559,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						};
 						return value;
 					},
-					//note: name might change
 					"#":({label})=>new Variable({name:"(..#code)",//BODGED //extract all the function blocks from a label
 						code:[...label.getCode().map(label_or_scope=>label_or_scope instanceof Variable?label_or_scope:label_or_scope.label)],
 					}).toValue("label"),
+					//note: name might change
 					"@$":({label})=>new Variable({name:"(..@$code)",code:assemblyCompiler.collectCode(label)}).toValue("label"),
 					"$":({label})=>new Variable({name:"(..$code)",code:assemblyCompiler.collectCode(label).filter(v=>v instanceof HiddenLine)}).toValue("label"),
 					"@":({label})=>new Variable({name:"(..@code)",code:assemblyCompiler.collectCode(label).filter(v=>v instanceof AssemblyLine)}).toValue("label"),
@@ -2579,7 +2610,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						"super":({label})=>new InternalValue({label,name:"super"},"functionSupertype"),
 					//other
 					"defs":({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
-					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args})=>{
+					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args,scope,statement})=>{
 						let ans;
 						switch(args[0]?.type){
 							case "label":
@@ -3354,12 +3385,17 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				{
 					tptasmString=args
 						.map((v,i,a)=>{
+							if(0){
+								if(mainObject.labels["settings"].labels["include_labels"].lineNumber)
+								if(a[i-1]!="r" && v instanceof Value&&v.type=="label"&&v.label.defs.length>0&&v.label.defs[0]?.defs?.length>0)
+									return assemblyCompiler.getAssemblyLabelName(v.label);
+							}
 							let v1=this.getArg(v);
 							if(!isNaN(+v1)&&a[i-1]!="r"){
 								v1="0x"+(0x1fffffff&v1).toString(16);
 							}
 							failed||=(v1!==v1)?Error(
-								["1st","2nd","3rd"][i]+" argument: '"+
+								["1st", "2nd", "3rd"][i]+" argument: '"+
 								(
 									v.label?.name?v.label.name+"' is undefined":
 									(v?v.name?.toString?.():v)+"' is undeclared"
@@ -3493,7 +3529,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		"Math":Object.doubleFreeze(new class MathObj extends Variable{
 			constructor(){
 				super({name:"Math"});
-				for(let i of ["abs","acos","acosh","asin","asinh","atan","atan2","atanh","cbrt","ceil","clz32","cos","cosh","exp","expm1","floor","fround","hypot","imul","log","log10","log1p","log2","max","min","pow","random","round","sign","sin","sinh","sqrt","tan","tanh","trunc"]){
+				for(let i of ["abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh", "cbrt", "ceil", "clz32", "cos", "cosh", "exp", "expm1", "floor", "fround", "hypot", "imul", "log", "log10", "log1p", "log2", "max", "min", "pow", "random", "round", "sign", "sin", "sinh", "sqrt", "tan", "tanh", "trunc"]){
 					if(Math.hasOwnProperty(i)){
 						this.labels[i]=new BuiltinFunction(i,
 							({args})=>new Value.Number(Math[i](...(args.map(v=>v.toType("number").number))))
@@ -3501,7 +3537,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						Object.doubleFreeze(this[i]);
 					}
 				}
-				for(let i of ["E","LN10","LN2","LOG10E","LOG2E","PI","SQRT1_2","SQRT2"]){
+				for(let i of ["E", "LN10", "LN2", "LOG10E", "LOG2E", "PI", "SQRT1_2", "SQRT2"]){
 					this.labels[i]=Variable.fromValue(new Value.Number(Math[i]),null);
 				}
 				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),null);
@@ -3521,7 +3557,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	callStack.getData=function(){
 		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
 	};
-	let outputAsBinary=()=>["0xmin","int","text"].includes(assemblyCompiler.assembly.language);
+	let outputAsBinary=()=>["0xmin", "int", "text"].includes(assemblyCompiler.assembly.language);
 	let parts=inputFile;
 	parts=parseFile(parts,fileName);
 	parts=bracketPass(parts);

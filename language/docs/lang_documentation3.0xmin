@@ -661,7 +661,7 @@ function blocks;{
 							#callerScope.__this;//callerVarScope
 							//description of general idea & use of marcos e.g. 'foo<-()':
 								//macro 'foo<-()' functions: are similar to '...foo' except with more tools to modify the scope that calls the function
-									//Their code is run almost directly in the scope, similar to '...foo' but they still have access to 'foo..prototype'.
+									//Their code is run almost directly in the scope, similar to '...foo' but they still have access to 'foo..prototype'. and 'foo..supertype' aswell as any arguments
 									//They can reference the caller scope so they can modify it.
 								//labels in macros are assigned to the scope they were called from, instead of where they were defined
 						#baz = foo<=(1,2,3);//called as a strong scoped function.
@@ -680,6 +680,31 @@ function blocks;{
 					};
 				}
 			}
+		//the 'midScope'
+			//Function instances contain a hidden scope sandwiched inbetween the function's parent scope and the function instance
+			//This hidden scope is called the 'midScope' in the compiler.
+			//It contains all the inbuilt variables such as the arguments, 'constructor' 'this' 'arguments' etc...
+			//A polly fill for what function calls look like under the hood might look like
+			//e.g.
+				let foo{
+					let parameterNames = {let a,b,c};
+					let code = (a,b){
+						#return = a + b;
+					};
+				};
+				:globalObject;
+				let foo.call(args,thisObject)->{
+					let .[arguments] = args;
+					let .[caller] = caller;
+					let .[this] = thisObject;
+					...labelsof args;
+					let .[return]{
+						...foo.code;
+					};
+					#let returnValue = .[return];
+					#delete .[return];
+					#return = returnValue;
+				};
 	};
 };
 single_expressions;{
@@ -838,9 +863,10 @@ long_expressions;{
 		In lists of values like the line above, the last value will be returned, i.e. 3.
 	};
 	{:operators;
-		¬;{
+		operator ¬;{
 			the ¬ can be used in 2 ways depending on number of argumments.
 			1:
+				'label cast / property key'
 				¬x turns a value into a label with the 'symbol' value-subtype.
 				This can be used to make private variables that can only be accessed by curtain parts of the code
 				{:intended use;
@@ -853,8 +879,16 @@ long_expressions;{
 							#return = +a[¬symbol];
 						}
 					};
-				};]
-			2: In a long expresstion, if there are statements behind the ¬, ¬ will be interpretted as the collecter operator:
+				};
+				
+				This can also be used to convert a value into a label.
+				e.g.
+				{
+					let a = #(¬(2+2))[0];
+				}
+			2:
+				'collect and then'
+				In a long expresstion, if there are statements behind the ¬, ¬ will be interpretted as the collecter operator:
 				This collecter operator gets the current long expression value makes it the start of a short expression.
 				It is intended to be syntactic sugar for putting '()'s around a long expresstion
 				e.g.
@@ -863,6 +897,8 @@ long_expressions;{
 				e.g.
 				a + b * c ¬()
 				is the same as: ( (a + b * c)() )
+				a + b * c ¬ + 2
+				is the same as: ( (a + b * c) + 2 )//this would be the same as (a+b*c+2) and ((a+b)*c+2) because of how 0xmin proceedence works
 		};
 		boolean operators && || ^^;{
 			'||' or;{
@@ -926,6 +962,31 @@ long_expressions;{
 				+a;// 4
 				a.prop;// 3
 			}
+		}
+		concatnation operator ...;{
+			In long expressions this is parsed as a concatnation or spread operator.
+			1. concatnation: a...b
+				Here it joins the array-like contence of both arguments together, returning a new value/label.
+				If the first argument is a label of a string the result will be of that type.
+				This means that the following can be used to cast a value to a string
+					""...bar //string cast
+				;
+				¬a...¬b       ==> {...codeof ¬a, ¬b};
+				¬a...(""...b) ==> ¬a...¬(""...b);
+				""...¬b       ==> ""...¬{...codeof ¬b};
+				""...+b       ==> ""...¬{@+b};
+				""...¬b       ==> ""...¬{...codeof ¬b};
+				""...+b       ==> ""...¬{@+b};
+				To turn a number into a decimal string use `..asNumber`
+				Note this is one way of returning a non-symbol label
+			2. spread operator ...a
+				e.g. 
+					let add = (a,b){
+						#return<->a+b;
+					};
+					add(...{2;3});
+				note since this is part of a long expression:
+					doing: (foo()<:...a) will not work.
 		}
 	};
 	proceedence{

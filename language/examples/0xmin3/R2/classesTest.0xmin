@@ -153,8 +153,9 @@ let RegState(regState)={
 			let return = this..constructor(this);
 			let i = -1;
 			repeat (return && regState.regsUsed..length):{
+				//UNFINISHED
 				return.use()
-				repeat this.freeRegs..indexOf(regState.regsUsed[i += 1]) == -1;
+				repeat !!¬this.freeRegs..indexOf(regState.regsUsed[i += 1]);
 			};
 		},
 		use(regState){

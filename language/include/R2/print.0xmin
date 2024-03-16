@@ -9,9 +9,9 @@
 		char:#(%char,%Const_0?,#bool?)->{@};
 		number:{
 			#(%int)->{@}; //same function as print.number.register
-			register:#(%int,%Const_0?,%?,(%|())?)->{@};
-			static:#([@],%Const_0?,%?,(%|())?)->{@};
-			hexChar:#(%int,%Const_0?,(%|())?) -> {@};
+			register:#(%int,%Const_0?,%?,(%|¬)?)->{@};
+			static:#([@],%Const_0?,%?,(%|¬)?)->{@};
+			hexChar:#(%int,%Const_0?,(%|¬)?) -> {@};
 			charSet:{@}&{
 				setup:#()->{@}?
 			};
@@ -52,7 +52,7 @@ let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 		send r const_0 r reg;
 		def reinsertRegs;
 	};
-	let saveReg(reg,default,regsToPush,regsToPop){
+	let saveReg(reg,default,regsToPush,regsToPop){#;
 		repeat !reg:{
 			#reg = default;
 			#regsToPush..splice(-0,0,{push r reg});
@@ -76,18 +76,21 @@ let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 					let i = 0;
 					let regArgs = {+reg_const_0;+reg_char;+reg_i};
 					repeat 14 {#;
-						repeat (regArgs..indexOf(+i) != -1):
-						i += 1;
+						repeat (!!¬regArgs..indexOf(+i)):
+						#i += 1;
 					};
 					#reg_memoryData = 4;
 				};
-				push r regInput;
+				push r reg_memoryData;
 			};
-			r regInput = [memoryAddress];
-			register(regInput,reg_const_0,reg_char,reg_i);
+			r reg_memoryData = [memoryAddressInput];
+			register(reg_memoryData,reg_const_0,reg_char,reg_i);
 			repeat !+hadRegInput {
-				pop r regInput;
+				pop r reg_memoryData;
 			};
+		};
+		let register_short(regInput,reg_const_0,reg_char,reg_i){
+
 		};
 		let register(regInput,reg_const_0,reg_char,reg_i){//#(%,%?,%?,%?)->{@}
 			//if reg_i is provided then runs a loop at run time.
@@ -95,12 +98,12 @@ let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 			#let temp = regInput;
 			def let regsToPush;
 			let regsToPop;
-			#reg_const_0 = saveReg(reg_const_0,(regInput+1)%14,regsToPush,regsToPop);
-			#reg_char = saveReg(reg_char,(regInput+2)%14,regsToPush,regsToPop);
+			#reg_const_0 = saveReg(reg_const_0,regInput+1 %14,regsToPush,regsToPop);
+			#reg_char = saveReg(reg_char,0xmin.Math.max(reg_const_0,regInput) +1 %14,regsToPush,regsToPop);
 			repeat !reg_const_0.is0: r reg_const_0 = 0;
-			repeat (arguments..length >= 4):let useForLoop;//if no reg_i argument
+			repeat (reg_i!=()):let useForLoop;//if reg_i argument provided
 			repeat !!useForLoop:{
-				#reg_i = saveReg(reg_i,(regInput+3)%14,regsToPush,regsToPop);
+				#reg_i = saveReg(reg_i,0xmin.Math.max(reg_const_0,regInput,reg_char) +1 %14,regsToPush,regsToPop);
 				r reg_i = #(4 - 1);
 			};
 			def let loop;
@@ -117,16 +120,17 @@ let print(str,const_0,is0){//:#(#string|{@},%?,{}?)->{@}
 			def regsToPop;
 			charSet.setup();
 		};
-		let hexChar(regInt,reg_char,const_0){
+		let hexChar(regInt,const_0,reg_char){
 			def let regsToPush;
 			let regsToPop;
-			saveReg(const_0,(regInput+1)%14,regsToPush,regsToPop);
-			saveReg(reg_char,(regInput+2)%14,regsToPush,regsToPop);
-			r char = 0;
-			r temp <<<= 4;//circular shift
-			r char <<= 4 + internal;
-			send r const_0 [charSet + r char];
-			r temp >>>= 4
+			#const_0=saveReg(const_0,(regInt+1)%14,regsToPush,regsToPop);
+			#reg_char=saveReg(reg_char,(regInt+2)%14,regsToPush,regsToPop);
+			repeat !const_0.is0: r const_0 = 0;
+			r reg_char = 0;
+			r regInt | 0;//circular shift
+			r reg_char >>= 4 + internal;
+			r reg_char >>= 12;
+			send r const_0 [charSet + r reg_char];
 			def regsToPop;
 			charSet.setup();
 		};

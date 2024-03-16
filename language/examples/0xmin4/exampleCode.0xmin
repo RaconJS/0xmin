@@ -1,0 +1,57 @@
+#"tptasm";
+#"ZASM4-0";//version 4.0
+import lib "std.0xmin";
+//new features with ZASM4:
+	//powerful lib "std.0xmin",
+	//types,
+	//operator overloading,
+	//lambda functions,
+	//meta by default,
+	//new 'high level' phase made up from the 'meta (#)' phace,
+	//..prototype as a list of prototypes, for multi inheritence
+	//eval
+	//powerful statechecking
+	//customisable assembly language
+	//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
+	//(#) and  for non-operator overloaded blocks
+	//using £() or '<>' for non-operator overloading blocks
+//list of types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
+let gravitySimulator{
+	let dim = 2;//same as #let: dim = 
+	let parts:>Array()<:Array(3)<:Array(dim)<:Number;//:@[][3][dim]Number
+	let equation:>Function(Number,Number)<:(distance){//:#
+		return = 1/distance**3;
+	};
+	let doStep{
+		let dt = 0.1;
+		parts.length.iterate()<:i=>{
+			let a = parts[i];
+			a[2].mutate().fill(0);
+			for({let i<=>j;i<parts.length;i++})<:{
+				let b = parts[j];
+				let difference:>Vector() = b[0]:>as(Vector)-a[0];//here we convert 'b' to a vector to use Vector..prototype..-
+				//Vector.length:Number&NonInt ; normally Float or Fixed
+				//Array.length:Number&Int
+				let distance = difference.length;//same as: difference.forEach((sum,value)=>sum+(value**2))**0.5;
+				let force = equation(distance);
+				//can use function 'as' to assert a type or use a label as a type
+				//can use function 'to' to permenently convert a label to a type
+				a[2]:>as(Vector) += difference.forEach(v=>v*force:>as(Number));
+				b[2]:>as(Vector) -= difference*force;
+			};
+			a[1]:>as(Vector) += a[2]:>as(Vector)*dt;
+			a[0]:>as(Vector) += a[1]:>as(Vector)*dt + a[2]:>as(Vector)*(1/2*dt**2);
+		};
+	};
+	parts = {repeat dim:0xmin.Math.random():>Number.Float()}
+};
+let otherThings{
+	let list = Array(Number.int)::{1;2;3;4};
+	for()<:{let i:>Number() = 0; i < list.length; i++}<:{
+
+	};
+	list:>forIn()<:(value){
+		value+1;
+	};
+};
+std.build();

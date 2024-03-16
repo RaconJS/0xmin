@@ -1,75 +1,170 @@
-#"tptasm";
+#"tptasm";#"len";
 #"table";
-let heap{
-	import lib "heap.0xmin";
-	#..splice(0,-0);
-	{
-		//def memory;
-		def malloc;
-		def free;
-		def resize;
-		let memory = memory,
-			malloc = malloc,
-			free = free,
-			resize = resize,
-			realloc = realloc,
-			ref = ref,
-			unref = unref,
-		;
+...labelsof{
+	import "std v1.0xmin";
+	let heap = {import lib "heap.0xmin"};
+	let static = Static();
+	let meta.class()<-{
+		#return = #(arguments[0] <=> this) || this;
 	};
-	delete;
-	...let .[0];
+	let Object(label)={
+		...run meta.class;
+	}::{
+		let pointer(label,size,struct)={
+			...run meta.class;
+			#return::{
+				repeat !!struct let struct = struct..compile;
+				repeat !!size let size = size;
+				repeat !size let size = struct..@..length;
+				...codeof labelsof struct;
+			};
+		}::{
+			let printObject{//:@(%)->mutate
+				RegEnum().blockScope()<:(reg){
+					let obj = heap.Object.pointer=()<->reg();
+					let size = reg();//:%sizeOf obj.data
+					%size = [%obj-(-obj.next)];
+					%size -= %obj;
+					let const_0 = reg();
+					print("@",const_0);
+					#let const_0.is0 = 1;
+					print.register(obj,const_0);
+					print(":",const_0,{});
+					print.register(size,const_0);
+					print("{",const_0,{});
+					let temp = {repeat 2 reg()};
+					{:forLoop;
+						let max = size;
+						//max:%int !signed & []
+						let i = temp[0];//:%obj+ !signed
+						%max|0;
+						jump->forLoop..return if==0;//"{}"
+						%i = 0;
+						def let loop;
+						{:do;
+							let v = temp[1];//:%[]obj
+							%v = [%obj+%i];
+							print.number.hexChar(v,const_0);
+						};
+						%i+=1;
+						%i-%max;
+						jump->forLoop..return if==0;
+						{:onLoop;
+							print(",",const_0,{});
+						};
+						jump->loop;
+					};
+					print("}\n");
+				};
+				return;
+			}:>static();
+			#set ..proto = Object;
+			#set ..prototype..proto = Object..prototype;
+			#set ..prototype{
+				let print(){
+					push r0;
+					r0 = %this;
+					call printObject:>static.use();
+					pop r0;
+				};
+				let: def(size,constructor){
+					let size = size || this.size;
+					RegEnum(1).blockScope({this})<:(reg)=>{
+						r0 = size;
+						heap.malloc.call();
+						%this = r0;
+					};
+					constructor;
+				};
+				let: set(struct){
+					let struct = struct..@||this.struct..@;
+					let i = -1;
+					repeat struct..length{
+						[%this + #(i=i+1)] = struct.(i);
+					};
+				};
+				let ref(outputReg){
+					let output = outputReg;
+					heap.ref(this);
+				};
+			};
+			let prototype = ..this();
+		};
+	};
+	let Ref(type,canBeNull)={//:#()->@Object*
+		...run meta.class;
+		let type = type;
+	}::{
+	};
+	#print.register..splice(0,0)<:(){
+		#print.number.charSet:>static.use();
+	};
 };
-...let heap;
-jump->heap..return;
-def heap;
-null;//main program
-repeat 0 {:reallocTest;
-	r0 = 4;
-	call malloc;//malloc.call(0);
-	mask = 0xff00; r1=0x0000; [r0 + 0] = r1;
-	mask = 0x00ff; r1=0x0000; [r0 + 1] = r1;
-	mask = 0x0000; r1=0xff00; [r0 + 2] = r1;
-	mask = 0x0000; r1=0x00ff; [r0 + 3] = r1;
-	mask = 0x0000;
-	push r0;
-	{
-		r0 = 16;
-		call malloc;
-		push r0;
-			r0 = 3;
-			call malloc;
-		pop r0;
-		call free;
-	};
-	pop r0;
-	r1 = 10;
-	r2 = 0;
-	r3 = 0;
-	call realloc;//realloc.call(0);
-	call free;//free.call(0);
-};
-repeat 1{:resizeTest;
-	repeat 0 {
-		r0 = 4;
-		call malloc;
-		push r0;
-			r0 = 5;
-			call malloc;
-		pop r0;
-		call free;
-	};
-	{
+repeat 0 def let simpleTest = RegEnum().weakScope()<:(reg){
+	let obj:>reg():>Object.pointer=(4);
+	obj.def((),obj.set({1;2;4;7}));
+	reg.blockScope()<:(reg){
 		r0 = 5;
-		call malloc;
-		r1 = 20;
+		heap.malloc.call();
 		push r0;
-			hlt;
-			call resize;
-		pop r1;
+		r0 = 10;
+		heap.malloc.call();
+		pop r0;
+		heap.free.call();
+	};
+	//obj.print();
+	let temp = reg();
+	reg.blockScope()<:(reg){
+		r1 = 3;
+		call heap.resize.use();
+		if sign jump->static.use()<:{
+			print("failed");
+			print.register(0);
+			jump->return..return;
+		};
+	};
+	print("\n");
+	obj.print();
+	hlt;
+};
+RegEnum().weakScope()<:(reg){
+	let obj1 = reg():>Object.pointer=(4);
+	let obj2 = reg():>Object.pointer=(6);
+	let temp = reg();
+	let const_0 = reg();
+	%const_0 = 0;
+	${
+		hlt;
+		obj1.def(());
+		hlt;
+		meta.repeat(obj1.size)<:(i){%temp=0xf000;[%obj1+i]=%temp};
+		obj2.def(());
+		meta.repeat(obj2.size)<:(i){[%obj2+i]=0x000f};
+		hlt;
+		heap.free.call(obj1);
+		print(".",const_0,{});
+	}:>(do){:loop;
+		do;
+		jump -> loop;
+	}();
+};
+repeat 0 RegEnum().weakScope()<:(reg){
+	let Array(itemType)={//:%{size;itemType[]}*
+		#return:>Object({
+			let type = itemType;
+			8 #def let length;
+			#def items;
+		});
+		#return..proto = constructor..prototype;
+		#return..super = constructor..supertype;
+		#return..constructor = constructor;
+	}::{
+		#..prototype..proto = Object..prototype;
+		#..supertype..super = Object..supertype;
+		#..prototype{
+			def
+		};
 	};
 };
-hlt;
-let end;
-jump->end #def end;
-def heap.memory;
+def static.memory;
+def heap.data;

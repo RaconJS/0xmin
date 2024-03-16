@@ -1,0 +1,433 @@
+...labelsof (){
+	#return{let
+		heap,
+		print,
+		Static,
+		static,
+		readHigh,
+		RegEnum,
+		reg,
+		getInput,
+		meta,
+	};
+	//import lib "R2/class.0xmin";
+	#heap = {import lib "heap.0xmin"};
+	#print = {import lib "R2/print.0xmin";...let set print;};
+	...labelsof(){//Static: static memory management
+		let private{let obj,allowRedefine};
+		let Static(label)={
+			repeat !!label:#this = label;
+
+			#this::(obj,allowRedefine)={//:(obj:{@},#bool & #({}|(¬))) -> #{use:#()->@obj on static}
+				...labelsof{
+					let this.[¬private.obj] = obj;
+					let this.[¬private.allowRedefine] = allowRedefine;
+				};
+				#{
+					let this.[¬Static] = this;
+					let obj[¬Static] = this;
+					let this.[¬constructor] = this;
+					let obj[¬constructor] = this;
+				};
+				repeat !!obj def obj;
+				let def()<-{//same as use, but to local scope's static
+					//static.def:#()->this & mutation
+					meta.unimplemented();
+					#{
+						let static = 
+					};
+				};
+			};
+			let ..prototype{//with: static.
+				let use(){//:#()-> this & mutate static
+					//assert: this:Static() & a single static label
+					let obj = this[¬private.obj];
+					let allowRedefine = this[¬private.allowRedefine];
+					repeat (this..defs..length == 0 || !!allowRedefine)
+						#this..constructor.memory::{def this};
+					#return = obj;
+					repeat 0 #let this.use = #(){#return = obj};
+				};
+			};
+			let this.memory;
+			let use(obj,allowRedefine){//:({@}|Static()(),#(()|{})?)->
+				repeat !!obj[¬this] #return = obj[¬this].use();
+				repeat !obj[¬this] #return = ..this=(obj,allowRedefine).use();
+			};
+		}::{
+			#void(){:exmples;
+				let static = Static=();
+				call static.use()<:{r0 = r1; r0 += r2; return};
+				let string = static.use("hello world");
+				r0 = string.use().(0);
+				hault;
+				def static.memory;
+			};
+		};
+		#return = {let Static = Static};
+	}();
+	let static = Static=();
+	let readHigh(rOut,rAddress){
+		@(0x11100001 | (rOut & 0xf << 8) | (rAddress & 0xf << 4));
+	};
+	...labelsof(){//Reg: register management
+		let type_register{//private properties
+			let isUsed;
+			let isConst;
+		};//type Register = % & ( RegState()() | RegEnum()() )
+		let RegState(dataRegState)={#;//general register management
+			//type RegState = #{string:%[]}
+			...labelsof dataRegState;
+			let set all;//:#%[] all registers
+			repeat !dataRegState.parent let set parent = ¬;//:RegState ; regState of the parent scope
+			repeat !dataRegState.free let used;//:#%[] ; registers that are not currently being used
+			repeat !dataRegState.mut let const;//:#%[] ; registers with known values 'register.value' and 'register.is0'
+			repeat !dataRegState.uninvolved let involved;//:#%[] ; registers that are mutated at all by this scope
+			
+			#all::{
+				let i = -1;
+				repeat 14 def ¬+(i += 1);
+				delete i;
+			};
+			(label){//:#({#}?)-> % & RegState()
+				repeat (free..length == 0): throw "out of registers";
+				#return = #(arguments[0] || return) <-> +freeRegs..splice(0,1);
+				#usedRegs..splice(-0,0,{@:#(+return)});
+				#let return[¬RegEnum.type_register];
+			};
+		}::{
+			let type_register = type_register;
+			let ..prototype{
+				let reg(regNumber){//#(% & #int)-> % & #Register
+					let constructor = this;
+					:this;
+					let [¬type_register];
+					let [¬constructor] = this;
+					#this<->regNumber;
+					//def let isUsed = ¬;//{}|¬
+					//def let isInvolved = ¬;//{}|¬
+					//def let isConst = ¬;//#int|¬
+				};
+				let use(reg){//:#(...%[])->RegEnum
+					repeat arguments..length #{
+
+					};
+					repeat !reg[¬type_register.isUsed] #{
+						#let reg[¬type_register.isUsed];
+					};
+					#return = this;
+				};
+				let push(to_regStateData){
+					let to_regState = this..constructor(to_regStateData);
+					meta.repeat(this.usedRegs..length)<:(i){
+						let reg = this.usedRegs[i];//:%
+						repeat (!!¬to_regStateData..indexOf());
+					};
+				};
+				let copy(){
+
+				};
+			};
+			let push(regState){
+				let i = -1;
+				repeat regState.used..length push %(i=i+1);
+			};
+			let pop(regState){
+				let i = regState.used..length;
+				repeat regState.used..length pop %(i=i-1);
+			};
+			let blockScope(regsToSave,startAt){//:#(...args,#(RegEnum){})
+				let do = arguments[-1];
+				meta.if(arguments..length < 2)<:(){#regsToSave = ¬;}
+				meta.if(arguments..length < 3)<:(){#startAt = ¬;}
+				repeat !startAt startAt = 0;
+				repeat !startAt regsToSave = 0;
+				let regsToSave = regsToSave;
+				let reg = ..this(startAt);//:RegEnum
+				def ..this.push(regsToSave);
+				def do(reg);
+				def ..this.pop(regsToSave);
+			};
+		};
+		let RegEnum_forEachReg(from_ignore,static_regStorage,startI,nextI,do_stack,do_static)<-{//:injectable macro #(#%[],@{}?,#macro,#()->index & mutation,#macro,#macro)->{@}
+			//from_ignore: #int & %[]? ; number of registers to ignore starting from @r0 
+			//static_regStorage: ({@} on static)?
+			#let from <-> +from_ignore || 0;
+			#let ignore <=> {...codeof from_ignore};
+			...run startI;
+			let state;
+			repeat (this - from):...codeof{
+				#nextI();
+				repeat (!¬ignore..indexOf(+i))
+					meta.if(!static_regStorage)
+					<:(){...run do_stack}
+					<:(){
+						$state => static_regStorage + i;
+						...run do_static;
+					};
+			}
+		}::{
+			//this function is used by push and pop
+			//even though it used macros and '...run' (aka macro injection), it is private, and only used in a similar scope so it should not be too much of an issue.
+		};
+		let RegEnum(start)={//register enum
+			#this<->(start||0);
+			//assert: +this == next free regester
+			//assert: +this == number of registers used
+			let freeRegs = {};//:%[]
+			(){//:({#}?)->RegEnum()
+				#return = #(arguments[0] || return) <-> +(freeRegs..splice(-1,1)[0]||..this);
+				#..this<->..this + 1;
+				#let return[¬..constructor.type_register];
+				#return..constructor = ..this;
+				repeat (+return > (16-2)):throw "out of registers";
+			};
+		}::{
+			let type_register = type_register;
+			//RegEnum: provides a simple form of register management.
+			let ..prototype{
+				let free(register){
+					#this.freeRegs..splice(-0,0,{register});
+				};
+				let use(registerNumber){
+					let index = this.freeRegs..indexOf(+registerNumber);
+					repeat !!index #return = this.freeRegs..splice(index,1);
+					repeat !index throw "register is already being used";
+				};
+				let push(from_ignore,static_regStorage){
+					...codeof RegEnum_forEachReg<-(from_ignore,static_regStorage)
+						<:(){let i <-> -1 + from;}
+						<:(){#i=i+1;}
+						<:(){@push %i;}
+						<:(){[%static_regStorage + i] = r i;}
+					;
+				};
+				let pop(from_ignore,static_regStorage){
+					...labelsof codeof RegEnum_forEachReg<-(from_ignore,static_regStorage)
+						<:(){let i <-> this;}
+						<:(){#i=i-1;}
+						<:(){@pop %i;}
+						<:(){[%static_regStorage + i] = r i}
+					;
+				};
+				let copy(){//:#()->RegEnum
+					#return = this..constructor(this);
+				};
+				let blockScope(do_ignore,do){//:#((ignore:#int? & %[])?,do:#(RegEnum,ignoredRegs)->{@})->{@} ; allows use of all registers
+					let do,ignore;
+					meta.if(!!arguments[1])<:(){//blockScope(ignore,do)
+						#do = arguments[1];
+						#ignore = arguments[0];
+					}<:(){//blockScope(ignore,do)
+						#do = arguments[0];
+						#ignore = #();
+					};
+					let regEnum = RegEnum(ignore || 0);
+					let block = do(regEnum);
+					//this..constructor(0xmin.Math.min(+this,+regEnum)<=>this)
+					this.push(ignore || ());//ignores the first (ignore) registers from popping
+					def block;
+					this.pop(ignore || ());
+				};
+				let weakScope(do){//:#(#(RegEnum)->{@})->{@} ; zero cost abstraction version of blockScope.
+					do(this.copy());
+				};
+			};
+			let scope = {
+				let borrow(regSet,do){//regSet:#int&%[],do:#(RegEnum)->{@}
+					let regEnum = RegEnum(+regSet)::{
+						#freeRegs<=>regSet;
+					};
+					do(regEnum);
+				};
+			};
+		};
+		let reg = RegEnum();
+		#return = {let
+			RegState = RegState,
+			RegEnum = RegEnum,
+			reg = reg,
+		};
+	}();
+	let: CaseSet(){
+		let match(){
+			repeat arguments..length
+		}
+	};
+	let getInput(portReg,outputReg,wait,doWhile,miniProcess){//:#(%,out %char,#bool,{@}?,{@}?)->{@}
+		:this;
+		def let bumpLoop{
+			def doWhile||{};
+			wait %portReg;
+			repeat !!wait:jump -> ..this if sign;
+			repeat !wait:jump -> this..return if !sign;
+		};
+		bump %portReg;
+		def miniProcess||{};//using the 14
+		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
+		def let syncLoop{
+			recv %outputReg %portReg;
+			jump -> ..this if !carry;
+		};
+		let test(string,tempReg)=>{//(string,%)->{@} ; builder pattern
+			let i;
+			:self;
+			push %tempReg;
+			%tempReg = [i];
+			%tempReg - string..length;
+			{:block;
+				jump->block..return if >= 0;//when out of chars, use user input as normal
+				[i] += 1;
+				doWhile;
+				%outputReg = [string + %tempReg];
+				pop %tempReg;
+				miniProcess;
+				jump -> self..return;
+				{:data;
+					def string;
+					@0 #def i;
+				};
+			};
+			pop %tempReg;
+			hlt;
+			def let a;
+			jump->a;
+			//def this;
+		};
+	};
+	let for(i,start,condision,do)={//(?%,?#(%)->{@},?#(%)->{@},#(%)->{@})
+		#(){
+			#(
+				?i:%&#{isFree:#?},
+				start:#(i:%)->{@},
+				condision:#(i:%,to:@,isJumpOnSuccess:#?)->{@;@jump->isJumpOnSuccess if flag;},
+				do:#(i:%)->{@}
+			)->{@}
+		};
+		#i = arguments[-4]||(¬);
+		#start = arguments[-3]||(){};
+		#condision = arguments[-2]||(){};
+		#do = arguments[-1]||(){};
+		let hasReg = !!i;
+		let isSaveReg = !hasReg||!i.isFree;
+		repeat !hasReg:{
+			#i = 1;
+		};
+		repeat  push %i;
+		def let start = start(i);
+		def let loop{
+			let jumpTo;
+			def let condision = condision(i,jumpTo,());
+			def let do = do(i);
+			jump -> loop;
+		};
+		def loop.jumpTo;
+		repeat !hasReg pop %i;
+	}::{
+		:this;
+		let doFor::{this}::(){
+			#loop::{
+				undef condision;
+				#..splice(-1,1,{def condision});
+				undef jumpTo;//note: '#def' already '#undef's jumpTo. This is only here to be more clear.
+				#..splice(0,0,{def jumpTo});
+			};
+		};
+	};
+	let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
+		%i_reg = #(length - 1);
+		def let loop{
+			def do;
+			%i_reg -= 1;
+			jump -> loop if >= 0;
+		};
+	};
+	let meta{//{[string]:#(...)->{#}}
+		let: enum(startValue)={
+			#..this<->start||0;
+			(value)={
+				#..this<->..constructor;
+				#..constructor<->..constructor+1||value;
+			};
+		};
+		let: if(condision,then,else)<-{//:#(bool,#()->#,#()->#)
+			#delete arguments;
+			#delete scope;
+			#delete return;
+			#repeat !!+condision ...run(){
+				#delete else;
+				...run then;
+			};
+			#repeat !+condision ...run(){
+				#delete then;
+				...run else;
+			};
+		};
+		let: forEach(array,doFunc)<-{
+			#let .["i"] = -1;
+			repeat array..length $doFunc(array[.["i"] = .["i"] + 1],.["i"],array,return);//v,i,a,s
+			#delete .["i"];
+		};
+		let: repeat(length,doFunc)<-{//:#(#int,#()->{any})
+			#let arguments.i = -1;
+			repeat length $doFunc(arguments.i = arguments.i + 1);
+			#delete i;
+		};
+		let assert(bool,message){
+			repeat !+bool throw ("assertion failed" ... message);
+		};
+		let unimplemented(reason){//:#(reason:#string?)->{}
+			throw reason;
+		}::{
+			let test(testString){//:#(testString:#string?)->{@}
+				repeat !!testString: print(testString);
+			};//
+		};
+		let test(code)<-{
+			...code;
+		}::{
+			let breakPoint(string){
+				repeat !!string:print(""...string);
+				@hlt;
+			};
+		};
+		let inject(refLabel,do){#;
+			return = refLabel;
+			let oldSupertype = refLabel..super;
+			refLabel..super = arguments;
+			refLabel::{
+				...run do;
+			};
+			refLabel..super = oldSupertype;
+		};
+	};
+	repeat 0 ...labelsof (){//Types
+		meta.unimplemented();
+		let type(type)={
+			#type::(){
+				repeat (arguments[0]&&):{
+					;
+				};
+				#.return = arguments[0] || return;
+				#.this <=> .this;
+				repeat 
+				#.this[¬constructor];
+			};
+		}::{
+			#this<-();
+		};
+		let String{
+			let Len(obj)={
+				def let length;
+				def let string;
+			}:>type();
+			let Null(obj)={
+				def let string;
+				def let null = "\x00";
+			}:>type();
+		};
+		#return = {
+			let String = String
+		};
+	}();
+}();

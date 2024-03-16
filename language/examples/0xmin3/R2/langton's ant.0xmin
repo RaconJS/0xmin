@@ -1,0 +1,65 @@
+#"tptasm";#"len";
+#"labels";
+#"ZASM3";
+let grid = {
+	let width = 16;
+	let height = 12;
+	//repeat height repeat width:0;
+};//:@Cell[][]
+let enum = #(n)={:self;#this<->n||0;(){:a;#a<->self;#self+=1;}};
+...labelsof{
+	import lib "R2/print.0xmin";
+	import lib "var_const.0xmin";
+	let reg = enum();
+	let const_0 = reg();//%int const 0
+	let direction = reg();//:% 0..3 & %+int
+	let currentCell = reg();//:%Cell*
+	let cellValue = reg();//:%Cell
+};
+{:init;
+	%const_0 = 0;
+	print("\p00\c0f",const_0,{});
+	sp = 0;
+	let midGrid = #("\p68"&0xff);
+	%currentCell = midGrid;
+	%direction = 0;
+};
+${:main;
+	:loop;
+	{:ifBlock;
+		{:draw_pos;
+			let reg = enum(reg);
+			let posChar = reg();//:%(char&"\pXX")
+			%posChar = %currentCell;
+			%posChar |= "\p00";
+			send %const_0 %posChar;
+		};
+		[%currentCell+grid] -= 1;
+		let moduloCellState;
+		let dont_moduloCellState;
+		jump -> moduloCellState if < 0;
+		def dont_moduloCellState{:else;
+			//assert [%currentCell] == 1
+			send %const_0 ".";
+			%direction += 1;
+			%direction - 4;
+			if < 0 jump-> ..return;
+			%direction = 0;
+		};
+		jump->ifBlock..return;
+		def moduloCellState{:then;
+			[%currentCell + grid] = 1;
+			//assert [%currentCell] == 0
+			send %const_0 "#";
+			%direction -= 1;
+			if >= 0 jump-> ..return;
+			%direction = 3;
+		};
+	};
+	{:move;
+		%currentCell += [%direction + var()<:{1;grid.width;(-1&0xffff);(-grid.width&0xffff)}];
+	};
+	jump->loop;
+};
+def var;
+def grid;

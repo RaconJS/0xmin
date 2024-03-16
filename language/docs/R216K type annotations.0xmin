@@ -7,7 +7,7 @@
 	*           ; pointer
 	T           ; item of Type T
 	T*          ; pointer to value of type T ""
-	Array+T     ; an index from array of type 'Array', that contains item of type 'T'
+	Array+Index ; an index from array of type 'Array', that contains item of type 'T'
 	+T          ; an index to value of type T "An index containing T"
 	Array+      ; an index from Array
 	T[]         ; array of type T
