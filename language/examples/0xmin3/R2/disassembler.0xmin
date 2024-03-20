@@ -364,7 +364,7 @@
 				let i = -1;
 				repeat statement..length ...codeof statement[i+=1];
 				delete i
-			}(opcode_rawString[1][0]);// || opcode.tptasmName;
+			}(opcode.tptasmName);//(opcode_rawString[1][0]);
 			let opcode.type = opcodeClassMap.(""...opcode_rawString[4]);//"P", "S", "PS", "0"
 			let opcode.number = opcode_rawString[-2]..asNumber;
 			...codeof Opcode(opcode.zasmName,opcode.type);//:{@} ; {print ()}
@@ -418,7 +418,7 @@
 			r temp = r valueRedBits;
 			r temp >>= #(24-16);
 			[data.oper] = r temp;
-			print(""...colours.command,const0,1);
+			print(""...colours.command,const0,0);
 			jump -> [opcodeHashTable + r temp];//:jump -> Opcode
 		};
 		def opandTypeHandler;

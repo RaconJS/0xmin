@@ -1390,7 +1390,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 				let spreadArgsObj;//:Value[]? ; used with for spread operator '...a'
 				let word=statement[index];
-				let nextIndex=index;
+				let nextIndex;
 				if(includeBrackets){
 					if(includeBrackets && !"([{".includes(word)){
 						return {index,value:undefined};//expression not found
@@ -1401,7 +1401,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					//label,number,array:[function]
 					statement=statement[index];
 					if(!shouldEval){
-						return {index};
+						return {index:nextIndex};
 					}
 				}
 				//UNFINISHED
@@ -2427,7 +2427,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}				
 				return value;
 			}
-
 			static String=//Variable.String
 			class String extends Variable{
 				constructor(string,data){
@@ -2705,6 +2704,30 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 
 						}).toValue("label");
 					},
+					"iterate":new BuiltinFunctionFunction("iterate",({label,args,scope,statement})=>{
+						let oldCode = [...label.code];
+						let ans;//:Variable
+						throw Error("compiler error: UNFINISHED");
+						if(args.length >= 2)
+							ans = oldCode.reduce((s,v,i,a)=>{
+								([s,v,i,a] = [s,v,i,label].map(v=>new Value().fromCode(v)));
+								label.callFunction({
+									args:{list:[s,v,i,a],obj:{s,v,i,a}},
+									value:callingValue,callType:undefined,scope,statement
+								})
+							})
+						;
+						else if(args.length >= 1)
+							ans = oldCode.reduce((s,v,i,a)=>{
+								([s,v,i,a] = [s,v,i,a].map(v=>new Value().fromCode(v)));
+								label.callFunction({
+									args:{list:[s,v,i,a],obj:{s,v,i,a}},
+									value:callingValue,callType:undefined,scope,statement
+								})
+							})
+						;
+						return ans;
+					}),
 					//convert string to number
 					"asNumber":({label})=>new Value.Number(+label.toValue("string").string),
 				};
@@ -3470,6 +3493,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					recur[symbol]++;
 					if(recur[symbol]>(statement.maxRecur??1)){
 						//reached recursion cap
+						recur[symbol]--;
+						if(recur[symbol]==0)delete recur[symbol];
 						continue;
 					}
 					callStack.push(statement);
@@ -3721,4 +3746,4 @@ let buildSettings={makeFile:true}
 		})();
 	}
 }
-//13959
+//13959, 143116

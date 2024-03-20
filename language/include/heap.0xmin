@@ -608,6 +608,7 @@ void #set:(){//examples
 		};
 		{
 			call malloc;
+			call malloc.use();
 			malloc.call();
 		};
 		{

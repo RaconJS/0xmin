@@ -395,11 +395,11 @@ contexts:
             pop: true
     - match: '\b(?:import|throw|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
-    - match: '{{labelName}}\s*(?=(?:<=>\s*\w+\(.*?\)\s*<:\s*)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*\=\s*){)' #'foo()={}' or 'foo:>type()::()={}'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*\=\s*){)' #'foo()={}' or 'foo:>type()::()={}'
       scope: entity.name.class
-    - match: '{{labelName}}\s*(?=(?:<=>\s*\w+\(.*?\)\s*<:\s*)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function
-    - match: '{{labelName}}\s*(?=(?:<=>\s*\w+\(.*?\)\s*<:\s*)?(?:{{typeChain}}::\s*)?{)' #'foo{}'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?{)' #'foo{}'
       scope: entity.name.namespace
     - match: '\)' #'foo = ()=>{}' function declaration
       push: potentialFunctionDeclaration

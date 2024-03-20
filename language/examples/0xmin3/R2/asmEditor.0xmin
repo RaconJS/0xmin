@@ -8,7 +8,7 @@ let allMain(){
 	repeat !+heapAlreadyDefined def heap.memory;
 };
 ...(){
-	let heap{import lib "heap.0xmin"};
+	repeat !+heapAlreadyDefined let heap{import lib "heap.0xmin"};
 	import lib "var_const.0xmin";
 	let readHigh(rOut,rAddress){
 		@(0x11100001|(rOut&0xf<<8)|(rAddress&0xf<<4));

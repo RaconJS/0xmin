@@ -118,6 +118,7 @@
 					#return = this;
 				};
 				let push(to_regStateData){
+					meta.unimplemented();
 					let to_regState = this..constructor(to_regStateData);
 					meta.repeat(this.usedRegs..length)<:(i){
 						let reg = this.usedRegs[i];//:%
@@ -130,7 +131,7 @@
 			};
 			let push(regState){
 				let i = -1;
-				repeat regState.used..length push %(i=i+1);
+				repeat regState.used..length push %regState.used.(i+=1);
 			};
 			let pop(regState){
 				let i = regState.used..length;
@@ -171,13 +172,22 @@
 			//even though it used macros and '...run' (aka macro injection), it is private, and only used in a similar scope so it should not be too much of an issue.
 		};
 		let RegEnum(start)={//register enum
+			//a block of used registers starting from r0.
 			#this<->(start||0);
 			//assert: +this == next free regester
 			//assert: +this == number of registers used
 			let freeRegs = {};//:%[]
+			recur 1 let maxUsed,max = maxUsed = ..constructor(this) || ({} <-> +this);//highest register used by this RegEnum instance
+			recur 1 let minUsed,min = minUsed = ..constructor(this) || ({} <-> +this);//lowest register used by this RegEnum instance
 			(){//:({#}?)->RegEnum()
-				#return = #(arguments[0] || return) <-> +(freeRegs..splice(-1,1)[0]||..this);
-				#..this<->..this + 1;
+				#return = #(arguments[0] || return);
+				meta.if(freeRegs..length > 0)<:(){
+					#return <-> +freeRegs..splice(-1,1)[0];
+				}<:(){
+					#return <-> +..this;
+					#..this<->..this + 1;
+				};
+				#maxUsed <-> 0xmin.Math.max(maxUsed,..this);
 				#let return[¬..constructor.type_register];
 				#return..constructor = ..this;
 				repeat (+return > (16-2)):throw "out of registers";
@@ -230,8 +240,12 @@
 					this.pop(ignore || ());
 				};
 				let weakScope(do){//:#(#(RegEnum)->{@})->{@} ; zero cost abstraction version of blockScope.
-					do(this.copy());
+					let reg = this.copy();
+					do(reg,this);
 				};
+			};
+			let type(reg){
+				let set reg[¬type_register];
 			};
 			let scope = {
 				let borrow(regSet,do){//regSet:#int&%[],do:#(RegEnum)->{@}
@@ -295,53 +309,75 @@
 			//def this;
 		};
 	};
-	let for(i,start,condision,do)={//(?%,?#(%)->{@},?#(%)->{@},#(%)->{@})
-		#(){
-			#(
-				?i:%&#{isFree:#?},
-				start:#(i:%)->{@},
-				condision:#(i:%,to:@,isJumpOnSuccess:#?)->{@;@jump->isJumpOnSuccess if flag;},
-				do:#(i:%)->{@}
-			)->{@}
-		};
-		#i = arguments[-4]||(¬);
-		#start = arguments[-3]||(){};
-		#condision = arguments[-2]||(){};
-		#do = arguments[-1]||(){};
-		let hasReg = !!i;
-		let isSaveReg = !hasReg||!i.isFree;
-		repeat !hasReg:{
-			#i = 1;
-		};
-		repeat  push %i;
-		def let start = start(i);
-		def let loop{
-			let jumpTo;
-			def let condision = condision(i,jumpTo,());
-			def let do = do(i);
-			jump -> loop;
-		};
-		def loop.jumpTo;
-		repeat !hasReg pop %i;
-	}::{
-		:this;
-		let doFor::{this}::(){
-			#loop::{
-				undef condision;
-				#..splice(-1,1,{def condision});
-				undef jumpTo;//note: '#def' already '#undef's jumpTo. This is only here to be more clear.
-				#..splice(0,0,{def jumpTo});
+	...labelsof(){
+		let for(i,start,condision,next,do)={//(?%,?#(%)->{@},?#(%,$(break|continue),isContinue:#int&bool)->{@},#(%)->{@})
+			#(){
+				#(
+					?i:%&#{isFree:#?},
+					start:#(i:%)->{@},
+					condision:#(i:%,to:@,isJumpOnSuccess:#?)->{@;@jump->isJumpOnSuccess if flag;},
+					do:#(i:%)->{@}
+				)->{@}
+			};
+			#i = arguments[-5]||(¬);
+			#start = arguments[-4]||(i){%i = 0};
+			#condision = arguments[-3]||(i,breakOrContinue,isContinue){
+				repeat !!isContinue:{
+					let continue = breakOrContinue;
+					if < 0 jump->continue;
+				};
+				repeat !isContinue:{
+					let break = breakOrContinue;
+					if >= 0 jump->break;
+				};
+			};
+			#next = arguments[-2]||(i){%i += 1};
+			#do = arguments[-1]||(i){};
+			let hasReg = !!i;
+			let isSaveReg = !hasReg||!i.isFree;
+			let isJumpToContinue = for!=..constructor;
+			#isJumpToContinue = !!isJumpToContinue &&{} ||¬;
+			repeat !hasReg:{
+				#i = 1;
+			};
+			repeat  push %i;
+			def let start = start(i);
+			def let loop{
+				let jumpTo;
+				def let condision = condision(i,jumpTo,isJumpToContinue);
+				def let do = do(i);
+				def let next = next(i);
+				jump -> loop;
+			};
+			def loop.jumpTo;
+			repeat !hasReg pop %i;
+		}::{
+			let ..prototype{
+
+			};
+			:this;
+			let doFor(i,start,condision,next,do)={//1 cycle faster version of `for`
+				delete this;
+				...run this;
+				#loop::{
+					undef condision;
+					#..splice(-1,1,{def condision});
+					undef jumpTo;//note: '#def' already '#undef's jumpTo. This is only here to be more clear.
+					#..splice(0,0,{def jumpTo});
+				};
+				debugger ..@..length;
 			};
 		};
-	};
-	let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
-		%i_reg = #(length - 1);
-		def let loop{
-			def do;
-			%i_reg -= 1;
-			jump -> loop if >= 0;
+		let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
+			%i_reg = #(length - 1);
+			def let loop{
+				def do;
+				%i_reg -= 1;
+				jump -> loop if >= 0;
+			};
 		};
-	};
+		#return = {let for=for,for_repeat=for_repeat;};
+	}();
 	let meta{//{[string]:#(...)->{#}}
 		let: enum(startValue)={
 			#..this<->start||0;

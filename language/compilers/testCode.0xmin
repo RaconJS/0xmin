@@ -16,9 +16,8 @@
 //let a,b;$debugger +b;
 //$a=>b;
 //def b;$debugger +a;
-
-//adds spread operator '...a'
-#(a,b,c){debugger(a+b+c)}(...{2;5;3});
-#(a,b,c){debugger("["...a...","...b..."]")}(...{let hello,world}..labels);
-#(a,b,c){debugger(a+b)}(...2);
-#(a,b,c){debugger(""...a...","...b...","...c)}(..."ABC");
+let foo(){//register enum
+	debugger;
+	#foo();
+};
+#foo();
