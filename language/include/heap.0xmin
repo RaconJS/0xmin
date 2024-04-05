@@ -7,11 +7,12 @@ void #set:(){//documentation
 			call:#(...%[])->@{};     //property 'call' is a macro function that takes in no arguments
 			inputs:#{...%[]};//array of registers
 			use:#()->Function mutate heap;//def's Function, by assigning it onto the heap
+			regsUsed:int;
 		};
 		#type Page{
 			next:@Page*;
 			last:@Page*;
-			isUsed:@bool;
+			isUsed:@bool;//!=0:used,>0:reference counter,==-1:static
 			data:@any[];//+page == +page.data
 		};
 		Page.size:#int;
@@ -25,7 +26,7 @@ void #set:(){//documentation
 		free:Function(%Object*)->void;
 		
 		resize:Function(%Object*,%int16)-> #{%int16,flag(if sign)};
-		shift:Function(%Object*,%int16)-> #{%int16,%Object*,flag(if sign)};
+		shift:Function(%Object*,%int16)-> #{%Object*,%int16,flag(if sign)};
 
 		clear:Function(%Object*,fillWith:{@} & {int16,int13}? & []static)->void;
 		memset:Function(%Object*,%int16,%int13)->void;
@@ -51,7 +52,7 @@ void #let set: heap{#;
 		//checks whether the checkVersion of the heap is compatible with this version
 		let isCompatible = {1;2}..indexOf(checkVersion);
 	};
-	#let: regsUsed = 3;//:int & %
+	#let: regsUsed = 5;//:int & %
 	#let: ref,unref;//#()->{@}
 	#let: memory;
 	#let: data{
@@ -120,6 +121,7 @@ void #let set: heap{#;
 				#return=foo;
 			};
 			#set: Call.addCaller(foo,argumentsLength);
+			let foo.regsUsed <-> foo.nextReg.n;
 		};
 	};
 	#let: Page()={
@@ -134,8 +136,12 @@ void #let set: heap{#;
 			...set let prototype;
 		};
 	};
-	#let: Object()={
+	#let: Object(staticData)={
 		...let set Page();
+		repeat !!staticData:#{//BODGED ; for static memory blocks
+			#data::{staticData};
+			#isUsed <=> ¬-1;
+		};
 		$set this;
 	}::{
 		#let: prototype=..this();
@@ -175,7 +181,7 @@ void #let set: heap{#;
 		#set: return = newObj;
 	};
 	#let isPageEndOfHeap(page){//:(%Page*)->flag(if>=0 !signed)
-		%page - 0xffff;
+		%page - sp;//0xffff // note: stack has priority over the heap
 	};
 	#let skipIfEndOfHeap(nextPage,do){
 		//prevents mutating the end of the heap
@@ -268,6 +274,7 @@ void #let set: heap{#;
 		%pointer=%page;
 		%pointer+=Page.size;
 		return;
+		"ZASM";
 		#def: data;
 	}::{void #set: intoHeapFunction(..this,1);};
 	#set: free{
@@ -490,6 +497,7 @@ void #let set: heap{#;
 		};
 	}::{void #set: intoHeapFunction(..this,2);};
 	#set:shift{
+		//TODO: check this function
 		//same as resize but can extend or retract the back of an object.
 		//This function is useful for `object.unshift(1,2,3)` or `object.shift()` operations
 		//returns fail by setting the signed flag to 1
@@ -499,15 +507,11 @@ void #let set: heap{#;
 			#def let: size=nextReg();//:%int !signed; size of new block
 		};
 		#let: outputs{
-			#def let: newPointer=Object.pointer=()<->0;
+			#def let: object=Object.pointer=()<->0;
 			#def let: size=1;//:%int ; returns the new size of the input Object
 		};
 		let lastPage = Page.pointer=()<->nextReg();//:%Page*
 		let lastObject = Object.pointer=()<->lastPage;//:%Object* & (%lastPage as %Object*)
-		let newPage = Page.pointer=()<->inputs.size;//:%Page* replaces inputs.size
-		%newPage ^= 0xffff;//$assert: %newPage == 1-%size
-		%newPage -= 1;//$assert: %newPage == -%size
-		%newPage += [%inputs.object-(-inputs.object.next)];//$assert: %newPage == %object.next - %size
 		%lastPage = [%inputs.object-(-inputs.object.last)];
 		{:checkIsFree;//checks lastPage is free;
 			:ifBlock;
@@ -522,6 +526,10 @@ void #let set: heap{#;
 				return;
 			};
 		};
+		let newPage = Page.pointer=()<->inputs.size;//:%Page* replaces inputs.size
+		%newPage ^= 0xffff;//$assert: %newPage == -(%size+1)
+		%newPage -= (-(+1-Page.size));//$assert: %newPage == -%size - Page.size
+		%newPage += [%inputs.object-(-inputs.object.next)];//$assert: %newPage == %object.next - %size
 		let mergePages,resizePages;
 		{:checkForSpace;
 			:ifBlock;
@@ -534,14 +542,17 @@ void #let set: heap{#;
 				%nextPage = [%inputs.object+inputs.object.next];
 				[%lastObject-(-lastObject.next)] = %nextPage;
 				let outputObject = lastObject;
-				%outputs.newPointer = %lastObject;
+				%outputs.object = %lastObject;
 				//assume: +nextPage > 2
 				%outputs.size = %nextPage;
-				%outputs.size -= %outputs.newPointer;
+				%outputs.size -= %outputs.object;
 				return;
 			};
 		};
 		def resizePages{//inserts a new page
+			%lastObject += Page.size;
+			let lastPage = lastObject;
+			delete lastObject;
 			[%lastPage+inputPage.next] = %newPage;
 			[%lastPage+inputPage.last] = %page;
 			[%newPage+newPage.next] = %page;
@@ -575,9 +586,9 @@ void #let set: heap{#;
 			:block;
 			jump->block..return if>0;
 			delete block;
-			repeat (!deconstruct||!deconstruct..defs..length):
+			repeat (!deconstruct||!deconstruct..defs..length)://if deconstruct is a block
 				#def let: deconstruct=deconstruct||{};
-			repeat !!deconstruct..defs..length:
+			repeat !!deconstruct..defs..length://if deconstruct is a static function
 				#def let: deconstruct={call deconstruct};
 			repeat 0:{//clear
 				%clear.inputs.(0)=%r_address;

@@ -443,6 +443,9 @@ class NumberDisplay{
 	}
 }numberDisplay;
 //cpu
+	class CPU{
+
+	}
 	class CPU0xmin3{
 		public://used by emulator
 		filt30* ram;
@@ -516,10 +519,10 @@ class NumberDisplay{
 					else if(str=='\n')cout<<"\"\\n\"";
 					else if(str=='\r')cout<<"\"\\r\"";
 					else if(str==' ')cout<<"\" \"";
-					else cout<<"String.char("<<hex(str)<<")";
+					else cout<<"\\x"<<hex(str)<<"";
 					break;//char
-					case 0x1000:cout<<"String.pos("<<(0xf&cpu.currentWord)<<","<<(0xff&(cpu.currentWord>>4))<<")";break;//pos
-					case 0x2000:cout<<"String.col("<<(0xf&cpu.currentWord)<<","<<(0xf&(cpu.currentWord>>4))<<")";break;//col
+					case 0x1000:cout<<"\\p"<<(0xf&cpu.currentWord)<<(0xf&(cpu.currentWord>>4));break;//pos
+					case 0x2000:cout<<"\\c"<<(0xf&cpu.currentWord)<<(0xf&(cpu.currentWord>>4));break;//col
 				}
 			}
 			else cout<<hex(cpu.currentWord);

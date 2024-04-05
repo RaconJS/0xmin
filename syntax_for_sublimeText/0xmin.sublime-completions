@@ -2,9 +2,9 @@
 	"scope": "source.0xmin",// - variable.other.php",
 	"completions":[
 		{
-			"trigger":"\"make file\";",//can only appear at start of file
-			"contents":"#\"make file\";\n#\"log.table\";\n#\"log.code\";",
-			"details":"file settings. must appear at top of file.",
+			"trigger":"#\"tptasm\";",//can only appear at start of file
+			"contents":"#\"tptasm\";\n#\"table\";\n#\"len\";\nimport lib\"heap.0xmin\";\nimport lib\"R2/print.0xmin\";",
+			"details":"tptasm, R216K envioment",
 		},
 		{
 			"trigger": "import",
@@ -17,6 +17,12 @@
 			"trigger":"debugger",
 			"contents":"debugger",
 			"kind":"keyword",
+		},
+		{
+			"trigger":"assembly method",//can only appear at start of file
+			"contents":"let .[¬Trait.asMethod.asm] = ¬;\nlet use(state){#;\n\t#return = ..this;\n\t#static.use(..this);\n};\nlet regsUsed;\nlet reg = RegEnum();\nlet inputs{};\nlet outputs{};\n{\n\t${1:...do;}\n\treturn;\n};\n#regsUsed <-> reg;",
+			"kind": "snippet",
+			"details":"assembly method using the Trait system",
 		},
 			/*{
 				"contents":"debugger.labelsOf",
@@ -48,12 +54,6 @@
 			"contents":"import this \"${1:file}.0xmin\";${2}",
 			"kind":"keyword",
 		},{
-			"trigger":"var",
-			"contents":"var ${1:name}",
-			"kind":"variable",
-			"annotation": "object scope",
-			"details": "creates new variable"
-		},{
 			"trigger":"let",
 			"contents":"let ${1:name}",
 			"kind":"variable",
@@ -61,7 +61,7 @@
 			"details": "creates new variable"
 		},{
 			"trigger":"set",
-			"contents":"set ${1:name} = ${2:name2}",
+			"contents":"#set ${1:name} = ${2:name2}",
 			"kind":"variable",
 			"annotation": "set variable",
 			"details": "assigns values to existing variable"
@@ -82,11 +82,11 @@
 			"contents":"let ${1:macroName}(${2:argument}) <- {\n\t${3:...code;}\n} :: {\n\t#let set: ..supertype {\n\t\t${4:...supertype;}\n\t}\n}",
 			//"kind":"type",
 		},
-		{
+		/*{
 			"trigger":"String",
 			"contents":"String(\"${1}\")${2}",
 			"kind":"type",
-		},
+		},*/
 		{
 			"trigger":"0bblack",
 			"contents":"0b000000000000000000000000000000",

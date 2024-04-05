@@ -1,0 +1,21 @@
+import "type.0xmin";
+repeat 0{//main
+	let string = String("hello");
+	string.print();
+	string.push(" world");
+	print("\n");
+	string.print();
+};
+{
+	//let source = RefList();
+	let a = RefList():>heap.Object():>static.use().data[0];
+	let ref = Pointer(RefList.Reference())<->1;
+	r0 = ref.size;
+	call heap.malloc.use();
+	r1 = r0;
+	r0 = a;
+	call RefList.Source.addRef.use();
+};
+hault;
+def static.memory;
+def heap.data;

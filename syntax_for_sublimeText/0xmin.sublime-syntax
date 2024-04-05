@@ -47,6 +47,7 @@ variables:
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|model|language))?|Math(?:\s*\.\s*())?|toJSON)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
+  tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b'
 contexts:
   main:
     - match: '^'
@@ -381,17 +382,20 @@ contexts:
       push: internalScope
     - match: \.
       scope: dotOperator.0xmin
-    - match: '\b(?:void|virtual)\b' #1st part of line along with '@$#'
+    - match: '\b(?:void|virtual|static)\b' #1st part of line along with '@$#'
       scope: keyword.control
     - match: '(?:\b(?:recur|repeat)\b\s*)+' #2nd part of line
       scope: keyword.control
       push: 
         - - match: '\s*(?={{number}})'
             pop: true
-          - match: '\b\w+\b' #allows 'repeat a {}' == 'repeat a: {}' instead of 'repeat (a{})'
-            scope: source
+          - match: '([!\s+¬]*)\b(\w+)\b' #allows 'repeat a {}' == 'repeat a: {}' instead of 'repeat (a{})'
+            captures:
+              1: keyword.operator.0xmin
+              2: source.0xmin
+
             pop: true
-          - match: '(?=\S|$)'
+          - match: '(?=\S)'
             pop: true
     - match: '\b(?:import|throw|debugger|delete)\b' #3rd part of line along with
       scope: keyword.control
@@ -409,7 +413,7 @@ contexts:
       push: functionCall_1
     - match: '(?<=\))\s*(?=(?:{{functionCallSymbols}})?\s*\()'
       push: functionCall_1
-    - match: '(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
+    - match: '(?<=[\)\]\}\w])(?:{{functionCallSymbols}})\s*(?=\()' #'foo=>();' function call
       scope: 'keyword.declaration.functionCall.0xmin'
 
       #push:
@@ -436,7 +440,7 @@ contexts:
         2: keyword.control
 
     #for '#"tptasm";'
-    - match: '\s*(?:[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b)\s*{{assembly_commands_end}}'
+    - match: '\s*(?:(?:{{tptasm_optionals}})|(?:{{tptasm_optionals}})\s*{{assembly_commands_end}})'
       scope: support.constant #e.g. 'a >> b + internal'
     - match: '(?<=if)\s*(!\s*)?\b(0|sign|overflow|carry)\b' # 'jump -> a if zero'
       scope: support.constant
@@ -498,7 +502,7 @@ contexts:
     - include: brackets_expression
     - include: mainScope
   functionType:
-    - match: '{{functionCallSymbols}}|'
+    - match: '{{functionCallSymbols}}|(?=\S)'
       scope: 'keyword.declaration.functionCall.0xmin'
       pop: true
   internalScope:

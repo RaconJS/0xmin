@@ -1,10 +1,41 @@
 //SETTINGS, TEST
 #"tptasm";#"len";//#"table";
-//#"labels";
+#"labels";
 let main;
 #main(){
 	let terminal:>static();
+	let titleScreen:>static();
+	nop;//call titleScreen:>static.use();
 	call terminal.(¬Static).use();
+	#titleScreen{
+		let string = {
+			"\p00\c0f";
+			def let logoString={
+				// /0@$#\
+				// \ZASM/
+				"\c0f\/\c050\c04@\c0a$\c0b#\c0f\\\n";
+				"\c0f\\\c05Z\c04A\c0aS\c0bM\c0f\/\n";
+			};
+			//ZeroXMin (0xmin)
+			//Assembly
+			//Small
+			//Macro
+			;
+			//language
+			"press any key\n";
+			"to continue;\n\n";
+		}..@;
+		let const_0 = 0;
+		print(string,const_0);
+		#def getInput(const_0,(),{})::{
+			undef syncLoop;
+		};
+		let i = 1;
+		let a = meta.forEach(string,(v){
+			@(""...(¬" \n")[+v==+"\n"])
+		})..@;
+		print("\p00"...a,const_0,{});
+	};
 	let intoStringWithLen(string)={//#(#string)->@{length:int;char[length]}
 		def let length;
 		@(string..length);
@@ -358,7 +389,9 @@ let main;
 					for_repeat(i,16*12)<:{
 						repeat 1 print(" ",const_0,{});
 					};
-					print("\p00",const_0,{});
+					let temp = 0;
+					%temp = "\p00";
+					[IO.cursorPos] = %temp;
 					r0 = 0;
 					r1 = 0;
 				};
@@ -369,10 +402,11 @@ let main;
 						let returnsVal = ¬;
 					};
 					//call clear;
+					let temp = 0;
+					%temp = "\p00";
+					[IO.cursorPos] = %temp;
 					//r0 = 0;
 					//r1 = 0;
-					r0 = "\p00";
-					[IO.cursorPos] = r0;
 				};
 				def let run{
 					let commandData{
@@ -434,6 +468,11 @@ let main;
 						let argsLength = 0;
 						let returnsVal = ¬;
 					};
+					print("\p00warning this editor is buggy.\n"
+						..."Use 'h', 'tab', 'r', 'backspace' and 'enter' to navigate.\n"
+						..."The command will be shown at the bottom.\n"
+					);
+					print("Now opening the hex editor...");
 					call static.use()<:{
 						import this "../asmEditor.0xmin";
 						return;
@@ -449,11 +488,20 @@ let main;
 					%i = r0;
 					%max = r1;
 					%max += r0;
+					{:updateCursorPos;
+						let temp = 0;
+						//r1 -= 1;
+						r1 <<= 4;
+						[IO.cursorPos] += r1;
+						r1 = "\p00";
+						[IO.cursorPos] |= %temp;
+						r0 = #(0x00ff | "\p00");
+						[IO.cursorPos] &= %temp;
+					};
 					${:loop;
 						r0 = %i;
 						call static.use()<:{
 							import this "../disassembler.0xmin";
-							debugger dissassemble;
 							#i<->dissassemble.regsUsed+0;
 							#max<->dissassemble.regsUsed+1;
 							return;
@@ -472,14 +520,18 @@ let main;
 					};
 					nop;//help
 					output(
+						//123456789ABCDEF
 						"cmd int16 int16\n"...
 						"All numbers are\n"...
 						"in hex.\n"...
-						"commands:\n"...
-						"0:help,\n"...
-						"\n"...
-						"read, write, run"...
-						", malloc."
+						"commands{\n"...
+						"help clear reset"...
+						"read hwrite free"...
+						"malloc write run"...
+						//123456789ABCDEF
+						"vim obj alloc"...
+						"}\n"...
+						"Try \"vim A\" \"r\" "
 					);
 				};
 			}::{
@@ -1132,370 +1184,8 @@ let main;
 		print("hello world");
 		return;
 	};
-	let FileSystem{
-		...labelsof{
-			let Trait(traitObj)={//#(data Trait)-> Trait & #(T:Type?)-> T & #(...)-> T
-				#constructor::{
-					#return(typeObj){//:(Type?)->Type
-						#return = typeObj = typeObj||return;
-						repeat(typeObj..length == 0): #typeObj::()={};
-						let typeObj[¬traitObj];
-						let typeObj[¬traitObj]..prototype;
-						#{
-							let traitInstance <=> traitObj(typeObj);
-							#addTraitToType(traitInstance,typeObj);
-							#addTraitToType(traitInstance..prototype,typeObj..prototype);
-						};
-					};
-				};
-			}::{
-				let asMethod_onPototype;//for methods with the form `m(label,...args){}`
-				let private;//for private properties, only accessable by `typeObj[¬traitObj]`
-				let isPublicByDefault = {};//:#const setting
-				let addTraitToType(traitInstance,typeObj)=>{//
-					let i = -1;
-					let labels = traitInstance..labels;
-					repeat labels..length{
-						let name = labels[i+=1];
-						let property = traitInstance[""...name];
-						let typeObj[¬traitObj][""...name] = property;
-						repeat (
-							(!!isPublicByDefault && !!property[¬Trait.public]||!property[¬Trait.private])||
-							( !isPublicByDefault && !!property[¬Trait.public]&&!property[¬Trait.private])
-						):let typeObj[""...name] = property;
-						repeat !!property[¬Trait.asMethod_onPototype]:#{
-							let typeObj..prototype[""...name];
-							let isDefaultMethod = !!(property[¬Trait.asMethod_onPototype]..length&&property[¬Trait.asMethod_onPototype]..labels..length);
-							repeat !!isDefaultMethod:
-								let typeObj[¬traitObj]..prototype[""...name] =
-									typeObj..prototype[""...name] <=>
-									#(){#return = property(this,...arguments)}
-								;
-							;
-							repeat !isDefaultMethod:
-								#typeObj..prototype[""...name] <-> property[¬Trait.asMethod_onPototype]
-							;
-						};
-					};
-				};
-				let typeToTrait(typeObj){
-					let typeObj[¬Trait] = Trait()<:(type){#return<=>typeObj};
-				};
-				let impl(typeObj,implData){//:Type 'Type:>Trait.impl((type){let a,b,c;})'
-					#return = typeObj;
-					repeat(typeObj..length == 0): #typeObj::()={};
-					repeat !!implData let traitInstance = implData();
-					repeat !implData let traitInstance = typeObj;
-					let typeObj[¬typeObj];
-					let typeObj[¬typeObj]..prototype;
-					let typeObj[¬Trait] = implData;
-					#addTraitToType(traitInstance,typeObj);
-					#addTraitToType(traitInstance..prototype,typeObj..prototype);
-				};
-			};
-			repeat 0 #{
-				let ExampleTrait1(type){
-					let staticProperty1{//'type.staticProperty1'
-						print("Hello, world!");
-						@return;
-					}::{};
-					let ..prototype{
-						let property1{//'type().property1'
-							let value;
-							r0 = value;
-							@call property;
-						};
-					};
-					let method1(object,arg1,arg2){//'type.method1(type(),4,5)'
-						object.value<->object.value + arg1*arg2;
-						#return = object;
-					}::{let .[¬Trait.asMethod_onPototype]};//'type().method1(4,5)'
-				}:>Trait();
-			};
-			let Type<=>Trait()<:(type){
-				#type::()=>{#let return[¬Type] = type};
-			};
-			let Struct<=>Trait()<:(type){
-				#type:>Type();
-				let pointer(label)={
-					repeat !label: //'type.pointer()'
-						#this<=>type();
-					repeat !!label:{ //'type().pointer()'
-						#this = return = label||return;
-					}
-					#this..proto = type.pointer..prototype;
-					#this..constructor = type.pointer;
-					#this..compile;
-					#let set this.size = this..@..length;
-					let this.asm(){//:@Object*
-						#delete this;
-						#this::{
-							#..splice(0,-0);
-							#def let pointer{0};
-						};
-						let this.isStatic;
-						#return = this;
-					};
-					let this.register(){//:%Object*
-						let this.isRegister;
-						#return = this;
-					};
-				}::{let .[¬Trait.asMethod_onPototype];};
-				repeat 0 let new{
-					let call(){
-						call ..this:>static.use();
-					};
-				}::{let .[¬Trait.asMethod_onPototype](type){}};
-				repeat 0 let free{
-					let call(){
-						call ..this:>static.use();
-					};
-				}::{let [¬Trait.asMethod_onPototype](type){};};
-			};
-			let Object:>Struct()::(struct){//:{@}&any
-				...labelsof codeof struct;
-			};
-			let LenObject(data,startLength)={//:type -> {l:usize;any<size=l>|any<size=l>*}
-				let length = startLength||¬data..@..length||¬0;
-				let data = data||{};
-				def length;
-				def data;
-			}:>Struct():>Trait.impl((type){
-				let data_pointer(obj){
-					#return = obj;
-					#obj.data<=>Object(obj.data).pointer().asm();
-				}::{let[¬Trait.asMethod_onPototype]};
-			});
-			//let Usize:>Struct():>Trait((type){});
-			let DynLenObject(startData,type)={//:type -> {capacity:usize;size:usize;any<size=l>|any<size=l>*}
-				//object with dynamic size
-				#startCapacity = startCapacity||data..length*2;
-				def let capacity{startCapacity}<->startCapacity;
-				def let data ;
-			}:>Struct():>Trait.impl((type){
-				#type:>LenObject[¬Trait]();
-				let set ..prototype{
-					let: set(dataStructObj){
-						this.data<=>dataStructObj;
-						this.length<=>dataStructObj..length;
-					};
-				};
-				let push{//:@(%(self&RefList)*,ref:%@*)->([%ref]: %(@self*?)*) & mutate self
-					let static = Static();
-					let reg = RegEnum();
-					let inputs = {
-						let dynArray = reg();//:%{size;capacity;any*}*
-						let size = reg();//:%usize
-					};
-					let outputs = {
-						let dynArray
-					};
-					{
-						let refSize = 1;
-						let outputs = {};
-						...inputs;
-						...outputs;
-						let temp = reg();
-						{:linkNewReference;
-							%temp = [%self+self.data];//ref:%self.data & %self.type[self.size]*
-							%temp += [%self+self.size];
-							[%ref+ref.itemOnList] = %temp;
-							[%ref+ref.object] = %self;
-						};
-						[%self + self.size] += ref..@..length;//1
-						{:sizeCheck;
-							let newSize <-> temp;//share
-							%newSize = [%self + self.capacity];
-							%newSize - [%self + self.size];
-							if <= 0 jump->static.use()<:RegEnum(2).blockScope()<:(reg){
-								:growArray;
-								%newSize <<= 1;
-								r0 = [%self + self.data]
-								r1 = %newSize;
-								call heap.resize.use();
-								if !overflow jump -> growArray..return;
-								{:moveArray;
-									#reg<->2;
-									let newArray = 0;//%Object* & %[]heap
-									let self = reg();
-									pop %inputs.ref;
-									pop %self;
-									...(){let self_data = self;//move
-										%self_data += self.data;
-										let self = ¬;
-									};
-									reg.weakScope()<:(){
-										for(reg())
-											<:(i){%i = [%self + self.capacity]}
-											<:(i,continue){if >= 0 jump->continue;}
-											<:(i){%i -= 1;}
-										<:(i){
-											let temp = reg();
-											%temp = [%self_data + %i];
-											[%newArray + %i] = %temp;
-										};
-									}
-									jump->handleCapacity..return;
-									//assert: newArray:%RefList().data*
-								};
-							};
-						};
-					};
-					#reg<->reg.max;
-					return;
-					def static.memory;
-				}::{
-					//...run autoCall;
-				}:>static();
-			})::{
-				let set ..prototype{
-					...labelsof LenObject..prototype;
-				};
-			};
-			let NullableReference()={
-				def let ref{0};
-			}::{
-				let None(){0};
-				let Some = (obj){Object(obj).pointer().asm()};
-			};
-			let RefList:>Trait.impl()<:(type){//for many to one a->b<-c
-				//RefList is a type of smart pointer,
-				let autoCall = ()<-{
-					let [¬Trait.asMethod_onPototype](state){
-						$..this.reg.blockScope()<:(reg){
-							call ..this:>state.static.use();
-						};
-					};
-				};
-				let Source(){
-					def let capacity{0};//:+usize
-					def let size{0};//:+usize where: size+1 <= capacity
-					def let refs;//:+type[size]*
-					def let data;//:+any[]
-				}:>Struct():>Trait.impl()<:(type){
-					let ref{//:@(%(self&RefList)*,ref:%@*)->([%ref]: %(@self*?)*) & mutate self
-						let static = Static();
-						let reg = RegEnum();
-						let inputs = {
-							let self = Source().pointer().asm() <-> reg();
-							let ref = Reference(self).pointer().asm() <-> reg();
-						};
-						{
-							let refSize = 1;
-							let outputs = {};
-							...inputs;
-							...outputs;
-							let temp = reg();
-							{:linkNewReference;
-								%temp = [%self+self.data];//ref:%self.data & %self.type[self.size]*
-								%temp += [%self+self.size];
-								[%ref+ref.itemOnList] = %temp;
-								[%ref+ref.object] = %self;
-							};
-							[%self + self.size] += ref..@..length;//1
-							{:sizeCheck;
-								let newSize <-> temp;//share
-								%newSize = [%self + self.capacity];
-								%newSize - [%self + self.size];
-								if <= 0 jump->static.use()<:RegEnum(2).blockScope()<:(reg){
-									:growArray;
-									%newSize <<= 1;
-									r0 = [%self + self.data]
-									r1 = %newSize;
-									call heap.resize.use();
-									if !overflow jump -> growArray..return;
-									{:moveArray;
-										#reg<->2;
-										let newArray = 0;//%Object* & %[]heap
-										let self = reg();
-										pop %inputs.ref;
-										pop %self;
-										...(){let self_data = self;//move
-											%self_data += self.data;
-											let self = ¬;
-										};
-										reg.weakScope()<:(){
-											for(reg())
-												<:(i){%i = [%self + self.capacity]}
-												<:(i,continue){if >= 0 jump->continue;}
-												<:(i){%i -= 1;}
-											<:(i){
-												let temp = reg();
-												%temp = [%self_data + %i];
-												[%newArray + %i] = %temp;
-											};
-										}
-										jump->handleCapacity..return;
-										//assert: newArray:%RefList().data*
-									};
-								};
-							};
-						};
-						#reg<->reg.max;
-						return;
-						def static.memory;
-					}::{
-						...run autoCall;
-					}:>static();
-					let unrefAll::{
-					}::{
-						...run autoCall;
-					}:>static();
-					let setType(label,type){
-						#label = return = label||return;
-						#label.type = type;
-						#label.typeTemplate = type();
-					}::{let [¬Trait.asMethod_onPototype];};
-					let setData(label,data){
-						#label = return = label||return;
-						#label.data <=> {data};
-					}::{let [¬Trait.asMethod_onPototype];};
-					#let ..prototype{
-						
-					};
-				};
-				let Reference(ref_refList)={//:#(RefList.Source?)->{RefList.Source*?}
-					def let object <=> NullableReference(ref_refList);//:Object*
-					def let ref<=> NullableReference((){#;
-						#repeat !!ref_refList[¬Source]:#{
-							recur 1 #ref_refList.refs..splice(-0,0,{Reference(this)});
-							#return = ref_refList;
-						};
-					}());
-					#ref <=> ref_refList || NullableReference.None;
-				}:>Struct():>Trait.impl()<:(type){
-					let unref{
-						let static = Static();
-						let reg = RegEnum();
-						let inputs{
-							let self;//:%Reference* &
-						};
-						...labelsof inputs;
-						return;
-						def static.memory;
-					}::{
-						...run autoCall;
-					};
-				};
-				delete autoCall;
-			}::{
-			};
-			let Process<=>Struct()::(){//type
-				def let ownedObjects<=>RefList(Object);//:{len:usize;Object*[len]*}
-				def let objectReferences<=>RefList(Object);//:File*[]*
-				def let references{0};//Process*[]*
-				def let ownedStaticObjects{0};//
-				def let state{
-					def let regs{//@%[]
-						...codeof{
-							let enum = meta.enum(0);
-							repeat 16 @enum();
-						};
-					};
-					def let stack{0};//@(Object&Stack&{@})*
-				};
-			};
-		};
+	repeat 0 let FileSystem{
+		import "typesTest.0xmin";
 		let reg = RegEnum();
 		repeat 0 let FileType(){
 			#def let value{0};
@@ -1541,8 +1231,10 @@ let main;
 			#new{};
 			#free{};
 		};
+		let a = DynLenObject();
+		#a.push();
 	}:>static();
-	#FileSystem[¬static].use();
+	repeat 0 #FileSystem[¬static].use();
 };
 ...labelsof{
 	import "std v1.0xmin";

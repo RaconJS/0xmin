@@ -1,0 +1,3 @@
+let readHigh(rOut,rAddress){
+	@(0x11100001 | (rOut & 0xf << 8) | (rAddress & 0xf << 4));
+};

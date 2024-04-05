@@ -17,7 +17,6 @@
 		let private{let obj,allowRedefine};
 		let Static(label)={
 			repeat !!label:#this = label;
-
 			#this::(obj,allowRedefine)={//:(obj:{@},#bool & #({}|(¬))) -> #{use:#()->@obj on static}
 				...labelsof{
 					let this.[¬private.obj] = obj;
@@ -30,7 +29,7 @@
 					let obj[¬constructor] = this;
 				};
 				repeat !!obj def obj;
-				let def()<-{//same as use, but to local scope's static
+				let: def()<-{//same as use, but to local scope's static
 					//static.def:#()->this & mutation
 					meta.unimplemented();
 					#{
@@ -196,6 +195,18 @@
 			let type_register = type_register;
 			//RegEnum: provides a simple form of register management.
 			let ..prototype{
+				let pointer(data){//#()->%*
+					meta.unimplemented("Unsertain where (which module/object) to put this function, or how it should be called");
+					//'label:>reg.pointer({1;2})'
+					#return = arguments[-2]||this()::{
+						let data = data;
+					};//note: || does won't always call 
+					#value = arguments[-1]||{};
+					#return::{
+						type
+						...labelsof {}<=>data¬..compile;
+					};
+				};
 				let free(register){
 					#this.freeRegs..splice(-0,0,{register});
 				};
@@ -337,7 +348,7 @@
 			let isSaveReg = !hasReg||!i.isFree;
 			let isJumpToContinue = for!=..constructor;
 			#isJumpToContinue = !!isJumpToContinue &&{} ||¬;
-			repeat !hasReg:{
+			repeat !+hasReg:{
 				#i = 1;
 			};
 			repeat  push %i;
@@ -349,6 +360,7 @@
 				def let next = next(i);
 				jump -> loop;
 			};
+			...labelsof loop;
 			def loop.jumpTo;
 			repeat !hasReg pop %i;
 		}::{
@@ -365,7 +377,6 @@
 					undef jumpTo;//note: '#def' already '#undef's jumpTo. This is only here to be more clear.
 					#..splice(0,0,{def jumpTo});
 				};
-				debugger ..@..length;
 			};
 		};
 		let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
@@ -386,23 +397,19 @@
 				#..constructor<->..constructor+1||value;
 			};
 		};
-		let: if(condision,then,else)<-{//:#(bool,#()->#,#()->#)
-			#delete arguments;
-			#delete scope;
-			#delete return;
-			#repeat !!+condision ...run(){
-				#delete else;
-				...run then;
-			};
-			#repeat !+condision ...run(){
-				#delete then;
-				...run else;
-			};
+		let: if(condision,then,else)<-{//:#(bool&number,#()->#,#()->#)
+			delete arguments,scope,return;
+			repeat !+condision #then = else;
+			delete condision;
+			delete else;
+			...run (){#return = then;delete then}();
 		};
 		let: forEach(array,doFunc)<-{
 			#let .["i"] = -1;
-			repeat array..length $doFunc(array[.["i"] = .["i"] + 1],.["i"],array,return);//v,i,a,s
+			#repeat array..length $doFunc(array[.["i"] = .["i"] + 1],.["i"],array,return);//v,i,a,s
 			#delete .["i"];
+			#delete array,doFunc;
+			#delete arguments,scope,return;
 		};
 		let: repeat(length,doFunc)<-{//:#(#int,#()->{any})
 			#let arguments.i = -1;
@@ -411,6 +418,9 @@
 		};
 		let assert(bool,message){
 			repeat !+bool throw ("assertion failed" ... message);
+		};
+		let todo(message){
+			print("\p00\c0fERROR:TODO");hlt;
 		};
 		let unimplemented(reason){//:#(reason:#string?)->{}
 			throw reason;

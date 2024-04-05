@@ -15,6 +15,7 @@ import lib "std.0xmin";
 	//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
 	//(#) and  for non-operator overloaded blocks
 	//using £() or '<>' for non-operator overloading blocks
+	//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
 //list of types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
 let gravitySimulator{
 	let dim = 2;//same as #let: dim = 
@@ -53,5 +54,35 @@ let otherThings{
 	list:>forIn()<:(value){
 		value+1;
 	};
+};
+#(){
+	a{//same as 'let a{}'
+		b{
+
+		};
+	};
+	a:{//Note: This one is not needed, use
+		//with; uses labels of a but code is pushed into the parent scope's label
+	};
+	a::{
+		//extend; uses names and ..this from parent
+	};
+	a:::{
+		//and then; uses both labels and pushes into label; useful for modifying objects without needing to use it's name again.
+	};
+	{:a;
+		{:b;
+			let [a>¬prop];//assign unique key that is static to a curtain label.
+			let [a>¬prop];//similar syntax meaning to 'a.b' except it can only be accessed by the inner scope
+		};
+	};	
+	#(){
+		#"ZASM4-0";
+		let jump(to,from){
+			let dif;
+			$dif <-> to-from;
+			@:$:0x0&(0xmin.abs(dif)&0xff |(dif<0 *0x100) <<4);
+		};
+	}
 };
 std.build();

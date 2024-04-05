@@ -338,10 +338,10 @@
 			r temp1 &= 0xf;
 			r temp1 -= 1 !store;
 			jump -> [jumpHashTable+r temp1] if == 0;//allow for "nop;"
-			print("jump"...colours.jumpType,const0,1);
+			print("j"...colours.jumpType,const0,1);
 			r temp1 |= 0;
 			jump -> [jumpHashTable+r temp1] if == 0;//allow for "jmp x"
-			print(" ",const0,1);//for "jmp >= x"
+			repeat 0 print(" ",const0,1);//for "jmp >= x"
 			jump -> [jumpHashTable+r temp1];//jumpHashTable: {@}*[]
 			let number = 0x31000000, name = "jump";
 		};
@@ -360,15 +360,16 @@
 			:opcode;//:Opcode & {@}
 			let opcode_rawString = opcodes[i+=1];
 			let opcode.tptasmName = opcode_rawString[3];
+			let isJump = opcode.tptasmName[0] == "j";
 			let opcode.zasmName = #(statement){
 				let i = -1;
 				repeat statement..length ...codeof statement[i+=1];
+				repeat !!+isJump:#return..splice(0,1);
 				delete i
 			}(opcode.tptasmName);//(opcode_rawString[1][0]);
 			let opcode.type = opcodeClassMap.(""...opcode_rawString[4]);//"P", "S", "PS", "0"
 			let opcode.number = opcode_rawString[-2]..asNumber;
 			...codeof Opcode(opcode.zasmName,opcode.type);//:{@} ; {print ()}
-			let isJump = opcode.tptasmName[0] == "j";
 			repeat !!+isJump:{
 				repeat (opcode.number & 0xf == 1):{//nop or readHigh
 					#opcode..splice(0,0,{

@@ -1,5 +1,6 @@
 #"tptasm";#"len";//#"table";
 let heapAlreadyDefined = !!heap;
+let isModule = heapAlreadyDefined;
 let allMain(){
 	def main();
 	repeat !+heapAlreadyDefined def heap.malloc;
@@ -137,7 +138,11 @@ let main(){
 		//current memory address = [[program]+[index]+[lineNumber]]]
 		let lineNumber=program.lineNumber;//:[int]
 		let charNumber:>var()::{0};//:[int]
-		{:tempNewProgram;
+		repeat !!+isModule:{
+			[program] = r0;
+			[program.maxLength] = r1;
+		};
+		repeat !+isModule:{:tempNewProgram;
 			r0 =16;
 			[program.maxLength]=r0;
 			{

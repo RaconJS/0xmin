@@ -1,0 +1,895 @@
+#"tptasm";#"len";//#"table";
+import "std v1.0xmin";
+...labelsof{
+	let Trait(traitObj)={//#(data Trait)-> Trait & #(T:Type?)-> T & #(...)-> T
+		//an abstraction to make injecting properties, and methods easier
+		#constructor::{
+			#return(typeObj)={//:(Type?)->Type
+
+				#return = typeObj = typeObj||return;
+				repeat(typeObj..length == 0): #typeObj::()={};
+				#{
+					let trait = constructor[¬Trait.traitNameLabel]||constructor;
+					let typeObj[¬trait];
+					let typeObj[¬trait]..prototype;
+					let traitInstance <=> traitObj(typeObj);
+					#addTraitToType(traitInstance,typeObj);
+					#addTraitToType(traitInstance..prototype,typeObj..prototype);
+				};
+			};
+			let return[¬Trait] = return[-1];
+		};
+	}::{
+		let symbols{
+			let asMethod{//not for valid objects
+				let asm;// ¬ => default, property.use:#()->adds method to static
+				let meta;// ¬ => defualt, #()->{} ; for methods with the form `m(label,...args){}`
+			};
+			let asConstructor{//only for invalid Container types
+				let asm;// ¬ => default, property.use:#()->adds method to static
+				let meta;// ¬ => defualt, #()->{} ; for methods with the form `m(label,...args){}`
+			};
+			let asProperty{
+				let asm;
+				let meta;
+			};
+			let private;//for private properties, only accessable by `typeObj[¬traitObj]`
+			let traitNameLabel;
+		};
+		...labelsof symbols;
+		let isPublicByDefault = {};//:#const setting
+		let addTraitToType(traitInstance,typeObj)=>{//
+			let i = -1;
+			let labels = traitInstance..labels;
+			repeat labels..length{
+				let name = labels[i+=1];
+				let property = traitInstance[""...name];
+				let typeObj[¬traitObj][""...name] = property;
+				repeat(
+					(!!isPublicByDefault && !!property[¬Trait.public]||!property[¬Trait.private])||
+					( !isPublicByDefault && !!property[¬Trait.public]&&!property[¬Trait.private])
+				):let typeObj[""...name] = property;
+				repeat(property[¬Trait.asMethod.meta] != ()):#{
+					let typeObj..prototype[""...name];
+					let isDefaultMethod = property[¬Trait.asMethod.meta]== ¬;
+					repeat !!isDefaultMethod:
+						let typeObj[¬traitObj]..prototype[""...name] =
+							typeObj..prototype[""...name] <=>
+							#(){#return = property(this,...arguments)}
+						;
+					;
+					repeat !isDefaultMethod:
+						#typeObj..prototype[""...name] <=> property[¬Trait.asMethod.meta]
+					;
+				};
+				repeat(property[¬Trait.asMethod.asm] != ()):#{
+					let typeObj..prototype[""...name];
+					let isDefaultMethod = property[¬Trait.asMethod.asm] == ¬;
+					meta.if(isDefaultMethod)<:(){
+						let typeObj[¬traitObj]..prototype[""...name] =
+							typeObj..prototype[""...name] <=>
+							#(state,getArguments,getOutputs){
+								let args = {...arguments};
+								#args..splice(0,1);
+								let pushedSelf;
+								let pushedRegs = {};
+								def getArguments()||{
+									meta.repeat(property.regsUsed||0)<:(i){
+										#pushedSelf = pushedSelf || (+i == +property.inputs.self);
+										repeat !state.regState.isUsed(i):{
+											push %i;
+											#pushedRegs..splice(0,-0,{i});
+										};
+									};
+								};
+								repeat(!+pushedSelf&&!!property.inputs.self):{
+									push %property.inputs.self;
+									meta.if(!!+Pointer.isPointer(this))<:(){
+										%property.inputs.self = %this;
+									}<:(){
+										%property.inputs.self = this;
+									};
+								};
+								call #(property.use(state.static||static,this)||property:>static.use());
+								def getOutputs()||{
+									let i = property.regsUsed;
+									let len = pushedRegs..length;
+									repeat len:{
+										repeat !+pushedSelf pop pushedRegs..splice(0,-1)[0];
+									};
+								};
+							}
+						;
+						repeat !property.use let property.use(){
+							#property:>static.use();
+							#return = property;
+						};
+					}<:(){
+						#typeObj..prototype[""...name] <=> property[¬Trait.asMethod.asm];
+					};
+				};
+			};
+		};
+		let typeToTrait(typeObj){
+			let typeObj[¬Trait] = Trait()<:(type){#return<=>typeObj};
+		};
+		let impl(typeObj,implData){//:Type 'Type:>Trait.impl((type){let a,b,c;})'
+			#return = typeObj;
+			repeat(typeObj..length == 0): #typeObj::()={};
+			repeat !!implData let traitInstance = implData(typeObj);
+			repeat !implData let traitInstance = typeObj;
+			let typeObj[¬typeObj];
+			let typeObj[¬typeObj]..prototype;
+			let typeObj[¬Trait] = Trait(implData)::{
+				let .[¬traitNameLabel] = typeObj;
+			};
+			#addTraitToType(traitInstance,typeObj);
+			#addTraitToType(traitInstance..prototype,typeObj..prototype);
+		};
+	};
+	repeat 0 #{
+		let ExampleTrait1(type){
+			let staticProperty1{//'type.staticProperty1'
+				print("Hello, world!");
+				@return;
+			}::{};
+			let ..prototype{
+				let property1{//'type().property1'
+					let value;
+					r0 = value;
+					@call property;
+				};
+			};
+			let method1(object,arg1,arg2){//'type.method1(type(),4,5)'
+				object.value<->object.value + arg1*arg2;
+				#return = object;
+			}::{let .[¬Trait.asMethod.meta]};//'type().method1(4,5)'
+		}:>Trait();
+		let type()={
+		}:> ExampleTrait1();
+		type().method1();
+	};
+	let Type = #(){
+		let Type<=>Trait()<:(type){//similar to Trait, but for objects
+			repeat !type.[¬alreadyCalled] #type::()={
+				repeat !..this[¬type]
+					#let ..this[¬type]{...labelsof this},..this[¬Type.symbols.type] = type;
+				delete return;
+			};
+			let type.[¬alreadyCalled];
+		}¬::{
+			let addType(obj,type){
+				#return = obj;
+				#let obj[¬type];
+			};
+			let isType(type){//:(#{})->#{}?
+				#return = type[¬Type];
+			};
+			let isInstance(type){//:(#{})->#{}?
+				#return = type[¬Type.symbols.type]];
+			};
+			let symbols;
+			let symbols.type;
+		};
+		let alreadyCalled;//:symbol
+		#return = Type;
+	}();
+	let ToType<=>Trait()<:(type){
+		let set toType(object,castType){//:castType
+			#return = toType[¬castType](object)
+				||castType[¬ToType].fromType[¬type](object,type)
+				||{throw "cannot convert types"}
+			;
+		}::{let .[¬Trait.asMethod.meta]};
+		let set fromType(object,castType){//:type
+			#return = fromType[¬castType](object)
+				||castType[¬ToType].toType[¬type](object,type)
+				||{throw "cannot convert types"}
+			;
+		}::{let .[¬Trait.asMethod.meta]};
+	};
+	let Wrapper<=>Trait()<:(type,innerType){
+		let innerType = innerType||¬;
+		let unwrap(){
+			#delete this[¬type];
+		};
+	}¬::{
+		let Wrap(type,innerType){//:Trait ; includes Wrapper trait
+			#return = Wrapper(type)::(innerObject)={
+				#{
+					let object = ..this;
+					#wrap(object,innerType()||innerObject,type);
+				};
+			};
+		};
+		let wrap(wraperObj,wrapeeObj,type){//:#<W=Wrapper,T>(obj:~W<T>,T,Type<T>?)->mutate obj:W<T>
+			#return = wraperObj;
+			let type = type||wraperObj..constructor;
+			#let set wraperObj[¬type]::{
+				...labelsof wraperObj;
+			};
+			meta.if(wraperObj.wraperObj == ())<:(){
+				#wraperObj::{
+					...labelsof wrapeeObj;
+				};
+			}<:(){
+				#wraperObj..splice(-0,0,{wrapeeObj});
+				#wraperObj::{
+					...labelsof ..splice(-1,1)[0];
+				};
+			};
+			#wraperObj..proto = {}::{
+				let set:..super = wrapeeObj..proto;
+				let set:..proto = wraperObj..proto;
+			};
+		};
+		let ..prototype{
+			let unwrap(){
+				#this
+			};
+		};
+	};
+	let Struct<=>Trait()<:(type){
+	}¬::{
+		let Object(object)={//:{@}&any
+			//Contains a valid object
+			...codeof object;
+		}:>Struct():>Wrapper.Wrap();
+		let Container(object)={//:<T>(T)->~T ;
+			//A container contains an object that is yet to be inicialised.
+			//Note, using type annotation '~' for the more general container type
+				//Read as 'approximately'. e.g. '{let a = ¬} : #~{a:#int}'
+			//May not contain a valid object of type.
+			//Can be used for @ constructors
+			//e.g.
+				//Calling @malloc returns a Container,
+				//Then calling a @constructor will turn the container into a valid Object
+			...codeof object;
+		}:>Struct():>Wrapper.Wrap();
+	};
+	let Pointer(typeOrObject,isType,TEST)={//(T|Type<T>,()|{}):T*
+		let ..this[¬..constructor];
+		...codeof{
+			let type,object;
+			#isType = isType || Type.isType(typeOrObject);
+			meta.if(!!isType)<:(){//%T*
+				#type = typeOrObject;
+				#object = type();
+			}<:(){//@T*|%T*
+				#object = typeOrObject;
+				#type = object..constructor;
+			};
+			#..this[¬..constructor]={
+				let size = object..@..length;
+				let data = object;
+				let type = object..constructor;
+			}::{
+				#..proto = pointer..prototype;
+			};
+			@((object<->0)||0);
+			#..this::{...labelsof ..this[¬..constructor];};
+			#..this::{...labelsof type()::{#..compile};};
+			let ..this..proto = {}::{
+				let ..super = object..proto;
+				let ..proto = pointer..prototype;
+			};
+		};
+	}:>Type():>Wrapper()::{
+		let isPointer(label){
+			#return = label[¬Pointer]||¬;
+		};
+	};
+	let OuterType<=>Trait()<:(type){
+		#type::()={
+			let .[¬OuterType] = ..constructor;
+		};
+	};
+	let Register()={}:>OuterType():>Type():>Wrapper.Wrap();
+	#Register:>Trait.impl()<:(type){//:#<T>(T)-> %T; %register
+		let:set(label1,label2){
+			meta.if(!!label2[¬Register])<:(){
+				%label1 = %label2;
+			}<:(){
+				%label1 = [label2];
+			};
+
+		};
+	};
+	let Index(propertyIndex,onObject)={//:#<P:O+ & #[]O?, O:{@}>(P?,O?)-> O+P ; '@[%object+property]' | '@%object+=property
+		...codeof propertyIndex;
+		let set .[¬constructor]{
+			let object = onObject;
+			let property = propertyIndex;
+		};
+		...labelsof .[¬constructor];
+		#Wrapper.wrap(this,propertyIndex);
+	}:>OuterType():>Wrapper();
+	let Item(property,onObject)={//:#<P:[]O,O:{@}>(P?,O?)-> []O
+		...codeof property;
+		let set .[¬constructor]{
+			let object = onObject;
+			let property = property;
+		};
+		...labelsof .[¬constructor];
+		#Wrapper.wrap(this,property);
+	}:>OuterType():>Wrapper();
+	...labelsof Struct;
+	let usize(value)={def value||¬0};//:Type<unsigned @>
+	let int(value)={def value||¬0};//:Type<@>
+	let Optional(noneObject,someType)={//:#(value,Type)->Optional
+		let None,Some;
+		let None = #(){
+			#return <=> noneObject;
+			let return[¬None];
+		};
+		let Some = #(value){
+			#value = value || {0};
+			#return = value;
+			let value[¬Some];
+			let value.[¬someType]{value};
+		}:>Wrapper();
+	}:>Type():>Trait.impl()<:(type){
+		let set None, Some;
+	};
+	let NullableReference()={
+		#return = Pointer(...arguments);
+		let return[¬NullableReference];
+	}:>Type():>Optional[¬Trait](Pointer)::{
+		let None(){
+			return = Pointer({}<->0):>Type.addType(NullableReference);
+		}:>Type();
+		let Some(obj){
+			return = Pointer(obj):>Type.addType(NullableReference);
+		}:>Type();
+	};
+	let Function<=>Trait()<:(function,inputTypes,returnTypes){//{@}
+		let inputs<=>inputTypes||{};
+		let outputs<=>returnTypes||{};
+		let regsUsed;
+		let use = #(state){
+			#:static.use(this);
+		};	
+		let call = #(){
+			#function.use();
+		};
+		let reg = RegEnum();
+	};
+	let Method<=>Trait()<:(function,inputTypes,returnTypes){//{@}
+		#function:>Function(inputTypes,returnTypes);
+		let inputs{
+			let self;//
+			...codeof inputTypes;
+		};
+		let outputs;
+		let regsUsed;
+		let type[¬Trait.asMethod.asm] = ¬;
+		let use = #(){
+			;
+		};	
+		let call = #(){
+			;
+		};
+		let reg = RegEnum();
+	};
+};
+...labelsof{
+	let DynLenObject(data)={//object with dynamic size
+		def let slice = constructor.Slice()||{
+			#def let size<=>usize(0);//:@usize
+			#def let data<=>NullableReference(Object,{});//:@any*?
+		};
+		...labelsof slice;
+		def let capacity<=>usize(0);//:@usize
+	}:>Type():>Trait.impl((type){
+		//remember: data must be a pointer otherwise all refs will have to be updated whenever the data is realloced
+		#type:>LenObject[¬Trait]();
+		let meta_set(label,data){
+			#return = label;
+			#return.data <=> Pointer(data,());
+			#return.size <=> usize(data..@..length);
+			#return.capacity <=> usize(data..@..length);
+		}::{let .[¬Trait.asMethod.meta]=¬};
+		let push{//:@(%(self&DynLenObject)*,ref:%@*)->([%ref]: %(@self*?)*) & mutate self
+			let static = Static();
+			let reg = RegEnum();
+			let regsUsed;
+			let inputs = {
+				def let self = reg()<=>Pointer()<:DynLenObject();//:%DynLenObject*
+				def let size = reg()<=>usize();//:%usize
+			};
+			let outputs = {
+				let self = inputs.self;
+				let newItem = +inputs.size <=> Pointer(Container);//%@[size]* & %([]*dynArray.data)
+			};
+			{:pushFunction;
+				#reg = RegEnum(0xmin.Math.max(heap.resize.regsUsed,heap.malloc.regsUsed,heap.free.regsUsed));
+				let self = inputs.self;
+				let temp = reg();
+				let temp2 = reg();
+				let store = {
+					let self = reg()<=>outputs.self;
+					let newSize = reg()<=>usize();
+				};
+				{:sizeCheck;
+					:handleCapacity;
+					let newSize <-> inputs.size;//share
+					meta.assert(+outputs.newItem == +inputs.size);
+					//assume: %outputs.newItem == %inputs.size
+					%newSize += [%self + self.size];
+					%newSize - [%self + self.capacity];
+					let returner{
+						let temp = temp;
+						%temp = [%self + self.size];
+						[%self + self.size] = %newSize;
+						%outputs.newItem = %temp;
+						%outputs.newItem += [%self + self.data];
+						return;
+					}:>static.use();
+					jump->returner if <= 0 !signed;
+					%store.self = %self;
+					%store.newSize = %newSize;
+					{:growArray;
+						%newSize <<= 1;
+						[%self + self.capacity] = %newSize;
+						repeat (+newSize != 1): r1 = %newSize;
+						r0 = [%self + self.data];
+						let successfulResize;
+						if == 0 jump -> static.use()<:{:handleNullDataPointer;
+							r0 = %newSize;
+							call heap.malloc;
+							[%store.self + store.self.data] = r0;
+							jump -> successfulResize;
+						};//handle null
+						let newSize = ¬; 
+						call heap.resize.use();
+						if !sign jump -> successfulResize::{
+							%outputs.self = %store.self;
+							let self = outputs.self;
+							%temp = [%self + self.size];
+							[%self + self.size] = %store.newSize;
+							%outputs.newItem = %temp;
+							%outputs.newItem += [%self + self.data];
+							return;
+						};
+						{
+							r0 = [%store.self + store.self.capacity];
+							call heap.malloc.use();
+							let newArray = Pointer(self.data)<->heap.malloc.outputs[0];//%Object* & %[]heap
+							let reg = RegEnum(1);
+							let oldArray = Pointer(self.data)<->reg();
+							%oldArray = [%store.self + store.self.data];
+							{:moveArray;
+								#reg<->2;
+								reg.weakScope()<:(){
+									for.doFor(reg())
+										<:(i)=>{
+											%i = [%store.self + store.self.size];
+											%i -= 1;
+											if == 0 jump->return..return;
+										}<:(i,continue){if >= 0 jump->continue;}
+										<:(i){%i -= 1;}
+									<:(i){
+										let item <-> temp2;
+										%item = [%oldArray + %i];
+										[%newArray + %i] = %item;
+									};
+								};
+								//assert: newArray:%DynLenObject().data*
+							};
+							[%store.self + store.self.data] = %newArray;
+							r0 = %oldArray;
+							call heap.free.use();
+						};
+						def successfulResize;
+					};
+				};
+			};
+			#reg<->reg.max;
+			def static.memory;
+			#regsUsed = reg;
+		}::{
+			let use(state){
+				#{
+					let tempLabel = ..this.static;
+					delete ..this.static;
+					#:static.use(..this);
+					let ..this.static = tempLabel;
+					delete tempLabel;
+				};
+				#heap.malloc.use();
+				#heap.free.use();
+				#heap.resize.use();
+				#return = ..this;
+			};
+			let .[¬Trait.asMethod.asm](newItem,pushFunction){
+				#newItem = newItem || {0};
+				meta.if(!!+Pointer.isPointer(this))
+					<:(){%inputs.self = %this}
+					<:(){%inputs.self = this}
+				;
+				repeat !newItem throw "method 'DynLenObject.push' requires an object";
+				%inputs.size = #(newItem[¬Pointer].size||newItem..@..length);
+				call ..this.use();
+				def pushFunction(newItem)||{
+					let item = newItem..@;
+					meta.forEach(item)<:(v,i,a){
+						[%outputs.newItem] = v;
+						%outputs.newItem += 1;
+					};
+					%outputs.newItem -= item..length;
+				};//#(%[]array*,{@})->{@}
+			};
+		}:>static();
+	})::{
+		let set ..prototype{
+			...labelsof LenObject..prototype;
+		};
+	};
+	let DynLenObject.Slice()={
+		def let size<=>usize(0);//:@usize
+		def let data<=>NullableReference(Object,{});//:@any*?
+	}:>Type():>Trait.impl((type){
+		let print = {//:@(self:%*)->mutate terminal
+			let regsUsed = 0;
+			let regs = RegEnum();
+			let inputs = {
+				let self = Pointer()<:DynLenObject.Slice()<->0;
+			};
+			let outputs = {};
+			regs.blockScope()<:()={
+				...labelsof inputs;
+				#return = #(reg)=>{this};
+				let const_0 = reg();
+				let array = Pointer()<:Object() <-> reg();
+				let array.size = usize()<->reg();
+				%array = [%self + self.data];
+				%array.size = [%self + self.size];
+				%const_0 = 0;
+				r0 - %array.size;
+				reg.weakScope()<:(reg){
+					for.doFor(reg(),(),(i,to){
+						%i - %array.size;
+						jump->to if<0;
+					},())<:(i){
+						send %const_0 [%array + %i];
+					};
+				};
+			}();
+			return;
+		}::{
+			let .[¬Trait.asMethod.asm] = ¬;
+		};
+	});
+	#DynLenObject{
+		let print = Slice.print;
+		let ..prototype.print = Slice..prototype.print;
+	};
+	let DynArray(type,length)={//:<T1,T2> T[T1]
+		#return = DynLenObject();
+	}:>Type();
+	let RefList()={
+		#return = RefList.Source();
+	}:>Type():>Trait.impl()<:(type){//for many to one a->b<-c
+		//RefList is a type of smart pointer,
+		/*old code
+			let Source()={
+				def let refs <=> DynLenObject();//:DynArray<Reference*>
+				//...labelsof refs;
+				def let data <=> Pointer(Object());
+			};//:>DynLenObject[¬Trait]();
+			#Source :>Type();
+			let Reference()={//:#(RefList.Source?)->{RefList.Source*?}
+				def let source <=> NullableReference();//:Object*?
+				def let itemRef <=> NullableReference();//[]Source.data*?
+			}:>Type():>Optional[¬Trait]()::{
+				#None()={
+					#return = ..this()::{
+						#object<=>{0};
+					};
+					let return[¬constructor];
+				};
+				#Some()={
+					#return = ..this(...arguments);
+					let return[¬constructor];
+				};
+			};
+			#Reference:>Trait.impl()<:(type){
+				let unref{
+					let regsUsed;
+					let reg=RegEnum();
+					let inputs{
+						let self=Reference()<->ref;
+					};
+					let outputs{};
+					{
+						let ref=reg();
+						%ref=[%self+self.ref];
+						let break;
+						jump->break if==0;
+
+						#def break;
+						[%self+self.object]=0;
+						return;
+					};
+					#regsUsed <-> reg;
+				}::{
+					let .[¬Trait.asMethod.asm] = ¬;
+				};
+			};
+			#Source:>Trait.impl()<:(type,nullRefFunction){
+				let addRef{
+					//for link: self->object
+					let regsUsed;
+					let reg = RegEnum();
+					let inputs{
+						let self = Pointer()<:Source()<->reg();
+						let object = Pointer(Object())<->reg();
+					};
+					let outputs{
+						let self = Pointer()<:Source()<->inputs.self;
+					};
+					{
+						let reg1 = RegEnum(DynLenObject.push.regsUsed);
+						let store{
+							let ref = Pointer()<:Reference()<->reg1();
+						};
+						#regsUsed <-> 0xmin.Math.max(reg,reg1);
+						delete reg1;
+						@%store.ref = %inputs.ref;
+						@%DynLenObject.push.inputs.size = 1;
+						@call DynLenObject.push;
+						meta.assert(+outputs.self==+DynLenObject.push.outputs.self);
+						@return;
+					};
+				};
+				let addWeakRef{//:@(self:%*,ref:%*)-> mutate self
+					//for link: Source<-Reference
+					let regsUsed;
+					let reg = RegEnum();
+					let inputs{
+						let self = Pointer()<:Source()<->reg();
+						let ref = Pointer()<:Pointer(self)<->reg();
+					};
+					let outputs{
+						let self = Pointer()<:Source()<->inputs.self;
+						let ref = Pointer()<:Reference()<->inputs.ref;
+					};
+					{
+						call Source.addRef();
+						@[%DynLenObject.push.outputs.newItem] = %store.ref;
+						@[%store.ref + store.ref.source] = %DynLenObject.push.outputs.self;
+						@[%store.ref + store.ref.itemRef] = %DynLenObject.push.outputs.newItem;
+						@%outputs.ref = %store.ref;
+						@return;
+					};
+					#regsUsed <-> reg;
+				}::{
+					let .[¬Trait.asMethod.asm] = ¬;
+					let use(){
+						#:static.use(..this);
+						#addRef.use();
+						#DynLenObject.push.use();
+						#return = ..this;
+					};
+				}:>static();
+				let unrefAll::{
+					let: static = Static();
+					let regsUsed;
+					let reg = RegEnum();
+					let inputs{
+						let self = Pointer(Source())<->reg();
+					};
+					let outputs{
+						let self = inputs.self;
+					};
+					#reg<->heap.free.regsUsed;
+					let store{
+						let self = Pointer(Source())<->reg();
+					};
+					{
+						repeat (+Reference.unref.inputs.self == self):{
+							%store.self = %self;
+						};
+						{:loop;
+							let array = reg();//:%Reference[]*
+							%array = [%self+self.data];
+							let ref = Pointer()<:Reference() <-> Reference.unref.inputs.self;//:%[]self.data*
+							for.doFor(reg()<=>usize(),
+								(i){
+									%i = [%self+self.size];
+									%i -= 1;
+									jump->loop..return if <= 0 !signed;
+								},(i,continue){jump->continue if>=0 !signed},
+								(){%i-=1}
+							)<:(i){
+								%ref = [%array+%i];
+								{:dropReference;
+									heap.unref(ref,(),{});
+								};
+							};
+						};
+						repeat (+Reference.unref.inputs.self == self):{
+							%store.self = %self;
+						};
+						return;
+					};
+					def static.memory;
+					#regsUsed<->reg;
+				}::{
+					let .[¬Trait.asMethod.asm] = ¬;
+				}:>static();
+			};
+		*/
+		let OwnedSource()={
+			def let refs <=> DynLenObject();//:DynArray<owned<*>>
+			#Wrapper.wrap(this,refs);
+			let [¬OwnedSource]{...labelsof this};
+		}:>Type():>Trait.impl()<:(type){debugger OwnedSource().push;
+			let addRef{
+				let .[¬Trait.asMethod.asm] = ¬;
+				let use(state){#;
+					#return = ..this;
+					#static.use(..this);
+					#static.use(DynLenObject.push);
+				};
+				let regsUsed;
+				let reg = RegEnum();
+				let inputs{
+					let self = Pointer(OwnedSource())<->0;
+					let ref = Pointer()<->1;
+				};
+				let outputs{
+					let self = Pointer(OwnedSource())<->0;
+					let newItem = Pointer(inputs.ref..constructor)<->1;
+				};
+				{
+					#reg<->DynLenObject.push.regsUsed;
+					#let store{repeat 1 reg()};
+					#let store.ref = #({}<=>inputs.ref)<->store[0];
+					@%store.ref = %inputs.ref;
+					@%DynLenObject.push.inputs.size = 1;
+					@call DynLenObject.push;
+					#meta.assert(+outputs.self==+DynLenObject.push.outputs.self);
+					#meta.assert(+outputs.newItem==+DynLenObject.push.outputs.newItem);
+					@[%DynLenObject.push.outputs.newItem] = %store.ref;
+					@return;
+				};
+			}::{
+				//TEST inputs.self.push(Pointer(Object));
+				return;
+				#regsUsed <-> reg;
+			};
+			let unref{
+				let .[¬Trait.asMethod.asm] = ¬;
+				let use(state){#;
+					#return = ..this;
+					#:static.use(..this);
+					#:heap.free.use();
+				};
+				let regsUsed;
+				let reg = RegEnum();
+				let inputs{
+					let self = Pointer(OwnedSource())<->reg();
+					let ref = Pointer(Object())<->reg();
+				};
+				let outputs{let self = inputs.self};
+				let static = Static();
+				{
+					{:validateRef;
+						let index <-> reg();
+						%index = %ref;
+						%index -= [%self+self.data];
+						%index - [%self+self.size];
+						if < 0 !signed jump -> static.use()<:{
+							;
+						};
+					};
+					return;
+					def static;
+				};
+			};
+			let unrefAll{
+				let .[¬Trait.asMethod.asm] = ¬;
+				let use(state){#;
+					#return = ..this;
+					#:static.use(..this);
+					#:heap.free.use();
+				};
+				let regsUsed;
+				let reg = RegEnum();
+				let inputs{let self = OwnedSource()<->reg()};
+				let outputs{let self = inputs.self};
+				{:loop;
+					for.doFor(reg()<=>usize(),
+						(i){
+							%i = [%self+self.refs.size];
+							%i -= 1;
+							jump->loop..return if <= 0 !signed;
+						},
+						(i,continue){jump->continue if >= 0 !signed},
+						(){%i-=1}
+					)<:(i){
+						%ref = [%array+%i];
+						{:dropReference;
+							heap.unref(ref,(),{});
+						};
+					};
+					heap.unref(self,unrefRef,{});
+					return;
+				};
+				#regsUsed <-> reg;
+			};
+			let unrefRef{};
+		};
+	}¬::{
+	};
+	let Process()={//type
+		def let ownedObjects<=>RefList.OwnedSource(Process);
+		def let weakReferences<=>RefList.WeakSource(Process);
+		def let objectReferences<=>RefList(Object);
+		def let references{0};//Process*[]*
+		def let ownedStaticObjects{0};//
+		def let state{
+			def let regs{//@%[]
+				...codeof{
+					let enum = meta.enum(0);
+					repeat 16 @enum();
+				};
+			};
+			def let stack{0};//@(Object&Stack&{@})*
+		};
+	}:>Type()<:Trait.impl()<:(type){
+		let malloc{
+			let .[¬Trait.asMethod.asm] = ¬;
+			let use(state){#;
+				#return = ..this;
+				#static.use(..this);
+			};
+			let regsUsed;
+			let reg = RegEnum();
+			let inputs{};
+			let outputs{};
+			{
+				...do;
+				return;
+			};
+			#regsUsed <-> reg;
+		};
+		let free{
+			let .[¬Trait.asMethod.asm] = ¬;
+			let use(state){#;
+				#return = ..this;
+				#static.use(..this);
+			};
+			let regsUsed;
+			let reg = RegEnum();
+			let inputs{};
+			let outputs{};
+			{
+				
+				return;
+			};
+			#regsUsed <-> reg;
+		};
+	};
+};
+let String(string){
+	let stringObj = heap.Object(string):>static.use().data[0];
+	#return = DynLenObject().meta_set(stringObj):>static.use();
+};
+let str(string){
+	let stringObj = heap.Object(string):>static.use().data;
+	#return = DynLenObject().meta_set(stringObj).slice:>static.use();
+};
+repeat 0 {:example;
+	let string = "Hello, world":>static.use().data;
+	let list = DynLenObject().meta_set(string):>static.use();
+	list.print();
+	list.push("!");
+	print("\n");
+	list.print();
+};
+let composite = {
+	def let a = {def let a = int(), b = int();};
+	def let thing = DynLenObject();
+}:>Register();
