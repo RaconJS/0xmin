@@ -2968,8 +2968,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					case"="://class
 						instanceScope.let=instanceScope;
 						instanceScope.var=instanceScope;
-						newLabel.functionPrototype=functionLabel.prototype;
-						newLabel.functionSupertype=functionLabel.pupertype;
+						newLabel.functionPrototype??=functionLabel.prototype;
+						newLabel.functionSupertype??=functionLabel.pupertype;
 						middleLabel.labels["this"]=newLabel;
 						middleLabel.labels["return"]=newLabel;
 						middleLabel.labels["arguments"]=argsObj;
@@ -2977,8 +2977,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					break;//pure, unpure, 
 					case"=>"://arrow function, has no special labels, impure, let scope
 						instanceScope.let=instanceScope;
-						newLabel.functionPrototype=functionLabel.prototype;
-						newLabel.functionSupertype=functionLabel.pupertype;
+						newLabel.functionPrototype??=functionLabel.prototype;
+						newLabel.functionSupertype??=functionLabel.pupertype;
 					break;
 					case"<="://'using(){}' super strong scope macro function
 						instanceScope.let=instanceScope;
@@ -2991,8 +2991,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						middleScope.parent=scope;
 						instanceScope.let=scope.let;
 						instanceScope.var=scope.var;
-						newLabel.functionPrototype=functionLabel.prototype;
-						newLabel.functionSupertype=functionLabel.pupertype;
+						newLabel.functionPrototype??=functionLabel.prototype;
+						newLabel.functionSupertype??=functionLabel.pupertype;
 						middleLabel.labels["scope"]??=scope.label;
 						middleLabel.labels["arguments"]=argsObj;
 						middleLabel.labels["return"]=returnObj;
