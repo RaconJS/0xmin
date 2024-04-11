@@ -1,6 +1,6 @@
 #(){
 	...#(...)->{#}
-}
+};
 #;
 let if(condision,then,else){
 	void repeat !!+condision:...codeof then();

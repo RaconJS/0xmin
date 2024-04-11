@@ -1,3 +1,13 @@
+#"table";
+#"tptasm";
+//#"labels";
+let test{
+	push r0;
+	let arraySize;
+	r0 = [arraySize];
+	hlt;
+	pop r0;
+};
 import "type.0xmin";
 repeat 0{//main
 	let string = String("hello");
@@ -6,7 +16,7 @@ repeat 0{//main
 	print("\n");
 	string.print();
 };
-{
+repeat 0 {
 	//let source = RefList();
 	let a = RefList():>heap.Object():>static.use().data[0];
 	let ref = Pointer(RefList.Reference())<->1;
@@ -15,6 +25,22 @@ repeat 0{//main
 	r1 = r0;
 	r0 = a;
 	call RefList.Source.addRef.use();
+};
+{
+	let sourceObj = RefList.OwnedSource():>static.use();
+	let array = DynLenObject():>static.use();
+	//array.push({1;2;3;4});
+	r1 = 5;
+	sourceObj.mallocRef();
+	test(array);
+	sourceObj.mallocRef(Container(DynLenObject()));
+	sourceObj.slice.print();
+	print("\n");
+	sourceObj.unrefAll();
+	sourceObj.slice.print();
+	#array.size::{def test.arraySize};
+	hlt;
+	jump 0;
 };
 hault;
 def static.memory;

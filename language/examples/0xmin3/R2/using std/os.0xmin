@@ -1,6 +1,6 @@
 //SETTINGS, TEST
 #"tptasm";#"len";//#"table";
-#"labels";
+//#"labels";
 let main;
 #main(){
 	let terminal:>static();

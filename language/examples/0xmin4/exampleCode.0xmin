@@ -11,11 +11,19 @@ import lib "std.0xmin";
 	//..prototype as a list of prototypes, for multi inheritence
 	//eval
 	//powerful statechecking
+	//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
 	//customisable assembly language
 	//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
-	//(#) and  for non-operator overloaded blocks
 	//using £() or '<>' for non-operator overloading blocks
-	//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
+	//different sizes of data. infinite sized numbers, for different word lengths
+		//this is similar to a string, except it is not simply a list of chars, it is a list of bits
+		e.g. {0x12345678912456789123456789}
+		0x0001//16 bit number of value 1
+		0x5//4 bit number of value 1
+		0xmin.number(size,value)//returns a number of size 
+		//this variable size number will be a new part of the 0xmin label object.
+		//it can be accessed with ..size and ..value
+	//allowing '""{"a";"b";"c"}' --> '""...{"a";"b";"c"}' for shorter conversion to strings ``
 //list of types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
 let gravitySimulator{
 	let dim = 2;//same as #let: dim = 
@@ -63,6 +71,11 @@ let otherThings{
 	};
 	a:{//Note: This one is not needed, use
 		//with; uses labels of a but code is pushed into the parent scope's label
+		//same as
+			()={
+				...doStuff;
+			}::{let ..proto=a}()
+		//----
 	};
 	a::{
 		//extend; uses names and ..this from parent

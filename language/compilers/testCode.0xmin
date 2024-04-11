@@ -1,47 +1,12 @@
-#"table";#"tptasm";//#"0xmin";//
-//mov [1] [2];//this compiles
-
-//operator tests
-//debugger (+>=0);
-//debugger (0+...0) //retuns a label
-
-//BUG: the inner '..splice' mutates the outer '..splice'. This is to do with the fact that '(,,..splice)' is evaluated between the '..splice' and the '(..splice)(...)' parts
-//#..splice(,,..splice);
-
-//#let state;//BUG, this does not compile
-//$state=>move;
-
-//BUG: the following does not compile //FIXED
-//let a,b,c;
-//let a,b;$debugger +b;
-//$a=>b;
-//def b;$debugger +a"value.number+'?'";
-//@a;
-
-//#()={debugger ..prototype}::{let ..prototype..prototype = 2}();
-
-//let foo(){
-//	#return = 0/0;
-//};
-//debugger foo()"label?.name";
-
 let a{
-	(a,b)={
-		#this<->3;
+	()={
+		#this..proto=2;
 	};
 	()={
-		debugger +this;
-	}
+		debugger ..proto;//expect 2, got 4 ; FIXED
+	};
+	let ..prototype=4;
 };
-#a();
-
-//let symbol1,symbol2;
-//let ab = {1;let a}...{2;let b};
-//let AB = {1;2;let .[¬symbol1]}...{let .[¬symbol2]};
-//debugger ab..labels;
-//debugger !!AB[¬symbol1];
-//debugger !!AB[¬symbol2];
-
-//debugger({1}...{1})..length;//FIXED, used to return a length of 0
-
-if <0 !signed jump -> x;//FIXED, this now compiles
+//#a();
+//#(){}()<:{}::{:a;debugger a};//is parsed as the bellow
+//#(){}()<:({}::{:a;debugger a});

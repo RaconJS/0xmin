@@ -199,7 +199,7 @@ let player{:this;
 				//else => above ground
 
 				remove(1);
-			}
+			};
 			#doCollision=doCollision(newPos);
 			push doCollision..return;//call doCollision;
 			def doCollision;

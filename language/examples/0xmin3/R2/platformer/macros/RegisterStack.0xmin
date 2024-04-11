@@ -9,7 +9,7 @@ let var,const,remove,blockScope,getState,save,load,Function;
 let registerStack{#;
 	let dataLen=0;
 	let maxRegisters=14;
-	let consts=[];
+	let consts={};
 	let data;
 	set var(value){:register;
 		void #let value=value;

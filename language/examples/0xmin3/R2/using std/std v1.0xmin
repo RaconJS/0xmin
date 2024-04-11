@@ -246,9 +246,9 @@
 					let regEnum = RegEnum(ignore || 0);
 					let block = do(regEnum);
 					//this..constructor(0xmin.Math.min(+this,+regEnum)<=>this)
-					this.push(ignore || ());//ignores the first (ignore) registers from popping
+					def let push = this.push(ignore || ());//ignores the first (ignore) registers from popping
 					def block;
-					this.pop(ignore || ());
+					def let pop = this.pop(ignore || ());
 				};
 				let weakScope(do){//:#(#(RegEnum)->{@})->{@} ; zero cost abstraction version of blockScope.
 					let reg = this.copy();

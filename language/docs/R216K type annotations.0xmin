@@ -3,33 +3,44 @@
 	$           ; state code
 	#           ; meta, or any label with 'label:#'
 	%           ; register
-	+           ; index
+	+           ; index from array or tuple-like struct ; from the assemly pattern [%obj+obj.prop]
 	*           ; pointer
-	T           ; item of Type T
+	[]          ; array ; can sometimes be used to instead represent a pointer '*'
+	T           ; object of type T
 	T*          ; pointer to value of type T ""
 	Array+Index ; an index from array of type 'Array', that contains item of type 'T'
 	+T          ; an index to value of type T "An index containing T"
 	Array+      ; an index from Array
 	T[]         ; array of type T
-	[]Array     ; item on (object of type T)
+	[]Array     ; item on Array (object of type T)
+	T[l]        ; array of type T with length l
+	[i]Array    ; item from index 'i' on Array
 	{}          ; label or empty object
-	()->T       ; function
+	()          ; undefined label or null label
+	¬           ; null label
+	()->T       ; function ; returning object of type T
 	#()->T      ; meta function
 	@()->T      ; assembly function
 	{}          ;
 	{@}         ; list of assembly code and sometimes data
 	{T;T1}      ; tuple or struct
+	T(A,B)      ; generic similar to `T<A,B>` in other languages like rust. T() can thought of as a function call.
+	<T>         ; generic declaration, tempory type
+
 	int         ; integer
+	usize       ; unsigned int
 	char        ; character
 
 	(...Args)->T ; function that takes in a list of arguments from type 'Args' and returns a value of type 'T'
 	()->mutate label ; function that mutates object 'label'
 	@(pop{A;B})->push{C}; stack based function
 };
+//Note that these are just annotations and are not yet supported outside of comments.
 #(){:example;
 	@(...%[])-> %[] ; register based function
 	#()->{@} ; macro i.e. a meta function that returns a block of assembly code
-}
+	#()->@(%)->% ; macro that generates an assembly function that takes in a register and returns a register.
+};
 #(){:example;
 
 };

@@ -117,7 +117,7 @@
 				def let high=0xffff&(~low);
 			};
 			{
-				{:handle_negativeFloats
+				{:handle_negativeFloats;
 					r sign = r a;
 					r sign ^= r b;
 					r a= r a;

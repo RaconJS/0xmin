@@ -263,6 +263,9 @@ $;{
 				/*:> is ignored in the first short expression. This is to allow type conversions.*/
 				/*e.g.*/let a :> float(2);
 				/*here we make a 'float' with value '2' called 'a'. In this example float is an existing function that takes in two arguments*/
+			//case 3
+			{let=a,=b,=c} -> {let a=a,b=b,c=c}:
+				//for hoisting variables into a new scope
 	//----
 	#let set: label;//creates a new label only if it does not already exist in this block scope.
 	#let set: label.property;//only creates a new property if it does not exist.

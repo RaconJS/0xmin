@@ -8,19 +8,27 @@ ram={
 }
 ]]
 ram=minFilt;
+function loadBinaryFile(name)
+	local file=io.open(name or "", "rb");
+	if not (file) then return "failed" end
+	data=file:read("*all")
+	file.close()
+	return data
+	--return data;
+end
 function tptasm(doLog)
 	local str=nil
-	local arg1 = 0xDEAD
-	if doLog=="log" then str="tptasm.log"end
-	if doLog=="bin" then arg1="minFilt.bin"end
-	return loadfile("tptasm/main.lua")("scripts/minFilt.lua",arg1,str);--tester.asm");
+	local arg1=0xDEAD
+	if doLog=="log" then str="tptasm.log" end
+	if doLog=="bin" then arg1="minFilt.bin" end
+	return loadfile("tptasm/main.lua")("scripts/a.asm",arg1,str);--tester.asm");
 end
 function compile(computer)
-	dofile("scripts/minFilt.lua");
-	ram=minFilt;
-	if not (ramIn==nil) then ram=ramIn end
 	if(computer==1)then
 		--riskete
+		dofile("scripts/minFilt.lua");
+		ram=minFilt;
+		if not (ramIn==nil) then ram=ramIn end
 		startPos={76,128}
 		size={128,32}
 		for i,v in ipairs(ram) do
@@ -32,7 +40,37 @@ function compile(computer)
 			tpt.set_property("tmp",0,n)
 		end
 	else
-		--0xmin
+		oxmin()
+	end
+	tpt.log(startPos[1],startPos[2])
+end
+function oxmin(fileName)
+	--0xmin
+	local file=io.open(fileName or "a.filt", "rb");
+	if not file then return "file not found" end
+	startPos={141,72}
+	if not (x==nil) then startPos[1]=x end
+	if not (y==nil) then startPos[2]=y end	
+	for i=0,627 do --
+		local bytes=file:read(4)
+		if not bytes then break end
+		local value=0
+		for i=1,4 do
+			value=value+bit.lshift(string.byte(bytes,i),i-1)
+		end
+		do
+			local posX,posY;
+			posX=startPos[1]+i
+			posY=startPos[2]
+			tpt.delete(posX,posY)
+			local n=tpt.create(posX,posY,"filt") 
+			tpt.set_property("ctype",value,n)
+			tpt.set_property("tmp",0,n)
+		end
+	end
+    file:close()
+	--[[
+		dofile("scripts/minFilt.lua");
 		startPos={141,72}
 		if not (x==nil) then startPos[1]=x end
 		if not (y==nil) then startPos[2]=y end
@@ -45,8 +83,7 @@ function compile(computer)
 			tpt.set_property("ctype",v,n)
 			tpt.set_property("tmp",0,n)
 		end
-		end
-	tpt.log(startPos[1],startPos[2])
+	]]--
 end
 function subleq()
 	--subleq1

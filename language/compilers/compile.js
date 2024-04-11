@@ -574,6 +574,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(endingStringList.includes(word)){break;}
 					if(metaState["let"]){
 						let value;
+						if(word=="=")throw Error(throwError({index,statement,scope},"# unsupported syntax", "label hoisting (i.e. pattern:`#let = label;`) is not supported yet"));//TODO:
 						({value,index}=contexts.expression_short({statement,index,scope,argsObj:contexts.noPipeLineing}));
 						if(value){
 							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
@@ -1357,8 +1358,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								arg1.toType("label").label||{}
 							];
 							ans=new Variable({
+								...(arg0??{}),
+								name:"<...>",
 								code:[...(arg0?.code??[]),...(arg1?.code??[]),],
-								labels:{...(arg0??{}),...(arg1??{})},
+								labels:{...(arg0?.labels??{}),...(arg1?.labels??{})},
 								scope,
 							}).toValue("label");
 						}
@@ -3667,6 +3670,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		+"%include \"common\"\n"
 		+"start:\n"
 		+outputFile.map(v=>v.match(/\w+:/)?v:"\t"+v).join("\n");
+	let defaultFileName=outputAsBinary()?"a.filt":"a.asm";
 	const fillText=(txt,len,space=" ",map=(t,s)=>t+s)=>map(txt,space.repeat(len-txt.length));
 	const hex30ToStr=(v,len=8)=>{v=(v|0).toString(16);return "0".repeat(len-v.length)+v;};
 	const hex8ToStr=v=>hex30ToStr(v,2);
@@ -3741,7 +3745,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():"")
 		);
 	}
-	return outputBinary;
+	return {file:outputBinary,defaultFileName};
 };
 let buildSettings={makeFile:true}
 {
@@ -3785,18 +3789,14 @@ let buildSettings={makeFile:true}
 			return [inputFile,fileName];
 		})();
 		let outputFile=null;
-		let fileWriter=()=>new Promise((resolve,reject)=>{//minFilt.lua or a.filt
+		let fileWriter=(outputFile,defaultFileName)=>new Promise((resolve,reject)=>{//a.filt
 			let newFileName=process.argv[3];
 			if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
 			//else{console.log("made file")}
-			newFileName??="minFilt.lua";//?? "a.filt" ?? "minFilt.lua";
+			newFileName??=defaultFileName??"a.filt";
 			let fileType=newFileName.match(/(?<=\.)[^.]*$/)?.[0]??"filt";
 			let content=outputFile;
 			if(typeof content!="string"){//content:Uint32Array
-				if(fileType=="lua"){
-					let varName=newFileName.replaceAll(".", "_");
-					content="minFilt={"+outputFile+"}";
-				}
 			}
 			fs.writeFile(newFileName, content, err => {
 				if (err)reject(err);
@@ -3806,8 +3806,8 @@ let buildSettings={makeFile:true}
 		});
 		(async function(){
 			let [inputFile,fileName]=fileLoader;
-			outputFile=oxminCompiler(inputFile,fileName,);
-			await fileWriter();
+			let {file:outputFile,defaultFileName}=oxminCompiler(inputFile,fileName,);
+			await fileWriter(outputFile,defaultFileName);
 			return outputFile;
 		})();
 	}

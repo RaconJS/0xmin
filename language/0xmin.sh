@@ -4,7 +4,9 @@ function useExamples {
 	#to use do
 	./0xmin.sh inputFileName.0xmin -o outputFileName.filt 
 	#or if your using The Powder Toy 
-	./0xmin.sh inputFileName.0xmin minFilt.lua
+	./0xmin.sh inputFileName.0xmin a.filt
+		#or
+		./0xmin.sh inputFileName.0xmin
 }
 function compile {
 	mainfolder=$(dirname ${BASH_SOURCE[0]});
@@ -98,13 +100,16 @@ function compile {
 			fi
 		done
 	
-	#code.0xmin => code.filt or code.lua
+	#code.0xmin => code.filt or code.asm
 	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
 	if [[ $isUsingOutFileNameToExicute == true ]]; then
 		nodejs $mainfolder/compilers/compile.js "$inputFileName" $outFileName; #(nodejs test.js);
 	fi
-	if [[ -f minFilt.lua && -e "$powderToyScriptsFolder" ]]; then #if file exists
-		mv minFilt.lua "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
+	if [[ -f a.filt && -e "$powderToyScriptsFolder" ]]; then #if file exists
+		mv a.filt "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
+	fi;
+	if [[ -f a.asm && -e "$powderToyScriptsFolder" ]]; then #if file exists
+		mv a.asm "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
 	fi;
 	if [[ $isRunningFile == true ]]; then
 		test=0;
