@@ -28,17 +28,16 @@ repeat 0 {
 };
 {
 	let sourceObj = RefList.OwnedSource():>static.use();
-	let array = DynLenObject():>static.use();
-	//array.push({1;2;3;4});
+	let tuple = DynLenObject():>static.use();
+	tuple.push({1;2;3;4;"hello world"});
 	r1 = 5;
 	sourceObj.mallocRef();
-	test(array);
 	sourceObj.mallocRef(Container(DynLenObject()));
 	sourceObj.slice.print();
+	tuple.print({});
 	print("\n");
 	sourceObj.unrefAll();
 	sourceObj.slice.print();
-	#array.size::{def test.arraySize};
 	hlt;
 	jump 0;
 };
