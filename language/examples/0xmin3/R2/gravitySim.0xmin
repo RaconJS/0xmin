@@ -555,7 +555,7 @@
 			let symbol;
 			return = class;
 			class..proto=constructor..prototype;
-			class::{(object){#let object[¬symbol];}};
+			class::{(object){#let object[¬symbol];#delete return}};
 		}::{
 			let ..prototype{
 				let has(object){#;//:bool
