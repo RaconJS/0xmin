@@ -56,11 +56,11 @@ import "std v1.0xmin";
 			def let assignExtraInputs{
 				repeat(!inputs&&!!hasSelf):{
 					meta.if(!!this[¬Static])<:(){
-						%method.inputs.self = [this];//this:@{@}*
+						%foo.inputs.self = [this];//this:@{@}*
 					}||meta.if(!!+Pointer.isPointer(this))<:(){
-						%method.inputs.self = %this;//this:%{@}*
+						%foo.inputs.self = %this;//this:%{@}*
 					}<:(){
-						%method.inputs.self = this;//this:{@}
+						%foo.inputs.self = this;//this:{@}
 					};
 				}
 			};
@@ -100,7 +100,9 @@ import "std v1.0xmin";
 						let typeObj[¬traitObj]..prototype[""...name] =
 							typeObj..prototype[""...name] <=>
 							#(state,getArguments,getOutputs){
-								derive.method.asm(property,this,state,getArguments,getOutputs);
+								let s;
+								let this[¬s]=derive.method.asm;
+								#return = this[¬s](property,this,state,getArguments,getOutputs);
 							}::{
 								let function = property;
 							}
@@ -532,9 +534,9 @@ import "std v1.0xmin";
 };
 ...labelsof{
 	let DynLenObject(data)={//object with dynamic size
-		def let slice = constructor.Slice()||{
+		def let slice = constructor.Slice(data)||{
 			#def let size<=>usize(0);//:@usize
-			#def let data<=>NullableReference(Object,{});//:@any*?
+			#def let data<=>NullableReference(data||Object);//:@any*?
 		};
 		#Wrapper.wrap(this,slice);
 		def let capacity<=>usize(0);//:@usize
@@ -702,7 +704,7 @@ import "std v1.0xmin";
 	});
 	let DynLenObject.Slice()={
 		def let size<=>usize(0);//:@usize
-		def let data<=>NullableReference(Object,{});//:@any*?
+		def let data<=>NullableReference(Object);//:@any*?
 	}:>Type():>Trait.impl((type){
 		let meta_set(label,data){
 			#return = label;
@@ -1149,8 +1151,8 @@ import "std v1.0xmin";
 };
 let String(string){//dynamic string
 	let stringObj = heap.Object(string):>static.use().data[0];
-	let stringObj.print = stringObj.printString;
 	#return = DynLenObject().meta_set(stringObj):>static.use();
+	let return.print = return.printString;
 };
 let str(string){
 	let stringObj = heap.Object(string):>static.use().data;
