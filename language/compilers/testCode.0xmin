@@ -10,3 +10,4 @@ let a{
 //#a();
 //#(){}()<:{}::{:a;debugger a};//is parsed as the bellow
 //#(){}()<:({}::{:a;debugger a});
+//let a1 = {debugger a1;};

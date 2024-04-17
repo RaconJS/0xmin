@@ -1,0 +1,22 @@
+//testing using a type system in normal 0xmin
+//types are functions,
+//a type can start with %,*,+,[],@,$,#,<
+//maybe types can start with £, as the 'type/operator overloading' symbol
+#(){
+	import lib "standard assembly operator overloading.0xmin";
+	let i = %int<:0;
+	let type_int3 = [3]int;
+	let type_intOption = [];
+	let intOption = type_intOption(@);
+	let print:static[] {@}={//`%B<->` == register of (type/value) A contains (type/value) B
+		let string = %&{l:int,[l]char} <: 0;
+		assert(string.l:string+int & string[]int);
+		assert(static[]T:static[]T & static+T);
+		let i = %usize <: 1;
+		i = string.l;//%i = [%string+string.l]
+		${:loop;
+			string.length
+			jump -> loop if > 0;
+		};
+	};
+};

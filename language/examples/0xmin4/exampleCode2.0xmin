@@ -1,0 +1,102 @@
+repeat 0 {
+	let a;
+	$def insert a;$a=>0xmin 2;
+	:b;
+	$debugger +a;
+	debugger b..length;
+};
+
+
+#;//code for the design of the 2nd subleq CPU
+arg1:
+	PC->ram.address;PC++:
+		ram.read:
+			ram.data->buffer;
+	buffer->ram.address:
+		ram.read:
+			ram.data->alu;alu++;
+arg2:
+	PC->ram.address;PC++:
+		ram.read:
+			ram.data->buffer;
+	buffer->ram.address:
+		ram.read:
+			ram.data->alu;alu++;
+		alu->ram.data:
+			ram.write:
+if >= 0:
+	PC++;
+	return;
+if < 0://jump
+	PC->ram.address;PC++:
+		ram.read:
+			ram.data->buffer;
+	buffer->PC;
+	return;
+{//using '=>' for paths that are used multiple times
+	//using '$' to show the movement of signals/command control flow
+	//indentation is used to show that an inner block must happen when it's parent command is still valid (the signal pulse has arived or the data is still flowing)
+	getData.signal:
+		$getData.signal.pulse -> PC.read.latch.1;
+		PC->ram.address;PC++://pulse
+			$PC.signal.pulse->ram.read;
+			ram.data->buffer.set;
+			$ram.pulse=>flipFlop++;
+			$ram.pulse->flipFlop.if;
+			$flipFlop.if.0.pulse->buffer.freeze_andRead.latch.1;
+				buffer->ram.address;
+		$buffer.freeze_andRead.latch.1.pulse->PC.read.latch.0 -> PC.miscSignal1;
+		PC.miscSignal1->alu.2ndRead_aboveALU.latch.1;
+			//assert: this waits for: PC data no longer sent to ram;
+			//note: alu.2ndRead_aboveALU.latch reads data used by the alu
+			$alu.2ndRead_aboveALU.latch.1->ram.read:
+				ram.data->alu;
+				$ram.pulse=>flipFlop++;
+				$flipFlop.if.1.pulse->alu.save;
+				$alu.save->alu++;
+		$alu.save->alu.2ndRead_aboveALU.latch.0;
+		$alu.save->buffer.freeze_andRead.latch.0;
+		$alu.if.0.pulse->await ram to reset:
+			await->getData.signal.pulse;
+	//getData is signaled again before continueing
+	$alu.if.1.pulse->alu.read.latch.1;
+		alu->ram.data:
+		$alu.read->ram.write:
+		alu.negativeBit->checkNegative.arg1.latch.1;//this is a single bit
+		$ram.pulse->checkNegative.pulse;//does the logic gate ; checkNegative is a latch, with a switch gate.
+		$checkNegative.pulse->checkNegative.arg1.latch.0;
+		#if!<0:
+			$checkNegative.(if>=0)->temp1;
+				$temp1->PC++;//temp is just a simple wire
+				$temp1->getData.signal.pulse;
+		#if<0://jump
+			$checkNegative.(if<0)->temp2;
+				$temp2->PC.miscSignal1.blocker.latch.1;//stops flipFlop being triggered
+				$temp2->flipFlop++.blocker.latch.1;//stops flipFlop being triggered
+				$temp2->PC.read.latch.1;
+				$temp2->PC.allowJump.latch.1;
+			PC->ram.address;PC++;
+				$PC.signal.pulse->ram.read;
+				ram.data->buffer.set;
+				#blocked: $ram.pulse -/-> flipFlop++;
+				$ram.pulse->flipFlop.if;
+				$flipFlop.if.0.pulse->buffer.freeze_andRead.latch.1;
+					buffer->ram.address;
+				$buffer.freeze_andRead.latch.1.pulse->PC.read.latch.0 -> PC.miscSignal1;
+		PC.miscSignal1->alu.2ndRead_aboveALU.latch.1;
+
+				$ram.pulse->PC.miscSignal1.blocker.latch.0;
+				$flipFlop.if.0.pulse->buffer.freeze_andRead.latch.1;
+					buffer->ram.address;
+			$buffer.freeze_andRead.latch.1.pulse->PC.read.latch.0 -> PC.miscSignal1;
+
+				#if PC.allowJump.latch.1:
+					$ram.pulse->PC.allowJump.latch.0;
+					$ram.pulse->PC.jump.saveValue;
+			buffer->PC;
+			return;
+	{
+		for address buffer, whenever ram.read.falling edge:
+			$->addressBuffer.clear
+	}
+}

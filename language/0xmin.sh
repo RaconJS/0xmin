@@ -9,7 +9,7 @@ function useExamples {
 		./0xmin.sh inputFileName.0xmin
 }
 function compile {
-	mainfolder=$(dirname ${BASH_SOURCE[0]});
+	mainfolder=$(dirname "${BASH_SOURCE[0]}");
 	#process inputs
 		inputFileName=$1;
 		outFileName=$2;

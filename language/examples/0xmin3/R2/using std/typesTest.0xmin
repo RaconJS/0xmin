@@ -4,8 +4,43 @@
 import "type.0xmin";
 let string = String("hello world");
 string.print();
+string.push("!");
+RegEnum().weakScope()<:(reg){
+	[string.size] = 0;
+	string.push("\p00\p00this may look like an ordinary string.");
+	string.print();
+	let data = reg();
+	%data = [string.data];//:%char[]*
+	let temp = reg();
+	%temp = "\c08";
+	[%data+1] = %temp;
+	string.push("\nBut this is a dynamic string!");
+	let const_0 <-> data;
+	
+	{let i = reg();
+	for.doFor(i,
+		(i){r i = [string.capacity];
+			//print.register(i);
+			print("\p00",const_0);},
+		(i,continue){jump -> continue if >=0},
+		(i){r i-=1},
+		(i){print(".",const_0,{})}
+	)};
+	print("\p00\c0f",const_0,{});
+	string.print();
+	{:reduce_string_capacity;
+		r heap.resize.inputs.object = [string.data];
+		r heap.resize.inputs.size = [string.size];
+		heap.resize.call();
+		[string.capacity] = r heap.resize.outputs.size;
+	};
+	{:cleanUp;
+		r heap.free.inputs.(0) = [string.data];
+		heap.free.call();
+	};
+};
 ${:data;
 	hlt;
-	def heap.memory;
 	def static.memory;
+	def heap.data;
 };

@@ -1117,10 +1117,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						let name,nameFound=false;
 						if(word!="["){index++;word=statement[index]??"";}
 						//optional expression
-						if(isInternal&&["@", "$", "#"].includes(word)){//'a..@' ?
+						if(isInternal&&["@", "$", "#"].includes(word)){//'a..@' 'a..$' 'a..#' ?
 							name=word;
 							nameFound=true;
 							index++;
+							if(word=="@"&&statement[index]=="$"){//'a..' ?
+								name+="$";
+								index++;
+							}
 						}else if(word.match(nameRegex)){//'a.b' ?
 							name=word;
 							nameFound=true;

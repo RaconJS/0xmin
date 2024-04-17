@@ -279,6 +279,20 @@
 			repeat arguments..length
 		}
 	};
+	let awaitInput(outputReg,doWhile_wait,miniProcess,portReg){
+		let hasPort = !!portReg;
+		let hasOutputReg = !!outputReg;
+		repeat !+hasPort #{
+			#portReg = outputReg||0 +1 %14;//:%
+			let storeRegs;
+		};
+		repeat !+hasPort push %portReg;
+		${:waitLoop;
+			wait %portReg;
+			jump->waitLoop if==0;
+		};
+		repeat !+hasPort pop %portReg;
+	};
 	let getInput(portReg,outputReg,wait,doWhile,miniProcess){//:#(%,out %char,#bool,{@}?,{@}?)->{@}
 		:this;
 		def let bumpLoop{
@@ -290,11 +304,11 @@
 		bump %portReg;
 		def miniProcess||{};//using the 14
 		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
-		def let syncLoop{
+		repeat !!outputReg def let syncLoop{
 			recv %outputReg %portReg;
 			jump -> ..this if !carry;
 		};
-		let test(string,tempReg)=>{//(string,%)->{@} ; builder pattern
+		let testInput(string,tempReg)=>{//(string,%)->{@} ; builder pattern
 			let i;
 			:self;
 			push %tempReg;

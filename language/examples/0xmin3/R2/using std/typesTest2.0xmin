@@ -1,0 +1,30 @@
+import "type.0xmin";
+let enum <=> Trait()<:(type,values){
+	...labelsof codeof enum.baseEnum(type,values);
+	meta.forEach(values)<:(case,i){
+		#case::(){
+			#return::{
+				def let .[¬type]{def let .[¬case](+case)};
+			};
+		};
+	};
+	#type::(){
+		
+	};
+	#values..compile;
+}¬::{
+	let case;
+	let baseEnum(type,valueSubSet){#;
+		let values = valueSubSet;
+		...labelsof values;
+	};
+	let subset<=>Trait()<:(type,valueSubSet){
+		...labelsof codeof baseEnum(type,values);
+	};
+};
+let enum1:>enum()<:{
+	def let a(){0;0},b,c;
+};
+let enum2:>enum.subset()<:{
+	enum1.a;enum1.b;
+};

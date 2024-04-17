@@ -35,7 +35,16 @@ function main {
 		unpack_for_sublimetext $sublimetext
 	)
 	echo 2-2/2: checking for the the-powder-toy
-	echo this section is UNFINISHED. Please move across the appropriate files into ThePowderToy 
+	if ! command -v "the-powder-toy"; then
+	    echo the-powder-toy is missing
+	    yes_or_no install the-powder-toy from snap\? && installTPT
+	else 
+		echo the-powder-toy found
+	fi
+	sublimetext= "~/.config/sublime-text-3/Packages/0xmin"
+	yes_or_no use the file location: $sublimetext\? ||
+	read -e -p "enter new file path for the sublimetext syntax package" sublimetext
+	unpack_for_sublimetext $sublimetext
 }
 function unpack_for_sublimetext {
 	echo unpacking Sublime Text files
@@ -45,12 +54,15 @@ function unpack_for_thePowderToy {
 	cp -r the_powder_toy $1
 }
 function installNode {
-	return 0
 	echo installing node.js 16;
 	sudo apt-get update;
 	curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -;
 	sudo apt-get install -y nodejs;
 	nodejs --version;
+}
+function installTPT {
+	echo installing the-powder-toy;
+	sudo snap install the-powder-toy;
 }
 function yes_or_no {
     read -e -p "$* [Y/n]:" choice
