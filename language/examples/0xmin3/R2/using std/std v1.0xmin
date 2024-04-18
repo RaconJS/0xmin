@@ -171,7 +171,7 @@
 			//even though it used macros and '...run' (aka macro injection), it is private, and only used in a similar scope so it should not be too much of an issue.
 		};
 		let RegEnum(start)={//register enum
-			//a block of used registers starting from r0.
+			//a consecitive block of used registers starting from r0.
 			#this<->(start||0);
 			//assert: +this == next free regester
 			//assert: +this == number of registers used
@@ -279,61 +279,65 @@
 			repeat arguments..length
 		}
 	};
-	let awaitInput(outputReg,doWhile_wait,miniProcess,portReg){
-		let hasPort = !!portReg;
-		let hasOutputReg = !!outputReg;
-		repeat !+hasPort #{
-			#portReg = outputReg||0 +1 %14;//:%
-			let storeRegs;
-		};
-		repeat !+hasPort push %portReg;
-		${:waitLoop;
-			wait %portReg;
-			jump->waitLoop if==0;
-		};
-		repeat !+hasPort pop %portReg;
-	};
-	let getInput(portReg,outputReg,wait,doWhile,miniProcess){//:#(%,out %char,#bool,{@}?,{@}?)->{@}
-		:this;
-		def let bumpLoop{
-			def doWhile||{};
-			wait %portReg;
-			repeat !!wait:jump -> ..this if sign;
-			repeat !wait:jump -> this..return if !sign;
-		};
-		bump %portReg;
-		def miniProcess||{};//using the 14
-		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
-		repeat !!outputReg def let syncLoop{
-			recv %outputReg %portReg;
-			jump -> ..this if !carry;
-		};
-		let testInput(string,tempReg)=>{//(string,%)->{@} ; builder pattern
-			let i;
-			:self;
-			push %tempReg;
-			%tempReg = [i];
-			%tempReg - string..length;
-			{:block;
-				jump->block..return if >= 0;//when out of chars, use user input as normal
-				[i] += 1;
-				doWhile;
-				%outputReg = [string + %tempReg];
-				pop %tempReg;
-				miniProcess;
-				jump -> self..return;
-				{:data;
-					def string;
-					@0 #def i;
-				};
+	let getInput(outputReg,await_bool,doWhile_wait,miniProcess,portReg){//:#(%?,#?,{@}?,{@}?,%?)->{@} & @mutate terminal
+		repeat !await_bool : awaitInput(outputReg,doWhile_wait,miniProcess,portReg);
+		repeat !!await_bool: checkInput(outputReg,miniProcess,portReg);
+	}::{
+		let awaitInput(outputReg,doWhile_wait,miniProcess,portReg){//:#(%?,{@}?,{@}?,%?)->{@} & @mutate terminal
+			let hasPort = !!portReg;
+			let hasOutputReg = !!outputReg;
+			repeat !+hasPort #{
+				#portReg = outputReg||0 +1 %14;//:%
+				let storeRegs;
 			};
-			pop %tempReg;
-			hlt;
-			def let a;
-			jump->a;
-			//def this;
+			repeat !+hasPort push %portReg;
+			def let waitLoop{
+				repeat !!doWhile_wait def doWhile_wait||{};
+				wait %portReg;
+				jump -> waitLoop if !sign;
+			};
+			repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
+			repeat !!miniProcess def miniProcess;
+			repeat !!+hasOutputReg def let getOutputLoop{
+				recv %portReg %outputReg;
+				jump -> getOutputLoop if !carry;
+			};
+			repeat !+hasPort pop %portReg;
+			let testInput(string)=>{//(string,%)->{@} ; builder pattern
+				let i;
+				let tempReg = 0;
+				:self;
+				push %tempReg;
+				%tempReg = [i];
+				%tempReg - string..length;
+				{:block;
+					jump->block..return if >= 0;//when out of chars, use user input as normal
+					[i] += 1;
+					doWhile;
+					%outputReg = [string + %tempReg];
+					pop %tempReg;
+					miniProcess;
+					jump -> self..return;
+					{:data;
+						def string;
+						@0 #def i;
+					};
+				};
+				pop %tempReg;
+				def return;
+			};
 		};
+		let await = awaitInput;
+		let checkInput(outputReg,miniProcess,portReg){//:#(%?,{@}?&@[0-14]?,%?)->{@} & @mutate terminal
+			awaitInput(outputReg,(),miniProcess,portReg)::{
+				undef waitLoop;
+				delete waitLoop;
+			};
+		};
+		let check = checkInput;
 	};
+	let awaitInput = getInput.awaitInput;
+	let checkInput = getInput.check;
 	...labelsof(){
 		let for(i,start,condision,next,do)={//(?%,?#(%)->{@},?#(%,$(break|continue),isContinue:#int&bool)->{@},#(%)->{@})
 			#(){

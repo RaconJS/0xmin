@@ -27,9 +27,7 @@ let main;
 		}..@;
 		let const_0 = 0;
 		print(string,const_0);
-		#def getInput(const_0,(),{})::{
-			undef syncLoop;
-		};
+		#def awaitInput(const_0,(),{});
 		let i = 1;
 		let a = meta.forEach(string,(v){
 			@(""...(¬" \n")[+v==+"\n"])
@@ -230,7 +228,7 @@ let main;
 	#let OS{
 		let syscall
 	};
-	//import this "shell and terminal.0xmin";
+	repeat 0 import this "shell and terminal.0xmin";
 	def let testFunction1{
 		nop;//print function
 		print("???");
@@ -242,8 +240,13 @@ let main;
 		print("hello world");
 		return;
 	};
-	repeat 0 let FileSystem{
-		import "typesTest.0xmin";
+	let FileSystem{
+		repeat 0 let Type{
+			import "type.0xmin";
+			:self;
+			#self<=>type...self;
+			delete self;
+		};
 		let reg = RegEnum();
 		repeat 0 let FileType(){
 			#def let value{0};
@@ -260,7 +263,7 @@ let main;
 			let enum = meta.enum();
 			let 
 				Data(){
-					//:@&{isEnd:@bool,:int16}
+					;//:@&{isEnd:@bool,:int16}
 				} <-> enum() ::{},
 				Executable(){
 					;
@@ -274,13 +277,10 @@ let main;
 			;
 		};
 		let File(){
-			def let name:>String();
+			def let name:>LenString();
+			def let data:>DynLenObject();
 			def let type:>FileType();
-			def let size:>int();
-			def let data:>Array()<:any();
 		};
-		let a = DynLenObject();
-		#a.push();
 	}:>static();
 	repeat 0 #FileSystem[¬static].use();
 };

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #search words: TODO, UNFINISHED
+source ../settings.sh
 function main {
 	#TODO: test and UI
 	#TODO: complete file
-	echo Welcome to the 0xmin setup helper.
+	echo Welcome to the 0xmin installation helper.
 	echo This program is meant to be an alternative to moveing and installing files manually.
 	yes_or_no continue\? || exit
 	echo 1/2: dependancies: nodejs version 16+, sublimeText, the-powder-toy
@@ -29,22 +30,22 @@ function main {
 		if test -f $sublimetext;then
 			echo sublimeText found #echo it appears there is already an 0xmin package in sumblimetext\?
 		fi
-		sublimetext= "~/.config/sublime-text-3/Packages/0xmin"
+		sublimetext="$pathTo_SublimeText_0xminPackage"
 		yes_or_no use the file location: $sublimetext\? ||
 		read -e -p "enter new file path for the sublimetext syntax package" sublimetext
 		unpack_for_sublimetext $sublimetext
 	)
 	echo 2-2/2: checking for the the-powder-toy
+	tptPath=$pathTo_ThePowderToy
 	if ! command -v "the-powder-toy"; then
 	    echo the-powder-toy is missing
 	    yes_or_no install the-powder-toy from snap\? && installTPT
 	else 
 		echo the-powder-toy found
 	fi
-	sublimetext= "~/.config/sublime-text-3/Packages/0xmin"
-	yes_or_no use the file location: $sublimetext\? ||
-	read -e -p "enter new file path for the sublimetext syntax package" sublimetext
-	unpack_for_sublimetext $sublimetext
+	yes_or_no use the file location: $tptPath\? ||
+	read -e -p "enter new file path for the TPT 0xmin scripts and TPT 0xmin computer save" tptPath
+	unpack_for_thePowderToy $tptPath
 }
 function unpack_for_sublimetext {
 	echo unpacking Sublime Text files
@@ -84,6 +85,5 @@ function uninstall {
 	sudo apt-get update;
 	sudo apt-get remove nodejs;
 	mv ~/.config/sublime-text-3/Packages/0xmin syntax_for_sublimeText
-
 }
 main

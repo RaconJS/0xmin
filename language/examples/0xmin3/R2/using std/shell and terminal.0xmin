@@ -787,7 +787,7 @@
 					%cursor = [IO.cursorPos];
 					let miniProcess;
 					def let loop;
-					def getInput(temp,char,{},
+					def awaitInput(char,
 						{
 							%i -= 1;
 							:block;
@@ -804,7 +804,7 @@
 							let tempReg = reg.copy()();
 							IO.cursorPos.increment(1,cursor);
 							send %const_0 "\c0f";
-						}
+						},temp
 					)::{
 						#let maxI.loopLen <-> ..this[0]..@..length;
 						repeat !!SETTINGS.useTestInput: #..this <=> {def ..this.test(

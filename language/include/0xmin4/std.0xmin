@@ -1,3 +1,4 @@
+#"0xmin";
 #"len";
 let Int()={
 	#this(v)={
@@ -143,6 +144,6 @@ let getInput(waitUntillInput){//:#(bool)->{@}
 getInput(1);
 set_jump;
 repeat 3 null;
-move->0xmin;
+move=>0xmin;
 jump->0xmin;
 //def stack;

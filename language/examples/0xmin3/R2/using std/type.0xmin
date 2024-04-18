@@ -539,7 +539,7 @@ import "std v1.0xmin";
 	};
 };
 ...labelsof{
-	let DynLenObject(data)={//object with dynamic size
+	let DynLenObjectPtr(data)={//:{@[l]*,@l,@(>=l)} ; object with dynamic size
 		def let slice = constructor.Slice(data)||{
 			#def let size<=>usize(0);//:@usize
 			#def let data<=>NullableReference(data||Object);//:@any*?
@@ -554,12 +554,12 @@ import "std v1.0xmin";
 			#return.size <=> usize(data..@..length);
 			#return.capacity <=> usize(data..@..length);
 		}::{let .[¬Trait.asMethod.meta]=¬};
-		let push{//:@(%(self&DynLenObject)*,ref:%@*)->([%ref]: %(@self*?)*) & mutate self
+		let push{//:@(%(self&DynLenObjectPtr)*,ref:%@*)->([%ref]: %(@self*?)*) & mutate self
 			let static = Static();
 			let reg = RegEnum();
 			let regsUsed;
 			let inputs = {
-				def let self = reg()<=>Pointer()<:DynLenObject();//:%DynLenObject*
+				def let self = reg()<=>Pointer()<:DynLenObjectPtr();//:%DynLenObjectPtr*
 				def let size = reg()<=>usize();//:%usize
 			};
 			let outputs = {
@@ -639,7 +639,7 @@ import "std v1.0xmin";
 										[%newArray + %i] = %item;
 									};
 								};
-								//assert: newArray:%DynLenObject().data*
+								//assert: newArray:%DynLenObjectPtr().data*
 							};
 							[%store.self + store.self.data] = %newArray;
 							r0 = %oldArray;
@@ -674,7 +674,7 @@ import "std v1.0xmin";
 						<:(){%inputs.self = %this}
 						<:(){%inputs.self = this}
 					;
-					repeat !newItem throw "method 'DynLenObject.push' requires an object";
+					repeat !newItem throw "method 'DynLenObjectPtr.push' requires an object";
 					%inputs.size = #((+isNumber&&newItem) || (newItem[¬Pointer].size||newItem..@..length));
 					call ..this.use();
 					def pushFunction(newItem,isNumber)||meta.if(!+isNumber)<:(){
@@ -717,11 +717,11 @@ import "std v1.0xmin";
 			let regsUsed;
 			let reg = RegEnum();
 			let inputs{
-				let self = Pointer():>DynLenObject()<->reg();
+				let self = Pointer():>DynLenObjectPtr()<->reg();
 				let size = int()<->reg();
 			};
 			let outputs{
-				let self = Pointer():>DynLenObject()<->reg();
+				let self = Pointer():>DynLenObjectPtr()<->reg();
 			};
 			{:block;
 				let end = block..return;
@@ -739,9 +739,9 @@ import "std v1.0xmin";
 			#regsUsed <-> reg;
 		};
 	});
-	let DynLenObject.Slice()={
-		def let size<=>usize(0);//:@usize
+	let DynLenObjectPtr.Slice()={//:{@[l]*,@l}
 		def let data<=>NullableReference(Object);//:@any*?
+		def let size<=>usize(0);//:@usize
 	}:>Type():>Trait.impl((type){
 		let meta_set(label,data){
 			#return = label;
@@ -752,7 +752,7 @@ import "std v1.0xmin";
 			let regsUsed = 0;
 			let reg = RegEnum();
 			let inputs = {
-				def let self = Pointer()<:DynLenObject.Slice()<->reg();
+				def let self = Pointer()<:DynLenObjectPtr.Slice()<->reg();
 			};
 			let outputs = {
 				def let self = inputs.self;
@@ -784,7 +784,7 @@ import "std v1.0xmin";
 				#return = this:>static.use();
 			};
 			let inputs{
-				def let self = Pointer()<:DynLenObject.Slice()<->0;
+				def let self = Pointer()<:DynLenObjectPtr.Slice()<->0;
 			};
 			let outputs{
 				def let self = inputs.self;
@@ -863,28 +863,14 @@ import "std v1.0xmin";
 			#regsUsed <-> 0;
 		};
 	});
-	#DynLenObject:>Trait.impl()<:(type){
+	#DynLenObjectPtr:>Trait.impl()<:(type){
 		let printArrayObject = Slice.printArrayObject;
 		let printString = Slice.printString;
 	};
 	let ArraySlice(templateObject,items)={
-		#this<=>constructor.fromType[¬DynLenObject.Slice](DynLenObject.Slice(),typeTemplate);
+		#this<=>constructor.fromType[¬DynLenObjectPtr.Slice](DynLenObjectPtr.Slice(),typeTemplate);
 	}:>Type():>ToType()::{
-		#let fromType[¬DynLenObject.Slice](slice,typeTemplate){
-			#return = ArraySlice()::{
-				def let array = slice;
-				let item{
-					let template = typeTemplate;
-					let size = typeTemplate..@..length;
-				};
-				#Wrapper.wrap(return,array);
-			};
-		};
-	};
-	let ArraySlice(templateObject,items)={
-		#this<=>constructor.fromType[¬DynLenObject.Slice](DynLenObject.Slice(),typeTemplate);
-	}:>Type():>ToType()::{
-		#let fromType[¬DynLenObject.Slice](slice,typeTemplate){
+		#let fromType[¬DynLenObjectPtr.Slice](slice,typeTemplate){
 			#return = ArraySlice()::{
 				def let array = slice;
 				let item{
@@ -895,8 +881,8 @@ import "std v1.0xmin";
 			};
 		};
 	}¬:>Trait.impl()<:(type){
-		#let meta_set = DynLenObject.meta_set;
-		#let push = DynLenObject.push;
+		#let meta_set = DynLenObjectPtr.meta_set;
+		#let push = DynLenObjectPtr.push;
 	};
 	let RefList()={
 		#return = RefList.OwnedSource();
@@ -904,13 +890,12 @@ import "std v1.0xmin";
 		//RefList is a type of smart pointer,
 		let RefObject()={//:Type{([]source&{@}*)*,source:OwnedSource,@any}
 			let data;
-			def let itemRef <=> Pointer()<:Item(OwnedSource().refs)<:Pointer()::{#object=data}
-			;
+			def let itemRef <=> Pointer()<:Item(OwnedSource().refs)<:Pointer()::{#object=data};
 			def let owner <=> Pointer(self);
 			def data <=> Object();
 		}:>Type();
-		let OwnedSource()={//:Type<:DynLenObject<:Ref*[]
-			def let refs <=> DynLenObject();//:DynArray<owned<*>>
+		let OwnedSource()={//:Type<:DynLenObjectPtr<:Ref*[]
+			def let refs <=> DynLenObjectPtr();//:DynArray<owned<*>>
 			#Wrapper.wrap(this,refs);
 			let [¬OwnedSource]{...labelsof this};
 		}:>Type():>Trait.impl()<:(type){
@@ -935,7 +920,7 @@ import "std v1.0xmin";
 					#return = ..this;
 					#:static.use(..this);
 					#:static.use(heap.malloc);
-					#:static.use(DynLenObject.push.use());
+					#:static.use(DynLenObjectPtr.push.use());
 				};
 				let regsUsed;
 				let reg = RegEnum();
@@ -961,22 +946,22 @@ import "std v1.0xmin";
 					};
 					let ref;
 					{:push;
-						#let reg = RegEnum(DynLenObject.push.regsUsed);
+						#let reg = RegEnum(DynLenObjectPtr.push.regsUsed);
 						#let storeTemp{repeat 1 reg()};
 						#let storeTemp.ref = ref = #({}<=>newRef)<->storeTemp[0];
 						@: %storeTemp.ref = %newRef;
-						@: %DynLenObject.push.inputs.self = %temp_self;
-						@: %DynLenObject.push.inputs.size = 1;
-						@: call DynLenObject.push;
-						#meta.assert(+outputs.self==+DynLenObject.push.outputs.self);
-						@: [%DynLenObject.push.outputs.newItem] = %storeTemp.ref;
-						@: [%storeTemp.ref+storeTemp.ref.itemRef] = %DynLenObject.push.outputs.newItem;
+						@: %DynLenObjectPtr.push.inputs.self = %temp_self;
+						@: %DynLenObjectPtr.push.inputs.size = 1;
+						@: call DynLenObjectPtr.push;
+						#meta.assert(+outputs.self==+DynLenObjectPtr.push.outputs.self);
+						@: [%DynLenObjectPtr.push.outputs.newItem] = %storeTemp.ref;
+						@: [%storeTemp.ref+storeTemp.ref.itemRef] = %DynLenObjectPtr.push.outputs.newItem;
 					};
 					%outputs.newItem = %ref;
 					%outputs.newItem += ref.data;
 				};
 				return;
-				#regsUsed <-> 0xmin.max(heap.malloc.regsUsed,DynLenObject.push.regsUsed);
+				#regsUsed <-> 0xmin.max(heap.malloc.regsUsed,DynLenObjectPtr.push.regsUsed);
 			};
 			let unref{//:@(%,%)->(%,fail:flag(sign?))
 				let .[¬Trait.asMethod.asm] = ¬;
@@ -1117,7 +1102,7 @@ import "std v1.0xmin";
 		let doOnUse(foo){
 			#list..splice(-0,0,{()=>{#return{foo}}});
 		}::{let list};
-		//almost same code as DynLenObject.Slice.printArrayObject
+		//almost same code as DynLenObjectPtr.Slice.printArrayObject
 		def:{
 			let obj = heap.Object.pointer=()<->reg();
 			let size = reg();//:%sizeOf obj.data
@@ -1173,7 +1158,7 @@ import "std v1.0xmin";
 			def let registers{
 				repeat 14 0;
 				def let stackIndex{0};
-				def let stack <=> DynLenObject();	
+				def let stack <=> DynLenObjectPtr();	
 			};
 		};
 		def let objects = Process();
@@ -1202,7 +1187,7 @@ import "std v1.0xmin";
 				{
 					[%self+array.size] = 0;
 					%self+=array;
-					(DynLenObject()<->self).push();
+					(DynLenObjectPtr()<->self).push();
 					meta.unimplemented();
 				};
 				for.doFor(reg(),
@@ -1231,19 +1216,32 @@ import "std v1.0xmin";
 		def let references{0};//Process*[]*
 		def let ownedStaticObjects{0};//
 	}:>Type():>StoredProcess[¬Trait]();
+	let LenObject(_size,_object)={
+		def let size <=> usize();
+		def let object <=> Object();
+		#:set(_size,_object);
+	}:>Type():>Trait.impl()<:(type){
+		let: meta_set(lenObject,len,object){
+			#lenObject.size[0]=len||object..@..length;
+			#lenObject.object<=>{object};
+		}::{let .[¬Trait.asMethod.meta];};
+	};
 };
-let String(string){//dynamic string
+let LenString(string){//{@;char[l]}
+	#return = LenObject().meta_set((),string):>static.use();
+};
+let String(string){//dynamic string; :{@char[l]*;@l;@}
 	let stringObj = heap.Object(string):>static.use().data[0];
-	#return = DynLenObject().meta_set(stringObj):>static.use();
+	#return = DynLenObjectPtr().meta_set(stringObj):>static.use();
 	let return.print = return.printString;
 };
-let str(string){
+let str(string){//string slice
 	let stringObj = heap.Object(string):>static.use().data;
-	#return = DynLenObject().meta_set(stringObj).slice:>static.use();
+	#return = DynLenObjectPtr().meta_set(stringObj).slice:>static.use();
 };
 repeat 0 {:example;
 	let string = "Hello, world":>static.use().data;
-	let list = DynLenObject().meta_set(string):>static.use();
+	let list = DynLenObjectPtr().meta_set(string):>static.use();
 	list.print();
 	list.push("!");
 	print("\n");
