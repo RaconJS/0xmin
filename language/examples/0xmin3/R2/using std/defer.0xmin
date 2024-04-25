@@ -1,0 +1,13 @@
+let defer(foo){//:#(#()->{@})
+	(){foo()};
+	#return..constructor.deferedFunctions..splice(-0,0,{return}};
+	let foo[¬return..constructor];
+}::{
+	let deferedFunctions;//:Fn[]
+	let compile(){
+		let i = -1;
+		repeat deferedFunctions..length:
+			data::{deferedFunctions[i+=1](data)};
+	};
+	let data;
+};

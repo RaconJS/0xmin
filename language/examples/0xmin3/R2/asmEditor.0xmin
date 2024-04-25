@@ -93,7 +93,7 @@ let main(){
 		def let outOfMemory{
 			call fail;
 			print("\c10ERROR:\nout of memory\c0f");
-			hault;
+			//hault;
 			return;
 		};
 	}:>var();
@@ -503,7 +503,8 @@ let main(){
 	}:>var();
 	{
 		call machineCodeEditor;
-		hault;
+		//hault;
+		return;
 	};
 };
 def allMain();

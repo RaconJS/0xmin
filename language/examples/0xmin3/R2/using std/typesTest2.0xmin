@@ -1,3 +1,4 @@
+#"table";
 import "type.0xmin";
 let enum <=> Trait()<:(type,values){
 	...labelsof codeof enum.baseEnum(type,values);
@@ -19,7 +20,8 @@ let enum <=> Trait()<:(type,values){
 		...labelsof values;
 	};
 	let subset<=>Trait()<:(type,valueSubSet){
-		...labelsof codeof baseEnum(type,values);
+		#return = type||return;
+		#return <=> return ... baseEnum(type,values);
 	};
 };
 let enum1:>enum()<:{
@@ -28,3 +30,4 @@ let enum1:>enum()<:{
 let enum2:>enum.subset()<:{
 	enum1.a;enum1.b;
 };
+awaitInput((),{nop},{nop;nop});

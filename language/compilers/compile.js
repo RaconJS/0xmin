@@ -362,7 +362,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			)return{index,value:newScope};
 			//if(scope.label.code.length==0)
 			parsing:{
-				if(word==":"&&statement[index+1].match(/^\w+$/)&&(statement[index+2]??"").match(/^(;?)$/)){
+				if(word==":"&&statement[index+1]?.match?.(/^\w+$/)&&(statement[index+2]??"")?.match?.(/^(;?)$/)){
 					//'{:label;}' similar to `label:{break label}` in JS
 					index++;//index => label name
 					let word=statement[index];
@@ -2581,7 +2581,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				labels={//'a..b'
 					///(Variable)=>Value
 					//"foo":({label,value,scope})=>new Value({type:"number",number:2}),
-					"toJSON":({label,scope})=>new Value.String("`"+JSON.stringify(require("./JSON.js").listify(label).cloned)+"`",0,scope),
+					"toJSON":({label,scope})=>new Value.String("`"+JSON.stringify(require("./JSON.js").listify(label,labelData_classes).cloned)+"`",0,scope),
 					"length":({label})=>new Value.Number(label.code.length),
 					"splice":new BuiltinFunctionFunction("splice",({label,args,value,scope})=>{
 						args[0]??=new Value.Number(0);
@@ -3107,6 +3107,38 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				Object.assign(this,data??{});
 			}
 		}
+		const labelData_classes = {//all classes that can be accessed from a label object
+			Statement,
+			Value,
+			CpuState,
+			CodeLine,
+			AssemblyLine,
+			HiddenLine,
+			Define:HiddenLine.Define,
+			DefineReturn:HiddenLine.DefineReturn,
+			RelocateCurrentLineNumber:HiddenLine.RelocateCurrentLineNumber,
+			SetLabelOrPointer:HiddenLine.SetLabelOrPointer,
+			Virtual:HiddenLine.Virtual,
+			Void:HiddenLine.Void,
+			Debugger:HiddenLine.Debugger,
+			MetaLine,
+			Parameter,
+			Variable,
+			BuiltinFunction,
+			BuiltinFunctionFunction,
+			InternalValue,
+			Return,
+			StateLabel,
+			MacroFunction,
+			Pointer,
+			MachineCode,
+			Scope,
+			CodeObj:Scope.CodeObj,
+			GlobalScope,
+			ObjectScope,
+			BlockScope,
+			FunctionScope,
+		};
 	//----
 	const assembler={//oper,label
 		tptasm:new class InstructionSet extends Language{
@@ -3621,7 +3653,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				"language":new BuiltinFunction("language",({args})=>{
 					if(args[0]){//args[0]:Value
 						let str=args[0].toType("string").string;
-						if(["tptasm", "0xmin"].includes(str)){
+						if(["text", "int", "tptasm", "0xmin"].includes(str)){
 							assemblyCompiler.assembly.setLanguage(str);
 						}
 					}
@@ -3647,8 +3679,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				Object.doubleFreeze(this.labels);
 			}
 		}),
-		toJSON(){return "class:0xmin"}
-	})});
+	}),toJSON(){return "class:0xmin"}});
 	{
 		globalScope.label.prototype=mainObject;
 		globalScope.label.labels={"0xmin":mainObject};
@@ -3662,14 +3693,18 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	};
 	let outputAsBinary=()=>["0xmin", "int", "text"].includes(assemblyCompiler.assembly.language);
 	let parts=inputFile;
-	parts=parseFile(parts,fileName);
+	parts=parseFile(parts);
 	parts=bracketPass(parts);
 	parts=evalBlock(parts);
 	parts=evalAssembly(parts);
 	//chars->words->expression->statement->codeObj->block
 	//
 	let outputFile=outputAsBinary()?parts.asBinary():parts.asAssembly();
-	let outputBinary=outputAsBinary()?new Uint32Array(outputFile):
+	let outputBinary=outputAsBinary()?
+		(
+			assemblyCompiler.assembly.language=="text"?new Uint8Array(outputFile)
+			:new Uint32Array(outputFile)
+		):
 		""//"_Model \""+compileData.model+"\"\n"//R216K2A
 		+"%include \"common\"\n"
 		+"start:\n"
@@ -3810,6 +3845,9 @@ let buildSettings={makeFile:true}
 		});
 		(async function(){
 			let [inputFile,fileName]=fileLoader;
+			if(fileName.match(process.env.HOME)?.index==0){
+				fileName=fileName.replace(process.env.HOME,"~");
+			}
 			let {file:outputFile,defaultFileName}=oxminCompiler(inputFile,fileName,);
 			await fileWriter(outputFile,defaultFileName);
 			return outputFile;

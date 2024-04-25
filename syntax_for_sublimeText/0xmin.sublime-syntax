@@ -48,6 +48,7 @@ variables:
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
   tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b'
+  meta_statementTypes: '\b(?:let|set|def)\b'
 contexts:
   main:
     - match: '^'
@@ -378,6 +379,8 @@ contexts:
       captures:
         1: keyword.inject.0xmin
         2: keyword.declaration.inject.0xmin
+    - match: '#{{meta_statementTypes}}'
+      scope: keyword.declaration.meta.0xmin
     - match: '\.\.'
       push: internalScope
     - match: \.
@@ -446,13 +449,13 @@ contexts:
       scope: support.constant
     - match: '\b(r[0-9]|r1[0-5]|ip|sp)\b'
       scope: support.constant
-    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask)\b'
+    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask|push|pop|mov|send)\b'
       scope: keyword.control
     - match: '{{assembly_commands_start}}\b(invoke|do)\b'
       scope: keyword.control
 
 
-    - match: '\b(?:let|def|set|undef)\b'
+    - match: '\b(?:{{meta_statementTypes}}|undef)\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|caller)\b'
       scope: variable.parameter

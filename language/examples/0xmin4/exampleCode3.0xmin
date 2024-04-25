@@ -1,3 +1,4 @@
+#"len";#"table";
 //testing using a type system in normal 0xmin
 //types are functions,
 //a type can start with %,*,+,[],@,$,#,<
@@ -19,4 +20,22 @@
 			jump -> loop if > 0;
 		};
 	};
+};
+#(){
+	@{},${},#{} as actuall statement types;
+	@//assembly code and code insertion
+	$//state code
+	#let:a;
+	#set:a;
+	#def:a;
+	@{};//insert block
+	${};//(address or state) block
+	#{};//default block
+	{//$def insert #{}
+		let a = 2;
+		1;2;3
+	};//
+	${
+
+	}
 };

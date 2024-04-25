@@ -230,6 +230,21 @@
 				r0 = 0;
 				r1 = 0;
 			};
+			def let deleteOsData{//removes all non-static os data;
+				let commandData{
+					let name = "del";
+					let argsLength = 0;
+					let returnsVal = ¬;
+				};
+				let const_0 = 1;
+				print("\p00\c0fwiping os data.",const_0);
+				call clear;
+				print("\c0f\p00",const_0,{});
+				r0 = 0x7fff;
+				[heap.page0.next] = r0;
+				let i = -1;
+				repeat 16 r#(i+=1) = 0;
+			};
 			def let textEditor{
 				let commandData{
 					let name = "vim";
@@ -252,32 +267,34 @@
 					let argsLength = 2;
 					let returnsVal = ¬;
 				};
-				let i,max;
-				%i = r0;
-				%max = r1;
-				%max += r0;
-				{:updateCursorPos;
-					let temp = 0;
-					//r1 -= 1;
-					r1 <<= 4;
-					[IO.cursorPos] += r1;
-					r1 = "\p00";
-					[IO.cursorPos] |= %temp;
-					r0 = #(0x00ff | "\p00");
-					[IO.cursorPos] &= %temp;
-				};
-				${:loop;
-					r0 = %i;
-					call static.use()<:{
-						import this "../disassembler.0xmin";
-						#i<->dissassemble.regsUsed+0;
-						#max<->dissassemble.regsUsed+1;
-						return;
+				{
+					let i,max;
+					%i = r0;
+					%max = r1;
+					%max += r0;
+					{:updateCursorPos;
+						let temp = 0;
+						//r1 -= 1;
+						r1 <<= 4;
+						[IO.cursorPos] += r1;
+						r1 = "\p00";
+						[IO.cursorPos] |= %temp;
+						r0 = #(0x00ff | "\p00");
+						[IO.cursorPos] &= %temp;
 					};
-					print("\n");
-					%i += 1;
-					%i - %max;
-					jump->loop if < 0;
+					${:loop;
+						r0 = %i;
+						call static.use()<:{
+							import this "../disassembler.0xmin";
+							#i<->dissassemble.regsUsed+0;
+							#max<->dissassemble.regsUsed+1;
+							return;
+						};
+						print("\n");
+						%i += 1;
+						%i - %max;
+						jump->loop if < 0;
+					};
 				};
 			};
 			def let help{
@@ -440,6 +457,7 @@
 				};
 				match("vim",0)<:pushCommand()<:commands.textEditor[¬Static].use();
 				match("obj",0)<:pushCommand()<:commands.disassembler[¬Static].use();
+				match("del",0)<:pushCommand()<:commands.deleteOsData[¬Static].use();
 				match.checkLength(4)<:{
 					match("clear",0)<:pushCommand()<:commands.clear[¬Static].use();
 					match("reset",0)<:pushCommand()<:commands.reset[¬Static].use();
@@ -771,7 +789,7 @@
 				};
 				reg.weakScope()<:(reg){:loop_getString;
 					let reg = RegEnum(reg);
-					let cyclePhaseLength = 30;//cycles per flash of cursor
+					let cyclePhaseLength = 60;//cycles per flash of cursor
 					let maxI <-> 0;//makes sure it flashes every 'cyclePhaseLength' cycles, inclu
 					let data{
 						let i{0}:>static();
@@ -806,7 +824,7 @@
 							send %const_0 "\c0f";
 						},temp
 					)::{
-						#let maxI.loopLen <-> ..this[0]..@..length;
+						#let maxI.loopLen <-> ..this.waitLoop..@..length;
 						repeat !!SETTINGS.useTestInput: #..this <=> {def ..this.test(
 							"obj 1a c\r",//"malloc 1A\rread 100\r",
 						reg())};

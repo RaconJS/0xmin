@@ -14,12 +14,15 @@ RegEnum().weakScope()<:(reg){
 	let temp = reg();
 	%temp = "\c08";
 	[%data+1] = %temp;
+	let oldSize=usize():>static();
+	%temp = [string.size];
+	[oldSize] = %temp;
 	string.push("\nBut this is a dynamic string!");
 	let const_0 <-> data;
 	
 	{let i = reg();
 	for.doFor(i,
-		(i){r i = [string.capacity];
+		(i){r i = [oldSize.use()];//[string.size];
 			//print.register(i);
 			print("\p00",const_0);},
 		(i,continue){jump -> continue if >=0},

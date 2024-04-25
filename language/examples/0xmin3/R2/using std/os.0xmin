@@ -139,10 +139,32 @@ let main;
 			def let processes{} <=> Ref()<:Array()<:Process=();//processes:@([]heap & @Process[])*
 			def let currentProcess{} <=> Process=();
 		}:>static();
+		let callProgram;//defined later;
 		let syscall{:onInterupt;//@(commandNumber:%[int.ordinal]commands,%[])->%[]
-			let commands;//defined later;
+			let inputs{
+				def let command <-> 0;
+			};
+			push next;
+			def let commands{//switch;
+				let interupt{};
+				let malloc = heap.malloc;
+				let free = heap.free;
+				let realloc = heap.realloc;
+				let resize = heap.resize;
+				let callProgram = kernal.callProgram;
+			}::{
+				#{
+					let static = Static();
+					let i = -1;
+					let labels = ..labels;
+					repeat labels..length: #..this[""... labels[i += 1]] = {
+						@jump-> #(..this[""... labels[i]]:>static.use());
+					}[0];
+					def static.memory;
+				};
+			};
 		};
-		let callProgram{//:(%@(...%[])->%[]*,argLen:%int,args:%int[argLen]*)->void
+		#set callProgram{//:(%@(...%[])->%[]*,argLen:%int,args:%int[argLen]*)->void
 			//assume: all registers free
 			let reg = RegEnum();
 			let inputs{
@@ -206,29 +228,11 @@ let main;
 			};
 			jump -> [inputs.programEntry.stored.use()];//assume: program returns
 		};
-		#set syscall.commands{
-			let interupt{};
-			let malloc = heap.malloc;
-			let free = heap.free;
-			let realloc = heap.realloc;
-			let resize = heap.resize;
-			let callProgram = kernal.callProgram;
-		}::{
-			#{
-				let static = Static();
-				let i = -1;
-				let labels = ..labels;
-				repeat labels..length: #..this[""... labels[i += 1]] = {
-					@call #(..this[""... labels[i]]:>static.use());
-				}[0];
-				def static.memory;
-			};
-		}:>static();
 	}:>static();
 	#let OS{
 		let syscall
 	};
-	repeat 0 import this "shell and terminal.0xmin";
+	import this "shell and terminal.0xmin";
 	def let testFunction1{
 		nop;//print function
 		print("???");
@@ -240,15 +244,16 @@ let main;
 		print("hello world");
 		return;
 	};
-	let FileSystem{
-		repeat 0 let Type{
+	repeat 0 let FileSystem{
+		let Type{
 			import "type.0xmin";
 			:self;
 			#self<=>type...self;
 			delete self;
 		};
+		...labelsof Type;
 		let reg = RegEnum();
-		repeat 0 let FileType(){
+		let FileType(){
 			#def let value{0};
 		}::{
 			#(){
@@ -277,9 +282,20 @@ let main;
 			;
 		};
 		let File(){
-			def let name:>LenString();
-			def let data:>DynLenObject();
+			def let name:>String();
 			def let type:>FileType();
+			def let data:>RefList.OwnedSource();
+			def let parent:>NullableReference(File);
+		}:>Type();
+		let new{
+			let parentFolder = File();//%File&Folder
+			let reg = RegEnum();
+			let newFile = File();
+			#parentFolder<->RefList.OwnedSource.mallocRef.inputs.self;
+			%RefList.OwnedSource.mallocRef.inputs.size = newFile..@..length;
+			RefList.OwnedSource.mallocRef.use();
+			let newItem = newFile<->RefList.OwnedSource.mallocRef.outputs.newItem;
+			let regsUsed = 0xmin.Math.max(0,RefList.OwnedSource.mallocRef.regsUsed);
 		};
 	}:>static();
 	repeat 0 #FileSystem[¬static].use();
@@ -296,3 +312,6 @@ let fullProgram(){
 	def heap.memory;
 };
 fullProgram();
+//#0xmin.settings.language("text");
+//#..splice(0,-0);
+//def ¬(""... ..toJSON);

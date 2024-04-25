@@ -439,6 +439,11 @@ void #let set: heap{#;
 			%inputs.object -= Page.size;
 			let inputPage = Page.pointer=() <-> inputs.object;
 			let mergePagesFully;
+			{:update_page0;
+				%nextPage - [malloc.startPage];
+				jump->update_page0..return if > 0;
+				[malloc.startPage] = %inputPage;
+			};
 			{:checkForSpaceToInsertPage;
 				%difference = %nextNextPage;
 				%difference -= %newPage;//check for enough space for inputs.size
@@ -582,8 +587,10 @@ void #let set: heap{#;
 		};
 		#set: unref(r_address,deconstruct,regsAreFree){//:#([%Object],{@}?,bool & label?)->{@}
 			//can be used when removing a reference
-			[%r_address-#(Page.prototype.data-Page.prototype.isUsed)]-=1;
 			:block;
+			[%r_address-#(Page.prototype.data-Page.prototype.isUsed)]+1;//handle static objects ; where static Page:{-1:isUsed;{@}}
+			jump->block..return if == 0;
+			[%r_address-#(Page.prototype.data-Page.prototype.isUsed)]-=1;
 			jump->block..return if>0;
 			delete block;
 			//TODO: improve knowing when deconstruct should be inlined or called

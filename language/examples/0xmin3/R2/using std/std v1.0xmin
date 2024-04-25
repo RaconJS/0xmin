@@ -74,81 +74,6 @@
 			let isUsed;
 			let isConst;
 		};//type Register = % & ( RegState()() | RegEnum()() )
-		let RegState(dataRegState)={#;//general register management
-			//type RegState = #{string:%[]}
-			...labelsof dataRegState;
-			let set all;//:#%[] all registers
-			repeat !dataRegState.parent let set parent = ¬;//:RegState ; regState of the parent scope
-			repeat !dataRegState.free let used;//:#%[] ; registers that are not currently being used
-			repeat !dataRegState.mut let const;//:#%[] ; registers with known values 'register.value' and 'register.is0'
-			repeat !dataRegState.uninvolved let involved;//:#%[] ; registers that are mutated at all by this scope
-			
-			#all::{
-				let i = -1;
-				repeat 14 def ¬+(i += 1);
-				delete i;
-			};
-			(label){//:#({#}?)-> % & RegState()
-				repeat (free..length == 0): throw "out of registers";
-				#return = #(arguments[0] || return) <-> +freeRegs..splice(0,1);
-				#usedRegs..splice(-0,0,{@:#(+return)});
-				#let return[¬RegEnum.type_register];
-			};
-		}::{
-			let type_register = type_register;
-			let ..prototype{
-				let reg(regNumber){//#(% & #int)-> % & #Register
-					let constructor = this;
-					:this;
-					let [¬type_register];
-					let [¬constructor] = this;
-					#this<->regNumber;
-					//def let isUsed = ¬;//{}|¬
-					//def let isInvolved = ¬;//{}|¬
-					//def let isConst = ¬;//#int|¬
-				};
-				let use(reg){//:#(...%[])->RegEnum
-					repeat arguments..length #{
-
-					};
-					repeat !reg[¬type_register.isUsed] #{
-						#let reg[¬type_register.isUsed];
-					};
-					#return = this;
-				};
-				let push(to_regStateData){
-					meta.unimplemented();
-					let to_regState = this..constructor(to_regStateData);
-					meta.repeat(this.usedRegs..length)<:(i){
-						let reg = this.usedRegs[i];//:%
-						repeat (!!¬to_regStateData..indexOf());
-					};
-				};
-				let copy(){
-
-				};
-			};
-			let push(regState){
-				let i = -1;
-				repeat regState.used..length push %regState.used.(i+=1);
-			};
-			let pop(regState){
-				let i = regState.used..length;
-				repeat regState.used..length pop %(i=i-1);
-			};
-			let blockScope(regsToSave,startAt){//:#(...args,#(RegEnum){})
-				let do = arguments[-1];
-				meta.if(arguments..length < 2)<:(){#regsToSave = ¬;}
-				meta.if(arguments..length < 3)<:(){#startAt = ¬;}
-				repeat !startAt startAt = 0;
-				repeat !startAt regsToSave = 0;
-				let regsToSave = regsToSave;
-				let reg = ..this(startAt);//:RegEnum
-				def ..this.push(regsToSave);
-				def do(reg);
-				def ..this.pop(regsToSave);
-			};
-		};
 		let RegEnum_forEachReg(from_ignore,static_regStorage,startI,nextI,do_stack,do_static)<-{//:injectable macro #(#%[],@{}?,#macro,#()->index & mutation,#macro,#macro)->{@}
 			//from_ignore: #int & %[]? ; number of registers to ignore starting from @r0 
 			//static_regStorage: ({@} on static)?
@@ -269,7 +194,6 @@
 		};
 		let reg = RegEnum();
 		#return = {let
-			RegState = RegState,
 			RegEnum = RegEnum,
 			reg = reg,
 		};
@@ -290,16 +214,21 @@
 				#portReg = outputReg||0 +1 %14;//:%
 				let storeRegs;
 			};
-			repeat !+hasPort push %portReg;
+			repeat !+hasPort {
+				push %portReg;
+				%portReg = 0;
+			};
+			def let check;
 			def let waitLoop{
 				repeat !!doWhile_wait def doWhile_wait||{};
 				wait %portReg;
-				jump -> waitLoop if !sign;
+				jump -> waitLoop if sign;
 			};
+			def let bump{bump %portReg};
 			repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
 			repeat !!miniProcess def miniProcess;
 			repeat !!+hasOutputReg def let getOutputLoop{
-				recv %portReg %outputReg;
+				recv %outputReg %portReg;
 				jump -> getOutputLoop if !carry;
 			};
 			repeat !+hasPort pop %portReg;
@@ -328,10 +257,17 @@
 			};
 		};
 		let await = awaitInput;
-		let checkInput(outputReg,miniProcess,portReg){//:#(%?,{@}?&@[0-14]?,%?)->{@} & @mutate terminal
+		let checkInput(outputReg,miniProcess,onSome,onNone,portReg){//:#(%?,{@}?&@[0-14]?,{@}?,{@}?,%?)->{@} & @mutate terminal
 			awaitInput(outputReg,(),miniProcess,portReg)::{
 				undef waitLoop;
 				delete waitLoop;
+				#check::{
+					wait %portReg;
+					jump->onNone if sign;//TODO add on success and on fail
+				};
+				def onSome;
+				jump-> onNone..return;
+				def onNone;
 			};
 		};
 		let check = checkInput;
@@ -371,7 +307,7 @@
 			};
 			repeat  push %i;
 			def let start = start(i);
-			def let loop{
+			recur do..flat def let loop{
 				let jumpTo;
 				def let condision = condision(i,jumpTo,isJumpToContinue);
 				def let do = do(i);
@@ -397,12 +333,20 @@
 				};
 			};
 		};
-		let for_repeat(i_reg,length,do){//:#(%,int,{@})->{@}
-			%i_reg = #(length - 1);
+		let for_start_repeat(i_reg,getLength,do){//:#(%usize,{@}->%usize?,{@})->{@}
+			getLength;
 			def let loop{
 				def do;
 				%i_reg -= 1;
-				jump -> loop if >= 0;
+				jump -> loop if >= 0 !signed;
+			};
+		};
+		let for_repeat(i_reg,length,do){//:#(%usize,#usize,{@})->{@}
+			def let start{%i_reg = #(length - 1)};
+			def let loop{
+				def do;
+				%i_reg -= 1;
+				jump -> loop if >= 0 !signed;
 			};
 		};
 		#return = {let for=for,for_repeat=for_repeat;};

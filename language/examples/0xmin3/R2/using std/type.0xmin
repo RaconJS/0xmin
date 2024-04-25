@@ -38,7 +38,7 @@ import "std v1.0xmin";
 		};
 		let derive{
 			let method{
-				asm(foo,selfObject,state,getInputs,getOutputs,bool_derefSelf){//regEnum
+				let asm(foo,selfObject,state,getInputs,getOutputs,bool_derefSelf){//regEnum
 					#this = this||selfObject;
 					let saveRegs::{#;//regsUsed&~outputs
 						meta.repeat(foo.regsUsed)<:(i){..splice(0,-0,{i})};
@@ -541,8 +541,8 @@ import "std v1.0xmin";
 ...labelsof{
 	let DynLenObjectPtr(data)={//:{@[l]*,@l,@(>=l)} ; object with dynamic size
 		def let slice = constructor.Slice(data)||{
-			#def let size<=>usize(0);//:@usize
 			#def let data<=>NullableReference(data||Object);//:@any*?
+			#def let size<=>usize(0);//:@usize
 		};
 		#Wrapper.wrap(this,slice);
 		def let capacity<=>usize(0);//:@usize
@@ -765,7 +765,7 @@ import "std v1.0xmin";
 				%const_0 = 0;
 				%array_end = [%self + self.data];
 				for.doFor(reg(),(i){
-					%i = [%self - self.size];
+					%i = [%self + self.size];
 					jump->block..return if == 0;//!signed
 					%array_end += %i;
 				},(i,to){
@@ -1249,3 +1249,4 @@ repeat 0 {:example;
 	def static.memory;
 	def heap.data;
 };
+#String().print();

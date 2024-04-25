@@ -1,0 +1,163 @@
+#"tptasm";#"len";
+let main(){//where: []x == item on x, *x == pointer containing an x
+	let fileTemplate{
+		def let type{0}::{
+			def let folder{
+				let template{
+					def let files <=> ArrayPtr();//:DynArray(File*)*
+					#..compile();
+				};
+			};
+			def let data;
+			def let executable{
+				let template{
+					def let objects <=> ArrayPtr();//:DynArray(File*)*
+					def let entryPoint{0};
+					#..compile();
+				};
+			};
+			def let link{
+				let template{
+					def let folder{0};//:Folder*
+					#..compile();
+				};
+			};
+			...labelsof{
+				#..compile;
+			};
+		};
+		def let parent{0};//:Folder*
+		#..compile;
+	};
+	let callingInputsFormat{
+		def let file{0};//:%File
+		def let argv,args_vector{0};//:%
+		def let argc,args_count{0};//:%
+		#..compile;
+	};
+	let folderTemplate{
+		...fileTemplate;
+		def let name = ArrayPtr();
+		def let files = ArrayPtr();
+		#..compile;
+	};
+	let runExe;
+	let currentProcess{
+		def let file{0};//:Executable & File
+	};
+	def let cd{//call dirictory
+		let Register = RegState();
+		let inputs{
+			let currentFolder:>Register();//:%Folder
+			let fileNumber:>Register();//:%usize
+			let onError;//:$@*
+		};
+		let outputs{
+			let folder;
+		};
+		...inputs;
+		let outputFolder:>currentFolder.share();
+		let outputs.folder = outputFolder;
+		{:check_validInput;
+			%fileNumber - [%currentFolder+folderTemplate.files.size];
+			r0 | (-1&0xffff);
+			jump->onError if<0 !signed;//assert:flag(sign) ; error: file out of range
+		};
+		let file:>inputs.fileNumber.share();
+		%file = [%currentFolder+folderTemplate.files.data];
+		%file += %fileNumber;//assert: temp:%*File
+		Register.weakScope()<:(Register){:switch_fileType;
+			let temp:>Register();
+			let: static = Static();
+			let fileType = temp.share();
+			%fileType = [%file+fileTemplate.type];
+			jump -> [%fileType+{#;
+				:block;
+				...labelsof fileTemplate.type;
+				#def block[folder] = {@{
+					%outputFolder = %file;
+					jump->block..return;
+				}:>static.use()};
+				#def block[data] = {@{
+					%outputFolder = %file;
+					//silent error
+					jump->onError..return;
+				}:>static.use()};
+				#def block[executable] = {@{
+					push runExe..return;
+					def runExe{
+						let inputs{
+							let file = file.share();
+						};
+						let outputs{};
+						...inputs;
+						let currentDirectory = {}:>static.use();
+						Register.weakScope()<:(Register){//debugger RegSet.fromRegEnum(14)..length;
+							RegSet.save_onStack(RegSet.fromRegEnum(14))<:(){
+								call [%file+fileTemplate.type.executable.template.entryPoint];
+							};
+						};
+						return;
+					};
+					jump->block..return;
+				}:>static.use()};
+				#def block[link] = {@{
+					%outputFolder = [%file+fileTemplate.type.link.template.folder];
+				}:>static.use()};	
+			}:>static.use()];
+			def: static.memory;
+		};
+		//assert: temp:%*File
+		Register.compile();
+		def onError;
+	};
+	def let makeFile{
+		let Register = RegState();
+		let inputs{
+			let folder:>Register();
+			let type:>Register();//:file type
+			let size:>Register();//:usize
+		};
+	};
+	def let push{
+		let Register = RegState();
+		let inputs{
+			let folder:>Register();
+			let type:>Register();//:file type
+			let data=heap.Object():>Register();
+			let size=heap.Object():>Register();
+		};
+		...inputs;
+		let outputs{
+
+		};
+		%DynLenObjectPtr.push.inputs.self = %data;
+		%DynLenObjectPtr.push.inputs.size = %size;
+		Register.blockScope(RegSet.fromRegEnum(DynLenObjectPtr.push.regsUsed))<:(Register){
+			call DynLenObjectPtr.push.use();
+		};
+		Register.weakScope()<:(Register){//UNFINISHED
+			for.doFor(Register(),(i){%i = });
+		};
+		Register.compile();
+	};
+};
+import "std v1.0xmin";
+import "RegState.0xmin";
+...{
+	let DynLenObjectPtr()={
+		def let data{0};//{@}*
+		def let size{0};
+		def let capacity{0};
+		#..compile;
+	};
+	let ArrayPtr(itemObject)={
+		...DynLenObjectPtr;
+		let item = item;
+		#..compile;
+	};
+};
+import "type.0xmin";
+def main();
+def static.memory;
+def heap.data;

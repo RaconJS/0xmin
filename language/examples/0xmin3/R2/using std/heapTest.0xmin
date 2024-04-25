@@ -107,7 +107,7 @@
 		#print.number.charSet:>static.use();
 	};
 };
-def let shiftTest = RegEnum().weakScope()<:(reg){
+repeat 0 def let shiftTest = RegEnum().weakScope()<:(reg){
 	let obj1:>reg():>Object.pointer=(8);
 	let obj2:>reg():>Object.pointer=(4);
 	obj1.def();
@@ -117,10 +117,10 @@ def let shiftTest = RegEnum().weakScope()<:(reg){
 		%heap.shift.inputs.object = %obj2;
 		%heap.shift.inputs.size = 10;
 		heap.shift.call();
-		%obj2 = %heap.shift.outputs.newPointer;
+		%obj2 = %heap.shift.outputs.object;
 	};
 };
-repeat 0 def let simpleTest = RegEnum().weakScope()<:(reg){
+def let simpleTest = RegEnum().weakScope()<:(reg){
 	let obj:>reg():>Object.pointer=(8);
 	let obj1:>reg():>Object.pointer=(5);
 	obj.def((),obj.set({1;2;4;7}));
@@ -129,7 +129,7 @@ repeat 0 def let simpleTest = RegEnum().weakScope()<:(reg){
 		heap.malloc.call();
 		push r0;
 			r0 = 10;
-			heap.malloc.call();
+			heap.malloc.call();hlt;
 		pop r0;
 		//heap.free.call();
 	};

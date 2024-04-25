@@ -1,0 +1,80 @@
+let meta_random(){
+	#...labelsof return..constructor;
+	#let s1 = state0;
+	#let s0 = state1;
+	#state0 <-> s0;
+	#s1 = s1 ^ (s1 << 11);//23
+	#s1 = s1 ^ (s1 >> 8);//17
+	#s1 = s1 ^ s0;
+	#s1 = s1 ^ (s0 >> 13);//26
+	#state1 <-> s1;
+	#return = #(state0 + state1);
+}::{
+	let state0 = 1;//u32
+	let state1 = 2;//u32
+};
+repeat 100 #debugger(+meta_random()/(2**32));//"value.number.toString(2)";
+let R2_random(){//16 mins to write
+	let state0 = {1;0};//u32 ; little indien
+	let state1 = {2;0};//u32 ; little indien
+	let data{
+		def state0;
+		def state1;
+	};
+	let i = 0;
+	let regsUsed = 3;
+	repeat (regsUsed-1):push %(i+=1);
+	let temp = 0;
+	let ans = 0;//:%[]&%u32
+	let s0=1,s1=2;//:%[]&%u32
+	{
+		r s1 = [state0];
+		r s0 = [state1];
+		[state0] = r s0;
+		{
+			r temp = r s1;
+			r temp <<= 11;//23
+			r s1 ^= r temp;
+		};{
+			r temp = r s1;
+			r temp >>= 9;//17
+			r s1 ^= r temp;
+		};
+		r s1 ^= r s0;
+		{
+			r temp = r s1;
+			r temp >>= 13;//26
+			r s1 ^= r temp;
+			[state1] = r s1;
+		};
+		r ans = [state0];
+		r ans += [state1];
+	};
+	#i+=1;
+	repeat (regsUsed-1):pop %(i-=1);
+	//return;
+	def data;
+};
+{:example;
+	0xmin.settings.language("tptasm");
+	import "random.0xmin";
+	import lib "R2/print.0xmin";
+	//import lib "std v1.0xmin";
+	let a = R2_random();
+	let show{
+		print.register(0);
+		//print(",");
+	};
+	{
+		let i = 0;//:%
+		def let loop_start;
+		%i = 12;
+		push r0;
+		def a;
+		def show;
+		pop r0;
+		%i -= 1;
+		jump -> loop_start if > 0;
+	};
+	hlt;
+};

@@ -1,13 +1,2 @@
-let a{
-	()={
-		#this..proto=2;
-	};
-	()={
-		debugger ..proto;//expect 2, got 4 ; FIXED
-	};
-	let ..prototype=4;
-};
-//#a();
-//#(){}()<:{}::{:a;debugger a};//is parsed as the bellow
-//#(){}()<:({}::{:a;debugger a});
-//let a1 = {debugger a1;};
+//debugger (¬..toJSON)..length;
+//;;debugger ..toJSON;

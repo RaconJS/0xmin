@@ -2,7 +2,9 @@
 #this program gathers all the external files into the repo.
 echo preparing repo for git
 echo code
-mkdir ./language
+if [ ! -d "language" ]; then
+	mkdir language
+fi
 cp -r ./../compilers ./language
 cp -r ./../emulators ./language
 cp -r ./../examples ./language

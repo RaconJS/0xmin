@@ -1,31 +1,65 @@
 #"tptasm";
-#"table";
 #"len";
+//keywords: TODO UNIMPLEMENTED UNUSED UNFINISHED
+//TODO: consider useing wave function collapse for register assignment
 //where: {1;2;3}:[]int
-...labelsof(){
+#(){:docs;
+	type RegSet = []# & []int;
+	type Register = #int;
+	type RegState{:self;
+		#()->Register , mutates self;
+	};
+};
+let RegState,RegSet,regState;
+#{#;
 	:internal;//for storing private properties
 	let internal.symbol_hasValue;
-	let RegState(setOfUsedRegs)={
-		(){
-			#return = RegState.Register();
-			#use(return);
-			#outerUsed::{def return};
+	let internal.data_usedBy;
+	let internal.R2_getFullRegSet;//()->RegSet
+	let internal.R2_numOfGeneralPerpousRegisters = 14;
+	#RegState(setOfUsedRegs,maxRegValue)={//:#(RegSet|RegState,#int|#14)-> RegState & #()-> Register & %
+		(label,value){
+			#return = RegState.Register(label,value);
+			#let regState = return[¬Register]||return;
+			#..this.bind(regState);
+			#..this.use(regState);
+			#outerUsed::{def regState};
 			#checkFull();
 		};
-		#{
-			//TODO: allow use of RegEnum instead of a regSet
-			let i=-1;
-			repeat setOfUsedRegs..length:{:cloneRegs};
-		};
-		let innerFree = setOfUsedRegs.innerFree||{RegState.regSetFromEnum(14)};//:[]%?, used when only the regs in this set are usable
-		let outerFree = setOfUsedRegs.innerFree||{}...innerFree;//:[]%?, used when only the regs in this set are usable
-		let innerUsed{
-			...codeof getOuterRegSet(setOfUsedRegs);
-		};//:[]% ; the registers currently used 
-		let outerUsed{//:[]% ; the registers modified by this block
-			...codeof getInnerRegSet(setOfUsedRegs);
-		};
+		repeat(+setOfUsedRegs != ())://if setOfUsedRegs:RegEnum;
+			#setOfUsedRegs = #(){
+				#return.innerUsed = RegState.regSetFromEnum(+setOfUsedRegs);
+				#return.innerFree = !!setOfUsedRegs.free && RegState.regSetFromEnum(+setOfUsedRegs.free);
+			}()
+		;
+		let maxRegValue = maxRegValue || R2_numOfGeneralPerpousRegisters;
+		repeat 1 let innerFree <=> setOfUsedRegs.innerFree||RegSet.substract(R2_getFullRegSet(),setOfUsedRegs.innerUsed||{});//:[]%?, used when only the regs in this set are usable
+		repeat 1 let outerFree <=> setOfUsedRegs.outerFree||({}...innerFree);//:[]%?, used when only the regs in this set are usable
+		let innerUsed <=> {}...getOuterRegSet(setOfUsedRegs);//:[]% ; the registers currently used
+		let outerUsed <=> {}...getInnerRegSet(setOfUsedRegs)||({}...innerUsed);//:[]% ; the registers modified by this block
+		let totalUsed <=> {}...getTotalRegSet(setOfUsedRegs);//used for assigning values to registers
+		let outliveList <=> {//is done this way to determin big O notation for `this.compile`
+			let regState = this;
+			$def this;
+			def let list <=> {}...(setOfUsedRegs.outliveList.list||{});
+			let deferedFunctions;//[]#()->void
+		};//:Tree<this.outliveList> ; used for compile ; set of register states referenced
+		#let parent = setOfUsedRegs.parent||¬;//:RegState? ; UNIMPLEMENTED&UNUSED ; parent regState outlives this one
 		let regsUsed = outerUsed;
+		let .[¬internal.data_usedBy]{
+			let compile{
+				let used = totalUsed;
+				let outlive = outliveList;
+			};
+			let inner{
+				let used = innerUsed;
+				let free = innerFree;
+			};
+			let call{
+				let used = outerUsed;
+				let free = outerFree;
+			};
+		};
 		repeat 0 let regAssigner{//:{$}
 			virtual{
 				ram => 0xmin 0;
@@ -33,15 +67,54 @@
 			};
 		};
 	}::{
-		let Register(n){
-			#return<->n;
-			//let type;//:?#
-			//let isMutable;//:?#
-			//let isReadable;//:?#
+		let Register(label,value)={
+			repeat !!value #return<->value;
+			let sharedRegs;//{$}; contains registers that reference this
+			let boundRegState = ¬;
+			repeat !!label:#{//wraps label in a register
+				#label..proto = {};
+				let label..proto..proto = label..proto;
+				let label..proto..super = this;
+				#let label[¬Register] = return;
+				#return = label;
+				#this.share(label);
+			};
+		}::{
+			let ..prototype{
+				let share(label){
+					#return = #(label=label||Register(this))<->+this||¬;
+					repeat(label && label..constructor!=Register && !label[¬Register]):
+						#label:>Register();
+					#this.sharedRegs::{
+						$set label;
+					};
+				};
+				let bind(regState){
+					#this.boundRegState = regState;
+					#return = this;
+				};
+				#internal.checkRegisterBound(reg){
+					#return = reg.boundRegState||{throw "register not bound to a RegState"};
+				};
+				let use(){
+					#return = this;
+					#checkRegisterBound(this);
+					#this.boundRegState.use(this);
+				};
+				let free(){
+					#return = this;
+					#checkRegisterBound(this);
+					#this.boundRegState.free(this);
+				};
+			};
 		};
 		let regSetFromEnum(size,ignore){
 			let i = #(ignore||0)-1;
-			repeat (size-ignore):Register(+(i+=1));
+			repeat (size-(ignore||0)):def Register((),+(i+=1));
+		};
+		let totalRegs = R2_numOfGeneralPerpousRegisters;
+		#internal.R2_getFullRegSet(){
+			repeat R2_numOfGeneralPerpousRegisters Register();
 		};
 		let set ..prototype;
 		#let ..prototype.RegState = ..this;
@@ -50,97 +123,129 @@
 				let indexOf(regSet,register){
 					#return = regSet..indexOf(register)||regSet..indexOf(0+register);
 				};
+				let getTotalRegSet(regState){
+					#return = regState.totalUsed||regState;
+				};
 				let getOuterRegSet(regState){
 					#return = regState.outerUsed||regState;
 				};
 				let getInnerRegSet(regState){
 					#return = regState.innerUsed||regState;
 				};
+				let regIsAssigned(register){
+					#return = 0*register==0 && {} || ¬;
+				};
+			};
+			let bind(register){
+				#register.boundRegState = this;
+				#return = this;
 			};
 			let clone(){
 				#return = RegState(this);
 			};
-			let outLive(innerState){//:#()-> (innerState|(¬ & failed)) mutate this
-				let sumState = RegState();//regState that includes this and innerState
+			let outlive(innerState){//:#(...[]RegState)-> (innerState|(¬ & failed)) mutate this
 				let i = -1;
-				let isValid;
-				repeat(!!isValid&&innerState.outerUsed..length):{
-					#i+=1;
-					let register = innerState.outerUsed[i];
-					#isValid = !this.indexOf(this.innerUsed,register);//note: using '0+x' to get undefined => NaN
-					repeat !this.indexOf(this.outerUsed,register): #this.outerUsed..splice(-0,0,{register});
+				#
+				repeat arguments..length {
+					let innerState = arguments[i+=1];
+					let i = -1;
+					let isValid;
+					repeat(!!isValid&&innerState.outerUsed..length):{
+						#i+=1;
+						let register = innerState.outerUsed[i];
+						#isValid = !this.indexOf(this.innerUsed,register);//note: using '0+x' to get undefined => NaN
+						repeat !this.indexOf(this.outerUsed,register): #this.outerUsed..splice(-0,0,{register});
+						repeat !this.indexOf(this.totalUsed,register): #this.totalUsed..splice(-0,0,{register});
+						repeat !this.outliveList.list..indexOf(innerState.outliveList): #this.outliveList.list..splice(-0,0,{innerState.outliveList});
+					};
+					#return = isValid && innerState;
 				};
-				#return = isValid && innerState;
 			};
 			let tryCall(innerRegState){//this.scope(){call innerRegState}
-				regState.outerUsed;
+				regState.outerUsed;//UNFINISHED
 			};
-			let scope(innerState,do){//:#(#()->{@})->{@}
-				#scope.getArgs<-();
-				let newInnerState = innerState || this.clone();
-				repeat !!innerState:#this.outLive(innerState);
-				do(newInnerState);
-				repeat !!innerState:#this.outLive(innerState);
-				repeat !innerState:#this.outLive(newInnerState);
+			let clone_subScope(){//clone but for inner scopes
+				#return <=>this.clone();
+				let parent = this;
+			};
+			let scope(){
+				//TODO: make a generalised scope function
 			}::{
-				let getArgs()<-{
+				let getArgs()<-{//standard arguments macro
 					delete arguments;
 					#do = arguments[-1];
 					#innerState = arguments[-2];
 				};
 			};
+			let weakScope(innerState,do){//:#(#()->{@})->{@}
+				#scope.getArgs<-();
+				let newInnerState = innerState || this.clone_subScope();
+				def do(newInnerState);
+				repeat !!innerState:#this.outlive(innerState);
+				repeat !innerState:#this.outlive(newInnerState);
+			};
 			let safeScope(innerState,do){
 				#scope.getArgs<-();
+				let newInnerState = innerState || this.clone_subScope();
 				let regsUsed = getOuterRegSet(innerState);
-				let i = -1;
-				let intersectionRegSet = Reg;
-				repeat this.innerUsed..length #{
-					let register = this.innerUsed[i+=1];
-					let regIsUsedInInnerScope = indexOf(regsUsed,register);
-					repeat !regIsUsedInInnerScope #intersectionRegSet::{register};
-				};
-				delete i;
-				repeat !!innerState:#this.outLive(innerState);
-				...labelsof codeof RegState.save(intersectionRegSet,(){#return = do(innerState)});
+				let do = do(innerState,return);
+				let intersectionRegSet = RegSet.intersection(this.innerUsed,regsUsed);
+				RegSet.save_onStack(intersectionRegSet,(),RegSet.save_onStack.postsave,(){#return = do});
+				repeat !!innerState:#this.outlive(innerState);
 			};
-			let lightScope(do){//weakScope
+			let blockScope<=>safeScope;
+			let strongScope(innerState,do){//: this function is unsafe: assumes all regs are saved by the end
+				#scope.getArgs<-();
+				let newInnerState = innerState || this.clone();
+				do(newInnerState);
+				newInnerState.compile();
+			};
+			let noCostScope(do){//a scope that has only borrows/shares existing registers
+				#scope.getArgs<-();
+				let regState = RegState({let innerFree = RegSet.intersection(this.totalUsed,this.innerFree)});
+				do(regState);
+			};
+			let lightScope(do){
+
 			};
 			let checkFull(){
-				#return = #(this.innerUsed..length>=14)||(this.outerUsed..length>=14);
+				#return = #(this.innerUsed..length>=this.maxRegValue)||(this.outerUsed..length>=this.maxRegValue);
 			};
 			...labelsof(){
-				let privateState_isSilent = ¬;
+				let privateState_isSilent = ¬;//only used by 'silentUse'
 				let use(reg){//:(...[]%)->this mutates(...[]%,this)
 					#return = this;
 					let i = -1;
 					#repeat arguments..length:{
 						let register = arguments[i+=1];
-						let wasFound;
-						#repeat(0*register==0): #{
+						let wasFound;//:#&bool;is {}, if the register was found in the free set
+						#repeat !!regIsAssigned(register): #{//if register allready assigned a number
 							#wasFound = this.innerFree..splice(indexOf(this.innerFree,register),1)[0];
 							repeat !wasFound throw "register allocation failed: '"...+register..."'";
 						};
-						#repeat(0*register!=0): #{
+						#repeat !regIsAssigned(register): #{
 							#register <-> (wasFound = this.innerFree..splice(0,1)[0]);
-							#{repeat !wasFound throw "out of registers"};
+							repeat !wasFound throw "out of registers";
 						};
 						repeat !!wasFound:{
 							repeat !indexOf(this.innerUsed,register): this.innerUsed..splice(-0,0,{register});
-							repeat !!privateState_isSilent: repeat !indexOf(this.outerUsed,register): this.outerUsed..splice(-0,0,{register});
+							repeat !indexOf(this.totalUsed,register): this.totalUsed..splice(-0,0,{register});
+							repeat !!privateState_isSilent: 
+							repeat !indexOf(this.outerUsed,register): this.outerUsed..splice(-0,0,{register});
 						};
 					};
-					#privateState_isSilent = ¬;
 				};
-				let silentUse(reg){//:(...[]%)->this mutate ...[]%
+				let silentUse(reg){//:(...[]%)->this mutate this & ...[]% ; use() but doesn't mutate outerUsed
 					#privateState_isSilent = {};
 					#return = this.use(...arguments);
+					#privateState_isSilent = ¬;
 				};
 				#return = {let use = use,silentUse = silentUse};
 			}();
 			let free(reg){//:(...[]%)->this
 				#return = this;
 				let i = -1;
-				#repeat arguments..length:{
+				#repeat arguments..length: #{
 					#this.innerUsed..splice(indexOf(this.innerUsed,arguments[i+=1]),1);
 					repeat !indexOf(this.innerFree,arguments[i]):this.innerFree..splice(-0,0,{arguments[i]});
 				};
@@ -148,56 +253,149 @@
 			let save(reg){//:(...[]%)->this ; same as free, but for outerUsed
 				#return = this;
 				let i = -1;
-				#repeat arguments..length:{
+				#repeat arguments..length: #{
 					#this.outerUsed..splice(indexOf(this.outerUsed,arguments[i+=1]),1);
 					repeat !indexOf(this.outerFree,arguments[i]):this.outerFree..splice(-0,0,{arguments[i]});
 				};
 			};
-			repeat 0 let compile(){//'def regState.compile()'
-				let i = -1;
-				let allRegs = {}...(this.outerUsed||{let i = -1;repeat 14 ¬+(i+=1)});
-				#repeat this.outerUsed..length:{
-					let register = this.outerUsed[i+=1];
-					let wasFound;
-					#repeat(0*register==0): #wasFound = allRegs..splice(allRegs..indexOf(+register),1)[0];
-					#repeat(0*register!=0): #register<->(wasFound = allRegs..splice(0,1)[0]);
-
-					#let allRegs[+register];
-				};
-				let i = -1;
-				#this.regAssigner<=>{
-					virtual{
-						$ram => 0xmin 0;
-						#repeat this.outerUsed..length: {
-							let register = this.outerUsed[i+=1];
-							repeat(0*register!=0 && !register.[¬symbol_hasValue]):{
-								let register[¬symbol_hasValue];
-								$set register=>ram;
-								@0;
+			let compile(){
+				#compile.regValues(this);
+				#compile.deferedFunctions(this);
+			}::{
+				let regValues(regState){
+					let i = -1;
+					repeat regState.outliveList.list..length #{//depth first search/compilation
+						let outliveList = regState.outliveList.list[i+=1];
+						let recurValue = +outliveList.list..flat;
+						recur recurValue outliveList.regState.compile();
+					};
+					let i = -1;
+					let nextReg;
+					repeat regState.totalUsed..length #{//add known regs
+						let register = regState.totalUsed[i+=1];
+						#repeat !!regIsAssigned(register):#{
+							#repeat !!indexOf(nextReg,register):{
+								throw "RegState().compile() failed: 2 registers already have the same value";
 							};
+							let nextReg[register] = register;
 						};
 					};
+					let i = -1;
+					#nextReg<->0;
+					repeat regState.totalUsed..length #{//add known regs
+						let register = regState.totalUsed[i+=1];
+						#repeat !regIsAssigned(register):{
+							repeat (!!nextReg[nextReg] && (1+nextReg..length)):#nextReg+=1;
+							repeat (nextReg>=14) throw "RegState::compile: out of registers";
+							let nextReg[nextReg] = register;
+							#register <-> nextReg;
+						};
+						#{
+							virtual{
+								$ram=>register;
+								register.sharedRegs;
+							};
+						}..compile;
+					};
+					#return = regState;
 				};
-				//def this.regAssigner;
-				#this.regAssigner..compile;
+				let deferedFunctions(regState){
+					let i = -1;
+					repeat regState.outliveList.list..length #{//depth first search/compilation
+						let outliveList = regState.outliveList.list[i+=1];
+						let recurValue = +outliveList.list..flat;
+						recur recurValue outliveList.regState.compile();
+					};
+					#regState.outliveList.deferedFunctions();
+				};
 			};
-		};
-		let save_onStack(regSet,innerState,do){
-			#regSet = RegState(regSet);
-			let i = -1;
-			def let save{repeat getOuterRegSet(regSet)..length push %regsUsed.(i+=1)};
-			do();
-			#i+=1;
-			def let load{repeat getOuterRegSet(regSet)..length pop %regsUsed.(i-=1)};
-			delete i;
 		};
 		let save = save_onStack;
 	};
-	#return = {let RegState = RegState};
-}();
-{:example;
-	let reg = RegState();
-	let a = reg();
-	let a = reg();debugger + a;
+	#RegSet{
+		let fromRegState(regEnum){
+			#return = regEnum.outerUsed;
+		};
+		let fromRegEnum(regEnum){
+			#return = RegState.regSetFromEnum(regEnum);
+		};
+		let operation_macro(setA,setB,do)<-{//
+			delete return;
+			#return<=>setA;
+			let i = -1;
+			repeat setB..length {
+				let item = setB[i+=1];
+				#do(item,indexOf(return,setB[i+=1]));
+			};
+			delete i;
+		};
+		let union(setA,setB){//a|b
+			#operation_macro(setA,setB,(item,index)=>{
+				repeat !index #return..splice(-0,0,{item});
+			});
+		};
+		let intersection(setA,setB){//a&b
+			#operation_macro(setA,setB,(item,index){
+				repeat !index #return..splice(index,1);
+			});
+		};
+		let substract(setA,setB){//a&~b
+			#operation_macro(setA,setB,(item,index){
+				repeat !!index #return..splice(index,1);
+			});
+		};
+		let save_onStack(regSet,innerState,whenToGetSaveState,do){//:#(RegSet?,(-1&prefix|0&infix|1&postFix)?,state?,do:#(RegSet,state)->{@})
+			#{:getArgs;
+				#regSet = #(arguments..length>1 && arguments[0]) || ¬;//regs to save
+				#innerState = #(arguments..length>1 && arguments[1]) || ¬;
+				#whenToGetSaveState = #(arguments..length>1 && arguments[2]) || ¬;
+				#do = arguments[-1];
+			};
+			#whenToGetSaveState = whenToGetSaveState || 1;
+			let isPrefix = whenToGetSaveState == -1;
+			let isInfix = whenToGetSaveState == 0;
+			let isPost = whenToGetSaveState == 1;
+			let i = -1;
+			let block;
+			repeat !!+isPrefix:#block{do(innerState||regSet,regSet,return);};
+			def let save{repeat regSet..length push %regSet.(i+=1)};
+			repeat !!+isInfix:#block{do(innerState||regSet,regSet,return);};
+			def block;
+			#i+=1;
+			def let load{repeat regSet..length pop %regSet.(i-=1)};
+			repeat !!+isPost:#block{do(innerState||regSet,regSet,return);};
+			delete i;
+		}::{
+			let presave = -1;
+			let insave = 0;
+			let postsave = 1;
+		};
+		let save_onRegs(){
+			//UNIMPLEMENTED
+		};
+	};
+	let RegState.RegSet = RegSet;
+	let RegSet.R2_getFullRegSet = R2_getFullRegSet;
+	#regState = RegState();
+	//repeat !!defer:defer((){regState.compile()});//TODO: use fileSystem symbols
 };
-let a = {};
+repeat 0 {:example;
+	let regState = RegState();
+	let a:>regState();
+	let b:>regState();
+	%a = 2;
+	%b = 2;
+	...doStuff;
+	repeat 0 $(do){
+		let outerState = regState;
+		let regState = RegState();//regState.clone();
+		let do = do(regState);
+		RegSet.save_onStack(outerState.innerUsed)<:(){do};
+		outerState.outlive(regState);
+	}()<:(regState){
+		let a:>regState();
+		%a = %b;
+	};
+	regState.compile();
+};
+...labelsof codeof RegState;

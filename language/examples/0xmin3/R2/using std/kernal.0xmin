@@ -1,0 +1,385 @@
+//TODO,UNUSED
+#"tptasm";#"len";#"table";
+import "std v1.0xmin";
+import "RegState.0xmin";
+let startProgram;
+let bootLoader,syscall,wakeUp,scheduler;
+def let startLines{
+	def let onStart{jump->bootLoader};//:mutable
+	def let onSystemCall{jump->syscall};
+	def let onSleep{jump->wakeUp};//UNUSED
+};
+...labelsof{
+	let processTemplate{
+		def let registers{
+			repeat 16:${0};
+			let sp = 14;
+			let ip = 15;
+		};//:%[]
+		def let memoryRefs{0;0};//:ArraySlice{Object[]*;size:usize}
+		#..compile;
+		let dropProcess{
+
+		};
+	};
+	let arraySliceTemplate{
+		def let data{0};//:T[]*
+		def let size{0};//:usize
+		#..compile;
+	};
+	let arrayTemplate{
+		def let data{0};//:T[]*
+		def let size{0};//:usize
+		def let capacity{0};//:usize
+		#..compile;
+	};
+	let staticHeapObject(data){
+		def let isUsed{0xffff};
+		...data;
+	};
+	let TEST(msg,do){print("TEST"...(msg||{}));def do||{};hlt;};
+};
+let dynData{//:staticObject[]
+	//memory for os
+	//a small buffer for storing arrays without needing a heap. Reduces chance of errors
+	def let tempRegStore{0};
+	def let stack{repeat 4 0};//UNUSED
+	def let storedProcessArray_data{
+		let arrayCapacity = 2;
+		def let pointers{repeat arrayCapacity 0};//:Process*[]
+		def let dataUsed{0};//:usize
+		def let data{//:Process[]
+			repeat pointers..length $def processTemplate;
+		};
+	};
+};
+let state{def let//state of the os ; data that lives as long as the program
+	flags{//:bool[]
+		0;
+		let isRunning <-> 0b1;//for handling resets
+		let clearProcessesOnBoot<->0b1;
+		let currentProcess_isActive<->0b10;
+	},
+	currentProcess{//used by syscall
+		def let registers{
+			repeat 16:${0};
+			let: sp = ..this[14];
+			let: ip = ..this[15];
+		};//:%[]
+		def let memoryRefs{0;0;0};//:ArraySlice{Object[]*;size:usize;capasity:usize}
+	},
+	//process
+	processArray{def let
+		data{@dynData.storedProcessArray_data},//:Process*[]* ; note: using pointers for `Process*` could be swapping processes very fast;
+		size{0},//:usize ; is > 0 while running ; size of array not the number of elements
+		capacity{@dynData.storedProcessArray_data.arrayCapacity},//:usize
+		index{0},//:usize ; next index to use
+		//assert: [index] < [size] <= [capacity] ; [data] is always valid
+	},
+	temp_static{0},//tempory variables, an alternitive to using stack
+	heapPage0{@heap.page0},//UNUSED
+};
+def dynData;
+def state;
+def bootLoader{print("booted");
+	//assume: all registers are free
+	let handleWhenRunning;
+	[state.flags] & state.flags.clearProcessesOnBoot;
+	let next;
+	if != 0 jump->handleWhenRunning::{
+		def let resetState{
+			RegEnum().weakScope()<:(reg){:freeProcessMemory;
+				let memoryRefs_reg <-> reg();
+				#reg <-> heap.free.regsUsed;
+				let i <-> reg();
+				let i_array <-> reg();
+				%i_array = [state.processArray.data];//:%Process*[]*
+				:forBlock;
+				jump->forBlock..return if==0;//if null
+				for.doFor(i,
+					(i){%i = [state.processArray.size]},
+					(i,continue){if>=0 jump->continue},
+					(i){%i -= 1},
+				)<:(i){
+					let process <-> i;
+					reg.weakScope()<:(reg){:deAllocObjects;
+						let j <-> reg();
+						let j_array <-> memoryRefs_reg;//:%(Process.refs&Object[])*
+						let arraySize<->arraySliceTemplate.size;//:+
+						let processRefs<->processTemplate.memoryRefs;//:+
+						%memoryRefs_reg = [%i_array+%i];//:%Process*
+						%memoryRefs_reg = [%memoryRefs_reg+processRefs];//:%Process().memoryRefs* & heap.Object*
+						#meta.assert(+j_array==+memoryRefs_reg);
+						:forBlock;
+						jump->forBlock..return if==0;
+						for.doFor(0,
+							(j){%j = [%j_array+arraySize]},
+							(j,continue){if>=0 jump->continue},
+							(j){%j -= 1},
+						)<:(j){
+							[dynData.tempRegStore] = %i;
+							%i += %j_array;
+							call heap.free.use();
+							%i = [dynData.tempRegStore];
+						};
+					};
+					jump -> return..return if == 0;//handle static objects, i.e. dynData.storedProcessArray_data.data
+					#meta.assert(+memoryRefs_reg==0 && (+memoryRefs_reg==+heap.free.inputs[0]));
+					heap.unref(memoryRefs_reg,(),{});
+				};
+				heap.unref(i_array,(),{});
+			};
+			%heap.free.inputs.(0) = [state.processArray.data];
+			heap.unref(heap.free.inputs[0],(),{});
+			let temp = 0;
+			%temp = dynData.storedProcessArray_data;
+			[state.processArray.data] = %temp;
+			[state.processArray.size] = 1;
+			[state.processArray.index] = 0;
+			[state.processArray.capacity] = dynData.storedProcessArray_data.pointers..length;
+			[dynData.storedProcessArray_data.pointers] = dynData.storedProcessArray_data.data;
+		};
+		[state.flags] = state.flags.isRunning;
+		jump -> next;
+	};
+	def next;
+	delete next;
+	{:setCurrentProcess;
+		r0 = startProgram;
+		[state.currentProcess.registers.ip] = r0;
+	};
+	{:resetSomeState;//only does fast&save static resetting
+		let i = 0;
+		for_repeat(i,15)<:{
+			r i = 0;
+			[r i+state.currentProcess.registers] = 0;
+		};
+		[dynData.tempRegStore] = 0;
+		print("\c00\p00",0,{});
+	};
+	[state.flags]|=state.flags.isRunning;
+	jump -> startProgram;
+	{:data;
+		def handleWhenRunning;
+	};
+};
+let interupt{:interuptHandler;//:@()->{}
+	pop [state.currentProcess.registers.ip];
+	[state.currentProcess.registers.sp] = sp;
+	jump->scheduler;
+	return;
+};
+def let processArray_addItem{
+	let call(){
+		call processArray_addItem;
+	};
+	let outputs{
+		def let newItem <-> heap.malloc.outputs[0];
+	};
+	let regsUsed = heap.malloc.regsUsed;
+	{
+		let reg = RegEnum(0);
+		let temp:>reg();
+		r temp = [state.processArray.size];
+		r temp - [state.processArray.capacity];
+		${:ifBlock;
+			if < 0 !signed jump -> ifBlock..return;
+			{:growArray;
+				print("\c04\p00TODO: growArray from syscall.spawnThead or scheduler");hlt;
+			};
+		};
+	};
+	{
+		%heap.malloc.inputs.(0) = processTemplate..@..length;
+		call heap.malloc.use();
+		{:pushToArray;
+			let reg = RegEnum(1+heap.malloc.outputs.(0));
+			let newItem:>reg();
+			%newItem = [state.processArray.data];
+			%newItem += [state.processArray.size];
+			[%newItem] = %heap.malloc.outputs.(0);
+		};
+	};
+	[state.processArray.size] += 1;
+	return;
+};
+def let saveRegs{//%[]->currentProcess
+	let returnTo{0};
+	let mainBlock;
+	let call(n){
+		{[dynData.tempRegStore] = r0;
+			r0 = return..return;
+			[returnTo] = r0;
+		};
+		repeat !!n jump -> mainBlock.(-n);
+		repeat !n jump -> mainBlock;
+	};
+	let i = 14,i_1;
+	$i_1=>state.currentProcess.registers..return-2;
+	def mainBlock{
+		${[state.currentProcess.registers.ip] = pop;};
+		${[state.currentProcess.registers.sp] = sp;};
+		repeat 14:${
+			$i_1=>i_1-1;
+			[i_1]=%(i=i-1);
+		};
+	};
+	jump->[returnTo];
+	def returnTo;
+};
+def let loadRegs{//%[]<-currentProcess
+	let call(){
+		jump->..this;
+	};
+	let i = -1,i_1;
+	$i_1 => state.currentProcess.registers;
+	repeat 15:...codeof{
+		%(i=i+1) = [i_1];
+		$i_1 => i_1+1;
+	};
+	jump -> [i_1];
+};
+let loadCurrentProcess{//currentProcess->Process[]
+	let regsUsed = 3;
+	let i = 0;
+	let temp = 1;
+	let array = 2;//:%Process*[]*
+	%array = [state.processArray.data];//:Process[]*[]
+	%array += [state.processArray.index];
+	for_repeat(i,processTemplate..@..length)<:{
+		%temp = [%array+%i];//%temp = Process*
+		[state.currentProcess+%i] = %temp;
+	};
+};
+let storeCurrentProcess{//Process[]->currentProcess ; does processArray.push(currentProcess)
+	let regsUsed = 3;
+	let i = 0;
+	let temp = 1;$debugger +dynData.storedProcessArray_data;
+	let array = 2;//:%Process*[]*
+	%array = [state.processArray.data];//:%Pointer*[]*
+	%array += [state.processArray.index];//:%Pointer**
+	{:TEST;
+		r10=[state.processArray.data];//:%Process*[]*
+		r10=[r10+1];//:%Process*
+		//r10=[r10+processTemplate.registers.ip];
+		nop;
+		print.register(10);
+		//r10=[%array + (processTemplate..@..length-1)];
+		print.register(array);
+	};
+	%array = [%array];//:%Pointer*
+	for_repeat(i,processTemplate..@..length)<:{
+		%temp = [state.currentProcess+%i];
+		[%array+%i] = %temp;//%temp = Process*
+	};
+};
+def syscall{//:@(...@[])->{...@[]}
+	//e.g. `r0=0;call syscall;`
+	let reg = RegEnum();
+	let inputs{
+		let args:>{repeat 4 reg()};
+	};
+	let commandSwitch;
+	//jump->[commandSwitch+r inputs.command];
+	let commands{
+		def let exit{
+			[state.processArray.size]-=1;
+			{:ifBlock;
+				let isEmpty;
+				if>=0 jump->isEmpty..return;
+				def isEmpty{
+					:thenShutDown;
+					state.flags |= %clearProcessesOnBoot;
+					{:shutDown;print("shutDown");hault;jump->startLines.onStart};
+				};
+			};
+			jump->scheduler;
+		};
+		def let spawnThead{
+			//TODO: wrap this function in a RegEnum().blockScope
+			let inputs{
+				def let program<->0;//:%{@}*
+			};
+			let reg = RegEnum(processArray_addItem.regsUsed);
+			[dynData.tempRegStore] = %inputs.program;
+			let dynData.tempRegStore.isUsed;
+			processArray_addItem.call();
+			{:initProcess;
+				let item<->processArray_addItem.outputs[0];
+				let i:>reg();
+				let inputs_program<->i;
+				[%item+processTemplate.registers.sp] = 0;
+				%inputs_program = [dynData.tempRegStore];
+				[%item+processTemplate.registers.ip] = %inputs_program;
+				delete dynData.tempRegStore.isUsed;
+				meta.assert(+processTemplate.registers==0);
+				for_repeat(i,processTemplate.registers..@..length-2)<:{
+					[%item+%i] = 0;
+				};
+			};
+			meta.if(0)<:(){
+				loadRegs.call(processArray_addItem.regsUsed);
+				jump->[state.currentProcess.registers.ip];
+			}<:(){
+				jump->scheduler;
+			};
+		};
+		def let interupt = interupt;
+	};
+	def commandSwitch{
+		jump->commands.exit#def let exit;
+		jump->commands.interupt#def let interupt;
+		jump->commands.spawnThead#def let spawnThead;
+	};
+	...labelsof commandSwitch;
+	def commands;
+};
+def scheduler{//:@()->{}
+	{:check_shouldSwitchContext;
+		//TODO:check 
+	};
+	saveRegs.call();
+	def storeCurrentProcess;
+	[state.processArray.index] -= 1;
+	${:loopIndex;
+		:ifBlock;
+		jump->ifBlock..return if >= 0 !signed;
+		let temp = 0;
+		%temp = [state.processArray.size];
+		%temp -= 1;
+		[state.processArray.index] = %temp;
+	};
+	def loadCurrentProcess;
+	loadRegs.call();
+};
+def wakeUp{
+	print("wakeUp");hlt;
+	jump->[state.currentProcess.registers.ip];
+};
+repeat 0 ...(){:UNUSED;
+	def let settings{//data that lives forever, even between shutdowns & retarts
+		def let startProgram = {startProgram};
+	};
+};
+def static.memory;
+{
+	def heap.free;
+	def heap.malloc;
+	//def heap.resize;
+	def heap.data;
+};
+def startProgram;
+{:example;
+	let subtask{
+		print("thread 2");
+		call syscall.exit;
+	};
+	nop;//hello world
+	print("hello world");
+	r0 = subtask;
+	call syscall.spawnThead;
+	print("done");
+	call syscall.exit;
+	def subtask;
+};
+def heap.memory;
