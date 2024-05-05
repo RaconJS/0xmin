@@ -3520,7 +3520,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								v1="0x"+(0x1fffffff&v1).toString(16);
 							}
 							failed||=(v1!==v1)?Error(
-								["1st", "2nd", "3rd"][i]+" argument: '"+
+								(["1st", "2nd", "3rd"][i]??i+"th")+" argument: '"+
 								(
 									v.label?.name?v.label.name+"' is undefined":
 									(v?v.name?.toString?.():v)+"' is undeclared"

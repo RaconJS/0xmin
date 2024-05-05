@@ -1,4 +1,4 @@
-//TODO,UNUSED
+//search words: TODO,UNUSED
 #"tptasm";#"len";#"table";
 import "std v1.0xmin";
 import "RegState.0xmin";
@@ -39,19 +39,20 @@ def let startLines{
 	};
 	let TEST(msg,do){print("TEST"...(msg||{}));def do||{};hlt;};
 };
-let dynData{//:staticObject[]
+let dynData{def let//:staticObject[]
 	//memory for os
 	//a small buffer for storing arrays without needing a heap. Reduces chance of errors
-	def let tempRegStore{0};
-	def let stack{repeat 4 0};//UNUSED
-	def let storedProcessArray_data{
-		let arrayCapacity = 2;
-		def let pointers{repeat arrayCapacity 0};//:Process*[]
-		def let dataUsed{0};//:usize
-		def let data{//:Process[]
-			repeat pointers..length $def processTemplate;
+	tempRegStore{0},
+	storedProcessArray_data{
+		let size;
+		let pointerArray;//:Process*[]
+		repeat 2 {
+			0xffff;
+			def let data{$def processTemplate};
+			#pointerArray::{@data};
 		};
-	};
+	},
+}::{
 };
 let state{def let//state of the os ; data that lives as long as the program
 	flags{//:bool[]
@@ -70,13 +71,12 @@ let state{def let//state of the os ; data that lives as long as the program
 	},
 	//process
 	processArray{def let
-		data{@dynData.storedProcessArray_data},//:Process*[]* ; note: using pointers for `Process*` could be swapping processes very fast;
+		data{0},//:Process*[]*? &  {@}*[capacity]* ; note: using pointers for `Process*` could be swapping processes very fast;
 		size{0},//:usize ; is > 0 while running ; size of array not the number of elements
-		capacity{@dynData.storedProcessArray_data.arrayCapacity},//:usize
+		capacity{0},//:usize ;
 		index{0},//:usize ; next index to use
 		//assert: [index] < [size] <= [capacity] ; [data] is always valid
 	},
-	temp_static{0},//tempory variables, an alternitive to using stack
 	heapPage0{@heap.page0},//UNUSED
 };
 def dynData;
@@ -89,13 +89,14 @@ def bootLoader{print("booted");
 	if != 0 jump->handleWhenRunning::{
 		def let resetState{
 			RegEnum().weakScope()<:(reg){:freeProcessMemory;
-				let memoryRefs_reg <-> reg();
+				let temp_unrefInput <-> reg();
 				#reg <-> heap.free.regsUsed;
 				let i <-> reg();
 				let i_array <-> reg();
 				%i_array = [state.processArray.data];//:%Process*[]*
 				:forBlock;
 				jump->forBlock..return if==0;//if null
+				
 				for.doFor(i,
 					(i){%i = [state.processArray.size]},
 					(i,continue){if>=0 jump->continue},
@@ -104,40 +105,49 @@ def bootLoader{print("booted");
 					let process <-> i;
 					reg.weakScope()<:(reg){:deAllocObjects;
 						let j <-> reg();
-						let j_array <-> memoryRefs_reg;//:%(Process.refs&Object[])*
+						let memoryRefs_reg <-> reg();//:%(Process.refs&Object[])*
 						let arraySize<->arraySliceTemplate.size;//:+
 						let processRefs<->processTemplate.memoryRefs;//:+
-						%memoryRefs_reg = [%i_array+%i];//:%Process*
-						%memoryRefs_reg = [%memoryRefs_reg+processRefs];//:%Process().memoryRefs* & heap.Object*
-						#meta.assert(+j_array==+memoryRefs_reg);
-						:forBlock;
+						%memoryRefs_reg = [%i_array+%i];//:%Process**
+						%memoryRefs_reg = [%memoryRefs_reg];//:%Process*
+						%memoryRefs_reg += processRefs;//:%Process().memoryRefs* & heap.Object*
+						:forBlock;//(*array[]).a
 						jump->forBlock..return if==0;
 						for.doFor(0,
-							(j){%j = [%j_array+arraySize]},
+							(j){%j = [%memoryRefs_reg+arraySize]},
 							(j,continue){if>=0 jump->continue},
 							(j){%j -= 1},
 						)<:(j){
-							[dynData.tempRegStore] = %i;
-							%i += %j_array;
-							call heap.free.use();
-							%i = [dynData.tempRegStore];
+							%temp_unrefInput = %j;
+							%temp_unrefInput += %memoryRefs_reg;
+							heap.unref(temp_unrefInput,(),{});
 						};
+						jump -> return..return if == 0;//handle static objects, i.e. dynData.storedProcessArray_data.data
+						%temp_unrefInput = %memoryRefs_reg;
+						#meta.assert(+temp_unrefInput==+heap.free.inputs[0]);
+						heap.unref(temp_unrefInput,(),{});
 					};
-					jump -> return..return if == 0;//handle static objects, i.e. dynData.storedProcessArray_data.data
-					#meta.assert(+memoryRefs_reg==0 && (+memoryRefs_reg==+heap.free.inputs[0]));
-					heap.unref(memoryRefs_reg,(),{});
 				};
 				heap.unref(i_array,(),{});
 			};
 			%heap.free.inputs.(0) = [state.processArray.data];
 			heap.unref(heap.free.inputs[0],(),{});
-			let temp = 0;
-			%temp = dynData.storedProcessArray_data;
-			[state.processArray.data] = %temp;
-			[state.processArray.size] = 1;
-			[state.processArray.index] = 0;
-			[state.processArray.capacity] = dynData.storedProcessArray_data.pointers..length;
-			[dynData.storedProcessArray_data.pointers] = dynData.storedProcessArray_data.data;
+			{:reinitialise;
+				let startSize = 2;
+				%heap.malloc.inputs.(0) = startSize;
+				call heap.malloc.use();
+				meta.repeat(3)<:(i){
+					%heap.malloc.inputs.(0) = processTemplate..@..length;
+					call heap.malloc.use();
+					let temp;
+					$temp=>state.processArray.data+(i);
+					[state.processArray.data] = %heap.malloc.outputs.(0);
+				};
+				[state.processArray.data] = 0;
+				[state.processArray.size] = 0;
+				[state.processArray.index] = 0;
+				[state.processArray.capacity] = 0;
+			};
 		};
 		[state.flags] = state.flags.isRunning;
 		jump -> next;
@@ -254,7 +264,7 @@ let loadCurrentProcess{//currentProcess->Process[]
 let storeCurrentProcess{//Process[]->currentProcess ; does processArray.push(currentProcess)
 	let regsUsed = 3;
 	let i = 0;
-	let temp = 1;$debugger +dynData.storedProcessArray_data;
+	let temp = 1;
 	let array = 2;//:%Process*[]*
 	%array = [state.processArray.data];//:%Pointer*[]*
 	%array += [state.processArray.index];//:%Pointer**

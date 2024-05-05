@@ -443,9 +443,468 @@ class NumberDisplay{
 	}
 }numberDisplay;
 //cpu
+	bool hasHault=false;
 	class CPU{
 
-	}
+	};
+	//R2
+		char *last_filename = NULL;
+		int speed_button_val = 60;//16
+		int slowModeState = 0;//bool
+		int pauseatHLT = 1;//bool
+		int pauseatIP = 0;//bool
+		int pauseatIPaddr = 0;//16
+		int pauseatIO = 0;//bool
+		int R2TERM_PORT = 0;//8
+		int R2TERM_PORT_IN = 0;//8
+
+		uint16_t INPUT_BUFFER[256];
+		int INPUT_BUFFER_SIZE = 0;//16
+		int INPUT_BUFFER_P = 0;//16
+		int bump_rec = 0xFFFF;//16
+		int Tcursor = 0;//8
+
+		const int INST_CLASS[] = {3,3,3,3,3,3,3,3,2,3,3,3,3,3,3,3,0,2,3,3,3,3,3,3,1,1,3,3,2,1,2,0};//0='0' 1='1' 2='1*' 3='2' <-- 8bit
+
+		int R2_SIZE = 2048-1;//DEFAULT 2K (bitmask)
+
+		uint32_t R2_MEM[65536];
+		uint16_t R2_REG[16];//14=SP 15=IP // 16
+		int R2_WM = 0;//Write Mask (SWM)
+		int R2_SHIFT_PREV = 0;
+		int F_Carr = 0;//bool
+		int F_Over = 0;//bool
+		int F_Zero = 0;//bool
+		int F_Sign = 0;//bool
+
+		int O1 = 0;int O1T = 0;//0=REG 1=MEM 2=CONST //16/8
+		int O2 = 0;int O2T = 0;//0=REG 1=MEM 2=CONST //16/8
+
+		void toR2TERM(int d){//16
+			/*if(d & 0x1000){
+				Tcursor = d & 0xFF;
+				return;
+			}
+			if(d & 0x2000){//0x20BF
+				char color_arr[] = {30,34,32,36,31,35,33,37,90,94,92,96,91,95,93,97};//To match colors in xterm. //8
+				printf("\033[%d;%dm",color_arr[d & 0xF],color_arr[(d>>4) & 0xF]+10);
+				return;
+			}
+			if(d<10) d+=0x30;	///OPTIONAL - Some of my R2 programs use 0x0 - 0x9 as '0' - '9'
+			if(d==10) d=0x30;	///OPTIONAL - or 0xA as '0'
+
+			if(d == 0x7F){//0x7F is a full block on the R2TERM - used as blinking cursor.
+				printf("\033[%d;%dH\u2588",(Tcursor>>4)+3,(Tcursor&0xF)+2);//UNICODE for FULL BLOCK
+			} else {
+				printf("\033[%d;%dH%c",(Tcursor>>4)+3,(Tcursor&0xF)+2,d & 0xFF);
+			}
+			fflush(stdout);
+
+			Tcursor++;
+			if(Tcursor>=16*13) Tcursor = 0;*/
+		}
+
+		void Roper(int _class, int inst){//8-32 //Updates O[1/2] and O[1/2]T
+			int type = (inst >> 20) & 0xF;//8
+			int subt = (inst >> 15) & 0x1;//8
+
+			int qR1,qR2,qRB,qI1,qI2,qR2F,qI2F;//8-8-8-16-16-8-16
+			switch(_class){
+				case 0://0
+					break;
+				case 1://1
+					qR1 = inst & 0xF;
+					qRB = (inst >> 16) & 0xF;
+					qI1 = (inst >> 4) & 0xFFFF;
+					O1T = 1;
+					switch(type){
+						case 0x0:
+							O1 = qR1;
+							O1T = 0;
+							break;
+						case 0x4:
+							O1 = R2_REG[qR1];
+							break;
+						case 0xC:
+							if(subt) O1 = R2_REG[qRB] - R2_REG[qR1];
+							else O1 = R2_REG[qRB] + R2_REG[qR1];
+							break;
+						case 0x5:
+							O1 = qI1;
+							break;
+						case 0xD:
+							if(subt) O1 = R2_REG[qRB] - (qI1 & 0x7FF);
+							else O1 = R2_REG[qRB] + (qI1 & 0x7FF);
+							break;
+					}
+					break;
+				case 2://1*
+					qR2 = (inst >> 4) & 0xF;
+					qRB = (inst >> 16) & 0xF;
+					qI2 = (inst >> 4) & 0xFFFF;
+					O1T = 1;
+					switch(type){
+						case 0x0:
+							O1 = qR2;
+							O1T = 0;
+							break;
+						case 0x1:
+							O1 = R2_REG[qR2];
+							break;
+						case 0x9:
+							if(subt) O1 = R2_REG[qRB] - R2_REG[qR2];
+							else O1 = R2_REG[qRB] + R2_REG[qR2];
+							break;
+						case 0x2:
+							O1 = qI2;O1T = 2;
+							break;
+						case 0x3:
+							O1 = qI2;
+							break;
+						case 0xB:
+							if(subt) O1 = R2_REG[qRB] - (qI2 & 0x7FF);
+							else O1 = R2_REG[qRB] + (qI2 & 0x7FF);
+							break;
+					}
+					break;
+				case 3://2
+					qR1 = inst & 0xF;
+					qR2 = (inst >> 4) & 0xF;//CHANGING
+					qRB = (inst >> 16) & 0xF;
+					qI1 = (inst >> 4) & 0xFFFF;
+					qI2 = (inst >> 4) & 0xFFFF;//CHANGING
+					qR2F = inst & 0xF;//CHANGING
+					qI2F = inst & 0xFFFF;//CHANGING
+					switch(type){
+						case 0x0:
+							O1 = qR1;O1T = 0;
+							O2 = qR2;O2T = 0;
+							break;
+						case 0x1:
+							O1 = qR1;O1T = 0;
+							O2 = R2_REG[qR2];O2T = 1;
+							break;
+						case 0x9:
+							O1 = qR1;O1T = 0;
+							if(subt) O2 = R2_REG[qRB] - R2_REG[qR2];
+							else O2 = R2_REG[qRB] + R2_REG[qR2];
+							O2T = 1;
+							break;
+						case 0x2:
+							O1 = qR1;O1T = 0;
+							O2 = qI1;O2T = 2;
+							break;
+						case 0x3:
+							O1 = qR1;O1T = 0;
+							O2 = qI1;O2T = 1;
+							break;
+						case 0xB:
+							O1 = qR1;O1T = 0;
+							if(subt) O2 = R2_REG[qRB] - (qI1 & 0x7FF);
+							else O2 = R2_REG[qRB] + (qI1 & 0x7FF);
+							O2T = 1;
+							break;
+						case 0x4:
+							O1 = R2_REG[qR1];O1T = 1;
+							O2 = qR2;O2T = 0;
+							break;
+						case 0xC:
+							O2 = qR2;O2T = 0;
+							if(subt) O1 = R2_REG[qRB] - R2_REG[qR1];
+							else O1 = R2_REG[qRB] + R2_REG[qR1];
+							O1T = 1;
+							break;
+						case 0x5:
+							O1 = qI1;O1T = 1;
+							O2 = qR2F;O2T = 0;
+							break;
+						case 0xD:
+							O2 = qR2F;O2T = 0;
+							if(subt) O1 = R2_REG[qRB] - (qI1 & 0x7FF);
+							else O1 = R2_REG[qRB] + (qI1 & 0x7FF);
+							O1T = 1;
+							break;
+						case 0x6:
+							O1 = R2_REG[qR1];O1T = 1;
+							O2 = qI1;O2T = 2;
+							break;
+						case 0xE:
+							O2 = (qI2 & 0x7FF);O2T = 2;
+							if(subt) O1 = R2_REG[qRB] - R2_REG[qR1];
+							else O1 = R2_REG[qRB] + R2_REG[qR1];
+							O1T = 1;
+							break;
+						case 0x7:
+							O1 = qI1;O1T = 1;
+							O2 = (qI2F & 0xF);O2T = 2;
+							break;
+						case 0xF:
+							O2 = (qI2F & 0xF);O2T = 2;
+							if(subt) O1 = R2_REG[qRB] - (qI1 & 0x7FF);
+							else O1 = R2_REG[qRB] + (qI1 & 0x7FF);
+							O1T = 1;
+							break;
+					}
+					break;
+			}
+		}
+		int RrOP1(){//16 //Read value of op 1
+			switch(O1T){
+				case 0://REG
+					return R2_REG[O1];
+				case 1://MEM
+					return R2_MEM[O1 & R2_SIZE] & 0xFFFF;
+				case 2://CONST
+					return O1;
+				default:
+					fprintf(stderr,"Error at RrOP1.\n");
+			}
+			return 0;
+		}
+		int RrOP2(){//16 //Read value of op 2
+			switch(O2T){
+				case 0://REG
+					return R2_REG[O2];
+				case 1://MEM
+					return R2_MEM[O2 & R2_SIZE] & 0xFFFF;
+				case 2://CONST
+					return O2;
+				default:
+					fprintf(stderr,"Error at RrOP2.\n");
+			}
+			return 0;
+		}
+		void RwOP1(int val){//16 //Write to op 1
+			switch(O1T){
+				case 0://REG
+					R2_REG[O1] = val;
+					break;
+				case 1://MEM
+					R2_MEM[O1 & R2_SIZE] = val | R2_WM | 0x20000000;
+					break;
+				case 2://CONST
+				default:
+					fprintf(stderr,"Error at RwOP1.\n");
+			}
+		}
+		void R_flag(int val){//16
+			F_Zero = (val == 0);
+			F_Sign = ((val & 0x8000) != 0);
+		}
+		void Rstep(){//Executes one instruction.
+			int saveIP = R2_REG[15];//16
+			int inst = R2_MEM[saveIP & R2_SIZE];
+			int comm = (inst >> 24) & 0x1F;//8
+			int _class= INST_CLASS[comm];
+			Roper(_class,inst);
+			int q1 = RrOP1();//16
+			int q2 = RrOP2();//16/4
+			int q3;//16/32
+			int WriteBack = (comm >> 3) ^ 0x01;
+			switch(comm){
+				case 0x00://MOV
+					RwOP1(q2);R_flag(q2);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x01://AND
+				case 0x09://ANDS
+					q3 = q1 & q2;
+					if(WriteBack) RwOP1(q3);
+					R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x02://OR
+				case 0x0A://ORS
+					q3 = q1 | q2;
+					if(WriteBack) RwOP1(q3);
+					R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x03://XOR
+				case 0x0B://XORS
+					q3 = q1 ^ q2;
+					if(WriteBack) RwOP1(q3);
+					R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x04://ADD
+				case 0x0C://ADDS
+					q3 = q1 + q2;
+					if(WriteBack) RwOP1(q3 & 0xFFFF);
+					R_flag(q3 & 0xFFFF);F_Carr = q3 >> 16;F_Over = ((q1>>15) == (q2>>15)) && (((q3>>15)&1) != (q2>>15));
+					break;
+				case 0x05://ADC
+				case 0x0D://ADCS
+					q3 = q1 + q2 + F_Carr;
+					if(WriteBack) RwOP1(q3 & 0xFFFF);
+					R_flag(q3 & 0xFFFF);F_Carr = q3 >> 16;F_Over = ((q1>>15) == (q2>>15)) && (((q3>>15)&1) != (q2>>15));
+					break;
+				case 0x06://SUB
+				case 0x0E://SUBS / CMP
+					q3 = (q1 - q2) & 0xFFFF;
+					if(WriteBack) RwOP1(q3);
+					R_flag(q3);F_Carr = (q1 < q2);F_Over = ((q1>>15)!=(q2>>15)) && ((q2>>15)==(q3>>15));
+					break;
+				case 0x07://SBB
+				case 0x0F://SBBS
+					q3 = (q1 - q2 - F_Carr) & 0xFFFF;
+					if(WriteBack) RwOP1(q3);
+					R_flag(q3);F_Carr = (q1 < q2);F_Over = ((q1>>15)!=(q2>>15)) && ((q2>>15)==(q3>>15));
+					break;
+				case 0x08://SWM
+					R_flag(q1);F_Carr = 0;F_Over = 0;
+					R2_WM = (q1 & 0x1FFF) << 16;
+					break;
+				case 0x10://HLT
+					if(pauseatHLT) slowModeState = 0;
+					break;
+				case 0x11://J**
+					switch(inst & 0xF){
+						case 0x0://JMP			TRUE
+							R2_REG[15] = q1;
+							break;
+						case 0x1://JN			FALSE	NOP
+							break;
+						case 0x2://JB/JNAE/JC	C = 1
+							if(F_Carr) R2_REG[15] = q1;
+							break;
+						case 0x3://JNB/JAE/JNC	C = 0
+							if(F_Carr == 0) R2_REG[15] = q1;
+							break;
+						case 0x4://JO			O = 1
+							if(F_Over) R2_REG[15] = q1;
+							break;
+						case 0x5://JNO			O = 0
+							if(F_Over == 0) R2_REG[15] = q1;
+							break;
+						case 0x6://JS			S = 1
+							if(F_Sign) R2_REG[15] = q1;
+							break;
+						case 0x7://JNS			S = 0
+							if(F_Sign == 0) R2_REG[15] = q1;
+							break;
+						case 0x8://JE/JZ		Z = 1
+							if(F_Zero) R2_REG[15] = q1;
+							break;
+						case 0x9://JNE/JNZ		Z = 0
+							if(F_Zero == 0) R2_REG[15] = q1;
+							break;
+						case 0xA://JLE/JNG		Z = 1 OR S != O
+							if(F_Zero || F_Sign!=F_Over) R2_REG[15] = q1;
+							break;
+						case 0xB://JNLE/JG		Z = 0 OR S = O
+							if(F_Zero == 0 || F_Sign==F_Over) R2_REG[15] = q1;//edited
+							break;
+						case 0xC://JL/JNGE		S != O
+							if(F_Sign != F_Over) R2_REG[15] = q1;
+							break;
+						case 0xD://JNL/JGE		S = O
+							if(F_Sign == F_Over) R2_REG[15] = q1;
+							break;
+						case 0xE://JBE/JNA		C = 1 OR Z = 1
+							if(F_Carr || F_Zero) R2_REG[15] = q1;
+							break;
+						case 0xF://JNBE/JA		C = 0 AND Z = 0
+							if(F_Carr == 0 && F_Zero == 0) R2_REG[15] = q1;
+							break;
+					}
+					break;
+				case 0x12://ROL <<
+					q2 &= 0xF;
+					q3 = q1;
+					for(int i=0;i<q2;i++) q3 = ((q3 << 1) | (q3 >> 15)) & 0xFFFF;
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x13://ROR >>
+					q2 &= 0xF;
+					q3 = q1;
+					for(int i=0;i<q2;i++) q3 = ((q3 & 0x01)<<15) | (q3 >> 1);
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x14://SHL <<
+					q2 &= 0xF;
+					q3 = (q1 << q2) & 0xFFFF;
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x15://SHR >>
+					q2 &= 0xF;
+					q3 = q1 >> q2;
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				/*case 0x16://SCL << (OLD)
+					q1 = RrOP1();
+					q2 = RrOP2() & 0xF;
+					qb = q1;
+					for(int i=0;i<q2;i++) qb = ((qb << 1) | ((R2_SHIFT_PREV >> (15-i)) & 0x01)) & 0xFFFF;
+					RwOP1(qb);R_flag(qb);F_Carr = 0;F_Over = 0;
+					break;*/
+				case 0x16://SCL << (NEW)
+					q2 &= 0xF;
+					q3 = ((((q1<<16) | R2_SHIFT_PREV) << q2) >> 16) & 0xFFFF;
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x17://SCR	>>
+					q2 &= 0xF;
+					q3 = (((R2_SHIFT_PREV << 16) | q1) >> q2) & 0xFFFF;
+					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x18://BUMP
+					break;
+				case 0x19://WAIT
+					if(INPUT_BUFFER_P < INPUT_BUFFER_SIZE) bump_rec = R2TERM_PORT_IN;
+					RwOP1(bump_rec);
+					R_flag(bump_rec);F_Carr = 0;F_Over = 0;
+					bump_rec = 0xFFFF;
+					break;
+				case 0x1A://SEND
+					if(q1 == R2TERM_PORT) toR2TERM(q2);
+					if(pauseatIO) slowModeState = 0;
+					break;
+				case 0x1B://RECV
+					if(pauseatIO) slowModeState = 0;
+					if(q2 == R2TERM_PORT_IN){
+						if(INPUT_BUFFER_P < INPUT_BUFFER_SIZE){
+							F_Carr = 1;
+							int r_val = INPUT_BUFFER[INPUT_BUFFER_P++];//16
+							RwOP1(r_val & 0xFFFF);
+							F_Zero = (r_val == 0);
+							F_Sign = ((r_val & 0x8000) != 0);
+							if(INPUT_BUFFER_P == INPUT_BUFFER_SIZE){
+								INPUT_BUFFER_SIZE = 0;
+								INPUT_BUFFER_P = 0;
+							}
+							updateIObufferlabel();
+						} else {
+							F_Carr = 0;
+						}
+					}
+					break;
+				case 0x1C://PUSH
+					R2_MEM[(--R2_REG[14]) & R2_SIZE] = q1 | R2_WM | 0x20000000;
+					R_flag(q1);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x1D://POP
+					q3 = R2_MEM[(R2_REG[14]++) & R2_SIZE];
+					RwOP1(q3);
+					R_flag(q3);F_Carr = 0;F_Over = 0;
+					break;
+				case 0x1E://CALL
+					R2_MEM[(--R2_REG[14]) & R2_SIZE] = (R2_REG[15] + 1) | R2_WM | 0x20000000;
+					R2_REG[15] = q1;
+					break;
+				case 0x1F://RET
+					R2_REG[15] = R2_MEM[(R2_REG[14]++) & R2_SIZE] & 0xFFFF;
+					break;
+				default:
+					fprintf(stderr,"Error at Rstep.\n");
+			}
+			if(_class != 0) R2_SHIFT_PREV = q1;
+			if(saveIP == R2_REG[15]) R2_REG[15]++;
+		}
+	//----
+	class CPU_R216{
+		public://used by emulator
+		filt30* ram;
+		u32 ramSize;
+		bool hasHault=false;
+		public://the CPU's state
+	};
 	class CPU0xmin3{
 		public://used by emulator
 		filt30* ram;

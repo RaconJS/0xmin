@@ -26,17 +26,17 @@ let RegState,RegSet,regState;
 			#outerUsed::{def regState};
 			#checkFull();
 		};
-		repeat(+setOfUsedRegs != ())://if setOfUsedRegs:RegEnum;
+		repeat((setOfUsedRegs..constructor == RegEnum) || (+setOfUsedRegs != ()))://if setOfUsedRegs:RegEnum;
 			#setOfUsedRegs = #(){
-				#return.innerUsed = RegState.regSetFromEnum(+setOfUsedRegs);
-				#return.innerFree = !!setOfUsedRegs.free && RegState.regSetFromEnum(+setOfUsedRegs.free);
+				#let return.innerUsed = RegState.regSetFromEnum(setOfUsedRegs);
+				#let return.innerFree = !!setOfUsedRegs.free && RegState.regSetFromEnum(+setOfUsedRegs.free) || ¬;
 			}()
 		;
 		let maxRegValue = maxRegValue || R2_numOfGeneralPerpousRegisters;
 		repeat 1 let innerFree <=> setOfUsedRegs.innerFree||RegSet.substract(R2_getFullRegSet(),setOfUsedRegs.innerUsed||{});//:[]%?, used when only the regs in this set are usable
 		repeat 1 let outerFree <=> setOfUsedRegs.outerFree||({}...innerFree);//:[]%?, used when only the regs in this set are usable
-		let innerUsed <=> {}...getOuterRegSet(setOfUsedRegs);//:[]% ; the registers currently used
-		let outerUsed <=> {}...getInnerRegSet(setOfUsedRegs)||({}...innerUsed);//:[]% ; the registers modified by this block
+		let innerUsed <=> {}...getInnerRegSet(setOfUsedRegs);//:[]% ; the registers currently used
+		let outerUsed <=> {}...(getOuterRegSet(setOfUsedRegs)||({}...innerUsed));//:[]% ; the registers modified by this block
 		let totalUsed <=> {}...getTotalRegSet(setOfUsedRegs);//used for assigning values to registers
 		let outliveList <=> {//is done this way to determin big O notation for `this.compile`
 			let regState = this;
@@ -145,7 +145,6 @@ let RegState,RegSet,regState;
 			};
 			let outlive(innerState){//:#(...[]RegState)-> (innerState|(¬ & failed)) mutate this
 				let i = -1;
-				#
 				repeat arguments..length {
 					let innerState = arguments[i+=1];
 					let i = -1;
@@ -323,25 +322,34 @@ let RegState,RegSet,regState;
 			delete return;
 			#return<=>setA;
 			let i = -1;
-			repeat setB..length {
-				let item = setB[i+=1];
-				#do(item,indexOf(return,setB[i+=1]));
+			repeat setA..length {
+				let item = setA[i+=1];
+				#do(item,indexOf(return,item),indexOf(setB,item));
 			};
 			delete i;
 		};
 		let union(setA,setB){//a|b
-			#operation_macro(setA,setB,(item,index)=>{
+			#(do)<-{
+				delete return;
+				#return<=>setA;
+				let i = -1;
+				repeat setB..length {
+					let item = setB[i+=1];
+					#do(item,indexOf(return,item));
+				};
+				delete i;
+			}()<:(setA,setB,(item,index)=>{
 				repeat !index #return..splice(-0,0,{item});
 			});
 		};
 		let intersection(setA,setB){//a&b
-			#operation_macro(setA,setB,(item,index){
-				repeat !index #return..splice(index,1);
+			#operation_macro(setA,setB,(item,indexA,indexB)=>{
+				repeat !indexB #return..splice(indexA,1);
 			});
 		};
 		let substract(setA,setB){//a&~b
 			#operation_macro(setA,setB,(item,index){
-				repeat !!index #return..splice(index,1);
+				repeat !!indexB #return..splice(indexA,1);
 			});
 		};
 		let save_onStack(regSet,innerState,whenToGetSaveState,do){//:#(RegSet?,(-1&prefix|0&infix|1&postFix)?,state?,do:#(RegSet,state)->{@})

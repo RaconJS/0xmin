@@ -1,3 +1,4 @@
+//search words: BODGED, OBSILETE, TYPE NOTE, TODO, UNFINISHED
 //heap
 void #set:(){//documentation
 	heap{//TYPE NOTE: using the newer '[]#' annotation as an array. e.g. {1;2}:[2]int
@@ -12,13 +13,21 @@ void #set:(){//documentation
 		#type Page{
 			next:@Page*;
 			last:@Page*;
-			isUsed:@bool;//!=0:used,>0:reference counter,==-1:static
-			data:@any[];//+page == +page.data
+			isUsed:@bool;//isUsed!=0:used, isUsed>0:reference counter, isUsed==-1:static
+			data:@[]any;
 		};
+		#type StaticPage{
+			isUsed:-1;
+			data:@[]any;
+		}
 		Page.size:#int;
 		Page.size:int;
 		//use '0' for null pointers
 		#type Object:Page.data & heap[];
+		Object{
+			pointer:#()->Object* & heap[]* ; is the end of a Page
+			static:#()->Object* & static[]* ; is the end of a StaticPage
+		};
 		regsUsed:#int & %;
 		alloc:Function(%Object*?,length:%int,offset:%int);//not implemented yet
 
@@ -46,14 +55,15 @@ void #set:(){//documentation
 };
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{#;
-	#let: free,malloc,clear,memset,resize,shift,alloc;//@functions
+	#let: free,malloc,clear,memset,resize,shift,checkObject,alloc;//@functions
+	#let: Object,Object.pointer,Object.static;//data types
+	#let: ref,unref;//:#()->{@}
 	#let version<->2;
 	#version(checkVersion){#;
 		//checks whether the checkVersion of the heap is compatible with this version
 		let isCompatible = {1;2}..indexOf(checkVersion);
 	};
 	#let: regsUsed = 5;//:int & %
-	#let: ref,unref;//#()->{@}
 	#let: memory;
 	#let: data{
 		#def let: usedFunctions;
@@ -136,9 +146,9 @@ void #let set: heap{#;
 			...set let prototype;
 		};
 	};
-	#let: Object(staticData)={
+	#set: Object(staticData)={
 		...let set Page();
-		repeat !!staticData:#{//BODGED ; for static memory blocks
+		repeat !!staticData:#{//BODGED OBSILETE ; for static memory blocks
 			#data::{staticData};
 			#isUsed <=> ¬-1;
 		};
@@ -149,8 +159,21 @@ void #let set: heap{#;
 			ram => #(- Page.size);
 			$def prototype;
 		}..compile..length;
-		#let: pointer()={
+		#set: pointer()={
 			...set let prototype;
+		};
+		#set: static(staticData)={
+			#def let: isUsed{@(-1&0xffff)};
+			#def let: data{repeat !!staticData staticData};
+		}::{
+			#let: prototype=..this();
+			#let: size={
+				ram => #(-prototype..@..length);
+				$def prototype;
+			}..compile..length;
+			#set: pointer()={
+				...set let prototype;
+			};
 		};
 	};
 	//note: Page=().isUsed can used as an int to count refernces for smart pointers.
@@ -163,32 +186,34 @@ void #let set: heap{#;
 		#set: next..splice(0,1,{0xffff});
 		#set: last..splice(0,1,{(page0);});
 	};
-	#let: enum(start,inputsLen)={
-		repeat !inputsLen #set: inputsLen=1;
-		#let: newObj={};
-		#set: newObj(){
-			#set: return =+newObj.n;
-			repeat #(newObj.n>=inputsLen):{
-				#set: newObj.push{push newObj.n;};
-				#set: newObj.pop..splice(0,0,{pop newObj.n;});
+	...let{//extra functions
+		#let: enum(start,inputsLen)={
+			repeat !inputsLen #set: inputsLen=1;
+			#let: newObj={};
+			#set: newObj(){
+				#set: return =+newObj.n;
+				repeat #(newObj.n>=inputsLen):{
+					#set: newObj.push{push newObj.n;};
+					#set: newObj.pop..splice(0,0,{pop newObj.n;});
+				};
+				#set: newObj.n=newObj.n+1;
+			}::{
+				#let: n=start;
+				#let: push{};
+				#let: pop{};
 			};
-			#set: newObj.n=newObj.n+1;
-		}::{
-			#let: n=start;
-			#let: push{};
-			#let: pop{};
+			#set: return = newObj;
 		};
-		#set: return = newObj;
-	};
-	#let isPageEndOfHeap(page){//:(%Page*)->flag(if>=0 !signed)
-		%page - sp;//0xffff // note: stack has priority over the heap
-	};
-	#let skipIfEndOfHeap(nextPage,do){
-		//prevents mutating the end of the heap
-		:block;
-		isPageEndOfHeap(nextPage);
-		jump -> block..return if>=0 !signed;
-		def do;
+		#let: isPageEndOfHeap(page){//:(%Page*)->flag(if>=0 !signed)
+			%page - sp;//0xffff // note: stack has priority over the heap
+		};
+		#let: skipIfEndOfHeap(nextPage,do){
+			//prevents mutating the end of the heap
+			:block;
+			isPageEndOfHeap(nextPage);
+			jump -> block..return if>=0 !signed;
+			def do;
+		};
 	};
 	//
 	//%:weak,@:let,$:break,#:this
@@ -286,6 +311,11 @@ void #let set: heap{#;
 		#let: outputs{};
 		#let: page=Page.pointer=()<->inputs.pointer;//:%Page*
 		%page-=Page.size;
+		{:handleStatic;//prevent attempting to free static objects
+			[%page+page.isUsed]+1;
+			jump->handleStatic..return if!=0;
+			return;//throws flag(overflow) if static
+		};
 		[%page+page.isUsed]=0;
 		#let: newLastPage=Page.pointer=()<->nextReg();
 		#let: newNextPage=Page.pointer=()<->nextReg();
@@ -315,7 +345,7 @@ void #let set: heap{#;
 			let startPage=otherPage;//:[%]
 			///[startPage]=%page if %page<[startPage];
 			[malloc.data.startPage]-%newLastPage;
-			jump->moveStartingPage..return if<=0;
+			jump->moveStartingPage..return if<=0 !signed;
 			//assert:%startPage>%page
 			[malloc.data.startPage]=%newLastPage;
 		};
@@ -402,16 +432,24 @@ void #let set: heap{#;
 		#let: nextReg = enum(0);
 		#let: inputs{
 			#def let: object = Object.pointer=()<->nextReg();//:%Object* ; input
-			#def let: size = nextReg();//:%int !signed; size of new block
+			#def let: size <-> nextReg();//:%int !signed; size of new block
 		};
 		#let: outputs{
-			#def let: size = 0;//:%int !signed; returns the new size of the input Object
+			#def let: size <-> 0;//:%int !signed; returns the new size of the input Object
 			//on fail sets flag(sign)
 		};
 		//...let inputs;
 		//...let outputs;
 		let nextPage = Page.pointer=()<->nextReg();//:%Page*
 		let newPage = Page.pointer=()<->inputs.size;
+		{:handleStatic;
+			let temp <-> nextPage;
+			[%inputs.object-(-inputs.object.next)] + 1;
+			jump -> handleStatic..return if != 0;
+			%outputs.size = 0;//static pages do not have info about their size
+			r0 | (-1 & 0xffff);
+			return;
+		};
 		%newPage += %inputs.object;//assert: %newPage == %object + %size
 		%nextPage = [%inputs.object-(-inputs.object.next)];
 		let difference = nextReg();//:%int !signed
@@ -441,7 +479,7 @@ void #let set: heap{#;
 			let mergePagesFully;
 			{:update_page0;
 				%nextPage - [malloc.startPage];
-				jump->update_page0..return if > 0;
+				jump->update_page0..return if >= 0 !signed;
 				[malloc.startPage] = %inputPage;
 			};
 			{:checkForSpaceToInsertPage;
@@ -527,7 +565,7 @@ void #let set: heap{#;
 				//assume: %inputs.object == the original input object
 				%outputs.size = [%inputs.object-(-inputs.object.next)];
 				%outputs.size -= %inputs.object;
-				r0|-1;
+				r0 | (-1 & 0xffff);
 				return;
 			};
 		};
@@ -580,10 +618,97 @@ void #let set: heap{#;
 		};
 		//UNFINISHED
 	}::{void #set: intoHeapFunction(..this,4);};
+	#set:checkObject{//checks if an address is an object on the heap.
+		let nextReg=enum(0);
+		let inputs{
+			def let object=Object.pointer=()<->nextReg();
+		};
+		let outputs{
+			def let object=inputs.object;
+		};
+		let startPage=malloc.data.startPage;
+		let currentPage=Page.pointer=()<->nextReg();
+		let targetPage=Page.pointer=()<->inputs.object;
+		{%targetPage-=Page.size;
+			%currentPage=page0;
+			let startLoop;
+			jump->startLoop;
+			#def:{:forLoop;
+				{//UNFINISHED
+					[%currentPage+currentPage.next] - %currentPage;
+					let fail;
+					jump->fail..return if > 0;
+					def fail{
+						%targetPage+=Page.size;
+						let temp = currentPage;
+						%temp = 0;
+						%temp - %targetPage;//assume %targetPage > 0 !signed
+						return;
+					};
+				};
+				%currentPage = [%currentPage+currentPage.next];
+				#def startLoop;
+				%targetPage-%currentPage;
+				jump->forLoop if>0 !signed;//fail with flag(0)
+			};
+		%targetPage+=Page.size};//convet back into object
+		%currentPage+=Page.size;
+		%targetPage-%currentPage;
+		//assert: success:flag(0) | fail:flag(<0!signed)
+		return;
+	}::{
+		void #set: intoHeapFunction(..this,1);
+		let useNumber = 0;
+		let try_catch(object,then,else,finally){
+			#object = object||0;
+			#then = then||{
+				import lib "R2/print.0xmin";
+				print("\c19valid"...+useNumber);
+				print.register(0);
+				print("\c0f");
+			};
+			#else = else||{
+				import lib "R2/print.0xmin";
+				print("\c4cinvalid #"...+useNumber...":");
+				print.register(0);
+				print("\c0f");
+				hlt;
+			};
+			#useNumber += 1;
+			#finally = finally||{};
+			push r0;
+			push r1;
+				call ..this.use();//#def:..this.call(object);
+				jump->else if != 0;
+				def then;
+				jump->else..return;
+				def else;
+			pop r1;
+			pop r0;
+			def finally;
+		};
+		let test(object,expectInvalid,message){//:#(%(heap[]?)*,#?,#{string,string}?)->@()->Result<hlt|()> & pure
+			//UNSTABLE
+			repeat !object #object = 0;
+			def ..this.call(object);
+			let expectOnHeap = !!expectOnHeap && {} || ¬;
+			repeat !!expectOnHeap:jump->return..return if == 0;
+			repeat !expectOnHeap:jump->return..return if != 0;
+			import lib "R2/print.0xmin";
+			print("\p00\c4C"...(message[0]||"ERROR:"));
+			print.register(object);
+			print(message[1]||({{"is"};{"is not"}}[!!expectOnHeap]..."on heap\c0f"));
+			hlt;
+		};
+	};
 	//garbidge collection
 		#set: ref(r_address){//#([%Page.data])->{@}
 			//can be used when adding a reference
-			[%r_address-#(Object.prototype.isUsed)]+=1;
+			[%r_address-#(-Object.prototype.isUsed)]+=1;
+			{:handleStatic;
+				jump->return..return if != 0;
+				[%r_address-#(-Object.prototype.isUsed)]-=1;
+			};
 		};
 		#set: unref(r_address,deconstruct,regsAreFree){//:#([%Object],{@}?,bool & label?)->{@}
 			//can be used when removing a reference
@@ -640,7 +765,7 @@ void #set:(){//examples
 		let doStuff{@;};
 		...labelsof {import lib "heap.0xmin";};
 		{
-			let sizeOfObject = 5;
+			# let sizeOfObject = 5;
 			@ r0 = sizeOfObject;//:size of object
 			@ call malloc;
 			@ [r0 + 0] = "h";
@@ -648,6 +773,7 @@ void #set:(){//examples
 			@ [r0 + 2] = "l";
 			@ [r0 + 3] = "l";
 			@ [r0 + 4] = "o";
+			# ...doStuff;
 			@ call free;
 		};
 		{
@@ -655,7 +781,7 @@ void #set:(){//examples
 			@ r malloc.inputs.(0) = 40;
 			@ call heap.malloc;
 			@ r object2 = heap.malloc.outputs.(0);
-			...doStuff;
+			# ...doStuff;
 			@ r free.inputs.(0) = r object2;
 			@ call free;
 			@ hault;
@@ -689,4 +815,4 @@ void #set:(){//examples
 		def heap.memory;
 	};
 };
-void #...let set heap; 
+void #...let set heap;

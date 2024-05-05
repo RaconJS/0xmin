@@ -95,6 +95,7 @@
 			//this function is used by push and pop
 			//even though it used macros and '...run' (aka macro injection), it is private, and only used in a similar scope so it should not be too much of an issue.
 		};
+		//type Template<T>:T() & {@} 
 		let RegEnum(start)={//register enum
 			//a consecitive block of used registers starting from r0.
 			#this<->(start||0);
@@ -103,9 +104,9 @@
 			let freeRegs = {};//:%[]
 			recur 1 let maxUsed,max = maxUsed = ..constructor(this) || ({} <-> +this);//highest register used by this RegEnum instance
 			recur 1 let minUsed,min = minUsed = ..constructor(this) || ({} <-> +this);//lowest register used by this RegEnum instance
-			(){//:({#}?)->RegEnum()
+			(label,object){//:({#}?,{@}?&Template)->RegEnum()
 				#return = #(arguments[0] || return);
-				meta.if(freeRegs..length > 0)<:(){
+				#meta.if(freeRegs..length > 0)<:(){
 					#return <-> +freeRegs..splice(-1,1)[0];
 				}<:(){
 					#return <-> +..this;
@@ -115,6 +116,22 @@
 				#let return[¬..constructor.type_register];
 				#return..constructor = ..this;
 				repeat (+return > (16-2)):throw "out of registers";
+				
+				repeat !!object #{
+					#return<=>{
+						...labelsof codeof (return...object);
+					};
+					#let return..proto = {}::{
+						#..proto = {}::{
+							let ..proto = return..proto;
+							let ..super = return..super;
+						};
+						#..super = {}::{
+							let ..proto = object..proto;
+							let ..super = object..super;
+						};
+					};
+				};
 			};
 		}::{
 			let type_register = type_register;
@@ -176,6 +193,11 @@
 					def let pop = this.pop(ignore || ());
 				};
 				let weakScope(do){//:#(#(RegEnum)->{@})->{@} ; zero cost abstraction version of blockScope.
+					let reg = this.copy();
+					do(reg,this);
+					#this.maxUsed <-> 0xmin.Math.max(+this.maxUsed,+reg.maxUsed,+reg);
+				};
+				let unsafeScope(do){//:#(#(RegEnum)->{@})->{@} ; same as weakScope, but doesn't mutate the original RegEnum
 					let reg = this.copy();
 					do(reg,this);
 				};
@@ -242,10 +264,10 @@
 				{:block;
 					jump->block..return if >= 0;//when out of chars, use user input as normal
 					[i] += 1;
-					doWhile;
+					def doWhile||{};
 					%outputReg = [string + %tempReg];
 					pop %tempReg;
-					miniProcess;
+					def miniProcess||{};
 					jump -> self..return;
 					{:data;
 						def string;
@@ -305,7 +327,7 @@
 			repeat !+hasReg:{
 				#i = 1;
 			};
-			repeat  push %i;
+			repeat !+hasReg push %i;
 			def let start = start(i);
 			recur do..flat def let loop{
 				let jumpTo;
@@ -316,7 +338,7 @@
 			};
 			...labelsof loop;
 			def loop.jumpTo;
-			repeat !hasReg pop %i;
+			repeat !+hasReg pop %i;
 		}::{
 			let ..prototype{
 
@@ -333,7 +355,7 @@
 				};
 			};
 		};
-		let for_start_repeat(i_reg,getLength,do){//:#(%usize,{@}->%usize?,{@})->{@}
+		let for_start_repeat(i_reg,getLength,do){//:#(%usize,{@}->%usize?,{@})->{@} ; similar to doFor
 			getLength;
 			def let loop{
 				def do;
@@ -349,7 +371,7 @@
 				jump -> loop if >= 0 !signed;
 			};
 		};
-		#return = {let for=for,for_repeat=for_repeat;};
+		#return = {let for=for,for_start_repeat=for_start_repeat,for_repeat=for_repeat;};
 	}();
 	let meta{//{[string]:#(...)->{#}}
 		let: enum(startValue)={

@@ -34,7 +34,8 @@ function listify(label,classes){
 		if(object[searchSymbol]||index!=-1)return typeMap.reference+index;//TODO:add indexes for `*objNum_classNum`
 		index=objectsWithClass.original.push(object)-1;
 		let dataObj=
-			object instanceof Array?[[],[]]
+			property.toJSON?object.toJSON()
+			:object instanceof Array?[[],[]]
 			:typeof object=="string"||object instanceof String?[[],typeMap.string+object]
 			:typeof object=="number"||object instanceof Number?[[],typeMap.number+object]
 			:[[]]
@@ -43,7 +44,6 @@ function listify(label,classes){
 		objectsWithClass.cloned.list.push(dataObj);
 		function forEachInDataTree(property){
 			if(!property)return property;
-			if(property.toJSON)return property.toJSON();
 			if(originals.has(Object.getPrototypeOf(property).constructor)){
 				return search(property);
 			}
@@ -71,7 +71,8 @@ function listify(label,classes){
 				return;
 			}
 			let nameIndex=objectsWithClass.cloned.properties.indexOf(key);
-			let propertyData=key=="data"?search(object[key]):forEachInDataTree(object[key]);
+			let propertyData=//key=="data"?search(object[key]):
+				forEachInDataTree(object[key]);
 			if(propertyData!=undefined){
 				if(nameIndex==-1)nameIndex=objectsWithClass.cloned.properties.push(key)-1;
 				for(let i = dataObj[0].length;i<nameIndex;i++){

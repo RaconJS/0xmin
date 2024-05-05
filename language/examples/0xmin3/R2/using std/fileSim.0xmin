@@ -1,0 +1,508 @@
+//TODO,UNUSED,UNFINISHED,UNSTABLE
+//#"table";
+import "type.0xmin";
+import "RegState.0xmin";
+//note: using '[]ram' for 'an item on the ram' and 'T~' for 'an invalid (write only) type T'
+let File(){
+	def let name<=>DynLenObjectPtr();//:String ; note: has a `meta.assert` that name:+0
+	def let parent<=>Pointer(File());
+	def let info<=>DynLenObjectPtr();//:String
+	def let data<=>DynLenObjectPtr();//:Object*
+	def let links<=>DynLenObjectPtr();//:File[]* & Graph<File>
+}:>Type():>Trait.impl()<:(File){
+	//TODO: refactor code into methods
+	//UNFINISHED formal methods are not fully implemented yet. this is currently dead code
+	let:
+		new,unref,
+		delete,ref,
+		construct,destruct
+	;
+	#new{
+		let .[¬Trait.asMethod.asm] = ¬;
+		let use(state){#;
+			#return = ..this;
+			#static.use(..this);
+			repeat(//if construct is already allocated then put it back in this @ function
+				(construct[¬Static]&&construct[¬Static]..defs..length)||
+				(construct..defs..length)
+			):{
+				#construct_location<=>{def construct};
+				#delete construct[¬Static];
+			};
+			#static.use(construct);
+			#heap.malloc.use();
+		};
+		let regsUsed;
+		let reg = RegEnum();
+		let inputs{};
+		let outputs{
+			def let object = Pointer()<:File()<->reg();
+		};
+		let construct_location;
+		{
+			%heap.malloc.inputs.(0) = object.(¬Pointer).data..@..length;
+			heap.malloc.call();//optimised for file size
+			def construct_location{def construct};
+		};
+		#regsUsed <-> reg;
+	};
+	#:static.use()<:"impossible string:";
+	//construct:@(self:%File~*,parent:%File*)->self & %File* mutate self //type anotation without boilerplate"
+	#construct{
+		//boilerplate function signiture
+		let .[¬Trait.asMethod.asm] = ¬;//allows for: `let a=Pointer()<:File()<->0;a.construct()`
+		let use(state){#;
+			#return = ..this;
+			#static.use(..this);
+		};
+		let regsUsed;
+		let reg = RegEnum();
+		let inputs{
+			def let self = Pointer()<:Container()<:File()<->reg();//:%File~*
+			def let parent = Pointer()<:File()<->reg();//:%File~*
+		};
+		let outputs{
+			def let self = Pointer()<:File()<->inputs.self;
+		};
+	}::{
+		meta.todo("move constructer into here");
+		return;
+	}::{
+		#regsUsed <-> reg;
+	}:>static();
+	#destruct{
+		let .[¬Trait.asMethod.asm] = ¬;
+		let use(state){#;
+			#return = ..this;
+			#static.use(..this);
+		};
+		let regsUsed;
+		let reg = RegEnum();
+		let inputs{};
+		let outputs{};
+		{
+			...do;
+			return;
+		};
+		#regsUsed <-> reg;
+	};
+	#: delete{
+
+	};
+};
+let startDir = File()::{
+	#parent<=>Pointer(..this);
+	#name.meta_set("root":>static.use());
+	#links.meta_set({
+		@File()::{
+			#name.meta_set("foo":>static.use());
+		}:>static.use();
+		@File()::{
+			#name.meta_set("bar":>static.use());
+		}:>static.use();
+		@File()::{
+			#name.meta_set("baz":>static.use());
+		}:>static.use();
+	}:>heap.Object.static():>static.use().data);
+}:>static().use();
+let keys{
+	let copy = +",";
+	let paste = +".";
+	let cd_parent = +"/";
+	let exit = +";";
+	let: delete = +"\x08";//backspace to delete
+};
+let largeReg = RegState();//outlives all other regs
+let currentDir:>reg()<=>Pointer()<:File();
+let linkDir<:Pointer()<:File();//assigned later
+let parentLinkDir<:Pointer()<:File();//:%File*? ; assigned later //UNUSED
+...labelsof{:whenUsedAsCallable;
+	let storedState{
+		//:File*?
+		def let linkDir <=> {@startDir};
+		def let currentDir <=> {@startDir};
+	}:>static();
+	let reset{:initialState;//UNUSED
+		%currentDir = startDir;
+		%linkDir = startDir;
+	}:>static();
+	let onExit{
+		[storedState.currentDir] = %currentDir;
+		[storedState.linkDir] = %linkDir;
+		//sp + 1;
+		//let else;
+		//jump->else if == 0;
+		//return;
+		//def else;
+		hlt;
+	};
+	let onEnter{
+		print("\c0f\p00");
+		%currentDir = [storedState:>static.use().currentDir];
+		{:block;
+			jump -> block..return if == 0;
+			%currentDir = startDir;//default to root if null
+		};
+		%linkDir = [storedState:>static.use().linkDir];
+		{:block;
+			jump -> block..return if == 0;
+			%linkDir = startDir;//default to root if null
+		};
+	};
+};
+def onEnter;
+def let start;
+let loopThroughNames;//inline function
+reg.weakScope()<:(reg){:printFile;
+	$(Pointer()<:DynLenObjectPtr()<->currentDir).printString();
+	print(":");
+	def (loopThroughNames(reg,do){
+		:forLoop;
+		let i = reg();
+		let item = reg()<:Pointer()<:Item(array,File());
+		let array = reg()<:Pointer()<:Item(File(),File().links.data);//:%File[]*
+		let regsUsed = {i;item;array}<->reg;
+		for_start_repeat(i,{
+			%i = [%currentDir+currentDir.links.size];
+			%i -= 1;
+			jump->forLoop..return if < 0 !signed;
+			%array = [%currentDir+currentDir.links.data];
+		},{
+			%item = [%array+%i];//:
+			meta.assert(+item.name==0);{
+				let name = {...item.name.slice} <-> item;//:String slice
+				do(name,regsUsed);
+			};
+		});
+	})(reg,(name){print("\n");name.printString()});
+};
+let clearString{//:@(%usize)->clears terminal ; assigned later
+	let stringLength <=> usize();
+	let const_0;//:% 0
+	let inputs{
+		def let stringLength = stringLength;
+	};
+	let regsUsed{
+		const_0;
+		stringLength;
+	};//:RegSet
+}:>static();
+let reg1 = RegEnum(DynLenObjectPtr.push.regsUsed);
+let char:>reg1()<:Char();
+def let getChar = awaitInput(char);
+def let linkDir.copy{:handleLinkDir_copy;
+	let UIstring = "copied";//user interface to tell user that the currentDir has been copied
+	let cleanUp;
+	%char - keys.copy;
+	if != 0 jump -> cleanUp;
+	{:then;
+		{:handleUI;
+			print("\pb0"...UIstring);
+		};
+		%linkDir = %currentDir;
+	 	jump -> getChar;
+	};
+	{:finally;//only clean up UI when a non-copying key is pressed
+		def cleanUp{
+			print(""...{"\pb0";repeat UIstring..length" "});
+		};
+	};
+};
+delete getChar;
+def reg.weakScope()<:(reg){:clearScreen;
+	%clearString.stringLength = [%currentDir+currentDir.name.size];
+	%clearString.const_0 = 0;
+	print("\p00",clearString.const_0,{});
+	call clearString:>static.use();
+	print(" ",clearString.const_0,{});
+	loopThroughNames(reg,(name,otherRegsUsed){//clears string
+		:forLoop;
+		%clearString.stringLength = [%name+name.size];
+		print("\n",clearString.const_0,{});
+		call static.use()<:clearString::{
+			let i = reg();
+			#stringLength <-> i;
+			#const_0 <-> reg();
+			//#regsUsed::{...otherRegsUsed};
+			//assume %const_0 == 0
+			for_start_repeat(i,{
+				%i -= 1;
+				jump->forLoop..return if < 0 !signed;
+			},{
+				print(" ",const_0,{});
+			});
+			return;
+		};
+	});
+	print("\p00",clearString.const_0,{});
+	meta.assert(reg < char);
+};
+reg.weakScope()<:(reg){:checkKey_delete;
+	:block;
+	let directoryToDelete = Pointer(File())<-> reg();
+	%char - keys.delete;
+	if != 0 jump -> block..return;
+	{:then;
+		let finally;
+		let showString = "delete";
+		print(showString);
+		%directoryToDelete = %currentDir;
+		{:saveRoot;//prevents deleting root
+			:block;
+			%directoryToDelete - startDir;
+			jump->finally if==0;
+		};
+		let temp = reg(),temp1 <-> currentDir;
+		//assert: currentDir is invalid here and so is not readable
+		let nextDir = reg();
+		%nextDir = [%currentDir+currentDir.parent];
+		let i = reg();
+		RegSet.save_onStack({currentDir;0})<:(){//UNSTABLE
+			let fileReg <-> 0;
+			#fileReg<=> Pointer()<:File();
+			%fileReg = %currentDir;
+			call static.use()<:{:unrefFile;
+				{//TODO make destructor recursive
+					let links = Pointer()<:DynLenObjectPtr().data<->reg();
+					for_start_repeat(i,{//assume: File():DynLenObjectPtr[]
+						%i = [%currentDir+currentDir.links.size];
+						%i -= 1;
+						%links = [%currentDir+currentDir.links.data];
+					},{
+						let subFile = Pointer()<:File()<-> temp;
+						%subFile = [%links+%i];
+						RegSet.save_onStack({i;subFile;links;fileReg})<:heap.unref(subFile,unrefFile);
+					})
+				};
+				heap.unref(directoryToDelete,{
+					heap.unref(directoryToDelete,{
+						for_start_repeat(i,{//assume: File():DynLenObjectPtr[]
+							%i = #(File()..length-1);
+						},{
+							let temp_dynamicLengthObjectPointer = Pointer()<:DynLenObjectPtr()<-> temp;
+							let obj = temp_dynamicLengthObjectPointer;
+							%obj = [%directoryToDelete + %i];
+							%obj = [%obj + obj.data];
+							heap.unref(obj);
+						})
+					});
+				});
+				return;
+			};
+		};
+		%currentDir = %nextDir;
+		def finally;
+		print("\p00"...{repeat showString..length " "}..."\p00");
+		jump->start;
+	};
+};
+{:checkKey_exit;
+	:block;
+	%char - keys.exit;
+	if != 0 jump -> block..return;
+	{:then;
+		def onExit;
+	};
+};
+{:handleParentDir;
+	let finally;//cleans data
+	%char - keys.cd_parent;
+	if != 0 jump -> finally;
+	{:then;
+		repeat 0 {//assume: root does not have a parent
+			%currentDir - startDir;
+			if == 0 jump -> finally;
+		};
+		%currentDir = [%currentDir+currentDir.parent];
+		jump -> start;
+	};
+	def finally{:else};
+};
+def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
+	let onFound,onFail;
+	let onFound.newDir = Pointer()<:File();//new directory
+	reg.weakScope()<:(reg){:searchDirForChar;
+		let i = reg();
+		let array = reg()<:Pointer()<:Item(File(),File().links.data);//:%File[]*
+		let item = reg()<:Pointer()<:File();
+		for_start_repeat(i,{
+			%i = [%currentDir+currentDir.links.size];
+			%i -= 1;
+			jump->return..return if < 0 !signed;
+			%array = [%currentDir+currentDir.links.data];
+		},{
+			%item = [%array+%i];
+			#onFound.newDir <-> item;
+			meta.assert(+item.name==0);{
+				let name = {...item.name.slice} <-> item;//:%String slice*
+				let temp = reg();
+				%temp = [%name+item.name.data];//:%char[]*
+				[%temp+0] - %char;
+			};
+			if == 0 jump->onFound;
+		});
+		meta.assert(+reg<+char);
+	};
+	#onFound{
+		%currentDir = %newDir;
+		jump-> return..return;
+	}:>static.use();
+	def onFail<=>reg.weakScope()<:(reg){:createFile;//create file if no file found
+		:onFail;
+		let oldReg = reg;
+		let temp <-> reg();
+		let string = String(1);
+		let newFile:>reg()<:Pointer()<:File();
+		let pushFile:>static();//:{@} & @()->() ; assigned later
+		{:getNewFile;
+			def let linkDir.paste{:handleLinkDir_paste;
+				:block;
+				%char - keys.paste;
+				if != 0 jump -> block..return;
+				%newFile = %linkDir;
+				let stringLength;
+				//assume: terminal is at \p00
+				print({"paste"}::{#stringLength=..length});
+				heap.ref(linkDir);
+				call pushFile;//using a function for pushFile since we do not want to `cd` into the newFile
+				RegSet.save_onStack(clearString.regsUsed)<:(){:clearScreen;
+					%clearString.const_0 = 0;
+					print("\p00",clearString.const_0,{});
+					%clearString.stringLength = stringLength;
+					call clearString;
+					print("\p00",clearString.const_0,{});
+				};
+				jump -> start;//TODO print "paste" when doing this
+			};
+			let mallocInputOutputSet = RegSet.union(heap.malloc.inputs,heap.malloc.outputs);
+			let saveSet1 = 
+				RegSet.fromRegEnum(oldReg)
+				:>RegSet.intersection(mallocInputOutputSet)
+				:>RegSet.substract({newFile})
+			;
+			RegSet.save_onStack(
+				RegSet.substract(saveSet1)
+			)<:(){:initFile;
+				//adds a new file with a link to the parent
+				let store_linksArray<->reg1();//:%File[]*; assert: outlives heap.malloc
+				RegSet.save_onStack(
+					RegSet.intersection({currentDir},mallocInputOutputSet)//saves currentDir if need be
+				)<:()->{
+					let currentDir_onStack <-> 0;//:stack+currentDir
+					{
+						%heap.malloc.inputs.(0) = newFile.(¬Pointer).data..@..length;
+						heap.malloc.call();
+						%newFile = %heap.malloc.outputs.(0);
+					};{:constructor;
+						let startLinkLength <-> 2;//:#int
+						meta.assert(startLinkLength >= 1,"needs 1 link back to parent");
+						%heap.malloc.inputs.(0) = startLinkLength;
+						heap.malloc.call();//note:newFile is valid here since we use the safer `malloc.call()` instead of `call malloc`
+						[%newFile+newFile.links.data] = %heap.malloc.outputs.(0);
+						meta.assert(+currentDir_onStack == 0);{
+							let temp_currentDir <-> (newFile+1%14);//:% & %currentDir
+							pop %temp_currentDir;
+							[%newFile+newFile.parent] = %temp_currentDir;
+							push %temp_currentDir;
+							delete temp_currentDir;
+						};
+						[%newFile+newFile.links.size] = 1;
+						[%newFile+newFile.links.capacity] = startLinkLength;
+						%store_linksArray = %heap.malloc.outputs.(0);
+						{:init_OtherData;//unstable ; TODO: find but with malloc
+							{:init_parent;};
+							{:init_file_data;
+								let startSize = 2;
+								%heap.malloc.inputs.(0) = startSize;
+								heap.malloc.call();
+								[%newFile+newFile.data.data] = %heap.malloc.outputs.(0);
+								[%newFile+newFile.data.size] = 0;//this line breaks the next malloc. `0xffff`
+								[%newFile+newFile.data.capacity] = startSize;
+								meta.repeat(malloc)<:(i){[%heap.malloc.outputs.(0)+i] = 0};
+							};
+							{:init_info;
+								let startSize = 2;
+								%heap.malloc.inputs.(0) = startSize;
+								heap.malloc.call();
+								[%newFile+newFile.info.data] = %heap.malloc.outputs.(0);
+								[%newFile+newFile.info.size] = 0;
+								[%newFile+newFile.info.capacity] = startSize;
+								meta.repeat(malloc)<:(i){[%heap.malloc.outputs.(0)+i] = 0};
+							};
+						};
+					};
+					{:getNewFileName;
+						let data = DynLenObjectPtr().data<->temp;
+						%data = [string.data];
+						[%data+0] = %char;
+						[string.size] = 1;
+						let stringLength;//:#usize
+						print({"new name file:\n"}::{#stringLength = ..length - 1});
+						print.char(char);
+						#stringLength += 1;
+						readString(string);
+						print("\n");
+						RegSet.save_onStack(
+							RegSet.intersection({
+								newFile;store_linksArray;currentDir;linkDir
+							},clearString.regsUsed)
+						)<:(){
+							%clearString.const_0 = 0;
+							print("\p00",clearString.const_0,{});
+							%clearString.stringLength = stringLength;
+							call clearString;
+							print("\n",clearString.const_0,{});
+							%clearString.stringLength = [string.size];
+							call clearString;
+							print("\p00",clearString.const_0,{});
+						};
+						%temp = [string.data];
+						[%newFile+newFile.name.data] = %temp;
+						%temp = [string.size];
+						[%newFile+newFile.name.size] = %temp;
+						%temp = [string.capacity];
+						[%newFile+newFile.name.capacity] = %temp;
+					};
+				};
+				[%store_linksArray+0] = %currentDir;
+				{:refreshStringBuffer;
+					%heap.malloc.inputs.(0) = 4;
+					heap.malloc.call();//allocates new array for string
+					[string.data] = %heap.malloc.outputs.(0);
+				};
+			};
+		};
+		call pushFile::{//does: currentDir.links.push(newFile)
+			let links = Pointer()<:DynLenObjectPtr() <-> temp;//:%File().links*&%File[]**
+			%links = %currentDir;
+			%links += currentDir.links;
+			meta.assert(+newFile!=+DynLenObjectPtr.push.outputs.newItem);
+			RegSet.save_onStack({newFile;currentDir})<:()->{
+				links.push(1);
+				delete links;
+				let currentDir = ¬;//is consumed, is invalid untill the end of this blockScope
+			};
+			meta.assert(+DynLenObjectPtr.push.outputs.newItem!=+newFile);
+			[%DynLenObjectPtr.push.outputs.newItem] = %newFile;
+			return;
+		}:>static.use();
+		{:changeDirectory;
+			%currentDir = %newFile;
+		};
+		meta.assert(+reg<+char);
+	};
+	meta.assert(+reg<+char);
+};
+let stateReg = RegEnum()<:0xmin.Math.max(
+	reg,reg.maxUsed,
+	reg1,reg1.maxUsed,
+);
+#linkDir<->stateReg();
+#parentDir<->stateReg();
+jump->start;
+{
+	hault;
+	def static.memory;
+	def heap.data;
+	#largeReg.compile();
+};

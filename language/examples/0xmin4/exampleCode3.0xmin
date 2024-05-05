@@ -23,19 +23,40 @@
 };
 #(){
 	@{},${},#{} as actuall statement types;
+	@(){},$(){},#(){}
 	@//assembly code and code insertion
 	$//state code
-	#let:a;
-	#set:a;
-	#def:a;
+	#repeat;
+	#recur;
+	#import;
+	#...labelsof;
+	#...codeof;
+	#...run;
+	#let;
+	#set;
+	#undef;
+	$virtual;
+	$def;
+	$insert{
+
+	};
 	@{};//insert block
 	${};//(address or state) block
 	#{};//default block
 	{//$def insert #{}
 		let a = 2;
 		1;2;3
-	};//
+	};
 	${
 
-	}
+	};
+	let stateCode_call{
+		(callerState,calleeState){
+			let callerState = callerState..state[¬constructor];
+			let calleeState = calleeState..state[¬constructor];
+			(calleeType...callerType);
+			return..state;
+		};
+	};
 };
+let a;
