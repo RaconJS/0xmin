@@ -1,0 +1,82 @@
+#"code";#"int";
+
+$(str){#;
+	//note I parse the input in as a function so that I get splitting by white spaces for free.
+	let str1<=>str;
+	let data = str1[0];//statement 
+	let i=0;
+	let ans1=0,ans2=0;
+	let map;debugger data..length;
+	repeat 26:{
+		let map[""...{(i+"a")}]=1+i;
+		let map[""...{(i+"A")}]=1+26+i;
+		#i+=1;
+	};:a;
+	let i=-1;
+	repeat data..length{:part1;#;
+		i+=1;
+		{
+			let temp=data;
+			let part1.data<=>temp[i];
+		};
+		//for each 'word'
+		let l=data..length/2;
+		data={data..splice(0,l);data..splice(0,l)};
+		let backpack=data;
+		let labels;
+		let i1=-1;
+		repeat l let set labels[""...backpack[0][(i1+=1)]];
+		let i1=-1;let a;
+		repeat l:{#;
+			i1+=1;
+			repeat +!!labels [""...backpack[1][i1]]:{#;
+				let letter;
+				let backpack.letter = letter = backpack[1][i1];
+				l=0;
+				ans1+=map[""...letter];
+			};
+		};
+	};
+	let i=-3,j;
+	repeat (data..length/3):{:part2;#;
+		i+=3;
+		let letters;
+		set j<->-1;
+		repeat data[i+0]..length:{#;
+			let letters[""...data[i+0][j<->j+1]]<->0;
+		};
+		set j<->-1;
+		repeat data[i+1]..length:{#;
+			set letters[""...data[i+1][j<->j+1]]+=1;
+		};
+		set j<->-1;
+		let len=data[i+2]..length;
+		repeat len:{#;
+			let name=data[i+2][j<->j+1];
+			let l=letters[""...name];//l:null|0|1
+			repeat !!+l: {
+				#len<->0;
+				#ans2=ans2+map[""...name];
+			};
+		};
+	};
+	@;
+	@(+ans1);
+	@(+ans2);
+	#debugger +ans1;//>7548
+	#debugger +ans2;//<2818
+}()<:((){
+	vJrwpWtwJgWrhcsFMMfFFhFp
+	jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+	PmmdzqPrVvPwwTWBwg
+	wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+	ttgJtRGJQctTZtZT
+	CrZsJsPPZsGzwwsLwLmpwMDw
+})[0];//0 for test
+/*
+debugger: 300
+debugger: 7848
+debugger: 2616
+len(2): 00001ea8,00000a38
+[Finished in 3.8s]
+*/

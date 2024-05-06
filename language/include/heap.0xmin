@@ -733,7 +733,7 @@ void #let set: heap{#;
 				call clear;
 			};
 			#let: nextReg=free.nextReg;
-			repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
+			//repeat (+r_address!=+free.inputs[0]):%free.inputs.(0)=%r_address;
 			repeat !regsAreFree:free.call(free.inputs.(0));
 			repeat !!regsAreFree:call free;
 		};

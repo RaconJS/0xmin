@@ -232,9 +232,9 @@ import "std v1.0xmin";
 	};
 	let Wrapper<=>Trait()<:(type,innerType){
 		let innerType = innerType||¬;
-		let unwrap(){
-			#delete this[¬type];
-		};
+		let unwrap(object){
+			#return = object[¬innerType];
+		}::{let .[¬Trait.asMethod.meta] = ¬};
 	}¬::{
 		let Wrap(type,innerType){//:Trait ; includes Wrapper trait
 			#return = Wrapper(type)::(innerObject)={
@@ -390,6 +390,10 @@ import "std v1.0xmin";
 		...codeof{
 			let type,object;
 			#isType = isType || Type.isType(typeOrObject);
+			repeat !!Known.isKnown(typeOrObject): {//TODO implement 'Known'
+				#typeOrObject = typeOrObject..constructor;
+				//note: this does not work well with types that contain types
+			};
 			meta.if(!!isType)<:(){//%T*
 				#type = typeOrObject;
 				#object = type();
@@ -784,35 +788,66 @@ import "std v1.0xmin";
 			};
 		}:>static();
 		let pop{
-			let .[¬Trait.asMethod.asm] = ¬;
+			let .[¬Trait.asMethod.asm](objectTemplate){
+				let object = objectTemplate;
+				let isNumber = !object..constructor && (object..length == 0 || (0*object != 0));//:#bool
+				let size;
+				#meta.if(+isNumber)
+					<:(){#size <-> ¬+object}
+					<:(){#size <-> object..@..length}//note that it does not unwrap pointers
+				;
+				Trait.derive.method.asm(..this,this,(),(method)=>{
+					def method.push;
+					%..this.inputs.size = size;
+				},(),());
+			};
 			let use(state){#;
 				#return = ..this;
-				#static.use(..this);
-				#heap.shift.use();
+				#:static.use(..this);
+				//#heap.shift.use();
+				#heap.resize.use();
 			};
 			let regsUsed;
 			let reg = RegEnum();
 			let inputs{
-				let self = Pointer():>DynLenObjectPtr()<->reg();
+				let self = Pointer()<:DynLenObjectPtr()<->reg();
 				let size = int()<->reg();//:signed int >= 0; number of elements to remove
 			};
 			let outputs{
-				let self = Pointer():>DynLenObjectPtr()<->reg();
+				let self = Pointer()<:DynLenObjectPtr()<->reg();
 			};
+		}::{
+			...labelsof inputs;
+			let case_sizeIsEmpty,resizeArray;
 			{:block;
-				let end = block..return;
-				...labelsof inputs;
 				[%self+self.size] -= %size;
-				let case_sizeIsEmpty;
-				if <= 0 !signed jump -> case_sizeIs0;
+				if > 0 !signed jump -> case_sizeIsEmpty..return;
 				def case_sizeIsEmpty{
-					[%self+self.data]|0;//if None
-					jump -> end if == 0;
-					return;
+					[%self+self.size] = 0;
+				};
+				def resizeArray{
+					let temp <-> size;//:%usize
+					%temp = [%self+self.size];
+					%temp <<= 2;
+					[%self+self.capacity] - %temp;
+					jump -> ..return if <= 0 !signed;
+					//assert: capacity > 4*size
+					let storeReg = RegEnum(heap.resize.regsUsed);
+					let store_self = storeReg();
+					%store_self = %self;
+					{//half the capacity
+						%heap.resize.inputs.object = %self;
+						%heap.resize.inputs.size = [%self+self.capacity];
+						%heap.resize.inputs.size >>= 1;
+						call heap.resize;
+						meta.todo();
+						//TODO
+					};
+					%self = %store_self;
 				};
 			};
 			return;
-			#regsUsed <-> reg;
+			#regsUsed <-> 0xmin.Math.max(store_self,reg);
 		};
 	});
 	let DynLenObjectPtr.Slice()={//:{@[l]*,@l}

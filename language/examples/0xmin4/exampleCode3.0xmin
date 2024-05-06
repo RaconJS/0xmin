@@ -2,13 +2,16 @@
 //testing using a type system in normal 0xmin
 //types are functions,
 //a type can start with %,*,+,[],@,$,#,<
-//maybe types can start with £, as the 'type/operator overloading' symbol
+//maybe types can start with £, as the 'type/operator overloading' symbol. using '!£ to ignore types '
 #(){
 	import lib "standard assembly operator overloading.0xmin";
-	let i = %int<:0;
-	let type_int3 = [3]int;
-	let type_intOption = [];
+	let i = %i16()<:0;
+	let type_int3 = int[3];
+	let type_intOption = int?;
 	let intOption = type_intOption(@);
+	let Class(a,b){
+		def let a:i32(a),b:string(b);
+	};
 	let print:static[] {@}={//`%B<->` == register of (type/value) A contains (type/value) B
 		let string = %&{l:int,[l]char} <: 0;
 		assert(string.l:string+int & string[]int);
@@ -20,6 +23,7 @@
 			jump -> loop if > 0;
 		};
 	};
+	//using 
 };
 #(){
 	@{},${},#{} as actuall statement types;
