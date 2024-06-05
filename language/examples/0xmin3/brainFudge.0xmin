@@ -1,0 +1,34 @@
+#"text";
+#"code";
+let: meta_repeat(len,do){
+	let i=-1;
+	repeat len:do(i=i+1);
+};
+let: meta_forEach(label,do){
+	let i=-1;
+	repeat label..length:do(label[i=i+1],i);
+};
+let state;
+let ..this[¬state]{
+	let value = 0;
+};
+let print(string)<-{
+	{//maybe have '#let foo = [¬state];' syntax; for searching scopes in macros
+	//assume: *move = 0
+	let value<->..this[¬state].value;
+	meta_forEach(string)<:(v,i){
+		let diff=v-value %256;
+		repeat(diff<=-128)#diff+=256;
+		repeat(diff<0)repeat(-diff)"-";
+		repeat(diff>0)repeat  diff "+";
+		".";
+		#value=v;
+	};
+	//clean up
+	#..this[¬state].value<->value;
+}}::{
+	let ..supertype{
+		let state=state;
+	};
+};
+print("aba");

@@ -447,7 +447,7 @@ class NumberDisplay{
 	class CPU{
 
 	};
-	//R2
+	/*//R2
 		char *last_filename = NULL;
 		int speed_button_val = 60;//16
 		int slowModeState = 0;//bool
@@ -481,27 +481,27 @@ class NumberDisplay{
 		int O2 = 0;int O2T = 0;//0=REG 1=MEM 2=CONST //16/8
 
 		void toR2TERM(int d){//16
-			/*if(d & 0x1000){
-				Tcursor = d & 0xFF;
-				return;
-			}
-			if(d & 0x2000){//0x20BF
-				char color_arr[] = {30,34,32,36,31,35,33,37,90,94,92,96,91,95,93,97};//To match colors in xterm. //8
-				printf("\033[%d;%dm",color_arr[d & 0xF],color_arr[(d>>4) & 0xF]+10);
-				return;
-			}
-			if(d<10) d+=0x30;	///OPTIONAL - Some of my R2 programs use 0x0 - 0x9 as '0' - '9'
-			if(d==10) d=0x30;	///OPTIONAL - or 0xA as '0'
+			// if(d & 0x1000){
+			// 	Tcursor = d & 0xFF;
+			// 	return;
+			// }
+			// if(d & 0x2000){//0x20BF
+			// 	char color_arr[] = {30,34,32,36,31,35,33,37,90,94,92,96,91,95,93,97};//To match colors in xterm. //8
+			// 	printf("\033[%d;%dm",color_arr[d & 0xF],color_arr[(d>>4) & 0xF]+10);
+			// 	return;
+			// }
+			// if(d<10) d+=0x30;	///OPTIONAL - Some of my R2 programs use 0x0 - 0x9 as '0' - '9'
+			// if(d==10) d=0x30;	///OPTIONAL - or 0xA as '0'
 
-			if(d == 0x7F){//0x7F is a full block on the R2TERM - used as blinking cursor.
-				printf("\033[%d;%dH\u2588",(Tcursor>>4)+3,(Tcursor&0xF)+2);//UNICODE for FULL BLOCK
-			} else {
-				printf("\033[%d;%dH%c",(Tcursor>>4)+3,(Tcursor&0xF)+2,d & 0xFF);
-			}
-			fflush(stdout);
+			// if(d == 0x7F){//0x7F is a full block on the R2TERM - used as blinking cursor.
+			// 	printf("\033[%d;%dH\u2588",(Tcursor>>4)+3,(Tcursor&0xF)+2);//UNICODE for FULL BLOCK
+			// } else {
+			// 	printf("\033[%d;%dH%c",(Tcursor>>4)+3,(Tcursor&0xF)+2,d & 0xFF);
+			// }
+			// fflush(stdout);
 
-			Tcursor++;
-			if(Tcursor>=16*13) Tcursor = 0;*/
+			// Tcursor++;
+			// if(Tcursor>=16*13) Tcursor = 0;
 		}
 
 		void Roper(int _class, int inst){//8-32 //Updates O[1/2] and O[1/2]T
@@ -827,13 +827,6 @@ class NumberDisplay{
 					q3 = q1 >> q2;
 					RwOP1(q3);R_flag(q3);F_Carr = 0;F_Over = 0;
 					break;
-				/*case 0x16://SCL << (OLD)
-					q1 = RrOP1();
-					q2 = RrOP2() & 0xF;
-					qb = q1;
-					for(int i=0;i<q2;i++) qb = ((qb << 1) | ((R2_SHIFT_PREV >> (15-i)) & 0x01)) & 0xFFFF;
-					RwOP1(qb);R_flag(qb);F_Carr = 0;F_Over = 0;
-					break;*/
 				case 0x16://SCL << (NEW)
 					q2 &= 0xF;
 					q3 = ((((q1<<16) | R2_SHIFT_PREV) << q2) >> 16) & 0xFFFF;
@@ -897,7 +890,7 @@ class NumberDisplay{
 			if(_class != 0) R2_SHIFT_PREV = q1;
 			if(saveIP == R2_REG[15]) R2_REG[15]++;
 		}
-	//----
+	//----*/
 	class CPU_R216{
 		public://used by emulator
 		filt30* ram;

@@ -1,0 +1,98 @@
+//start at ~15:50 17:20 (works), 17:27 stop time,
+//TODO: use chain add for >16 bit comparison
+#"tptasm";//R2 computer
+#"table";
+import "../std v1.0xmin";
+//import "../type.0xmin";
+//import "../RegState.0xmin";
+let reg = RegEnum();
+let nums_static{//:@{u16;i64[]}
+	let itemSize = 4;
+	let itemShift = 2;
+	def let size{0};//:usize
+	def let data{};//:(i64 & u16[4])[] & u16[size]
+	let: meta_set(array){//:#(#i64[])->this & mutates this
+		//little indien
+		#return = ..this;
+		#data<=>meta.forEach(array)<:(v,i){
+			meta.repeat(itemSize)<:(i){
+				let shift = 0xmin.Math.min(i *16,32);
+				repeat(shift<32) @:#(v>>shift&0xffff);
+				repeat!(shift<32) @:#(num||0);
+			};
+		};
+		#size <=> {@data..@..length};
+	};
+};
+#nums_static.meta_set({1;2;3});
+let target{repeat nums_static.itemSize reg()};//:%int
+%target.(0) = 4;
+//assume 1 solution
+let range_arrayLength = 0x2710;//1*16 bits
+let range_itemsOnArray = 0x2540be400;//3*16 bits
+let indexA <-> reg();//:u16 & nums_static+
+let indexB <-> reg();
+let ans = {indexA;indexB};
+let onFound;
+let nums{def let size,data;#..compile}<->reg();
+reg.weakScope()<:(reg){
+	let item_difs{repeat nums_static.itemSize reg()};//:%(u16)[]
+	let enterLoop;
+	{
+		%indexA = [nums_static.size];
+		jump->enterLoop;
+	};
+	${:loop;
+		meta.forEach(item_difs)<:(v,i){
+			let statePos;
+			$statePos => nums_static.data + i;
+			{:ifBlock;
+				let else;
+				jump -> else if !carry;
+				%v = 1;
+				jump -> else..return;
+				def else{
+					%v = 0;
+				};
+				//assert: %v = carry bit
+			};
+			%v += %target.(i);
+			%v -= [statePos+%indexA];
+		};
+		{
+			let enterLoop;
+			{
+				%indexB = [nums_static.size];
+				jump->enterLoop;
+			};
+			${:loop;
+				let continue;
+				let test = reg();
+				meta.forEach(item_difs)<:(v,i_1)=>{
+					let statePos;
+					$statePos => nums_static.data + i_1;
+					%v - [statePos+%indexB];
+					jump -> continue if != 0;
+				};
+				jump -> onFound;
+				def enterLoop;
+				def continue;
+				%indexB -= nums_static.itemSize;
+				jump -> loop if >= 0;
+			};
+		};
+		def enterLoop;
+		%indexA -= nums_static.itemSize;
+		jump -> loop if >= 0;
+	};
+};
+def onFound;
+meta.forEach(ans)<:(index){
+	meta.assert(nums_static.itemSize == 4);{
+		%index>>=2;
+	};
+};
+print.register(ans[0]);
+print(",");
+print.register(ans[1]);
+def nums_static;

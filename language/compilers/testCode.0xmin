@@ -1,2 +1,8 @@
-//debugger (¬..toJSON)..length;
+#"tptasm";
+#"len";
+import lib"heap.0xmin";
+import lib"R2/print.0xmin";
+print("hello world",0,{});
+hlt;
+//debugger (..toJSON);
 //;;debugger ..toJSON;

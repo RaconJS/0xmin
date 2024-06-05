@@ -28,21 +28,22 @@ function listify(label,classes){
 		;
 	};
 
-	function search(object){//:()->index:Number
+	function search(object){//:(Object)->index:Number
 		let objectsWithClass=originals.get(Object.getPrototypeOf(object).constructor);
 		let index=objectsWithClass.original.indexOf(object);
 		if(object[searchSymbol]||index!=-1)return typeMap.reference+index;//TODO:add indexes for `*objNum_classNum`
 		index=objectsWithClass.original.push(object)-1;
 		let dataObj=
-			property.toJSON?object.toJSON()
+			object.toJSON?object.toJSON(forEachInDataTree,search)
 			:object instanceof Array?[[],[]]
 			:typeof object=="string"||object instanceof String?[[],typeMap.string+object]
 			:typeof object=="number"||object instanceof Number?[[],typeMap.number+object]
 			:[[]]
 		;//:[properties:[],baseType:(String|Array|Function)?]
 		object[searchSymbol]=true;
-		objectsWithClass.cloned.list.push(dataObj);
-		function forEachInDataTree(property){
+		objectsWithClass.cloned.list.push(forEachInDataTree);
+		if(object.toJSON)return index;
+		function forEachInDataTree(property){//(any)->Array|Object|index:Number
 			if(!property)return property;
 			if(originals.has(Object.getPrototypeOf(property).constructor)){
 				return search(property);

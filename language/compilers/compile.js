@@ -709,7 +709,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(word=="["){//UNFINISHED: needs to be redone
 					index++;
 					let newScope=new Scope({fromName:"main_assembly_argument",parent:scope,code:statement[index]});
-					newScope.label=new Variable({scope:newScope});
+					newScope.label=new Variable({});
 					value=new Value({type:"scope",name:"[",label:newScope});
 					index++;
 				}else{
@@ -2369,7 +2369,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
-				scope=null;//the scope that the code should be called with. the scope contains the code
+				//uses `label.code` for the list of functionScopes to run
+				//scope=null;//the scope that the code should be called with. the scope contains the code
 				functionPrototype=null;//:Variable?
 				functionSupertype=null;//:Variable?
 				functionConstructor;//:Variable?;
@@ -2390,7 +2391,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				return address==undefined?undefined:address+this.relAddress;
 			}
 			isSearched=false;
-			getCode_source(){//:Statement
+			getCode_source(){//:Statement //OBSOLETE
 				if(this.scope){///this.scope:Scope|Scope.CodeObj;
 					//this: 0xminObject
 					//this.scope comes from 'obj{}' with 'obj{}()'
@@ -3038,7 +3039,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.var=this.var;
 				};
 				if(this instanceof Scope.CodeObj)
-					contexts.main({statement:this.code,scope:instanceScope});
+					contexts.main({statement:this.code,dinstanceScope});
 				else evalBlock(this.code,undefined,instanceScope,statement);
 				//evalBlock(codeBlock,undefined,instanceScope,statement);
 				//if no return label created, it returns the
@@ -3062,7 +3063,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//#set 0xmin.settings.model="R216K2A";
 			}
 			label=new Variable({
-				scope:this,
 				name:["GlobalObject"],
 			});
 			parent=this;
@@ -3074,7 +3074,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			var=this;
 		}
 		class BlockScope extends Scope{
-			label=new Variable({scope:this});
+			label=new Variable({});
 			let=this;
 		}
 		class FunctionScope extends Scope{
@@ -3836,10 +3836,28 @@ let buildSettings={makeFile:true}
 			let fileType=newFileName.match(/(?<=\.)[^.]*$/)?.[0]??"filt";
 			let content=outputFile;
 			if(typeof content!="string"){//content:Uint32Array
+
 			}
 			fs.writeFile(newFileName, content, err => {
 				if (err)reject(err);
-				else resolve();
+				else {
+					if(typeof content=="string" && !newFileName.match(/\.(asm)$/)){//if tptasm ; convert to binary
+						loga("??")
+						const { exec } = require("child_process");
+						exec("./tptasm/main.lua source=\""+newFileName+"\" target=./\""+newFileName+"\" model=R216K8B", (error, stdout, stderr) => {
+							if (error) {
+								console.log(`error: ${error.message}`);
+								return;
+							}
+							if (stderr) {
+								console.log(`stderr: ${stderr}`);
+								return;
+							}
+							console.log(`stdout: ${stdout}`);
+						});
+					}
+					resolve();
+				}
 				//file written successfully
 			})
 		});

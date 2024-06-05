@@ -1,0 +1,4 @@
+%include "common"
+start:
+	send r0,0x5a
+	hlt 

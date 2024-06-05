@@ -1,0 +1,80 @@
+//requires type.0xmin
+repeat !(LenObject&&DynLenObjectPtr&&Type&&heap):
+	import "type.0xmin";
+...labelsof{//strings and extra things
+	let Char(){0}:>Type();
+	let LenString(string){//{@;char[l]}
+		#return = LenObject().meta_set((),string):>static.use();
+	};
+	let String(string){//dynamic string; :{@char[l]*;@l;@} & []static
+		let stringObj = heap.Object.static=(string):>static.use().data[0];
+		#return = DynLenObjectPtr().meta_set(stringObj):>static.use();
+		let return.print = return.printString;
+	};
+	let readString(out_string,doForEach,allowBackSpace){//:#(%,#(%char,String)->{@},#?)->@()->String & []static
+		#out_string=out_string||String();
+		let string = out_string;
+		let inputGetter;
+		RegEnum(DynLenObjectPtr.push.regsUsed).blockScope()<:(reg){
+			let char = Char()<->DynLenObjectPtr.push.regsUsed;
+			def inputGetter = awaitInput(char);
+			%char-"\r";
+			jump -> return..return if == 0;
+			repeat !!allowBackSpace {:goBack;
+				%char-"\x08";//checks for backspace key
+				jump -> goBack..return if == 0;
+				string.pop(1);
+			};
+			string.push(char..@..length,(item,_char){
+				[%item] = %char;
+			});
+			meta.if(!!doForEach)
+				<:(){doForEach(char,string)||{}}
+				<:(){print.char(char)}
+			;
+			jump -> return;
+		};
+		let testInput(input){
+			#return = this;
+			#inputGetter<=>inputGetter.testInput(input);
+		};
+	};
+	let parseInt{
+		let fromHexChar(char,outReg){//#(in %char,out %int4)->@(%char)->%int4 & flag(sign)
+			//throws flag(sign) if invalid number
+			let end,fail,success;
+			repeat !outReg let char = charl
+			repeat !!outReg ...{
+				%outReg = %char;
+				let char = outReg;
+			}
+			{:check0to9;
+				:block;
+				%char -= "0";
+				jump->fail if < 0;
+				"9" - %char;
+				jump->success if >= 0;
+			};
+			{
+				%char -= ("A"-"0");
+				jump->fail if < 0;
+				"F" - %char;
+				jump->success if >= 0;
+			};{
+				%char -= ("a"-"F");
+				jump->fail if < 0;
+				"f" - %char;
+				jump->success if >= 0;
+				//assert: flag(sign)
+			};
+			def end,fail,success;
+		};
+		let fromHexString(){
+
+		}
+	};
+	let str(string){//string slice
+		let stringObj = heap.Object(string):>static.use().data;
+		#return = DynLenObjectPtr().meta_set(stringObj).slice:>static.use();
+	};
+};

@@ -19,6 +19,7 @@ function compile {
 		runSpeed=60;
 		runFileName="";
 		args=("$@");
+		arch="0xmin" #architecture
 		# get number of elements 
 		ELEMENTS=${#args[@]} 
 		 
@@ -78,6 +79,13 @@ function compile {
 				fi
 				i=$(($i + 1));
 				continue;
+			#'-a R2' or '-a 0xmin'
+			elif [[ $operator == "-a" ]]; then
+				if [[ $((i + 1)) < $ELEMENTS ]];then
+					arch=$val1;
+				fi
+				i=$(($i + 1));
+				continue;
 			elif [[ $operator == "-help" || $operator == "--help" ]]; then
 				echo compiles .0xmin files
 				echo
@@ -94,6 +102,9 @@ function compile {
 				echo -s -\> speed of the emulator in ticks per second. e.g. \`0xmin -\e a.filt -s 10\`
 				echo
 				echo -sm -\> speed multiplier, makes emulator run at x\*60 ticks per second. e.g. \`0xmin -\e a.filt -sm 10\`
+				echo
+				echo -a archetecture -\> used with \`\-e\` or \`-a\` to choose which CPU architecture to run it as. e.g. \`-a 0xmin\` or \`-a R2\`
+				
 			#default
 			else
 			inputFileName=$val;
@@ -118,7 +129,11 @@ function compile {
 		else
 			test=0;
 		fi;echo $test;
-		$mainfolder/emulators/0xmin_emulator $runFileName $test $runSpeed;
+		if [[ $arch == "0xmin" ]]; then
+			$mainfolder/emulators/0xmin_emulator $runFileName $test $runSpeed;
+		elif [[ $arch == "R2" ]]; then
+			$mainfolder/emulators/r2emulator $runFileName $test $runSpeed;
+		fi
 	fi
 	return;
 }

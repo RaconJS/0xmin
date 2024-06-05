@@ -25,7 +25,26 @@ scope: source.0xmin
 #
 #
 variables:
-  baseNumber: '\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b'
+  baseNumber_size: '(?x)
+      (?:s(?:
+        0x(?:[0-9]|[a-f]|[A-F])+
+        |0b[01]+
+        |(?:0|[1-9])[0-9]*
+        |0[0-7]+
+      ))
+    '
+  baseNumber_value: '(?x)
+      (?:
+        0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?
+        |0b[01]+(?:\.[01]+)?
+        |(?:0|(?:0d)?[1-9])[0-9]*(?:\.[0-9]+)?
+        |0[0-7]+(?:\.[0-7]+)?
+      )
+    '
+  baseNumber: '(?x)
+    \b{{baseNumber_value}}{{baseNumber_size}}?\b
+    |\b0{{baseNumber_size}}(?:v{{baseNumber_value}})?\b
+    '
   number: '\b(?:undefined|null)\b|{{baseNumber}}' #\b(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
   signedNumber: '(?:\b|[+\-*/]\s*){{baseNumber}}' #(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
   labelName: '\b\w+\b'
