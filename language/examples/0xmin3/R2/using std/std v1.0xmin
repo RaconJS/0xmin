@@ -1,17 +1,19 @@
 ...labelsof (){
 	#return{let
-		heap,
-		print,
-		Static,
-		static,
-		readHigh,
-		RegEnum,
-		reg,
-		getInput,
-		meta,
+		heap = ¬,
+		print = ¬,
+		Static = ¬,
+		static = ¬,
+		readHigh = ¬,
+		RegEnum = ¬,
+		reg = ¬,
+		getInput = ¬,
+		meta = ¬,
 	};
 	//import lib "R2/class.0xmin";
+	repeat !heap
 	#heap = {import lib "heap.0xmin"};
+	repeat !print
 	#print = {import lib "R2/print.0xmin";...let set print;};
 	...labelsof(){//Static: static memory management
 		let private{let obj,allowRedefine};
@@ -404,7 +406,8 @@
 			repeat !+bool throw ("assertion failed" ... message);
 		};
 		let todo(message){
-			print("\p00\c0fERROR:TODO");hlt;
+			print("\p00\c04ERROR:TODO:");
+			print(message);print(";\c0f");hlt;
 		};
 		let unimplemented(reason){//:#(reason:#string?)->{}
 			throw reason;

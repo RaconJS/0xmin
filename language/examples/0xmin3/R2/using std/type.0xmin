@@ -1,6 +1,9 @@
 #"tptasm";#"len";
 //TODO: fix stack memory leak in assembly method calls
-import "std v1.0xmin";
+repeat !(meta&&heap&&for):...{
+	repeat !!std:...labelsof{...labelsof std;std}[0];
+	import "std v1.0xmin";
+};	
 ...labelsof{//base type system with useful basic types
 	let Trait(traitObj)={//#(data Trait)-> Trait & #(T:Type?)-> T & #(...)-> T
 		//an abstraction to make injecting properties, and methods easier
@@ -840,8 +843,7 @@ import "std v1.0xmin";
 						%heap.resize.inputs.size = [%self+self.capacity];
 						%heap.resize.inputs.size >>= 1;
 						call heap.resize;
-						meta.todo();
-						//TODO
+						[%store_self+self.capacity] = %heap.resize.outputs.size;
 					};
 					%self = %store_self;
 				};
@@ -1339,49 +1341,8 @@ import "std v1.0xmin";
 	};
 	#print.number.charSet:>static.use();
 };
-...labelsof{//strings and extra things
-	let Char(){0}:>Type();
-	let LenString(string){//{@;char[l]}
-		#return = LenObject().meta_set((),string):>static.use();
-	};
-	let String(string){//dynamic string; :{@char[l]*;@l;@}
-		let stringObj = heap.Object.static=(string):>static.use().data[0];
-		#return = DynLenObjectPtr().meta_set(stringObj):>static.use();
-		let return.print = return.printString;
-	};
-	let readString(out_string,doForEach,allowBackSpace){//:#(%,#(%char,String)->{@},#?)->@()->String & []static
-		#out_string=out_string||String();
-		let string = out_string;
-		let inputGetter;
-		RegEnum(DynLenObjectPtr.push.regsUsed).blockScope()<:(reg){
-			let char = Char()<->DynLenObjectPtr.push.regsUsed;
-			def inputGetter = awaitInput(char);
-			%char-"\r";
-			jump -> return..return if == 0;
-			repeat !!allowBackSpace {:goBack;
-				%char-"\x08";//checks for backspace key
-				jump -> goBack..return if == 0;
-				string.pop(1);
-			};
-			string.push(char..@..length,(item,_char){
-				[%item] = %char;
-			});
-			meta.if(!!doForEach)
-				<:(){doForEach(char,string)||{}}
-				<:(){print.char(char)}
-			;
-			jump -> return;
-		};
-		let testInput(input){
-			#return = this;
-			#inputGetter<=>inputGetter.testInput(input);
-		};
-	};
-	let str(string){//string slice
-		let stringObj = heap.Object(string):>static.use().data;
-		#return = DynLenObjectPtr().meta_set(stringObj).slice:>static.use();
-	};
-};
+repeat !(String&&Char):
+	import "string.0xmin";
 repeat 0 {:example;
 	let string = "Hello, world":>static.use().data;
 	let list = DynLenObjectPtr().meta_set(string):>static.use();
@@ -1392,4 +1353,4 @@ repeat 0 {:example;
 	def static.memory;
 	def heap.data;
 };
-#String().print();
+//{:example;#String().print()};

@@ -1,5 +1,6 @@
 //TODO,UNUSED,UNFINISHED,UNSTABLE
-//#"table";
+#"table";
+#"labels";
 import "type.0xmin";
 import "RegState.0xmin";
 //note: using '[]ram' for 'an item on the ram' and 'T~' for 'an invalid (write only) type T'
@@ -51,7 +52,8 @@ let File(){
 		#regsUsed <-> reg;
 	};
 	#:static.use()<:"impossible string:";
-	//construct:@(self:%File~*,parent:%File*)->self & %File* mutate self //type anotation without boilerplate"
+	//construct:Fn(parent:&File)->Self                                      //rust type annotation
+	//construct:@(self:%File~*,parent:%File*)->self & %File* mutate self    //type anotation without boilerplate"
 	#construct{
 		//boilerplate function signiture
 		let .[¬Trait.asMethod.asm] = ¬;//allows for: `let a=Pointer()<:File()<->0;a.construct()`
@@ -66,7 +68,7 @@ let File(){
 			def let parent = Pointer()<:File()<->reg();//:%File~*
 		};
 		let outputs{
-			def let self = Pointer()<:File()<->inputs.self;
+			def let self = Pointer()<:File()<->inputs.self;//:%File*
 		};
 	}::{
 		meta.todo("move constructer into here");
@@ -302,11 +304,15 @@ reg.weakScope()<:(reg){:checkKey_delete;
 				:block;
 				jump -> block..return if <= 0 !signed;//do not need to move items around if it's length is 1
 				%temp += [%lastFile+lastFile.links.data];//= %&lastFile.data
-				%temp = [%temp];//= %lastFile.data[lastFile.data.size-1] ; last item in array
-				{:check_currentDirPointer;
+				let lastItemOnArray = Item(lastFile.links,Pointer(File())) <-> temp;
+				%lastItemOnArray = [%temp];//= %lastFile.data[lastFile.data.size-1] ; last item in array
+				%lastItemOnArray - %currentDir;
+				jump -> block..return if == 0;//if currentDir is already the last item we can just do `lastFile.pop()`
+				reg.weakScope()<:(reg){:check_currentDirPointer;
+					let temp = reg();
 					:block;
 					%lastFile.currentDirPointer | 0;
-					jump -> block..return if != 0;
+					jump -> block..return if != 0;//takes short cut if index was already computed 
 					{:searchDirForFile;
 						:block;
 						let i <-> temp;
@@ -322,7 +328,7 @@ reg.weakScope()<:(reg){:checkKey_delete;
 							jump->onSuccess..return if == 0;
 						};
 						{
-							meta.todo("unhandled case");//TODO: conferm that this case is impossible
+							meta.todo("unhandled case");//TODO: confirm that this case is impossible
 							jump->onSuccess..return;
 						};
 						def onSuccess{
@@ -331,13 +337,16 @@ reg.weakScope()<:(reg){:checkKey_delete;
 						};
 					};
 				};
-				[%lastFile.currentDirPointer] = %temp;
+				[%lastFile.currentDirPointer] = %lastItemOnArray;
+				%lastFile.currentDirPointer = 0;
 			};
-			//[%lastFile.currentDirPointer] = [[%lastFile+lastFile.links.data]+[%lastFile+lastFile.links.size]-1];
-			let array = Pointer()<:DynLenObjectPtr()<->temp;
-			%array = %lastFile;
-			%array += lastFile.links;
-			array.pop(Pointer()<:File());
+			{//finishes up the `lastFile.links.pop()`
+				//[%lastFile.currentDirPointer] = [[%lastFile+lastFile.links.data]+[%lastFile+lastFile.links.size]-1];
+				let array = Pointer()<:DynLenObjectPtr()<->temp;
+				%array = %lastFile;
+				%array += lastFile.links;
+				array.pop(Pointer()<:File());
+			};
 		};
 		heap.unref(directoryToDelete,{
 			call static.use()<:{:unrefFile;
@@ -371,6 +380,7 @@ reg.weakScope()<:(reg){:checkKey_delete;
 				return;
 			};
 		});
+		print.register(10);
 		%currentDir = %lastFile;
 		%lastFile = [%lastFile+lastFile.parent];
 		%lastFile.currentDirPointer = 0;//null
@@ -593,4 +603,32 @@ jump->start;
 	def static.memory;
 	def heap.data;
 	#largeReg.compile();
+};
+//#..toJSON;
+let myClass(){
+	def let number = int();
+}:>Trait.impl()<:(Self){
+	let method{
+		let .[¬Trait.asMethod.asm] = ¬;
+		let use(state){#;
+			#return = ..this;
+			#static.use(..this);
+		};
+		let regsUsed;
+		let reg = RegEnum();
+		let inputs{
+			def let self = Pointer()<:Self()<->reg();
+			//function inputs
+		};
+		let outputs{
+			def let self = inputs.self;
+			//function outputs
+		};
+		{
+			//function body
+			print("hello world");
+			return;
+		};
+		#regsUsed <-> reg;
+	};
 };
