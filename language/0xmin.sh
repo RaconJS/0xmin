@@ -22,7 +22,7 @@ function compile {
 		arch="0xmin" #architecture
 		# get number of elements 
 		ELEMENTS=${#args[@]} 
-		 
+		isDefaultTargetName=true
 		# echo each element in array  
 		# for loop 
 		for (( i=0;i<$ELEMENTS;i++)); do 
@@ -56,7 +56,7 @@ function compile {
 				else
 					val1=a.filt;
 				fi
-
+				isDefaultTargetName=false
 				outFileName=$val1;
 				externalOutFile=true;
 				if $isUsingOutFileNameToExicute; then
@@ -94,8 +94,7 @@ function compile {
 				echo flags:
 				echo -o filePath.filt -\> output
 				echo
-				printf '%s ' -\e filePath.filt -\> runs program on the 0xmin emulator
-				echo
+				printf '%s ' -\e filePath.filt -\> runs program on the 0xmin emulator;echo #extra echo to add the '\n'  to printf
 				echo
 				echo -r filePath.0xmin -\> compiles and then runs .0xmin program
 				echo
@@ -104,7 +103,12 @@ function compile {
 				echo -sm -\> speed multiplier, makes emulator run at x\*60 ticks per second. e.g. \`0xmin -\e a.filt -sm 10\`
 				echo
 				echo -a archetecture -\> used with \`\-e\` or \`-a\` to choose which CPU architecture to run it as. e.g. \`-a 0xmin\` or \`-a R2\`
-				
+				echo 
+				echo
+				echo note: without the \`\-o\` flag, it will default to output as \`a.filt\` or \`a.asm\`. 
+				echo "      "This is then sent to \`path-to-The-Powder-Toy/scripts\` to run in there.
+				echo
+				echo note: if the output name ends with \`.asm\` for \`\#\"tptasm\";\` mode, it will output as assembly instead of binary
 			#default
 			else
 			inputFileName=$val;
@@ -116,10 +120,10 @@ function compile {
 	if [[ $isUsingOutFileNameToExicute == true ]]; then
 		nodejs $mainfolder/compilers/compile.js "$inputFileName" $outFileName; #(nodejs test.js);
 	fi
-	if [[ -f a.filt && -e "$powderToyScriptsFolder" ]]; then #if file exists
+	if [[ $isDefaultTargetName == true && -f a.filt && -e "$powderToyScriptsFolder" ]]; then #if file exists
 		mv a.filt "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
 	fi;
-	if [[ -f a.asm && -e "$powderToyScriptsFolder" ]]; then #if file exists
+	if [[ $isDefaultTargetName == true && -f a.asm && -e "$powderToyScriptsFolder" ]]; then #if file exists
 		mv a.asm "$powderToyScriptsFolder"; #~/snap/the-powder-toy/current/.local/share/'The Powder Toy'/scripts;
 	fi;
 	if [[ $isRunningFile == true ]]; then

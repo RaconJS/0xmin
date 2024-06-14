@@ -1,6 +1,6 @@
 //TODO,UNUSED,UNFINISHED,UNSTABLE
 #"table";
-#"labels";
+//#"labels";
 import "type.0xmin";
 import "RegState.0xmin";
 //note: using '[]ram' for 'an item on the ram' and 'T~' for 'an invalid (write only) type T'
@@ -149,7 +149,6 @@ let lastFile.currentDirPointer<=>Pointer()<:Pointer()<:File();//:%File** & %([]l
 		//jump->else if == 0;
 		//return;
 		//def else;
-		hlt;
 	};
 	let onEnter{
 		print("\c0f\p00");
@@ -176,13 +175,13 @@ reg.weakScope()<:(reg){:printFile;
 		%lastFile - 0;
 		jump->ifBlock..return if == 0;
 		meta.assert(+lastFile.name == 0);{
-			$fileAsName=>lastFile;
+			$set fileAsName=>lastFile;
 			fileAsName.printString();
 			print("/");
 		};
 	};
 	meta.assert(+currentDir.name == 0);{
-		$fileAsName=>currentDir;
+		$set fileAsName=>currentDir;
 		fileAsName.printString();
 	};
 	print(":");

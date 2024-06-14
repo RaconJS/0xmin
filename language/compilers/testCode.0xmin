@@ -1,8 +1,13 @@
 #"tptasm";
-#"len";
-import lib"heap.0xmin";
-import lib"R2/print.0xmin";
-print("hello world",0,{});
+#"table";
+#"ZASM3";
+import lib "var_const.0xmin";
+r0 = 2;
+r1 = var()<:"ABC";
+send r2 [r0+r1];
 hlt;
-//debugger (..toJSON);
-//;;debugger ..toJSON;
+def var,const;
+{
+	let = b,=a;
+	debugger +.a;
+};

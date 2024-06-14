@@ -1082,6 +1082,7 @@ compilation_settings;{
 		};
 		let foo:Int = 2;
 		let bar:Int = "a";//throws error
+		//there is an idea of using "£" for type expressions, similar to `#()`
 	};
 	pipeLine;{//IS_NOW_IMPLEMENTED
 		':>' operator
@@ -1160,6 +1161,36 @@ compilation_settings;{
 				@var null;
 				let new var: a;
 				@move=>10#const;
+			};
+		};
+	};
+	hoisting;{
+		let a = 2;
+		let b = 3;
+		let object{
+			let =a,=b;//same as `let a = a,b = b`
+		};
+	};
+	{
+		//match 'label, { }' or 'label ( ){ }' -> 'def let set label {}' / 'let set label (){}'
+		object{
+			...doStuff;
+		};
+		//same as 
+		def let set object{
+			...doStuff;
+		};
+		//`a{}` is can be used for constructing objects, without using 'let' and 'def'
+		let object{
+			a{11;22};
+			b{33;44};
+		};
+		let foo{
+			subFunction1(){
+
+			};
+			subFunction2(){
+
 			};
 		};
 	};

@@ -1,5 +1,5 @@
 #"tptasm";
-//#"table";
+#"table";
 //compiles to the powder toy assembly language
 //specificly the assmbly used by the R216K2A virtual computer
 let forLoop(i,maxI,temp1,doStuff){//:macro
@@ -77,7 +77,9 @@ let bubbleSort{
 					[r currentAddress]=r value;
 					[r currentAddress+1]=r carry;
 				};
+				send r const_0 "\c0f";
 				send r const_0 [r currentAddress];
+				send r const_0 "\cf0";
 				send r const_0 [r currentAddress+1];
 				let nextCurserPos=currentAddress;
 				r nextCurserPos=r i;
@@ -89,7 +91,8 @@ let bubbleSort{
 		r maxI-=1;
 		jump->whileLoop;
 	};
-	send r const_0 "\p10";
+	send r const_0 "\c0f";
+	send r const_0 "\p00";
 	return;
 };
 let printList(array){//macro
@@ -105,7 +108,7 @@ let printList(array){//macro
  		set i=i+1;
 	};
 };
-let myList={"4321"};
+let myList={"helloworld4321"};
 set printMyList{
 	push r0;
 	push r1;

@@ -1,5 +1,5 @@
 #"tptasm";#"len";
-#"labels";
+#"table";
 #"ZASM3";
 let grid = {
 	let width = 16;
@@ -12,7 +12,7 @@ let enum = #(n)={:self;#this<->n||0;(){:a;#a<->self;#self+=1;}};
 	import lib "var_const.0xmin";
 	let reg = enum();
 	let const_0 = reg();//%int const 0
-	let direction = reg();//:% 0..3 & %+int
+	let direction = reg();//:% 0..=3 & %+int
 	let currentCell = reg();//:%Cell*
 	let cellValue = reg();//:%Cell
 };

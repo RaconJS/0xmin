@@ -1,3 +1,4 @@
+//clang r2emulator.cpp
 /*
 	// #include <chrono>
 	#include <thread>
@@ -104,13 +105,13 @@ class TextCanvas{//col,pos,clear;
 }ctx;
 struct IO{
 	public:
-	u32 input;
-	u32 output;
+	volatile u32 input;
+	volatile u32 output;
 }io;
 class R2Terminal{
 	public:
-	u32 &portValue = io.output;
-	u32 &output = portValue;
+	volatile u32 &portValue = io.output;
+	volatile u32 &output = portValue;
 	short int x=0,y=0;
 	short int bgColor=0,fgColor=15;
 	short int dims[2]={16,12};
@@ -229,14 +230,13 @@ class R2Terminal{
 					}
 				}
 			}
-			output=redFilt;
 		}
 	}
 }terminal;
 class R2KeyBoard{
 		public:
-		u32 &input = io.input;//from keyboard 'terminal.input'
-		u32 &output = io.output;//from CPU 'terminal.output'
+		volatile u32 &input = io.input;//from keyboard 'terminal.input'
+		volatile u32 &output = io.output;//from CPU 'terminal.output'
 		u32 inputValue;
 		char inputChar;
 		bool inputWasPressed;
@@ -268,7 +268,8 @@ class R2KeyBoard{
 						if(inputWasPressed){
 							latencyFrames=5;
 							coolDown=5;
-							returnVal=inputChar|confirm|data;
+							returnVal=inputChar|data|redFilt;
+							bufferToinput[latencyFrames+1]=returnVal;
 							mode=2;
 						}
 					}
@@ -307,19 +308,12 @@ class R2KeyBoard{
 		}
 		bool isRunning=true;
 }keyboard;
-void R2KeyBoard::inputListener(){
-	int pos[2]={keyboard.offset_x+1+4,keyboard.offset_y};
-	if(0)while(keyboard.isRunning){
-		//cout<<ctx.moveTo(pos[0],pos[1]);
-		keyboard.inputChar=std::getchar();
-		keyboard.inputWasPressed=true;
-	}
-}
 class Ram{
 	public:
 	Ram(){
+		size = 0x10000;
 		for (u32 i = 0; i < size; ++i){
-			ram[i] = 0;
+			ram[i] = redFilt;
 		}
 	}
 	u32 size;
@@ -337,10 +331,11 @@ class Ram{
 };
 class FiltCPU{
 	public:
-	u32* io_input = &io.input;//from keyboard
-	u32* io_output = &io.output;//to terminal
+	volatile u32* io_input = &io.input;//from keyboard
+	volatile u32* io_output = &io.output;//to terminal
 	bool haulted = false;
 	virtual void update(){
+		*io_output = redFilt;
 		if(haulted){
 			return;
 		}
@@ -354,6 +349,7 @@ class FiltCPU{
 class r2CPU:public FiltCPU{
 	public:
 	void innit(){
+		reset_all();
 	};
 	Ram* ram = new Ram();
 	r2CPU(){}
@@ -404,15 +400,17 @@ class r2CPU:public FiltCPU{
 				RB = (command >> 16) & 0xf;//bits 16-19
 			}
 			{//opcode data: bits 15 + 20-28
-				includeRB = (bool)((command >> 20) & 1);//bit 20
+				includeRB = (bool)((command >> 20) & 8);//bit 22
+				if(includeRB)I1 = I1 & 0x7ff;//U11
 				opandType = (command >> 20) & 0b111;//bits 22-24
-				subRB = (bool)((command >> 15) & 1);//
+				subRB = (bool)((command >> 12) & 8);//bit 14
 				opcode = (command >> 24) & 0x1f;
 			}
 			{
-				arg1FromRam = opandType&0x4;
-				arg2FromRam = !arg1FromRam && (bool)(opandType&1);
-				includeR1 = !arg1FromRam && !(bool)(opandType&1);
+				arg1FromRam = (bool)(opandType&0x4);
+				arg2FromRam = !arg1FromRam && (opandType&1);
+				includeR1 = !arg1FromRam || !(opandType&1);
+				if(arg1FromRam && !includeR1)R2 = R1;//handle `OPER [U16_I1], REG_R2`
 				includeR2 = !(opandType&0x2);
 			}
 		}
@@ -436,16 +434,16 @@ class r2CPU:public FiltCPU{
 		mask = 0;
 	}
 	void setValue(u32 value){
-		if(commandData.arg2FromRam)
+		if(commandData.arg1FromRam)
 			setRamValue(commandData.outputPointer,value);
 		else registers[commandData.R1] = 0xffff&(u16)value;
 	}
 	void setRamValue(u16 address,u32 value){
-		ram->set(address,0x3fffffff&(0x20000000|(((u32)mask)<<16)|(0xffff&value)));
+		ram->set(addRBtoAddress(address),0x3fffffff&(0x20000000|(((u32)mask)<<16)|(u32)(0xffff&value)));
 	}
 	void updateState(u32 value,bool write){
 		internalValue = commandData.arg1Value;
-		flags.sign = value & 0x8000 != 0;
+		flags.sign = value & 0x8000;
 		flags.zero = value == 0;
 		flags.overflow = 0;
 		flags.carry = 0;
@@ -461,61 +459,100 @@ class r2CPU:public FiltCPU{
 		flags.carry = (a < b);//unsigned
 		flags.overflow = ((a>>15) != (b>>15)) && ((b>>15) == ((o>>15)&1));
 	}
+	void disassemble(CommandData commandData){
+		cout<<(std::string[]){
+			"mov", "and", "or", "xor", "add", "adc", "sub", "sbb", "swm", "ands", "ors", "xors", "adds", "adcs", "subs", "sbbs", "hlt", "j", "rol", "ror", "shl", "shr", "scl", "scr", "bump", "wait", "send", "recv", "push", "pop", "call", "ret"
+		}[commandData.opcode];
+		if(commandData.opcode == 0x11){
+			cout<<(std::string[]){"mp", "n", "b", "ae", "o", "no", "s", "ns", "z", "nz", "le", "g", "l", "ge", "be", "a"}[commandData.jumpType];
+		}
+		char addOrSub = "+-"[commandData.subRB];
+		cout<<" ";
+		{
+			if(commandData.arg1FromRam){
+				cout<<"*";
+				if(commandData.includeRB)cout<<"r"<<0+commandData.RB<<addOrSub;
+			}
+			if(commandData.includeR1)cout<<"r"<<0+commandData.R1;
+			else cout<<hex commandData.I1;
+		}
+		cout<<" ";
+		{
+			if(commandData.arg2FromRam){
+				cout<<"*";
+				if(commandData.includeRB)cout<<"r"<<0+commandData.RB<<addOrSub;
+			}
+			if(commandData.includeR2)cout<<"r"<<0+commandData.R2;
+			else if(commandData.includeR1)cout<<hex commandData.I1;
+			else cout<<"r"<<hex commandData.I2;
+		}
+		cout<<" ";
+	}
+	u16 addRBtoAddress(u16 address){
+		return !commandData.includeRB?address:
+			registers[commandData.RB]+(commandData.subRB?-address:address);
+	}
+	int a = 2;
+	u32 getFromRam(u16 address, CommandData commandData){
+		return ram->get(addRBtoAddress(address));
+	}
 	void update() override {//:mutates ram & self
+		*io_output = redFilt;
+		if(haulted)throw;
 		u32 command = ram->get(ip);
 		commandData.getDataFromValue(command);//:@(~CommandData)->CommandData & mutates commandData
 		u16 arg1,arg2;
 		arg1 = commandData.includeR1?registers[commandData.R1]:commandData.I1;
 		if(commandData.arg1FromRam){
 			commandData.outputPointer = arg1;
-			arg1 = ram->get(arg1);
+			arg1 = 0xffff & getFromRam(arg1,commandData);
 		}
 		else commandData.outputPointer = 0;
 		commandData.arg1Value = arg1;
 		arg2 = commandData.includeR2?registers[commandData.R2]:commandData.includeR1?commandData.I1:(u16)commandData.I2;
-		if(commandData.arg2FromRam)arg2 = ram->get(arg2);
+		if(commandData.arg2FromRam)arg2 = 0xffff & getFromRam(arg2,commandData);
 		commandData.arg2Value = arg2;
-		u32 output;
-		bool hasJumped;
+		bool hasJumped = false;
 		bool silent = true;
-		u32 a=arg1,b=arg2,o=output;
+		arg1&=0xffff;
+		arg2&=0xffff;
+		u32 output=arg2;//require: output is assigned in all cases
+		u32 a=arg1,b=arg2,&o=output;
 		const u32 R2TERM_PORT = 0;//terminal port
 		const u32 R2TERM_PORT_IN = 0;//keyboard port
 		switch(commandData.opcode){
 			case 0x00://MOV
-				updateState(a,true);
+				updateState(b,true);
 				break;
 			case 0x01://AND
 				silent = false;
 			case 0x09://ANDS
 				output = a & b;
-				if(!silent) updateState(output,false);
-				setValue(output);
+				if(!silent)setValue(output);
+				updateState(output,false);
 				break;
 			case 0x02://OR
 				silent = false;
 			case 0x0A://ORS
 				output = a | b;
-				if(!silent) updateState(output,false);
-				setValue(output);
+				if(!silent)setValue(output);
+				updateState(output,false);
 				break;
 			case 0x03://XOR
 				silent = false;
 			case 0x0B://XORS
 				output = a ^ b;
-				if(!silent) updateState(output,false);
-				setValue(output);
+				if(!silent)setValue(output);
+				updateState(output,false);
 				break;
 			case 0x04://ADD
 				silent = false;
 			case 0x0C://ADDS
 				output = a + b;
 				updateForAddision:{
-					setValue(output);
-					if(!silent){
-						updateState(output,false);
-						setFlagsForAdd(a,b,o);
-					};
+					if(!silent)setValue(output);
+					updateState(output,false);
+					setFlagsForAdd(a,b,o);
 					break;
 				}
 			case 0x05://ADC
@@ -528,11 +565,9 @@ class r2CPU:public FiltCPU{
 			case 0x0E://SUBS / CMP
 				output = a - b;
 				updateForSubtration:{
-					setValue(output);
-					if(!silent){
-						updateState(output,false);
-						setFlagsForAdd(a,b,o);
-					};
+					if(!silent)setValue(output);
+					updateState(output,false);
+					setFlagsForAdd(a,b,o);
 					break;
 				}//R_flag(q3);F_Carr = (q1 < q2);F_Over = ((q1>>15)!=(q2>>15)) && ((q2>>15)==(q3>>15));
 				break;
@@ -543,60 +578,63 @@ class r2CPU:public FiltCPU{
 				goto updateForSubtration;
 				break;
 			case 0x08://SWM
+				output = b;
 				updateState(output,false);
-				mask = (a & 0x1FFF);
+				mask = (b & 0x1FFF);
 				break;
 			case 0x10://HLT
 				haulted = true;
 				break;
 			case 0x11://J**
+				ip++;
+				hasJumped = true;
 				switch(commandData.jumpType){
 					case 0x0://JMP			TRUE
-						ip = a;
+						ip = b;
 						break;
 					case 0x1://JN			FALSE	NOP
 						break;
 					case 0x2://JB/JNAE/JC	C = 1
-						if(flags.carry)ip = a;
+						if(flags.carry)ip = b;
 						break;
 					case 0x3://JNB/JAE/JNC	C = 0
-						if(!flags.carry)ip = a;
+						if(!flags.carry)ip = b;
 						break;
 					case 0x4://JO			O = 1
-						if(flags.overflow)ip = a;
+						if(flags.overflow)ip = b;
 						break;
 					case 0x5://JNO			O = 0
-						if(!flags.overflow)ip = a;
+						if(!flags.overflow)ip = b;
 						break;
 					case 0x6://JS			S = 1
-						if(flags.sign)ip = a;
+						if(flags.sign)ip = b;
 						break;
 					case 0x7://JNS			S = 0
-						if(!flags.sign)ip = a;
+						if(!flags.sign)ip = b;
 						break;
 					case 0x8://JE/JZ		Z = 1
-						if(flags.zero)ip = a;
+						if(flags.zero)ip = b;
 						break;
 					case 0x9://JNE/JNZ		Z = 0
-						if(!flags.zero)ip = a;
+						if(!flags.zero)ip = b;
 						break;
 					case 0xA://JLE/JNG		Z = 1 OR S != O
-						if(flags.zero || flags.sign!=flags.overflow)ip = a;
+						if(flags.zero || flags.sign!=flags.overflow)ip = b;
 						break;
 					case 0xB://JNLE/JG		Z = 0 OR S = O
-						if(!flags.zero && flags.sign==flags.overflow)ip = a;
+						if(!flags.zero && flags.sign==flags.overflow)ip = b;
 						break;
 					case 0xC://JL/JNGE		S != O
-						if(flags.sign != flags.overflow)ip = a;
+						if(flags.sign != flags.overflow)ip = b;
 						break;
 					case 0xD://JNL/JGE		S = O
-						if(flags.sign == flags.overflow)ip = a;
+						if(flags.sign == flags.overflow)ip = b;
 						break;
 					case 0xE://JBE/JNA		C = 1 OR Z = 1
-						if(flags.carry || flags.zero)ip = a;
+						if(flags.carry || flags.zero)ip = b;
 						break;
 					case 0xF://JNBE/JA		C = 0 AND Z = 0
-						if(!flags.carry && !flags.zero)ip = a;
+						if(!flags.carry && !flags.zero)ip = b;
 						break;
 				}
 				break;
@@ -633,10 +671,12 @@ class r2CPU:public FiltCPU{
 				updateState(output,true);
 				break;
 			case 0x18://BUMP
+				if(a == R2TERM_PORT_IN)
+					*io_output = redFilt | keyboard.confirm;
 				break;
 			case 0x19://WAIT
 				output = -1;
-				if(a == R2TERM_PORT_IN && *io_input & keyboard.confirm != 0)
+				if(*io_input & keyboard.confirm)
 					output = R2TERM_PORT_IN;
 				updateState(output,true);
 				break;
@@ -645,7 +685,7 @@ class r2CPU:public FiltCPU{
 				break;
 			case 0x1B://RECV
 				if(b == R2TERM_PORT_IN){
-					if(*io_input & keyboard.confirm){
+					if(*io_input & keyboard.data){
 						updateState(*io_input,true);
 						flags.carry = true;
 					} else {
@@ -654,7 +694,8 @@ class r2CPU:public FiltCPU{
 				}
 				break;
 			case 0x1C://PUSH
-				setRamValue(--sp,a);
+				setRamValue(--sp,b);
+				output = b;
 				updateState(output,false);
 				break;
 			case 0x1D://POP
@@ -665,10 +706,12 @@ class r2CPU:public FiltCPU{
 				//R2_MEM[(--R2_REG[14]) & R2_SIZE] = (R2_REG[15] + 1) | R2_WM | 0x20000000;
 				//R2_REG[15] = q1;
 				setRamValue(--sp,ip+1);
-				ip = a;
+				ip = b;
+				hasJumped = true;
 				break;
 			case 0x1F://RET
 				ip = ram->get(sp++);
+				hasJumped = true;
 				break;
 			default:{
 				//fprintf(stderr,"Error at Rstep.\n");
@@ -676,7 +719,35 @@ class r2CPU:public FiltCPU{
 		}
 		if(!hasJumped)ip++;
 	}
+	void display(){
+		TEST:{
+			//keyboard.gotoInputPos();
+			//cout<<"                                     ";
+			//keyboard.gotoInputPos();
+			cout<<(ip<0x10?"  ":ip<0x100?" ":"")<<hex ip<<"|";
+			cout<<hex commandData.value<<"|";
+			cout<<(!flags.zero?" ":"z");
+			cout<<(!flags.sign?" ":"s");
+			cout<<(!flags.carry?" ":"c");
+			cout<<(!flags.overflow?" ":"o");
+			cout<<hex *io_input;
+			cout<<hex *io_output<<" | ";
+			disassemble(commandData);
+			cout<<"\033[65D"<<"\033[65C";
+			cout<<"[";for(u8 i=0;i<16;i++){cout<<hex registers[i]<<",";};cout<<"]";
+		}
+	}
 }cpu;
+void R2KeyBoard::inputListener(){
+	int pos[2]={keyboard.offset_x+1+4,keyboard.offset_y};
+	while(keyboard.isRunning){
+		//cout<<ctx.moveTo(pos[0],pos[1]);
+		#define ngetc(c) (read (0, (c), 1))
+		ngetc(&keyboard.inputChar);//keyboard.inputChar=std::getchar();
+		keyboard.inputWasPressed=true;
+		if(cpu.haulted)return;
+	}
+}
 u32 i;
 class GetKeyInput{
 	struct termios oldt, newt;
@@ -685,43 +756,43 @@ class GetKeyInput{
 		//code I "borrowed" from stack overflow
 		int c;   
 
-		/*tcgetattr gets the parameters of the current terminal
-		STDIN_FILENO will tell tcgetattr that it should write the settings
-		of stdin to oldt*/
+		//tcgetattr gets the parameters of the current terminal
+		//STDIN_FILENO will tell tcgetattr that it should write the settings
+		//of stdin to oldt
 		tcgetattr( STDIN_FILENO, &oldt);
-		/*now the settings will be copied*/
+		//now the settings will be copied
 		newt = oldt;
 
-		/*ICANON normally takes care that one line at a time will be processed
-		that means it will return if it sees a "\n" or an EOF or an EOL*/
+		//ICANON normally takes care that one line at a time will be processed
+		//that means it will return if it sees a "\n" or an EOF or an EOL
 		newt.c_lflag &= ~(ICANON);          
 
-		/*Those new settings will be set to STDIN
-		TCSANOW tells tcsetattr to change attributes immediately. */
+		//Those new settings will be set to STDIN
+		//TCSANOW tells tcsetattr to change attributes immediately.
 		tcsetattr( STDIN_FILENO, TCSANOW, &newt);
 	
 	}
 	~GetKeyInput(){
-		/*restore the old settings*/
+		//restore the old settings
 		tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
 	}
 }getKeyInput;
 float runSpeed = 60;
 void mainThread(){
-	for (i = 0; i < 1000; ++i){
+	for (i = 0; i < 1000 || true; ++i){
 		cpu.update();
 		terminal.onUpdate();
 		keyboard.onUpdate();
 		if(cpu.haulted){
 			return;
 		}
+		//TEST:{int a;cin>>a;}
 		ctx.update();
 		mySleep(1000./runSpeed);
 	}
 }
 void foo(){}
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]){
 	const char* fileName;
 	{//load data
 		if(argc>2){//0:???,1:file,2:file exists, 3:speed
@@ -769,12 +840,26 @@ int main(int argc, char const *argv[])
 	terminal.innit();
 	keyboard.innit();
 	cpu.innit();
-	{
-		auto main = std::thread(mainThread);
-		std::thread(R2KeyBoard::inputListener).detach();
-		main.join();
+	const bool TEST = false;
+	if(TEST){
+		//mainThread();
+		cout<<ctx.clear();
+		for(int i=0;i<100;i++){
+			cpu.update();
+			cpu.display();
+			cout<<endl;
+			if(cpu.haulted)break;
+			//mySleep(1000./runSpeed);
+		}
 	}
-	terminal.onEnd();
+	else{
+		mainThread();
+		//auto main = std::thread(mainThread);
+		//auto listener = std::thread(R2KeyBoard::inputListener);
+		//listener.detach();
+		//main.join();
+	}
+	//terminal.onEnd();
 	cout<<"i:"<<i;
 	cout<<endl;
 	return 0;

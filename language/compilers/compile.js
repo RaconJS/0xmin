@@ -17,6 +17,17 @@
 //TODO: add JSON object exporting
 
 //note: function logic is in `Scope` class in `callFunction(`
+if(!require){//useing deno
+	throw Error("TODO; deno is not supported yet");
+	/*var require = (name)=>{
+		switch(name){
+			case "vm":
+				import { DenoWorker } from 'deno-vm';
+				break;
+			case "":
+		}
+	}*/
+}
 let TESTING=1;
 +process.version.match(/[0-9]+/g)[0]>=16;
 try {1??{}?.(2)}catch(e){throw Error("This 0xmin compiler requires node.js version 16.")}
@@ -37,6 +48,7 @@ function loga(...args){console.log(...args);};
 		return obj;
 	};
 //----
+const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0xmin'|'tptasm'
 	"compiler error: type error;";
 	//string consts
@@ -54,7 +66,6 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	//inputFile -> code tree
 		//(long string,string) => (array of words)
 		const mainFolder=fileName.match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
-		const compilerFolder=process.argv[1].match(/^[\s\S]*?(?=[^/]*?$)/)?.[0]??"";
 		const files={};///:{[filePath]:code tree};
 		const isStrict=true;
 		const throwError=({statement,index,scope=undefined},errorType,msg)=>{
@@ -574,14 +585,18 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(endingStringList.includes(word)){break;}
 					if(metaState["let"]){
 						let value;
-						if(word=="=")throw Error(throwError({index,statement,scope},"# unsupported syntax", "label hoisting (i.e. pattern:`#let = label;`) is not supported yet"));//TODO:
+						let isHoistingAssignment = false;
+						if(word=="="){//'#let = label;' -> '#let label = label;'
+							isHoistingAssignment = true;
+							index++;
+						}
 						({value,index}=contexts.expression_short({statement,index,scope,argsObj:contexts.noPipeLineing}));
 						if(value){
 							//e.g. 'let a=a+2;' ==> does not overwrite 'a' until the '=' and 'a+2' parts are parsed
 							let hasOperator=contexts.operators.hasOwnProperty(statement[index]);//e.g. 'let a + = b' or 'let a || = b'
 							let willCreateLabel=!(statement[index+hasOperator]=="="&&statement[index+1+hasOperator]!="(");
 							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
-								const newLabel=new Variable({name:value.name});
+								const newLabel=isHoistingAssignment?value.label??null:new Variable({name:value.name});
 								let labelParent=["name"].includes(value.refType)?scope.let.label:value.parent;
 								if(labelParent)//BODGED; TODO: add refType to callFunction, or make a better default refType for Values.
 								if(willCreateLabel){//'let a;' and not 'let a = ...' ==> makes default label;
@@ -596,7 +611,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								startValue=new Value({
 									type:"label",
 									label:newLabel,
-									name:newLabel.name,
+									name:value.name,//assume: newLabel.name==value.name || newLabel == null
 									parent:labelParent,
 								});
 							}
@@ -1115,7 +1130,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						value=new Value({parent});
 						let oldIndex=index;
 						let name,nameFound=false;
-						if(word!="["){index++;word=statement[index]??"";}
+						if(word!="["){index++;word=statement[index]??"";}//matching 'a.' 'a[ ]'
 						//optional expression
 						if(isInternal&&["@", "$", "#"].includes(word)){//'a..@' 'a..$' 'a..#' ?
 							name=word;
@@ -3842,9 +3857,8 @@ let buildSettings={makeFile:true}
 				if (err)reject(err);
 				else {
 					if(typeof content=="string" && !newFileName.match(/\.(asm)$/)){//if tptasm ; convert to binary
-						loga("??")
-						const { exec } = require("child_process");
-						exec("./tptasm/main.lua source=\""+newFileName+"\" target=./\""+newFileName+"\" model=R216K8B", (error, stdout, stderr) => {
+						const { exec } = require("child_process");loga(newFileName)
+						exec("\""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model=R216K8B", (error, stdout, stderr) => {
 							if (error) {
 								console.log(`error: ${error.message}`);
 								return;
