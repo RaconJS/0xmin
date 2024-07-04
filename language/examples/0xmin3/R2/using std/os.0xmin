@@ -303,6 +303,37 @@ let main;
 ...labelsof{
 	import "std v1.0xmin";
 };
+let printHeap{
+	print("\c0a#");
+	def:(foo){
+		let reg = RegEnum(0);
+		let block = foo(reg);
+		reg.blockScope()<:(){block};
+	}()<:(reg){
+		let page = heap.Page.pointer=()<-> reg();
+		let nextPage = heap.Page.pointer=() <-> reg();
+		let pageSize = heap.Page.pointer=() <-> reg();
+		let isUsed = reg();
+		%page = [heap.malloc.startPage];
+		${:loop;
+			%isUsed = [%page+page.isUsed];
+			jump->loop..return if == 0;
+			%nextPage = [%page+page.next];
+			%pageSize = %nextPage;
+			%pageSize -= %page;
+			{:validateValues;
+				
+			};
+			print.register(page);
+			print.register(nextPage);
+			print.register(isUsed);
+			%page = %nextPage;
+			jump->loop;
+		};
+	};
+	print("\c0f");
+	return;
+}:>static();
 let fullProgram(){
 	def main();
 	def static.memory;

@@ -1,34 +1,204 @@
-#"text";
-#"code";
-let: meta_repeat(len,do){
-	let i=-1;
-	repeat len:do(i=i+1);
+#"ZASM3";
+#"0xmin";#"len";
+//#"table";
+let main(){
+	let code = "^[]";//
+	compileBF(code);
 };
-let: meta_forEach(label,do){
-	let i=-1;
-	repeat label..length:do(label[i=i+1],i);
-};
-let state;
-let ..this[¬state]{
-	let value = 0;
-};
-let print(string)<-{
-	{//maybe have '#let foo = [¬state];' syntax; for searching scopes in macros
-	//assume: *move = 0
-	let value<->..this[¬state].value;
-	meta_forEach(string)<:(v,i){
-		let diff=v-value %256;
-		repeat(diff<=-128)#diff+=256;
-		repeat(diff<0)repeat(-diff)"-";
-		repeat(diff>0)repeat  diff "+";
-		".";
-		#value=v;
+let compileBF(sourceString){
+	//compiles BF into 0xmin
+	{:mapCodeToBinary;//String->u3[]
+		//UNFINISHED
 	};
-	//clean up
-	#..this[¬state].value<->value;
-}}::{
-	let ..supertype{
-		let state=state;
-	};
+	{:basicVersion;
+		...labelsof{
+			let struct{
+				import lib "var_const.0xmin";
+			};
+			...labelsof struct;
+			let static{
+				import lib "var_const.0xmin";
+				let 
+				delete var,const;
+			};
+			let data = var(0x20000000);//:bool[29]
+			let nextData = {0x20000000};
+			let code = var()<:{0b100};//:(filt29&u3[15])[] & ([]enum)[] ; '<>^.[]'
+			let instructionPointer_shift = var(0b111);//:shift29 & mask_u3 & 2**n & data+u3
+			let dataPointer_shift = var(1);//:shift29 & mask_u1 & code+bool
+			let temp = var();
+		};
+		{:main;
+			let function(label)={
+				//for functions that are used in multiple places.
+				//note: by default this includes where it is defined.
+				let returner;
+				let setDefault(address){
+					returnValues.default<=>{
+						!jump->address;
+					};
+				};
+				let setReturn(returnValue){//:#(@(!jump->any))->{@}
+					move=>returnValue;get;
+					move=>returner;set;
+				};
+				let resetReturn(){
+					#setReturner(returnValues.default);
+				};
+				let call(){
+					let returnValue,command;
+					#returnValues..splice(-0,0,{!jump->return..return#def returnValue;});
+					setReturner(returnValue);
+					jump->..this;
+					virtual{
+						move=>returner..state.move;
+					};
+					$move=>returner..state.move;
+				};
+				def let endState;
+				#def returner;
+				let default;
+				$default{jump->label..return};
+				#let label[¬function] = return;
+				let=label;
+				#label<=>label...{...codeof return;let=resetReturn,=setReturn,=call};
+				def let returnValues{
+					$default{!jump->label..return};
+				};
+				#return = label;
+				$move=>returner..state.move;
+			};
+			let entry;
+			move=>entry..state.move;
+			jump->entry;
+			def let loop;
+			def let setToNextInstruction{
+				move=>instructionPointer_shift;get;move=>const(2);if 1;blue;if;{:ifBlock;
+					jump->(ifblock..return);
+					"TODO: handle pointer overflow\h";
+				};
+			}:>function();
+			let setToLastInstruction{
+
+			};
+			def entry;
+			let getInstruction{:getInstruction;
+				null#def let return;
+				move=>code;get;
+				move=>data;
+				move=>instructionPointer_shift;blue;
+			};
+			{:applyMask_u3;
+				move=>const(0x20000000);or;
+				move=>const(0b111|0x20000000);and;//assert:alu == currentInstruction
+			};
+			let cases{
+				def let .["<"]{//decrement ip
+					move=>dataPointer_shift;get;
+					move=>const(2);if 1;blue;if;{:block;
+						jump->block..return;
+						:getLastDataBlock;
+						"TODO: 1\h";//getLastDataBlock
+					};
+				};
+				def let .[">"]{//increment ip
+					move=>const(2);if 1;red;if;{:ifBlock;
+						jump->ifBlock..return;
+						:getNextDataBlock;
+						"TODO: 2\h";//getNextDataBlock
+					};
+				};
+				def let .["^"]{//flip bit
+					move=>dataPointer_shift;get;
+					move=>data;xor;set;
+				};
+				def let .["."]{//input or output char
+					move=>data;get;
+					move=>dataPointer_shift;blue;
+					move=>const(+{"\x00"}..compile[0]);or;
+					move=>const(+{"\xff"}..compile[0]);and;
+					{
+						let printCommand;
+						move=>printCommand;
+						set;
+						"\x00"#def printCommand;
+					};
+				};
+				def let .["["]{};
+				def let .["]"]{
+					def let increment{
+						//assume: alu!=0bwhite || 0bblack
+						import lib "var_const.0xmin";
+						let const_not1 = const(~1);
+						let temp = var(0);
+						move=>temp;set;xor;set;
+						move=>const_not1;get;
+						move=>temp;red;xor;
+						jump->..return;
+						def var,const;
+					};
+					def let decrement{
+						import lib "var_const.0xmin";
+						let const_not1 = const(~1);
+						let temp = var(0);
+						let temp1 = var(0);
+						move=>temp;set;
+						move=>const_not1;get;
+						move=>temp1;set;xor;
+						move=>temp;xor;
+						jump->..return;
+						def var,const;
+					};
+				};
+				let errorCase{
+					"error: invalid instruction '";
+					let value;
+					import lib "var_const.0xmin";
+					move=>const(0x10);blue;
+					move=>const(+"0");or;
+					move=>value;
+					set;
+					null;
+				 	"0"#def value;
+					"'";
+					"\h";
+					def var,const;
+				};
+			};
+			{:switch;
+				//assert alu:u3
+				move=>const(+{0 1}..compile[0]);red;
+				move=>const(+{jump 0}..compile[0]);or;
+				let jumpCommand;
+				move=>jumpCommand;set;
+				null;
+				!jump +0 #def jumpCommand;
+				def let commandState;
+				{
+					let i = -1;
+					repeat 8 {
+						let jumpValue = cases[i+=1]||cases.errorCase;
+						jump->jumpValue;
+					};
+				};
+				{
+					let i = 0;
+					let len = cases..length;
+					repeat len {
+						$move=>commandState..state.move;
+						def cases[0];
+						move=>loop..state.move;
+						jump->loop;
+					};
+					$move=>commandState..state.move;
+					def cases.errorCase;
+				};
+			};
+		};
+		{
+			def var,const;
+			def nextData;
+		};
+	}
 };
-print("aba");
+main();

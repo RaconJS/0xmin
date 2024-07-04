@@ -4,13 +4,18 @@
 import "type.0xmin";
 import "RegState.0xmin";
 //note: using '[]ram' for 'an item on the ram' and 'T~' for 'an invalid (write only) type T'
-let File(){
+let File()={
+	:self;
 	def let name<=>DynLenObjectPtr();//:String ; note: has a `meta.assert` that name:+0
+	let printString()=>{
+		$(Pointer(DynLenObjectPtr())<->..this).printString();
+	};
 	def let parent{
 		def let parent<=>Pointer(File());
-		#Wrapper.wrap(..this,parent);
-		def let index<=>Index(parent[¬Pointer].data);
+		//#Wrapper.wrap(..this,parent);
+		def let itemPtr<=>Pointer()<:Item(parent[¬Pointer].data.links,Pointer(self));
 	};
+	delete self;
 	def let info<=>DynLenObjectPtr();//:String
 	def let data<=>DynLenObjectPtr();//:Object*
 	def let links<=>DynLenObjectPtr();//:File[]* & Graph<File>
@@ -20,8 +25,13 @@ let File(){
 	let:
 		new,unref,
 		delete,ref,
-		construct,destruct
+		construct,destruct,
+		setParent,
 	;
+	#setParent(label,parent,index){
+		label.parent.parent<=>Pointer(parent);
+		label.parent.parent<=>Pointer(index);
+	}::{let .[¬Trait.asMethod.meta] = ¬};
 	#new{
 		let .[¬Trait.asMethod.asm] = ¬;
 		let use(state){#;
@@ -96,22 +106,37 @@ let File(){
 
 	};
 };
+
 let startDir = File()::{:root;
-	#parent<=>Pointer(..this);
-	#name.meta_set("root":>static.use());
+	#parent.parent<=>{@..this};
+	#parent.itemPtr<=>0;//is not needed since the root cannot be deleted
+	#name.meta_set("root":>heap.Object.static():>static.use().data);
 	#links.meta_set({
+		def let item;
 		@File()::{
-			#parent<=>{@root};
-			#name.meta_set("foo":>static.use());
+			#parent::{
+				#parent<=>{@root};
+				#itemPtr<=>{@item};
+			};
+			#name.meta_set("foo":>heap.Object.static():>static.use().data);
 		}:>static.use();
+		def let item;
 		@File()::{
-			#parent<=>{@root};
-			#name.meta_set("bar":>static.use());
+			#parent::{
+				#parent<=>{@root};
+				#itemPtr<=>{@item};
+			};
+			#name.meta_set("bar":>heap.Object.static():>static.use().data);
 		}:>static.use();
+		def let item;
 		@File()::{
-			#parent<=>{@root};
-			#name.meta_set("baz":>static.use());
+			#parent::{
+				#parent<=>{@root};
+				#itemPtr<=>{@item};
+			};
+			#name.meta_set("baz":>heap.Object.static():>static.use());
 		}:>static.use();
+		delete;
 	}:>heap.Object.static():>static.use().data);
 	delete root;
 }:>static().use();
@@ -126,14 +151,12 @@ let largeReg = RegState();//outlives all other regs
 let currentDir:>reg()<=>Pointer()<:File();
 let linkDir<=>Pointer()<:File();//assigned later ; used to copy and paste file links
 let lastFile<=>Pointer()<:File();//:%File*? ; assigned later
-let lastFile.currentDirPointer<=>Pointer()<:Pointer()<:File();//:%File** & %([]lastFile.links)* ; assigned later
 ...labelsof{:whenUsedAsCallable;
 	let storedState{
 		//:File*?
 		def let linkDir <=> {@startDir};
 		def let currentDir <=> {@startDir};
 		def let lastFile <=> {0};
-		def let lastFile.currentDirPointer <=> {0};
 	}:>static();
 	let reset{:initialState;//UNUSED
 		%currentDir = startDir;
@@ -143,7 +166,6 @@ let lastFile.currentDirPointer<=>Pointer()<:Pointer()<:File();//:%File** & %([]l
 		[storedState.currentDir] = %currentDir;
 		[storedState.linkDir] = %linkDir;
 		[storedState.lastFile] = %lastFile;
-		[storedState.lastFile.currentDirPointer] = %lastFile.currentDirPointer;
 		//sp + 1;
 		//let else;
 		//jump->else if == 0;
@@ -159,7 +181,6 @@ let lastFile.currentDirPointer<=>Pointer()<:Pointer()<:File();//:%File** & %([]l
 		};
 		%linkDir = [storedState:>static.use().linkDir];
 		%lastFile = [storedState:>static.use().lastFile];
-		%lastFile.currentDirPointer = [storedState:>static.use().lastFile.currentDirPointer];
 		{:block;
 			jump -> block..return if == 0;
 			%linkDir = startDir;//default to root if null
@@ -180,6 +201,7 @@ reg.weakScope()<:(reg){:printFile;
 			print("/");
 		};
 	};
+	$debugger+startDir;
 	meta.assert(+currentDir.name == 0);{
 		$set fileAsName=>currentDir;
 		fileAsName.printString();
@@ -197,7 +219,7 @@ reg.weakScope()<:(reg){:printFile;
 			jump->forLoop..return if < 0 !signed;
 			%array = [%currentDir+currentDir.links.data];
 		},{
-			%item = [%array+%i];//:
+			%item = [%array+%i];//:%file*
 			meta.assert(+item.name==0);{
 				let name = {...item.name.slice} <-> item;//:String slice
 				do(name,regsUsed);
@@ -272,117 +294,107 @@ def reg.weakScope()<:(reg){:clearScreen;
 	print("\p00",clearString.const_0,{});
 	meta.assert(reg < char);
 };
+let error{
+	let Error(message,do)={
+		repeat !!message
+			print("\p00\c04error:"...message..."\c0f");
+		let call(){
+			#static.use(..this);
+			jump -> #(..this);
+		};
+		repeat !!do def def;
+		hault;
+		return;
+	};
+	let invalidFile<=>Error("invalid memory");
+};
 reg.weakScope()<:(reg){:checkKey_delete;
 	:block;
-	let directoryToDelete = Pointer(File())<-> reg();
 	%char - keys.delete;
 	if != 0 jump -> block..return;
 	{:then;
 		let finally;
 		let showString = "delete";
 		print(showString);
-		%directoryToDelete = %currentDir;
 		{:saveRoot;//prevents deleting root directory
 			:block;
-			%directoryToDelete - startDir;
+			%currentDir - startDir;
 			jump->finally if==0;
 			//assert: %directoryToDelete != %startDir
 		};
-		{:ifBlock;
-			%lastFile | 0;
-			jump->finally if==0;
-			//assert: %lastFile != null
+		${:ifBlock;
+			[%currentDir+currentDir.parent.itemPtr] | 0;
+			jump->ifBlock..return if!=0;
+			[%currentDir+currentDir.parent] | 0;
+			jump->ifBlock..return if!=0;
+			error.Error("impossible case: itemPtr == null");
+			//assert: currentDir.parent.itemPtr != null
 		};
+		%lastFile = [%currentDir+currentDir.parent];
 		//assert: currentDir is invalid here and so is not readable
 		let temp = reg(),temp1 = reg();
 		{:removeReference;
 			{//does `lastFile.links.set(currentDir,lastFile.links.pop())`
-				let temp = temp;
-				%temp = [%lastFile+lastFile.links.size];//= %&lastFile.data[lastFile.data.size]
-				%temp -= 1;//= %&lastFile.data[lastFile.data.size-1]
 				:block;
+				let temp = temp;
+				[%lastFile+lastFile.links.size] -= 1;
 				jump -> block..return if <= 0 !signed;//do not need to move items around if it's length is 1
-				%temp += [%lastFile+lastFile.links.data];//= %&lastFile.data
+				%temp = [%lastFile+lastFile.links.size];//= %+[lastFile.data.size-1]lastFile.data
+				%temp += [%lastFile+lastFile.links.data];//= %[lastFile.data.size-1]lastFile.data*
 				let lastItemOnArray = Item(lastFile.links,Pointer(File())) <-> temp;
-				%lastItemOnArray = [%temp];//= %lastFile.data[lastFile.data.size-1] ; last item in array
+				%lastItemOnArray = [%temp];//= %File* & [lastFile.data.size-1]lastFile.data ; last item in array
 				%lastItemOnArray - %currentDir;
 				jump -> block..return if == 0;//if currentDir is already the last item we can just do `lastFile.pop()`
-				reg.weakScope()<:(reg){:check_currentDirPointer;
-					let temp = reg();
-					:block;
-					%lastFile.currentDirPointer | 0;
-					jump -> block..return if != 0;//takes short cut if index was already computed 
-					{:searchDirForFile;
-						:block;
-						let i <-> temp;
-						let onSuccess;
-						let array = Pointer()<:DynLenObjectPtr() <-> temp1;
-						for_start_repeat()<:i<:{
-							%array = [%lastFile+lastFile.links.data];
-							%i = [%lastFile+lastFile.links.size];
-							%i -= 1;
-							jump -> block..return if < 0 !signed;
-						}<:{
-							[%array + %i] - %currentDir;
-							jump->onSuccess..return if == 0;
-						};
-						{
-							meta.todo("unhandled case");//TODO: confirm that this case is impossible
-							jump->onSuccess..return;
-						};
-						def onSuccess{
-							%lastFile.currentDirPointer = %array;
-							%lastFile.currentDirPointer += %i;
-						};
-					};
-				};
-				[%lastFile.currentDirPointer] = %lastItemOnArray;
-				%lastFile.currentDirPointer = 0;
+				let itemPtr = Pointer(Item((),Pointer(File()))) <-> temp1;
+				%itemPtr = [%currentDir+currentDir.parent.itemPtr];//:%File** & %currentDir**
+				[%lastItemOnArray+lastItemOnArray.parent.itemPtr] = %itemPtr;
+				[%itemPtr] = %lastItemOnArray;//:File* & lastItemOnArray*
 			};
 			{//finishes up the `lastFile.links.pop()`
-				//[%lastFile.currentDirPointer] = [[%lastFile+lastFile.links.data]+[%lastFile+lastFile.links.size]-1];
-				let array = Pointer()<:DynLenObjectPtr()<->temp;
-				%array = %lastFile;
-				%array += lastFile.links;
-				array.pop(Pointer()<:File());
+				let array = Pointer()<:DynLenObjectPtr()<->temp;//:%File().links*
+				%array = [%currentDir+currentDir.parent];
+				%array += Pointer(File()).links;
+				array.pop(Pointer()<:File());//TODO: work out why this pops from currentDir.name instead of 'array'.
 			};
 		};
-		heap.unref(directoryToDelete,{
+		heap.unref(currentDir,reg.weakScope()<:(reg){
+			let directoryToDelete = Pointer(File())<-> reg();
+			%directoryToDelete = %currentDir;
 			call static.use()<:{:unrefFile;
-				{:unrefLknks;
+				print("[");//TEST
+				{:unrefLinks;
 					let i = usize() <-> temp;
 					let links = Pointer()<:DynLenObjectPtr().data <-> temp1;
 					for_start_repeat(i,{//assume: File():DynLenObjectPtr[]
 						%i = [%directoryToDelete+directoryToDelete.links.size];
 						%i -= 1;
+						jump->unrefLinks..return if < 0 !signed;
 						%links = [%directoryToDelete+directoryToDelete.links.data];
 					},{
-						RegSet.save_onStack({directoryToDelete})<:(){
-							%directoryToDelete = [%links+%i];
-							RegSet.save_onStack({i;links})<:(){heap.unref(directoryToDelete,{call unrefFile})};
-						};
-					})
-				};
-				{:deleteFromParent;
-
-				};
-				{:deleteFileArrays;
-					let i = usize() <-> temp;
-					for_repeat(i,File()..length-1,{//assume: File():DynLenObjectPtr[]
-						let temp_dynamicLengthObjectPointer = Pointer()<:DynLenObjectPtr() <-> temp;
-						let obj = temp_dynamicLengthObjectPointer;
-						%obj = [%directoryToDelete + %i];
-						%obj = [%obj + obj.data];
-						heap.unref(obj);
+						:block;
+						%directoryToDelete = [%links+%i];
+						[%directoryToDelete+directoryToDelete.parent] - %currentDir;
+						jump -> block..return if != 0;//only delete file is owned by directoryToDelete
+						RegSet.save_onStack({i;links;directoryToDelete})<:(){heap.unref(directoryToDelete,{call unrefFile})};
 					});
+				};
+				print(".");null;//TEST
+				{:deleteFileArrays;
+					let object = Pointer()<:DynLenObjectPtr().slice.data<->temp;
+					%object = [%directoryToDelete+directoryToDelete.name.data];
+					heap.unref(object);
+					%object = [%directoryToDelete+directoryToDelete.links.data];
+					heap.unref(object);
+					%object = [%directoryToDelete+directoryToDelete.info.data];
+					heap.unref(object);
+					%object = [%directoryToDelete+directoryToDelete.data.data];
+					heap.unref(object);
 				};
 				return;
 			};
 		});
-		print.register(10);
 		%currentDir = %lastFile;
-		%lastFile = [%lastFile+lastFile.parent];
-		%lastFile.currentDirPointer = 0;//null
+		%lastFile = [%currentDir+currentDir.parent];
 		def finally;
 		print("\p00"...{repeat showString..length " "}..."\p00");
 		jump->start;
@@ -407,7 +419,6 @@ reg.weakScope()<:(reg){:checkKey_delete;
 		};
 		%currentDir = [%currentDir+currentDir.parent];
 		%lastFile = [%currentDir+currentDir.parent];
-		%lastFile.currentDirPointer = 0;
 		jump -> start;
 	};
 	def finally{:else};
@@ -498,6 +509,9 @@ def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
 							pop %temp_currentDir;
 							[%newFile+newFile.parent] = %temp_currentDir;
 							push %temp_currentDir;
+							let temp = temp_currentDir;
+							%temp += [%temp_currentDir+currentDir.links.size];
+							[%newFile+newFile.parent.itemPtr] = %temp;
 							delete temp_currentDir;
 						};
 						[%newFile+newFile.links.size] = 1;
@@ -581,7 +595,6 @@ def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
 			return;
 		}:>static.use();
 		{:changeDirectory;
-			%lastFile.currentDirPointer = %DynLenObjectPtr.push.outputs.newItem;//:%File**
 			%lastFile = %currentDir;
 			%currentDir = %newFile;
 		};
@@ -595,7 +608,6 @@ let stateReg = RegEnum()<:0xmin.Math.max(
 );
 #linkDir<->stateReg();
 #lastFile<->stateReg();
-#lastFile.currentDirPointer<->stateReg();
 jump->start;
 {
 	hault;

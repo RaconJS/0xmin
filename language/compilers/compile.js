@@ -109,8 +109,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				settings.forEach(v=>{
 					let turnOn=true;
 					if(v[0]=="!"){
-						reversed=false;
+						let reversed=false;
 						v=v.substr(1);
+					}
+					else if(v[0].match("ZASM")){//ZASM3
+						let version = +v[0].match(/(?<=ZASM)[0-9]+/);
+						if(!isNaN(version) && ![3].includes(version)){
+							throw Error("0xmin version error: ZASM"+version+" is not supported by this compiler. Try '#\"ZASM3\";'");
+						}
+						return
 					}
 					settingsList[v]?.(turnOn);
 				})
@@ -384,12 +391,12 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 				({index}=contexts.phaseSetter({index,statement,scope,state}));
 				if(state.phase==""||state.phase=="#"){
-					let keywords={"void":false,"virtual":false,"static":false};
+					let keywords={"void":false,"virtual":false};
 					let found,oldIndex=index;
 					({index,found}=contexts.keyWordList({index,statement,scope,keywords}));
 					if(!found&&statement[index-1]==":"){index=oldIndex}//allows '#:' to work
 					Object.assign(state,keywords);
-					if(keywords["void"]||keywords["virtual"]||keywords["static"])
+					if(keywords["void"]||keywords["virtual"])
 						({index}=contexts.phaseSetter({index,statement,scope,state}));
 				}
 				//TODO: 'virtual': allow the: 'virtual...(){  }' pattern to work
@@ -432,7 +439,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					word=statement[index];
 					//'keyword : arg' or 'keyword arg'
-					if(["debugger", "throw", "import", "delete", "..."].includes(word)){
+					function scopeSearch(scope,labelFromValue){
+						if(scope.isSearched)return undefined;
+						scope.isSearched=true;
+						if(scope.label==labelFromValue)return scope;
+						let ans = scopeSearch(scope.parent,labelFromValue);
+						delete scope.isSearched;
+						return ans;
+					}
+					if(["debugger", "throw", "import", "delete", "defer", "break", "..."].includes(word)){
 						wasUsed=true;
 						if(word=="debugger"
 							&&["", "$", "#"].includes(state.phase)
@@ -493,6 +508,42 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						){
 							index++;
 							({index}=contexts.main_importFile({statement,index,scope,phase:state.phase}));
+						}
+						else if(word=="defer"
+							&&["", "#"].includes(state.phase)
+						){//'defer scopeLabel:'
+							index++;
+							let value;
+							({value,index}=contexts.expression_short({index,statement,scope}));
+							let labelFromValue=Variable.fromValue(value);
+							let isValidScope=true;
+							if(labelFromValue){//check for label in scope parents
+								isValidScope=scopeSearch(scope,labelFromValue);
+							}
+							if(statement[index]==":")index++;
+							//'#defer: ...dostuff ;'
+							let label = labelFromValue??scope.label;//note: this can cause 
+							if(isValidScope)scope.defer.push(()=>contexts.main({statement,index,scope}));//BODGED: this works but it is prefered not to use closure functions as a programming style.
+							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue.name + "' is not a scope in the scope chain"));
+							break commands;
+						}
+						else if(word=="break"
+							&&["", "#"].includes(state.phase)
+						){
+							index++;
+							let value;
+							({value,index}=contexts.expression_short({index,statement,scope}));
+							let labelFromValue=Variable.fromValue(value);
+							let isValidScope=scope;//:Scope?
+							if(labelFromValue){//check for label in scope parents
+								isValidScope=scopeSearch(scope,labelFromValue);
+							}
+							let label = labelFromValue??scope.label;//note: this can cause 
+							if(statement[index]==":")index++;
+							if(isValidScope)throw label;//is caught by `evalBlock`, with the matching scope.
+							//note: throwing scope like this might break some compiler logic. TODO: confirm this is not the case and so `throw scope` is safe.
+							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue.name + "' is not a scope in the scope chain"));
+							break commands;
 						}
 					}{
 						if(false) if(statement[index]=="{"){
@@ -641,10 +692,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(metaState["def"]){//same as '$undef def set: obj;' ==> redefines and inserts code block;
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
-							value.label.unDefine();
-							contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true,virtualLine},true);//note: uses 'unshift' mode so that the '$' instructions are in the right order
-							//scope.label.code.push(value.label);
-							value.label.defs.push(scope.parent.label);
+								if(!Object.isFrozen(value.label))value.label.unDefine();//note an 0xmin error is thrown by meta_defineLabelToNextLine if the label is immutable
+								contexts.meta_defineLabelToNextLine(value.label,scope,value,{setAddress:true,insert:true,virtualLine},true);//note: uses 'unshift' mode so that the '$' instructions are in the right order
+								//scope.label.code.push(value.label);
+								if(!Object.isFrozen(value.label))value.label.defs.push(scope.parent.label);
 						}else{
 							if(isStrict)throw Error(throwError({statement,index,scope}, "# type", "label '"+value.name?.toString?.()+"' is undeclared"));
 						}
@@ -682,7 +733,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(value){
 					word=statement[index];
 					if(state["undef"]){//remove all refrences of an object from the code
-						if(value?.type=="label"&&value.label){
+						if(value?.type=="label"&&value.label&&!Object.isFrozen(value.label)){
 							value.label.unDefine();
 						}
 					}
@@ -709,6 +760,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			meta_defineLabelToNextLine(label,scope,value,{insert=false,setAddress=true,virtualLine=undefined}={},useUnshift=false){
 				//done in the line Assignment phase
 				if(label==undefined)throw Error(throwError({scope},"", "label '"+value.name?.toString?.()+"' is not declared"));
+				if(Object.isFrozen(label))throw Error(throwError({scope},"", "label '"+value.name?.toString?.()+"' cannot be defined since it is immutable. This is because values would have to be pushed to '..defs'. Try removing '#def' or '$def'"));
 				let newLineObj=new HiddenLine.Define({label,scope,insert,setAddress});
 				if(useUnshift){
 					if(virtualLine)scope.label.code.splice(scope.label.code.indexOf(virtualLine)+1,0,newLineObj);//allows 'virtual' to apply to '#def' e.g. 'virtual #def x'
@@ -878,6 +930,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				let word;
 				let filePath="";//:string;
 				let fileName="";//:string; for debugging only
+				let fileType="";//:string & []fileTypes
 				getFilePath:{
 					const fromTypes={
 						"lib":compilerFolder+"../include/",
@@ -896,17 +949,44 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					filePath+=fileName;
 				}
+				getFileType:{//'import this "data.txt" as text'
+					fileType="0xmin";//default
+					if(statement[index]!="as")break getFileType;
+					index++;
+					const fileTypes = ["0xmin", "bin", "u16", "u32", "text", "symbol"];
+					if(!fileTypes.includes(statement[index])){
+						throw Error(throwError({statement,index,scope},"syntax", "expected file type after 'as'. Got '"+statement[index]+"'. Try using e.g. 'import \"file.0xmin\";' or 'import this \"fileName.bin\" as u32;'"));
+					}
+					else fileType = statement[index];
+					index++;
+				}
 				if(phase=="")phase="#";
 				if(phase=="#"){//open as 0xmin file
 					let fileData;//:code tree;
-					if(files.hasOwnProperty(filePath)){
-						fileData=files[filePath];//if file already exists, use it
-					}else {
-						let fileString=oxminCompiler.fileLoader(filePath);
-						fileData=bracketPass(parseFile(fileString,filePath,fileName));
+					if(fileType=="0xmin"){
+						if(files.hasOwnProperty(filePath)){
+							fileData=files[filePath];//if file already exists, use it
+						}else {
+							let fileString=oxminCompiler.fileLoader(filePath);
+							fileData=bracketPass(parseFile(fileString,filePath,fileName));
+						}
+						evalBlock(fileData,undefined,scope,statement);
+					}
+					else{
+						let fileData;
+						switch(fileType){
+							case"text":
+								fileData=oxminCompiler.fileLoader(filePath);
+							break;
+							case"bin":
+							case"u32":
+								fileData=oxminCompiler.fs.readFileSync(filePath);
+								throw Error("compiler error: unsupported file import type: '"+fileType+"'. UNFINISHED");
+							break;
+							default:throw Error("compiler error: unsupported file import type: '"+fileType+"'.")
+						}
 					}
 					if(statement[index]==":")index++;
-					evalBlock(fileData,undefined,scope,statement);
 				}
 				index=statement.length;
 				return {index};
@@ -1115,14 +1195,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					let word=statement[index];
 					if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
 						//'()'-> null, '' -> undefined
+						let searchScopeForLabel = false;
 						if(value===undefined||value?.type=="undefined"){//TODO: add undefined and null types to the Value class
 							//sets default labels from scopes
 							//'(..b)' ==> 'this..b' var scope's label
 							//'(.b)' and '(.(b))' ==> 'b' let scope's label
-							//'([b])' ==> 'b'; weak scope's label
+							//'([b])' ==> 'b'; searches for 'b' in scopes
 							if(word=="..")value=scope.var.label.toValue("label");
 							if(word==".")value=scope.let.label.toValue("label");
-							if(word=="[")value=scope.label.toValue("label");
+							if(word=="["){value=scope.parent.label.toValue("label");searchScopeForLabel=true;}//uses scope.parent since scope refers to the codeObj from contexts.main
 						}
 						else if(value===null){}
 						let isInternal=word=="..";
@@ -1169,7 +1250,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								}
 							}//'a.b'
 							else {
-								if(typeof name=="string"||typeof name=="symbol")value.label=value.parent.findLabel(name)?.label;
+								if(typeof name=="string"||typeof name=="symbol"){
+									if(searchScopeForLabel){//'[b]'
+										let {label,parent:labelParent} = scope.findLabel(name)??{};
+										Object.assign(value,{label,parent:labelParent});
+									}
+									else value.label=value.parent.findLabel(name)?.label;
+								}
 								if(typeof name=="number"){//'a[b]'
 									value.refType="array";
 									name=contexts.getIndexNumber(name,parent)??0;
@@ -1468,7 +1555,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 											if(!newLabel)delete firstArg.parent.code[firstArg.number];//this line is here to reduce weird behaviour
 									}
 									else if(firstArg.refType=="internal"){firstArg.set(newLabel);}
-									else if(firstArg.parent.labels.hasOwnProperty(firstArg.name))firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' and 'a= ¬();' ==> a is an empty label (aka null)
+									else if(firstArg.parent.labels.hasOwnProperty(firstArg.name)){
+										if(newLabel&&!newLabel.name&&firstArg.name)newLabel.name=firstArg.name.toString();
+										firstArg.parent.labels[firstArg.name]=newLabel??null;//'a=#();' and 'a= ¬();' ==> a is an empty label (aka null)
+									}
 									value=isNotNull?newLabel?.toValue?.("label")??new Value():null;
 								}else{
 									//sets properties of existing variable
@@ -2470,6 +2560,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				return returnValue;
 			}
 			unDefine(){//'$undef label'; done in '#' phase
+				if(Object.isFrozen(this))return this;
 				//defs:Variable[]
 				for(let i=0;i<this.defs.length;i++){
 					let code=this.defs[i].code;
@@ -2799,6 +2890,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						;
 						return ans;
 					}),
+					"static":({label,scope})=>{
+						let labels = scope.code.symbolLabel??={};//:Map(Symbol->Variable)
+						return (labels[label.symbol]??=Object.doubleFreeze(new Variable({name:"(static)"}))).toValue("label");
+					},
+					//"defer":({label})=>(label.defered??=new Variable({name:"{defer}"})).toValue("label"),
 					//convert string to number
 					"asNumber":({label})=>new Value.Number(+label.toValue("string").string),
 				};
@@ -2922,6 +3018,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			//temp variables
 				//settings={banJS:false,banInfiniteLoops:false,};
 				defaultPhase;//: "#" | "$" | "@"; only exists in evalBlock
+				defer=[];//:(closure&()->mutate scope)[] ; is a list of functions that are run at the end of a scope
 			//line data, for debugging code only
 				data_phase;//: "#" | "$" | "@";  main()
 			//scope
@@ -3184,7 +3281,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			optionals=Object.freeze({
 				"carry":{
 					useArray:true,
-					map:{"add":["addc", "!"], "adds":["addcs", "!"], "sub":["sbb", "+"],"subs":[, "+"]},
+					map:{"add":["adc", "+"], "adds":["adcs", "+"], "sub":["sbb", "+"],"subs":["sbbs", "+"]},
 					defaultSymbols:[""],
 				},
 				"store":{
@@ -3250,6 +3347,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				"add":"add",
 				"adds":"adds",
 				"adcs":"adcs",
+				"adc":"adc",
 				"sub":"sub",
 				"subs":"subs",
 				"sbb":"sbb",
@@ -3618,13 +3716,22 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					callStack.push(statement);
 				}
-				contexts.main({statement,scope});
+				try{contexts.main({statement,scope});}catch(error){//allows for '#break;' to work
+					//error:Error|Variable
+					if(error instanceof Variable && (error==scope.label || scope instanceof GlobalScope)){
+						break;//prevent 'break' from throwing an error
+					}else throw error;
+				}
 				if(checkRecur){
 					recur[symbol]--;
 					if(recur[symbol]==0)delete recur[symbol];
 					callStack.pop();
 				}
 			}
+			for(let i=scope.defer.length-1;i>=0;i--){
+				scope.defer[i]();
+			}
+			scope.defer=[];
 			scope.defaultPhase="";
 			return scope;
 		}
@@ -3750,8 +3857,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				assemblyCompiler.assembly.language=="0xmin"?
 					" data:"+v.data
 					//+"  ram:"+v.cpu[0]
-					+" jump:"+v.cpu[1]
-					+" move:"+v.cpu[2]
+					+" jump:"+v.cpu[2]
+					+" move:"+v.cpu[3]
 					+" cmd:"+oxminDisassembler(v.value)+" ".repeat(Math.max(0,"set jump +3;".length-(oxminDisassembler(v.value)+"").length))
 				:assemblyCompiler.assembly.language=="tptasm"?
 					" asm:"+v.asm
@@ -3826,6 +3933,7 @@ let buildSettings={makeFile:true}
 	}
 	else{
 		const fs=require('fs');
+		oxminCompiler.fs = fs;
 		oxminCompiler.fileLoader=fileName=>{
 			try{
 				return fs.readFileSync(fileName, 'utf8');
@@ -3857,7 +3965,7 @@ let buildSettings={makeFile:true}
 				if (err)reject(err);
 				else {
 					if(typeof content=="string" && !newFileName.match(/\.(asm)$/)){//if tptasm ; convert to binary
-						const { exec } = require("child_process");loga(newFileName)
+						const { exec } = require("child_process");
 						exec("\""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model=R216K8B", (error, stdout, stderr) => {
 							if (error) {
 								console.log(`error: ${error.message}`);

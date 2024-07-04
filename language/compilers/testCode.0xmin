@@ -1,13 +1,50 @@
-#"tptasm";
-#"table";
-#"ZASM3";
-import lib "var_const.0xmin";
-r0 = 2;
-r1 = var()<:"ABC";
-send r2 [r0+r1];
-hlt;
-def var,const;
-{
-	let = b,=a;
-	debugger +.a;
+/*#"tptasm";#"table";
+{1;defer 3;2};//{1;2;3}
+//defer applies to the local scope
+//bar..static returns a label unique to 'bar' and the local weak scope's code
+//note that: '..static' is assigned to static code and not scopes, meaning that using '...run' cannot be used to access other static labels
+//(["name"]) returns a label called 'name' in the scope parents, including the local weak scope. it would be the same as '(foo)'
+//.[foo] and .() is for local `let` scope
+//[foo] is for all scopes
+//.. is for `var` scope
+let fileB(){
+	let hasSymbol = !![¬0xmin..static];
+	let set [¬0xmin..static];
+	repeat !+hasSymbol
+		let symbol = [¬0xmin..static];
+	repeat !+hasSymbol ...(){
+		let var(obj)=>{
+			let symbol = 0xmin..static;
+			let isStatic = !![¬symbol];
+			let set ..this[¬symbol];
+			let staticLabel = ..this[¬symbol];
+			repeat !+isStatic{
+				#..this..splice(-0,0,{def staticLabel});
+			};
+			#staticLabel::{def obj};
+		};
+	};
 };
+...fileB;
+...fileB;
+#var(1);
+#var(2);
+push r2;defer pop r2;
+r2 = 0;
+send r2 "a";*/
+let foo(){
+	let global =
+	:self;
+	def let a{
+		#{import lib "module.0xmin"}(0xmin..static,self,global);
+	};
+	debugger;
+};
+...foo;
+...foo;
+let foo(a){
+	break a;
+};
+:self;
+foo(self);
+debugger;

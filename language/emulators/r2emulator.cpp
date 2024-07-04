@@ -259,9 +259,13 @@ class R2KeyBoard{
 						mode=1;
 					}
 					else if(output==attensionRequest){
+						latencyFrames=14;//TEST
 						returnVal=0x20028000;//failed request
 					}
-					else returnVal=0x20000000;
+					else {
+						latencyFrames=14;//TEST
+						returnVal=0x20000000;
+					}
 				}
 				else if(mode==1){//ready for attension request
 					if(output==attensionRequest){
@@ -269,12 +273,12 @@ class R2KeyBoard{
 							latencyFrames=5;
 							coolDown=5;
 							returnVal=inputChar|data|redFilt;
-							bufferToinput[latencyFrames+1]=returnVal;
+							bufferToinput[latencyFrames+1]=returnVal;//is done for 2 frames
 							mode=2;
 						}
 					}
 					else {
-						latencyFrames=0;
+						latencyFrames=6;//0; trialing '6' since it wasn't working
 						returnVal=attensionRequest;
 					}
 				}
@@ -346,6 +350,7 @@ class FiltCPU{
 		}
 	};
 };
+u32 i;
 class r2CPU:public FiltCPU{
 	public:
 	void innit(){
@@ -492,7 +497,6 @@ class r2CPU:public FiltCPU{
 		return !commandData.includeRB?address:
 			registers[commandData.RB]+(commandData.subRB?-address:address);
 	}
-	int a = 2;
 	u32 getFromRam(u16 address, CommandData commandData){
 		return ram->get(addRBtoAddress(address));
 	}
@@ -567,7 +571,7 @@ class r2CPU:public FiltCPU{
 				updateForSubtration:{
 					if(!silent)setValue(output);
 					updateState(output,false);
-					setFlagsForAdd(a,b,o);
+					setFlagsForSub(a,b,o);
 					break;
 				}//R_flag(q3);F_Carr = (q1 < q2);F_Over = ((q1>>15)!=(q2>>15)) && ((q2>>15)==(q3>>15));
 				break;
@@ -576,7 +580,6 @@ class r2CPU:public FiltCPU{
 			case 0x0F://SBBS
 				output = a - b - flags.carry;
 				goto updateForSubtration;
-				break;
 			case 0x08://SWM
 				output = b;
 				updateState(output,false);
@@ -676,8 +679,9 @@ class r2CPU:public FiltCPU{
 				break;
 			case 0x19://WAIT
 				output = -1;
-				if(*io_input & keyboard.confirm)
+				if(*io_input & keyboard.confirm){
 					output = R2TERM_PORT_IN;
+				}
 				updateState(output,true);
 				break;
 			case 0x1A://SEND
@@ -744,11 +748,21 @@ void R2KeyBoard::inputListener(){
 		//cout<<ctx.moveTo(pos[0],pos[1]);
 		#define ngetc(c) (read (0, (c), 1))
 		ngetc(&keyboard.inputChar);//keyboard.inputChar=std::getchar();
+		{//map keys to r2 keyboard
+			if(keyboard.inputChar > 0x20 && keyboard.inputChar < 0x7f){}//normal charactors
+			else if(keyboard.inputChar == '\n')keyboard.inputChar = '\r';//enter
+			else if(keyboard.inputChar == 0x7f)keyboard.inputChar = '\x08';//delete
+			else{//unhandled case
+				//TEST
+				// cout<<"KEYCODE:"<<hex keyboard.inputChar<<endl;
+				// throw;
+			}
+		}
+		cout<<keyboard.inputChar<<endl;
 		keyboard.inputWasPressed=true;
 		if(cpu.haulted)return;
 	}
 }
-u32 i;
 class GetKeyInput{
 	struct termios oldt, newt;
 	public:
@@ -787,6 +801,7 @@ void mainThread(){
 			return;
 		}
 		//TEST:{int a;cin>>a;}
+		//terminal.onEnd();cout<<"ip:"<<hex cpu.ip<<"    ";//TEST
 		ctx.update();
 		mySleep(1000./runSpeed);
 	}
@@ -853,11 +868,10 @@ int main(int argc, char const *argv[]){
 		}
 	}
 	else{
-		mainThread();
-		//auto main = std::thread(mainThread);
-		//auto listener = std::thread(R2KeyBoard::inputListener);
-		//listener.detach();
-		//main.join();
+		auto main = std::thread(mainThread);
+		auto listener = std::thread(R2KeyBoard::inputListener);
+		listener.detach();
+		main.join();
 	}
 	//terminal.onEnd();
 	cout<<"i:"<<i;

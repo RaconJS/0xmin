@@ -1,6 +1,7 @@
 //requires type.0xmin
 repeat !(LenObject&&DynLenObjectPtr&&Type&&heap):
-	import "type.0xmin";
+	import this "type.0xmin";
+//repeat !(Char&&String)
 ...labelsof{//strings and extra things
 	let Char(){0}:>Type();
 	let LenString(string){//{@;char[l]}
@@ -11,7 +12,7 @@ repeat !(LenObject&&DynLenObjectPtr&&Type&&heap):
 		#return = DynLenObjectPtr().meta_set(stringObj):>static.use();
 		let return.print = return.printString;
 	};
-	let readString(out_string,doForEach,allowBackSpace){//:#(%,#(%char,String)->{@},#?)->@()->String & []static
+	let readString(out_string,doForEach,allowBackSpace){//:#(%[]static*&%String*,#(%char,String)->{@},#?&{@})->@()->String & []static
 		#out_string=out_string||String();
 		let string = out_string;
 		let inputGetter;
@@ -24,6 +25,7 @@ repeat !(LenObject&&DynLenObjectPtr&&Type&&heap):
 				%char-"\x08";//checks for backspace key
 				jump -> goBack..return if == 0;
 				string.pop(1);
+				def allowBackSpace;
 			};
 			string.push(char..@..length,(item,_char){
 				[%item] = %char;

@@ -1,98 +1,254 @@
 //start at ~15:50 17:20 (works), 17:27 stop time,
 //TODO: use chain add for >16 bit comparison
 #"tptasm";//R2 computer
-#"table";
+#"len";
+//#"table";
 import "../std v1.0xmin";
 //import "../type.0xmin";
 //import "../RegState.0xmin";
 let reg = RegEnum();
+let getInput(){//:#()->{#}
+	let array{0x10000000;0x10000000};//189112847;303526851;5302960144;5267579280;6807158224;9155494056;570921464;9578998384;3000146520;1070137160;1230763728;1472382120;3612717240;3804853304;9006965704;1716921880;7959957576;1675505816;2265262224;2240057664};//randomly generated numbers
+	let ansIndex = {2;1};
+	let target <-> array[ansIndex[0]%array..length] + array[ansIndex[1]%array..length];
+};
 let nums_static{//:@{u16;i64[]}
-	let itemSize = 4;
-	let itemShift = 2;
+	let itemSize = 2;
+	let itemSize_array = 3;
+	let numBitSize = 34;
 	def let size{0};//:usize
+	def let dataPtr;
 	def let data{};//:(i64 & u16[4])[] & u16[size]
+	#dataPtr<=>{@data};
 	let: meta_set(array){//:#(#i64[])->this & mutates this
-		//little indien
 		#return = ..this;
 		#data<=>meta.forEach(array)<:(v,i){
-			meta.repeat(itemSize)<:(i){
-				let shift = 0xmin.Math.min(i *16,32);
-				repeat(shift<32) @:#(v>>shift&0xffff);
-				repeat!(shift<32) @:#(num||0);
-			};
+			intToFilts(v);
 		};
-		#size <=> {@data..@..length};
+		#size <=> {@(data..@..length/itemSize)};
+	};
+	let intToFilts(number){//little indian
+		@(number&0x1fffffff);
+		@(number/(2**29));
+	};
+	let numStaticTemplate = intToFilts()::{//:{@}&u34
+		let w0<->0,low<->0;
+		let w1<->0;
+		let w2<->1,high<->1;
+	};
+	let NumReg(reg)={reg();reg();reg()};//#()->{%}&u34&{%u16;%u13;%u5}
+}:>static.use();
+let input{
+	#..this<->reg;
+	def let target{#..this<->reg;repeat nums_static.itemSize_array reg()};//:%int
+	def let arrayPtr = reg()::{
+		def let size<->0;
+		def let dataPtr<->1;
+	};
+	let setInput(target,array){//:#(#int,{@}*)->{@}
+		meta.assert(nums_static.itemSize_array==3);
+		%..this.target.(0) = #(target&0xffff);
+		%..this.target.(1) = #(target/(2**16)&0x1fff);
+		%..this.target.(2) = #(target/(2**29)&0x3f);//target:u35 ; assert: u34+u34 = u35
+		%arrayPtr = array;
 	};
 };
-#nums_static.meta_set({1;2;3});
-let target{repeat nums_static.itemSize reg()};//:%int
-%target.(0) = 4;
+let output{
+	#..this<->reg;
+	def let indexA <-> reg();//:u16 & nums_static+
+	def let indexB <-> reg();
+};
+...labelsof input;
+...labelsof output;
 //assume 1 solution
 let range_arrayLength = 0x2710;//1*16 bits
-let range_itemsOnArray = 0x2540be400;//3*16 bits
-let indexA <-> reg();//:u16 & nums_static+
-let indexB <-> reg();
+let range_itemsOnArray = 0x2540be400;//u5+u29 & 2*filts bits
 let ans = {indexA;indexB};
 let onFound;
-let nums{def let size,data;#..compile}<->reg();
-reg.weakScope()<:(reg){
-	let item_difs{repeat nums_static.itemSize reg()};//:%(u16)[]
-	let enterLoop;
-	{
-		%indexA = [nums_static.size];
-		jump->enterLoop;
+let inputData = getInput();
+let printReg{
+	print.register(0);
+	return;
+	let call(reg){
+		push r0;
+		r0 = r reg;
+		call #(..this[¬static].use());
+		pop r0;
 	};
-	${:loop;
-		meta.forEach(item_difs)<:(v,i){
-			let statePos;
-			$statePos => nums_static.data + i;
-			{:ifBlock;
-				let else;
-				jump -> else if !carry;
-				%v = 1;
-				jump -> else..return;
-				def else{
-					%v = 0;
-				};
-				//assert: %v = carry bit
-			};
-			%v += %target.(i);
-			%v -= [statePos+%indexA];
-		};
+}:>static();
+let printValues{
+	#..this:>static().use();
+	printReg.call(ans[0]);
+	print(",");
+	printReg.call(ans[1]);
+	print("\n");
+	${
+		let =0xmin,=RegEnum,=printReg,=print,=readHigh;
+		let =target,=ans,=arrayPtr;
+	}:>(data)<={
+		...data;debugger printReg;
+		let reg = RegEnum(0xmin.Math.max(target[-1],ans[-1],arrayPtr));
+		let temp = reg(),temp1 = reg(),temp2 = reg();
+		debugger + temp;
+		debugger + arrayPtr;
+		%ans.(0)<<=1;
+		%ans.(1)<<=1;
+		%temp1 = [%arrayPtr+arrayPtr.dataPtr];
 		{
-			let enterLoop;
-			{
-				%indexB = [nums_static.size];
-				jump->enterLoop;
+			%temp = [%temp1+%ans.(0)];
+			printReg.call(temp);
+			print("+");
+			%temp = [%temp1+%ans.(1)];
+			printReg.call(temp);
+			print("=");
+			printReg.call(target.(0));
+			print(",\n");
+		};{
+			%temp = %temp1;
+			%temp += %ans.(0);
+			readHigh(temp,temp);
+			printReg.call(temp);
+			print("+");
+			%temp = %temp1;
+			%temp += %ans.(1);
+			readHigh(temp,temp);
+			printReg.call(temp);
+			print("=");
+			printReg.call(target.(1));
+			print(",\n");
+		};{
+			%temp1+=1;
+			%temp = [%temp1+%ans.(0)];
+			printReg.call(temp);
+			print("+");
+			%temp = [%temp1+%ans.(1)];
+			printReg.call(temp);
+			print("=");
+			printReg.call(target.(2));
+			print("\n");
+		};
+		%ans.(0)>>=1;
+		%ans.(1)>>=1;
+	}():>(block){
+		block.reg.blockScope((){block});
+	}();
+	return;
+};
+#nums_static.meta_set(inputData.array);
+setInput(inputData.target,nums_static);
+reg.weakScope()<:(reg){
+	let forLoop(reg,doFor,start,condition,next,do){//:#(RegEnum,#->@,#->@,#->@,#?,#->@)->{@}
+		//doFor:¬|#{}|0
+		//:#(RegEnum,#(RegEnum,this)->{@;}&{i:%?,data:{#}?},#(%?,RegEnum,this)->{@},#(%?,continue:@*,RegEnum,this)->{@},#?,#(%?,RegEnum,this)->{@})->{@}
+		let entry,data;
+		reg.weakScope()<:(reg)=>{
+			let start=start(reg,return)||{let i = reg();%i=0};//:{@}&#{i:%?,data:{#}?}
+			#data = start.data;
+			//could also do: `...{...start;{let=data}}[-1];`
+			let i=start.data.i||start.i;//:(%|any)?
+			recur do..flat..length let do=do(i,reg,return);
+			let next=next(i,reg,return)||{%i=i-1};//:{@}
+			let condition=condition(i,do,reg,return);
+			def start;
+			def let jumpToEntry{jump->entry};
+			def do;
+			repeat !!doFor meta.if(0*doFor!=0)<:(){
+				undef jumpToEntry;
+			}<:(){
+				repeat !entry..defs..length def entry;
 			};
-			${:loop;
-				let continue;
-				let test = reg();
-				meta.forEach(item_difs)<:(v,i_1)=>{
-					let statePos;
-					$statePos => nums_static.data + i_1;
-					%v - [statePos+%indexB];
-					jump -> continue if != 0;
+			def next;
+			repeat !entry..defs..length def entry;
+			def condition;
+		};
+	};
+	let success;
+	forLoop(reg,0,
+		(reg){
+			let i = indexA;
+			%indexA = [%input.arrayPtr+input.arrayPtr.size];
+			meta.assert(nums_static.itemSize==2);{
+				%indexA <<= 1;
+			};
+			let arrayData<->reg();
+			%arrayData = [%input.arrayPtr+input.arrayPtr.dataPtr];
+			let data{let=arrayData;};
+		},(i,continue){
+			jump->continue if>=0 !signed;
+		},(i){
+			%i -= nums_static.itemSize;
+		}
+	)<:(i,reg,loop){
+		...loop.data;
+		let temp = reg();
+		forLoop(reg,0,//assume: the indexes are always different
+			(reg){
+				let j = indexB;
+				%j = %i;
+				let findNum = nums_static.NumReg(reg);//:%[]&u34
+				meta.assert(nums_static.numBitSize > 29 && (nums_static.numBitSize <= #(29+16)));{
+					let temp <-> findNum[0];
+					%temp = %arrayData;
+					%temp += %i;
+					let itemAddress = temp;//:%([](u34[]))*
+					readHigh(findNum[1],itemAddress);
+					%findNum.(2) = [%itemAddress+1];
+					%findNum.(0) = [%itemAddress];delete itemAddress;
 				};
-				jump -> onFound;
-				def enterLoop;
-				def continue;
-				%indexB -= nums_static.itemSize;
-				jump -> loop if >= 0;
+				meta.forEach(findNum,(v,i){
+					meta.if(+i==0)<:(){
+						%v -= %target.(i);
+					}<:(){
+						%v -= %target.(i) +carry;
+					};
+				});
+				//assert: if ans[1] is correct then: findNum + ans[1] == 0 if with an overflow 
+				let data{let i=j,=findNum};
+			},(j,continue){jump->continue if>=0 !signed},
+			(j){%j -= nums_static.itemSize},
+		)<:(j,reg,loopObj){
+			let findNum = loopObj.data.findNum;
+			:block;
+			meta.assert(nums_static.numBitSize > 29 && (nums_static.numBitSize <= #(29+16)));{
+				let continue = block..return;
+				//arrayData:34[]
+				let itemAddress <-> reg();//:%[]arrayData*
+				let temp <-> reg();
+				%itemAddress = %arrayData;
+				%itemAddress += %j;
+				let highBits <-> temp;
+				readHigh(temp,itemAddress);
+				let TEST;
+				repeat!!TEST{
+					%i>>=1;
+					%j>>=1;
+					call printValues.(¬static).use();
+					%i<<=1;
+					%j<<=1;
+				};
+				%findNum.(0) + [%itemAddress];
+				jump -> continue if != 0;
+				%findNum.(1) + %highBits +carry;
+				jump -> continue if != 0;
+				%findNum.(2) + [%itemAddress+1] +carry;
+				jump -> continue if != 0;
+			};
+			{:matchFound;
+				%indexA >>= 1;
+				%indexB >>= 1;
+				jump->success;
 			};
 		};
-		def enterLoop;
-		%indexA -= nums_static.itemSize;
-		jump -> loop if >= 0;
 	};
-};
-def onFound;
-meta.forEach(ans)<:(index){
-	meta.assert(nums_static.itemSize == 4);{
-		%index>>=2;
+	def let onFail{
+		jump->static.use()<:{
+			print("\c04ERROR: \c0cnumber not found\c0f");
+			hlt;
+		};
 	};
+	def success;
 };
-print.register(ans[0]);
-print(",");
-print.register(ans[1]);
-def nums_static;
+call printValues.(¬static).use();
+#:static.use({def print.number.charSet;});
+hlt;
+def: static.memory;
