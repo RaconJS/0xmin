@@ -1,50 +1,85 @@
-/*#"tptasm";#"table";
-{1;defer 3;2};//{1;2;3}
-//defer applies to the local scope
-//bar..static returns a label unique to 'bar' and the local weak scope's code
-//note that: '..static' is assigned to static code and not scopes, meaning that using '...run' cannot be used to access other static labels
-//(["name"]) returns a label called 'name' in the scope parents, including the local weak scope. it would be the same as '(foo)'
-//.[foo] and .() is for local `let` scope
-//[foo] is for all scopes
-//.. is for `var` scope
-let fileB(){
-	let hasSymbol = !![¬0xmin..static];
-	let set [¬0xmin..static];
-	repeat !+hasSymbol
-		let symbol = [¬0xmin..static];
-	repeat !+hasSymbol ...(){
-		let var(obj)=>{
-			let symbol = 0xmin..static;
-			let isStatic = !![¬symbol];
-			let set ..this[¬symbol];
-			let staticLabel = ..this[¬symbol];
-			repeat !+isStatic{
-				#..this..splice(-0,0,{def staticLabel});
-			};
-			#staticLabel::{def obj};
+break;
+£
+	%
+	*
+	heap[]()<:
+	Dlop()<:
+	heap[]()<:
+	4^int() //£[4](int)
+;
+£Vec(4,int);
+let Array2D = £@^ ^{0};//uses templates instead of type functions
+let a = Array2D();
+
+let a = int(2);
+let b = {int(2);float(2)};
+let ref_of_B = £*b;
+//REJECTED: a!b == `Result<Ok:a,Err:b>` since it adds new patterns; conflicts with `repeat a !jump->10` 
+import lib "std.0xmin";
+let object = String("hello world");
+defer:{:freeObject;
+	r0 = [object];
+	call heap.free;
+};
+//idea:'£' convert to operator overloading type syntax
+	//can use '¬' to convert it back
+//if > 0 jump 2; //fixed
+let a =£%^&*<>?2;
+let vec1={1;2},vec2={3;4};
+let vec3=£vec1+vec2;
+let Dlop(){
+	def let data = £@*heap[](£!sized)¬();
+	def let capasity = £@usize¬();
+	def let size = £@usize¬();
+};
+let type = £[];
+let arrayOfInts = £%*[](int)¬();
+//let £(b:>£%()) = 2;
+debugger {1;2}[¬1];
+#"tptasm";
+{:foo;
+	send r0 "h";
+	send r0 "i";
+	hault;
+};
+#(){
+	//#"tptasm";#"len";#"table";
+	import lib "var_const.0xmin";
+	import lib "heap.0xmin";
+	import lib "R2/print.0xmin";
+	defer: def heap.data;
+	defer: def var,const;
+	defer: def print.number.charSet;
+	print("Hello world!");
+	let Unsized;//{@}
+	let Pointer;//*
+	let Option;//?
+	let Box;//~
+	let inbuiltType{
+		let range(start,end)={
+			0;
+			let[¬constructor]={@#(start||0);@#(end||(1/0))};
 		};
 	};
-};
-...fileB;
-...fileB;
-#var(1);
-#var(2);
-push r2;defer pop r2;
-r2 = 0;
-send r2 "a";*/
-let foo(){
-	let global =
-	:self;
-	def let a{
-		#{import lib "module.0xmin"}(0xmin..static,self,global);
+	let DynLenObj(){//{c:@,l:@,@[l]}
+		@0#def let capasity;
+		@0#def let length;//len
+		@0#def let object{let.[¬Unsized]};
 	};
-	debugger;
+	let DynLenObjPtr(){
+		//:Dlop&{c:usize,l:usize,(@[l])*?} where c>l
+		let capasity;$capasity=>return+0;
+		let length;$length=>return+1;//len
+		let ptr{let.[¬Option]={let.[¬Pointer]{let.[¬Unsized]}}};
+		$ptr=>return+2;
+	};
+	let LinkedList(item){
+		0#def let next{let.[¬Option]{let.[¬Pointer]=..this}};
+		def item;
+	};
+	let data{repeat 5 @0;};
+	virtual{$;
+		ram=>data;
+		def: DynLenObjPtr();
+	};
 };
-...foo;
-...foo;
-let foo(a){
-	break a;
-};
-:self;
-foo(self);
-debugger;

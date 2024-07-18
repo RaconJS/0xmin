@@ -7,6 +7,8 @@
 //UNUSED
 //note
 
+//TODO: resolve/fix 'let a<=>a' --> 'let a;#a<=>a' bug.
+//TODO: finish implementing `allowOperatorOverloading` threading it into each function/`new Value`
 //TODO: BUG: fix '||=' bug
 //TODO: #add '$void'
 //TODO: #@make language definitions less BODGED and more formal
@@ -359,12 +361,17 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			if(number instanceof Value){
 				number=number.toType("number").number;
 			}
-			return value-value!==0?0:value|0;
+			return value-value!==0?0:Math.floor(value||0);
 		},
-		main({statement,index=0,scope},part=0){//codeObj; Bash-like statements
+		getNewScope({statement,scope}){//BODGED
 			let codeObj=new Variable({name:"(code line)",type:"array"});
 			let newScope=new Scope.CodeObj({fromName:"main",label:codeObj,parent:scope,code:statement});
 			codeObj.scope=newScope;
+			return {codeObj,newScope};
+		},
+		main({statement,index=0,scope,deferedParentScopeCodeObj=undefined}){//codeObj; Bash-like statements
+			//deferedParentScopeCodeObj:Scope? ; used for 'defer' statements ; BODGED
+			let {codeObj,newScope}=contexts.getNewScope({statement,scope});
 			let state={void:false,static:false,virtual:false,phase:scope.defaultPhase};
 			let wasUsed=false;
 			statement.maxRecur;
@@ -412,7 +419,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							({index,value}=contexts.expression_short({statement,index:repeatingIndex_number,scope}));
 							if(value)value=value.toType("number").number;
 							else value=0;
-							return value-value!==0?0:value|0;
+							return value-value!==0?0:Math.floor(value||0);
 						}
 						if(word=="repeat"){
 							let maxReps=calcReps();
@@ -439,12 +446,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					word=statement[index];
 					//'keyword : arg' or 'keyword arg'
-					function scopeSearch(scope,labelFromValue){
+					function scopeSearch(scope,labelFromValue){//:Scope?
 						if(scope.isSearched)return undefined;
 						scope.isSearched=true;
-						if(scope.label==labelFromValue)return scope;
-						let ans = scopeSearch(scope.parent,labelFromValue);
-						delete scope.isSearched;
+						let ans;
+						if(scope.label==labelFromValue)ans = scope;
+						else ans = scopeSearch(scope.parent,labelFromValue);
+						scope.isSearched=false;
 						return ans;
 					}
 					if(["debugger", "throw", "import", "delete", "defer", "break", "..."].includes(word)){
@@ -509,42 +517,34 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 							({index}=contexts.main_importFile({statement,index,scope,phase:state.phase}));
 						}
-						else if(word=="defer"
+						else if(["defer", "break"].includes(word)//note: feel free to WET these keywords into separate if blocks, if need be.
 							&&["", "#"].includes(state.phase)
-						){//'defer scopeLabel:'
+						){//'defer scopeLabel: code' or 'break scopeLabel;'
 							index++;
 							let value;
 							({value,index}=contexts.expression_short({index,statement,scope}));
-							let labelFromValue=Variable.fromValue(value);
-							let isValidScope=true;
+							let labelFromValue=value?Variable.fromValue(value):undefined;
+							let scopeOfLabel;//s:Scope? where s.label == labelFromValue
 							if(labelFromValue){//check for label in scope parents
-								isValidScope=scopeSearch(scope,labelFromValue);
+								scopeOfLabel=scopeSearch(scope,labelFromValue);
+							}else {
+								scopeOfLabel = scope;
+								labelFromValue = scope.label;
 							}
 							if(statement[index]==":")index++;
 							//'#defer: ...dostuff ;'
 							let label = labelFromValue??scope.label;//note: this can cause 
-							if(isValidScope)scope.defer.push(()=>contexts.main({statement,index,scope}));//BODGED: this works but it is prefered not to use closure functions as a programming style.
-							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue.name + "' is not a scope in the scope chain"));
-							break commands;
-						}
-						else if(word=="break"
-							&&["", "#"].includes(state.phase)
-						){
-							index++;
-							let value;
-							({value,index}=contexts.expression_short({index,statement,scope}));
-							let labelFromValue=Variable.fromValue(value);
-							let isValidScope=scope;//:Scope?
-							if(labelFromValue){//check for label in scope parents
-								isValidScope=scopeSearch(scope,labelFromValue);
+							if(scopeOfLabel){
+								if(word=="defer")scopeOfLabel.defer.push(
+									(({statement,index,scope})=>
+											(newScope)=>contexts.main({statement,index,scope,deferedParentScopeCodeObj:newScope})
+									)({statement,index,scope}),
+								);//BODGED: this works but it is prefered not to use closure functions as a programming style.
+								else if(word=="break")throw label;//is caught by `evalBlock`, with the matching scope.
 							}
-							let label = labelFromValue??scope.label;//note: this can cause 
-							if(statement[index]==":")index++;
-							if(isValidScope)throw label;//is caught by `evalBlock`, with the matching scope.
-							//note: throwing scope like this might break some compiler logic. TODO: confirm this is not the case and so `throw scope` is safe.
-							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue.name + "' is not a scope in the scope chain"));
-							break commands;
+							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue?.name + "' is not a scope in the scope chain"));
 						}
+						break commands;
 					}{
 						if(false) if(statement[index]=="{"){
 							index++;
@@ -594,7 +594,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 			}
 			if(!state.void&&!Object.isFrozen(scope.label.code)){
-				scope.label.code.push(...codeObj.code);//(codeObj);
+				if(deferedParentScopeCodeObj){
+					deferedParentScopeCodeObj.label.code.push(...codeObj.code)
+				}
+				else scope.label.code.push(...codeObj.code);//(codeObj);
 			}
 			return {index,value:newScope};
 		},
@@ -1138,8 +1141,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
 					const operator=contexts.operators_Left[word];//:function (Value) => Value
 					index++;
+					if(word=="£")value.allowOperatorOverloading=true;//allows for '£+a' instead of '+£a'
 					({index,value}=contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false}));
-					if(shouldEval)value=operator(value);
+					let {allowOperatorOverloading}=value;
+					if(shouldEval){
+						if(word!="¬"&&allowOperatorOverloading){//'+a' in '£+a'
+							({index,value}=context.operatorOverload({index,statement,scope,args:[value]}));
+						}
+						else{
+							value=operator(value);
+							if(word=="¬")value.allowOperatorOverloading=false;//'¬£a' == '¬a'; '¬' converts back to non-overloaded / old meta syntax
+							else value.allowOperatorOverloading||=allowOperatorOverloading;
+						}
+					}
 					return {index,value};
 				}else if(word.match(nameRegex)){//'label'
 					if(shouldEval){
@@ -1402,8 +1416,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						return v;
 					}
 					else {
-						return v.toType("label");//TODO: unsure about this mechanic
+						//return v.toType("label");//TODO: unsure about this mechanic. TODO: remove uses of this mechanic (where 'a[¬2]' --> 'let b=¬2;a[b]' --> 'a[2]') and replace it with a constant 'symbol' version
+						let v1=v.toType("label");
+						v1.refType="symbol";
+						return v1;
 					}
+				},
+				"£":(v)=>{//v:Value
+					if(v===null||v===undefined){//'¬()' and '(¬)' --> empty, undeclared label
+						v=new Value({type:"label",label:null});
+					}
+					else v=new Value(v??{});
+					v.allowOperatorOverloading=true;
+					return v;
 				},
 			},
 			operators:{
@@ -1474,7 +1499,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						args.push(ans);
 					}else if(arg1){//'...a' 1 arg ; spread operator for 'foo(...args)'
 						let label=arg1.toType("label").label;
-						let spreadArgsObj;
+						let spreadArgsObj;//:Value[]
 						if(label){
 							spreadArgsObj=label.code.map((code,i)=>new Value().fromCode(code,label,i));
 						}
@@ -1494,6 +1519,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				else if(value.type=="string")return !!value.string;
 				else if(value.type=="array")return !!value.array;
 				else return false;
+			},
+			operatorOverload({index,statement,scope,args,operator,numOfArgs=2}){//:{Value} ; for '£a + b' --> 'a.._+_()'
+				//(args:Value[],scope:Scope,operator:String&operator)
+				let operatorLabel;//:Variable&function'#(){}'
+				let label,parent;//parent:Some<> if operator found
+				let arg;
+				if(arg=args[args.length-1]?.label)({label,parent}=arg.findOperatorOverload(operator));
+				if(arg=args[args.length-2]?.label)({label,parent}=arg.findOperatorOverload(operator));
+				if(!parent)scope.findOperatorOverload(operator);
+				let operatorArgs=args.splice(args.length-numOfArgs,numOfArgs);
+				let value=label.callFunction({index,statement,scope,argsObj:new ArgsObj({list:operatorArgs})});
+				args.push(value);
+				return {index,value};
 			},
 			expression({index,statement,scope,startValue=undefined,argsObj=undefined,includeBrackets=false,shouldEval=true}){//a + b
 				let value=new Value();
@@ -1644,7 +1682,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
 								args.push(value);
 								//note: argsObj is only used for '...label' operator
-								({spreadArgsObj}=operator.do({args,hasEquals,argsObj, index,statement,scope})??{});
+								let {allowOperatorOverloading} = args[args.length-2]??{};
+								if(allowOperatorOverloading){
+									let value;
+									({index,value}=contexts.operatorOverload({index,statement,scope,args,operator:word,numOfArgs:operator.operator?2:1}));//TODO: confirm that numOfArgs is always 2 here 'a+b'.
+									if(word=="...")({spreadArgsObj}=operator.do({args,hasEquals,argsObj,index,statement,scope})??{});//
+								}
+								else ({spreadArgsObj}=operator.do({args,hasEquals,argsObj,index,statement,scope})??{});
+								args[args.length-1].allowOperatorOverloading||=allowOperatorOverloading;
 							}
 						}else{
 							({index}=contexts.expression_short({index,statement,scope,shouldEval}));
@@ -2111,11 +2156,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			array;//:(char|string)[] ; used with `value.string`
 			string;
 			number=0;//relAddress
+			allowOperatorOverloading=false;//for '£a' //UNIMPLEMENTED
 			//for 'let value;'
-			allowedLet=false;
+				allowedLet=false;
 			//tracking line numbers
 				statement;//?:Statement for
 				scope;//?:Scope for 
+
 			get array(){return this.label?.code;}//code ///arry: Variable|CodeLine; from: Variable.prototype.code
 			set array(val){(this.label??=new Variable()).code=val;}
 			static Number=//Value.Number
@@ -2173,7 +2220,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//name:string
 				let value=this;
 				if(code instanceof AssemblyLine){
-					let number=code.binaryValue??code.dataValue|0;//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
+					let number=code.binaryValue??Math.floor(code.dataValue||0);//(code.dataType=="char"?+code.args[1]:+code.args[0])|0;
 					value.type="label";
 					let type=code.dataType=="char"?"string":"number";
 					value.label=code.toLabel(name);
@@ -2221,8 +2268,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(value.type=="number"){string=""+value.number}
 				else if(value.type=="label"){if(value.label)string=value.label.code.reduce((s,v)=>{
 					if(v instanceof AssemblyLine)
-					if(v.dataType=="char")s+=String.fromCharCode(v.dataValue|0);
-					else if(v.dataType=="number")s+=String.fromCharCode(v.dataValue|0)
+					if(v.dataType=="char")s+=String.fromCharCode(Math.floor(v.dataValue||0));
+					else if(v.dataType=="number")s+=String.fromCharCode(Math.floor(v.dataValue||0));
 					return s;
 				},"");}
 				else if(value.type=="string"){string=value.string;array=value.array;}
@@ -2263,7 +2310,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			jump=0;//:int ; line pointer
 			move=0;//:int ; data pointer
 			virtualLevel=0;//:int
-			
+			states={};//:Map(Variable().symbol => Symbol|Number|[])
 			org=0;//:int ; the real index in the output file
 
 			get ram(){return this.lineNumber};//only for '$debugger "cpuState.ram";'
@@ -2298,7 +2345,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			hasChecks=true;
 			scope;//:Scope; used for finding source code line number
 			getNumber(){
-				return this.binaryValue??this.dataValue|0;
+				return this.binaryValue??Math.floor(this.dataValue||0);
 			}
 			toLabel(name=""){
 				let type=this.dataType=="char"?"string":"number";
@@ -2471,6 +2518,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				prototype=null;//:Variable? ; used in prototype chain similar to javascript `object.__proto__`
 				supertype=null;//:Variable? ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
 				securityLevel=0;//used with '..secure'
+				operatorOverLoadLabels={};//: Map(String=>Variable?); 'a.._+_'
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
@@ -2576,8 +2624,23 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//this.lineNumber=undefined;
 				return this;
 			}
+			getOperatorOverloadName(operatorBaseName,hasLeftArg,hasRightArg){//:(string,bool,bool)->string
+				//e.g. : `("+",false,true)->"+_"`
+				return ["","_"][+!!hasLeftArg]+operatorName+["","_"][+!!hasRightArg];
+			}
+			findOperatorOverload(operatorName){//:{label:Variable|null|undefined,parent:Variable?}
+				if(this.isSearched)return {label:undefined,parent:undefined};
+				this.isSearched=true;
+				let label,parent;//:Variable?
+				({label,parent}=this.supertype.findOperatorOverload(operatorName));
+				if(label===undefined&&this.operatorOverLoadLabels.hasOwnProperty(operatorName))
+					({label,parent}=this.operatorOverLoadLabels[operatorName]);
+				if(label===undefined)({label,parent}=this.prototype.findOperatorOverload(operatorName));
+				this.isSearched=false;
+				return {label,parent};
+			}
 			getNumber(){return this.lineNumber;}
-			getString(){return this.code.reduce((str,code)=>str+(code instanceof Variable?code.getString():code instanceof AssemblyLine?String.fromCharCode(+code.args[1]|0)??"" : ""), "")}
+			getString(){return this.code.reduce((str,code)=>str+(code instanceof Variable?code.getString():code instanceof AssemblyLine?String.fromCharCode(Math.floor(code.args[1]||0))??"" : ""), "")}
 			toValue(type="number"){//:string
 				let value=new Value();
 				value.type=type;
@@ -3040,6 +3103,15 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 				else {this.isSearched=false;return undefined;}
 			}
+			findOperatorOverload(operatorName){//:{label:Variable|null|undefined,parent:Variable?}
+				if(this.isSearched)return {label:undefined,parent:undefined};
+				this.isSearched=true;
+				let label,parent;//:Variable?
+				({label,parent}=this.label.findOperatorOverload(operatorName));
+				if(label===undefined)({label,parent}=this.parent.findOperatorOverload(operatorName));
+				this.isSearched=false;
+				return {label,parent};
+			}
 			//Scope
 			callFunction({newLabel,newReturnObj,functionLabel,args,value:callingValue,callType,scope,statement}){//:{value}
 				//get args
@@ -3464,16 +3536,16 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(value){arg.push(value);}
 				return {index};
 			}
-			asm_operator({statement,index,scope,operator,optionals}){//#:string|undefined
+			asm_operator({statement,index,scope,operator,optionals,hasAssignment}){//#:string|undefined
 				let word=statement[index];
-				let hasOperator=false;
-				if(!hasOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
+				let hasOverwritableOperator;//:bool
+				if(!hasOverwritableOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
 					let oper1=word;
 					index++;
 					if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b'
 						index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
 					}
-					else{//'a + b' --> 'a + = b !store'
+					else if(!hasAssignment){//'a + b' --> 'a + = b !store'
 						let operName=this.operators[oper1];
 						if(this.operatorsToCheckForNoStore.includes(oper1)){
 							optionals["store"]="!";
@@ -3486,10 +3558,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 						}
 					}
-					operator||=this.operators[oper1];
-					hasOperator=true;
+					if(!operator||this.operators[oper1]!="jmp")operator=this.operators[oper1];
+					if(oper1=="="){
+						hasAssignment=true;
+						hasOverwritableOperator=false;
+					}
+					else hasOverwritableOperator=true;
 				}
-				return {index,operator,hasOperator};
+				return {index,operator,hasOverwritableOperator,hasAssignment};
 			}
 			asm_arg({statement,index,scope}){//#:(string|Value)[]
 				let word=statement[index];
@@ -3515,21 +3591,33 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 				return {index,arg};
 			}
+			asm_assignment({statement,index,scope,operator}){
+				let word=statement[index];
+				let hasAssignment;
+				if(word=="="){
+					hasAssignment=true;
+					index++;
+					if(!operator)operator = this.operators[word];
+				};
+				return {index,hasAssignment,operator};hasAssignment
+			}
 			///interface
 			generateAssemblyLine({statement,index,scope}){//:void & mutates scope
 				const instruction=new AssemblyLine({scope});
 				let argsList=[];
-				let operator,args=[],hasIf=false,hasOperator=false,optionals={};//optionals:Map
-				for(let i=0;i<9;i++){
+				let hasIf=false,hasOverwritableOperator=false,hasAssignment=false;//note: hasOverwritableOperator excludes '=' to allow for 'a=b+c' --> 'add a,b,c'
+				let operator,args=[],optionals={};//optionals:Map
+				for(let i=0;i<12;i++){
 					let arg;
 					if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
-					if(!hasOperator)({index,operator,hasOperator}=this.asm_operator({statement,index,scope,operator,optionals}));
+					if(!hasOverwritableOperator)({index,operator,hasOverwritableOperator,hasAssignment}=this.asm_operator({statement,index,scope,operator,optionals,hasAssignment}));
+					//if(!hasAssignment)({index,operator,hasAssignment}=this.asm_assignment({statement,index,scope,operator,optionals}));
 					{
 						let failed;
 						({index,failed}=this.asm_optionalStatement({statement,index,scope,optionals}));
 						if(!failed)continue;//allow for 'if>0!signed jump->x'
 					}
-					if(args.length<2){
+					if(args.length<3){
 						({index,arg}=this.asm_arg({statement,index,scope}));
 						if(arg?.length>0){args.push(arg);}
 						if(statement[index]==","&&args.length==1)index++;//'mov a,b;'
@@ -3537,7 +3625,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					let word=statement[index],failed;
 					if(({index}=contexts.endingSymbol({index,statement})).failed){break;}
 				}
-				if(args.length>1){args.splice(1,0,",");}
+				if(args.length>1){for(let i=1;i<args.length;i+=2)args.splice(i,0,",");}
 				if(!operator){
 					//args[0][0]:Value
 					let dataMask=0xffff;
@@ -3729,7 +3817,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}
 			}
 			for(let i=scope.defer.length-1;i>=0;i--){
-				scope.defer[i]();
+				scope.defer[i](scope);
 			}
 			scope.defer=[];
 			scope.defaultPhase="";

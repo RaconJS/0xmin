@@ -496,6 +496,8 @@ contexts:
     #  push: main_hidden
     - match: '\@;|@'
       scope: keyword.assembly.0xmin
+    - match: '£'
+      scope: keyword.operator.overloadingCoerser.0xmin #allows for operator overloading
     - match: '{{assembly_operators}}'
       scope: support.constant.operator.0xmin
     - match: '{{operators_functionCallArgs}}'

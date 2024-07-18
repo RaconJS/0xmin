@@ -1,15 +1,15 @@
 //start at ~15:50 17:20 (works), 17:27 stop time,
 //TODO: use chain add for >16 bit comparison
 #"tptasm";//R2 computer
-#"len";
-//#"table";
+#"len";#"table";
 import "../std v1.0xmin";
 //import "../type.0xmin";
 //import "../RegState.0xmin";
+let doExtraPrinting=¬;//:{}? ; inserts extra fancy text if true
 let reg = RegEnum();
 let getInput(){//:#()->{#}
-	let array{0x10000000;0x10000000};//189112847;303526851;5302960144;5267579280;6807158224;9155494056;570921464;9578998384;3000146520;1070137160;1230763728;1472382120;3612717240;3804853304;9006965704;1716921880;7959957576;1675505816;2265262224;2240057664};//randomly generated numbers
-	let ansIndex = {2;1};
+	let array{189112847;303526851;5302960144;5267579280;6807158224;9155494056;570921464;9578998384;3000146520;1070137160;1230763728;1472382120;3612717240;3804853304;9006965704;1716921880;7959957576;1675505816;2265262224;2240057664};//randomly generated numbers
+	let ansIndex = {4;2};
 	let target <-> array[ansIndex[0]%array..length] + array[ansIndex[1]%array..length];
 };
 let nums_static{//:@{u16;i64[]}
@@ -37,6 +37,25 @@ let nums_static{//:@{u16;i64[]}
 		let w2<->1,high<->1;
 	};
 	let NumReg(reg)={reg();reg();reg()};//#()->{%}&u34&{%u16;%u13;%u5}
+	#NumReg::{
+		let ..prototype{
+			let fromStaticFormat(){//#()->@(~%Self)->%Self
+				%this.(1) <<= 3;
+				%this.(2) >>= 3;
+				%this.(1) >>= 3 +internal;
+			};
+			let intoStaticFormat(){//#()->@(%Self)->~%Self & %(@Self)
+				%this.(1) <<= 3;
+				%this.(2) <<= 3 +internal;
+				%this.(1) >>= 3;
+			};
+		};
+		let fromStaticFormat(regObj){//#(%[])->{@}
+			%regObj.(1) <<= 3;
+			%regObj.(2) >>= 3;
+			%regObj.(1) >>= 3 +internal;
+		};
+	};
 }:>static.use();
 let input{
 	#..this<->reg;
@@ -76,6 +95,13 @@ let printReg{
 		pop r0;
 	};
 }:>static();
+let TEST{
+	%i>>=1;
+	%j>>=1;
+	call printValues.(¬static).use();
+	%i<<=1;
+	%j<<=1;
+};
 let printValues{
 	#..this:>static().use();
 	printReg.call(ans[0]);
@@ -84,58 +110,76 @@ let printValues{
 	print("\n");
 	${
 		let =0xmin,=RegEnum,=printReg,=print,=readHigh;
-		let =target,=ans,=arrayPtr;
+		let =target,=ans,=arrayPtr,NumReg=nums_static.NumReg;
 	}:>(data)<={
-		...data;debugger printReg;
-		let reg = RegEnum(0xmin.Math.max(target[-1],ans[-1],arrayPtr));
-		let temp = reg(),temp1 = reg(),temp2 = reg();
-		debugger + temp;
-		debugger + arrayPtr;
+		...data;
+		let reg = RegEnum(0xmin.Math.max(target[-1],ans[-1],arrayPtr)+1);
+		let numA = NumReg(reg);//:%[]
+		let numB = NumReg(reg);//:%[]
+		let temp = reg();
+		let arrayData = reg();
+		//assume: ans:%(+)[]
 		%ans.(0)<<=1;
 		%ans.(1)<<=1;
-		%temp1 = [%arrayPtr+arrayPtr.dataPtr];
+		%arrayData = [%arrayPtr+arrayPtr.dataPtr];
 		{
-			%temp = [%temp1+%ans.(0)];
-			printReg.call(temp);
-			print("+");
-			%temp = [%temp1+%ans.(1)];
-			printReg.call(temp);
-			print("=");
-			printReg.call(target.(0));
-			print(",\n");
-		};{
-			%temp = %temp1;
-			%temp += %ans.(0);
-			readHigh(temp,temp);
-			printReg.call(temp);
-			print("+");
-			%temp = %temp1;
-			%temp += %ans.(1);
-			readHigh(temp,temp);
-			printReg.call(temp);
-			print("=");
-			printReg.call(target.(1));
-			print(",\n");
-		};{
-			%temp1+=1;
-			%temp = [%temp1+%ans.(0)];
-			printReg.call(temp);
-			print("+");
-			%temp = [%temp1+%ans.(1)];
-			printReg.call(temp);
-			print("=");
-			printReg.call(target.(2));
-			print("\n");
+			let temp_address<->temp;delete temp;
+			%numA.(0) = [%arrayData+%ans.(0)];
+			%numB.(0) = [%arrayData+%ans.(1)];
+			{
+				%temp_address = %arrayData;
+				%temp_address += %ans.(0);
+				readHigh(numA[1],temp_address);
+				%numA.(2) = [%temp_address+1];
+				numA.fromStaticFormat();
+			};{
+				%temp_address = %arrayData;
+				%temp_address += %ans.(1);
+				readHigh(numB[1],temp_address);
+				%numB.(2) = [%temp_address+1];
+				numB.fromStaticFormat();
+			};
 		};
 		%ans.(0)>>=1;
 		%ans.(1)>>=1;
+		{:printing;
+			//printReg.call(ans[0]);
+			//print(",");
+			//printReg.call(ans[1]);
+			//print("\n");
+			let i = 0;
+			repeat numA..length {
+				defer #i+=1;
+				printReg.call(numA[i]);
+				print("+");
+				printReg.call(numB[i]);
+				print("=");
+				printReg.call(target[i]);
+				repeat(+i<(numA..length-1)):{
+					print(",\n");
+				};
+			};
+		};
 	}():>(block){
-		block.reg.blockScope((){block});
+		block.reg.blockScope(reg,(){block});
 	}();
 	return;
 };
 #nums_static.meta_set(inputData.array);
 setInput(inputData.target,nums_static);
+#target<=>target...nums_static.NumReg..prototype;
+target.fromStaticFormat();
+repeat !!doExtraPrinting: reg.weakScope()<:(reg){:prints;
+	print("target:\n");
+	printReg.call(target[2]);
+	printReg.call(target[1]);
+	printReg.call(target[0]);
+	print("\narray length:\n");
+	let temp = reg(),arrayLen<->temp;
+	%arrayLen = [%input.arrayPtr+input.arrayPtr.size];
+	printReg.call(arrayLen);
+	print("\nwith 34 bit ints\n");
+};
 reg.weakScope()<:(reg){
 	let forLoop(reg,doFor,start,condition,next,do){//:#(RegEnum,#->@,#->@,#->@,#?,#->@)->{@}
 		//doFor:¬|#{}|0
@@ -195,6 +239,7 @@ reg.weakScope()<:(reg){
 					%findNum.(2) = [%itemAddress+1];
 					%findNum.(0) = [%itemAddress];delete itemAddress;
 				};
+				findNum.fromStaticFormat();
 				meta.forEach(findNum,(v,i){
 					meta.if(+i==0)<:(){
 						%v -= %target.(i);
@@ -214,23 +259,41 @@ reg.weakScope()<:(reg){
 				//arrayData:34[]
 				let itemAddress <-> reg();//:%[]arrayData*
 				let temp <-> reg();
+				let carry <-> reg();
+				repeat !!doExtraPrinting:{
+					{
+						%i>>=1;
+						%j>>=1;
+					};defer:{
+						%i<<=1;
+						%j<<=1
+					};
+					push r0;defer:pop r0;
+					let const_0 = 0;
+					print("\p50i:",const_0);printReg.call(i);
+					print(", j:",const_0,{});printReg.call(j);
+					print("\n",const_0,{});
+				};
 				%itemAddress = %arrayData;
 				%itemAddress += %j;
-				let highBits <-> temp;
-				readHigh(temp,itemAddress);
-				let TEST;
-				repeat!!TEST{
-					%i>>=1;
-					%j>>=1;
-					call printValues.(¬static).use();
-					%i<<=1;
-					%j<<=1;
-				};
+				%carry = 0;
 				%findNum.(0) + [%itemAddress];
 				jump -> continue if != 0;
-				%findNum.(1) + %highBits +carry;
+				%carry += 0 +carry;
+				let highBits <-> temp;
+				readHigh(temp,itemAddress);
+				let item2 <-> itemAddress;
+				%item2 = [%itemAddress+1];
+				delete itemAddress;
+				nums_static.NumReg.fromStaticFormat({{};highBits;item2});
+				%highBits += %carry;
+				%carry = 0;
+				%findNum.(1) + %highBits;
+				delete highBits;
 				jump -> continue if != 0;
-				%findNum.(2) + [%itemAddress+1] +carry;
+				%carry += 0 +carry;
+				%item2 += %carry;
+				%findNum.(2) + %item2;
 				jump -> continue if != 0;
 			};
 			{:matchFound;
