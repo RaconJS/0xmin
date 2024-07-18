@@ -117,7 +117,7 @@
 				#maxUsed <-> 0xmin.Math.max(maxUsed,..this);
 				#let return[¬..constructor.type_register];
 				#return..constructor = ..this;
-				repeat (+return > (16-2)):throw "out of registers";
+				repeat (+return >= (16-2)):throw "out of registers";
 				
 				repeat !!object #{
 					#return<=>{

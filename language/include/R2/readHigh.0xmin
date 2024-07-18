@@ -1,3 +1,3 @@
-let readHigh(rOut,rAddress){
-	@(0x11100001 | (rOut & 0xf << 8) | (rAddress & 0xf << 4));
+let readHigh(rOut,rAddress){//readhigh = 0x11100AB1; acts like `@rA = [rB]` but for high bits
+	@(0x11100001 | (rOut & 0xf << 8) | (rAddress & 0xf << 4));//uses `jn % [%]` with shifted R1 and R2
 };

@@ -99,4 +99,24 @@ if < 0://jump
 		for address buffer, whenever ram.read.falling edge:
 			$->addressBuffer.clear
 	}
-}
+};
+{
+	#"ZASM4";#"tptasm";
+	let vec2(a,b)={
+		reg();
+		reg();
+		let init(values:#int[2],){
+		};
+		let..operator["+="] = (a,b){
+			repeat(a==..this)let other = a;
+			repeat(b==..this)let other = b;
+			assert(a:=(%[]&vec2) && b:=(%[]&vec2));
+			{
+				%a.(0) += %b.(0);
+				%a.(1) += %b.(1);
+			}
+		};
+	};
+	let a = vec2();
+	let b = vec2();
+};

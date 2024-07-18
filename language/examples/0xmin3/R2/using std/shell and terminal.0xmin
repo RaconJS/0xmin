@@ -912,6 +912,7 @@
 						sp+=1;
 						jump -> callShell..return;
 					};
+					call printHeap.(¬Static).use();
 					call shell:>static.use();
 					{:onSuccess;
 						print("\c07");

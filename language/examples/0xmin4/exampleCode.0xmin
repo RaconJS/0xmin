@@ -1,101 +1,285 @@
 #"tptasm";
 #"ZASM4-0";//version 4.0
-import lib "std.0xmin";
-//new features with ZASM4:
-	//powerful lib "std.0xmin",
-	//types,
-	//operator overloading,
-	//lambda functions,
-	//meta by default,
-	//new 'high level' phase made up from the 'meta (#)' phace,
-	//..prototype as a list of prototypes, for multi inheritence
-	//eval
-	//powerful statechecking
-	//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
-	//customisable assembly language
-	//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
-	//using £() or '<>' for non-operator overloading blocks
-	//different sizes of data. infinite sized numbers, for different word lengths
-		//this is similar to a string, except it is not simply a list of chars, it is a list of bits
-		e.g. {0x12345678912456789123456789}
-		0x0001//16 bit number of value 1
-		0x5//4 bit number of value 1
-		0xmin.number(size,value)//returns a number of size 
-		//this variable size number will be a new part of the 0xmin label object.
-		//it can be accessed with ..size and ..value
-	//allowing '""{"a";"b";"c"}' --> '""...{"a";"b";"c"}' for shorter conversion to strings ``
-//list of types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
-let gravitySimulator{
-	let dim = 2;//same as #let: dim = 
-	let parts:>Array()<:Array(3)<:Array(dim)<:Number;//:@[][3][dim]Number
-	let equation:>Function(Number,Number)<:(distance){//:#
-		return = 1/distance**3;
-	};
-	let doStep{
-		let dt = 0.1;
-		parts.length.iterate()<:i=>{
-			let a = parts[i];
-			a[2].mutate().fill(0);
-			for({let i<=>j;i<parts.length;i++})<:{
-				let b = parts[j];
-				let difference:>Vector() = b[0]:>as(Vector)-a[0];//here we convert 'b' to a vector to use Vector..prototype..-
-				//Vector.length:Number&NonInt ; normally Float or Fixed
-				//Array.length:Number&Int
-				let distance = difference.length;//same as: difference.forEach((sum,value)=>sum+(value**2))**0.5;
-				let force = equation(distance);
-				//can use function 'as' to assert a type or use a label as a type
-				//can use function 'to' to permenently convert a label to a type
-				a[2]:>as(Vector) += difference.forEach(v=>v*force:>as(Number));
-				b[2]:>as(Vector) -= difference*force;
+{
+	import lib "std.0xmin";
+	//new features with ZASM4:
+		//powerful lib "std.0xmin",
+		//types,
+		//operator overloading,
+		//lambda functions,
+		//meta by default,
+		//new 'high level' phase made up from the 'meta (#)' phace,
+		//..prototype as a list of prototypes, for multi inheritence
+		//eval
+		//powerful statechecking
+		//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
+		//customisable assembly language
+		//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
+		//using £() or '<>' for non-operator overloading blocks
+		//different sizes of data. infinite sized numbers, for different word lengths
+			//this is similar to a string, except it is not simply a list of chars, it is a list of bits
+			e.g. {0x12345678912456789123456789}
+			0x0001//16 bit number of value 1
+			0x5//4 bit number of value 1
+			0xmin.number(size,value)//returns a number of size 
+			//this variable size number will be a new part of the 0xmin label object.
+			//it can be accessed with ..size and ..value
+		//allowing '""{"a";"b";"c"}' --> '""...{"a";"b";"c"}' for shorter conversion to strings ``
+	//list of types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
+	let gravitySimulator{
+		let dim = 2;//same as #let: dim = 
+		let parts:>Array()<:Array(3)<:Array(dim)<:Number;//:@[][3][dim]Number
+		let equation:>Function(Number,Number)<:(distance){//:#
+			return = 1/distance**3;
+		};
+		let doStep{
+			let dt = 0.1;
+			parts.length.iterate()<:i=>{
+				let a = parts[i];
+				a[2].mutate().fill(0);
+				for({let i<=>j;i<parts.length;i++})<:{
+					let b = parts[j];
+					let difference:>Vector() = b[0]:>as(Vector)-a[0];//here we convert 'b' to a vector to use Vector..prototype..-
+					//Vector.length:Number&NonInt ; normally Float or Fixed
+					//Array.length:Number&Int
+					let distance = difference.length;//same as: difference.forEach((sum,value)=>sum+(value**2))**0.5;
+					let force = equation(distance);
+					//can use function 'as' to assert a type or use a label as a type
+					//can use function 'to' to permenently convert a label to a type
+					a[2]:>as(Vector) += difference.forEach(v=>v*force:>as(Number));
+					b[2]:>as(Vector) -= difference*force;
+				};
+				a[1]:>as(Vector) += a[2]:>as(Vector)*dt;
+				a[0]:>as(Vector) += a[1]:>as(Vector)*dt + a[2]:>as(Vector)*(1/2*dt**2);
 			};
-			a[1]:>as(Vector) += a[2]:>as(Vector)*dt;
-			a[0]:>as(Vector) += a[1]:>as(Vector)*dt + a[2]:>as(Vector)*(1/2*dt**2);
 		};
+		parts = {repeat dim:0xmin.Math.random():>Number.Float()}
 	};
-	parts = {repeat dim:0xmin.Math.random():>Number.Float()}
-};
-let otherThings{
-	let list = Array(Number.int)::{1;2;3;4};
-	for()<:{let i:>Number() = 0; i < list.length; i++}<:{
-
-	};
-	list:>forIn()<:(value){
-		value+1;
-	};
-};
-#(){
-	a{//same as 'let a{}'
-		b{
+	let otherThings{
+		let list = Array(Number.int)::{1;2;3;4};
+		for()<:{let i:>Number() = 0; i < list.length; i++}<:{
 
 		};
-	};
-	a:{//Note: This one is not needed, use
-		//with; uses labels of a but code is pushed into the parent scope's label
-		//same as
-			()={
-				...doStuff;
-			}::{let ..proto=a}()
-		//----
-	};
-	a::{
-		//extend; uses names and ..this from parent
-	};
-	a:::{
-		//and then; uses both labels and pushes into label; useful for modifying objects without needing to use it's name again.
-	};
-	{:a;
-		{:b;
-			let [a>¬prop];//assign unique key that is static to a curtain label.
-			let [a>¬prop];//similar syntax meaning to 'a.b' except it can only be accessed by the inner scope
+		list:>forIn()<:(value){
+			value+1;
 		};
-	};	
+	};
 	#(){
-		#"ZASM4-0";
-		let jump(to,from){
-			let dif;
-			$dif <-> to-from;
-			@:$:0x0&(0xmin.abs(dif)&0xff |(dif<0 *0x100) <<4);
+		a{//same as 'let a{}'
+			b{
+
+			};
 		};
-	}
+		a:{//Note: This one is not needed, use
+			//with; uses labels of a but code is pushed into the parent scope's label
+			//same as
+				()={
+					...doStuff;
+				}::{let ..proto=a}()
+			//----
+		};
+		a::{
+			//extend; uses names and ..this from parent
+		};
+		a:::{
+			//and then; uses both labels and pushes into label; useful for modifying objects without needing to use it's name again.
+		};
+		{:a;
+			{:b;
+				let [a>¬prop];//assign unique key that is static to a curtain label.
+				let [a>¬prop];//similar syntax meaning to 'a.b' except it can only be accessed by the inner scope
+			};
+		};	
+		#(){
+			#"ZASM4-0";
+			let jump(to,from){
+				let dif;
+				$dif <-> to-from;
+				@:$:0x0&(0xmin.abs(dif)&0xff |(dif<0 *0x100) <<4);
+			};
+		}
+	};
+	std.build();
 };
-std.build();
+{
+	#"ZASM4";
+	#"len";#"table";
+	//testing using a type system in normal 0xmin
+	//types are functions,
+	//a type can start with %,*,+,[],@,$,#,<
+	//maybe types can start with £, as the 'type/operator overloading' symbol. using '!£ to ignore types '
+	#(){
+		import lib "standard assembly operator overloading.0xmin";
+		let i = %i16()<:0;
+		let type_int3 = int[3];
+		let type_intOption = int?;
+		let intOption = type_intOption(@);
+		let Class(a,b){
+			def let a:i32(a),b:string(b);
+		};
+		let print:static[] {@}={//`%B<->` == register of (type/value) A contains (type/value) B
+			let string = %&{l:int,[l]char} <: 0;
+			assert(string.l:string+int & string[]int);
+			assert(static[]T:static[]T & static+T);
+			let i = %usize <: 1;
+			i = string.l;//%i = [%string+string.l]
+			${:loop;
+				string.length
+				jump -> loop if > 0;
+			};
+		};
+		//using 
+	};
+	#(){
+		@{},${},#{} as actuall statement types;
+		@(){},$(){},#(){}
+		@//assembly code and code insertion
+		$//state code
+		#repeat;
+		#recur;
+		#import;
+		#...labelsof;
+		#...codeof;
+		#...run;
+		#let;
+		#set;
+		#undef;
+		$virtual;
+		$def;
+		$insert{
+
+		};
+		@{};//insert block
+		${};//(address or state) block
+		#{};//default block
+		{//$def insert #{}
+			let a = 2;
+			1;2;3
+		};
+		${
+
+		};
+		let stateCode_call{
+			(callerState,calleeState,callerReturnerState){//this function is run at '$' time does caller::{call callee}
+				let callerReturnerState ||= callerState..return;
+				//note that '#' values are immutable at this stage. '(#{})..splice' can be done but it only slices.
+				//the values in this function are semi compiled the same as '$' values userally are in ZASM3.
+				//..state values are mutable but new properties & elements cannot be added to them without garrentied finite memory use (similar to 'recur')
+					//This can be achieved by only allowing let a[¬b]; where:(a:#|$,b:#)
+				let callerState = callerState..state[¬constructor];
+				let calleeState = calleeState..state[¬constructor];
+				let callerReturnerState = callerReturnerState..state[¬constructor];
+				//$callerState.type.compair(calleeState);//checks 
+				//(calleeType...callerType);
+				return..state;
+				{
+					let registersA = callerState..state.registers;//A->B->C `A::{call B;C}`
+					let registersB = calleeState..state.registers;
+					let registersC = callerReturnerState..state.registers;
+					let i = -1;
+					repeat registersB..length{
+						let registerStateA:$% = registersA[i+=1];
+						let registerStateB:$% = registersB[i];
+						let registerStateC:$% = registersC[i];
+						repeat(!+registerStateA.isReadable && !!+registerStateB.isReadFrom):
+							throw;//adds a fail at '$' time
+						repeat(!+registerStateA.isWritable && !!+registerStateB.isWrittenTo):
+							throw;
+						repeat(!+registerStateB.isReadable && !!+registerStateC.isReadFrom):
+							throw;
+						repeat(!+registerStateB.isWritable && !!+registerStateC.isWrittenTo):
+							throw;
+					};
+				};
+			};
+		};
+		let staticArray = {1;2;3};
+		let arrayOfArrays = {@staticArray;{4;5;6};{7;8;9}};
+		let arrayPtr = {@$staticArray};
+	};
+	//idea: having static state-like types in 0xmin. readable,writable,isreadable,iswritable
+};
+{
+	let vec2(a,b)={
+		reg();
+		reg();
+		let init(values:#int[2],){
+		};
+		let..operator["+="] = (a,b){
+			repeat(a==..this)let other = a;
+			repeat(b==..this)let other = b;
+			assert(a:=(%[]&vec2) && b:=(%[]&vec2));
+			{
+				%a.(0) += %b.(0);
+				%a.(1) += %b.(1);
+			}
+		};
+	};
+	let a = vec2();
+	let b = vec2();
+};
+{
+	//revision 1: new features with ZASM4:
+		//using '$' for type system & state checking.
+		//more complex '..state' state checking, data structure:
+			//add more properties for '..state':
+				//readable, writable, written to, read from,
+			//multiple variables can be checked by using multiple '$set a->b;' statements.
+			//state can contain a lineNumber, number, symbol(from a label), array of states (e.g. for register state), mutability properties.
+		//operator overloading,
+		//allow for 'foo(){};' and 'bar{};' statements as 'def let set bar{};'
+		//have '#defer', statement that runs the code at the end of a scope, stored in '..defer' as functions. '..defer' is then cleared after all the '..defer' functions have been run and pushed to the end.
+		//have '..functions' for an array of functions, instead of using the normal code block array ('label..code')
+		//improved macro function type, 'foo()<-{}' with inbuilt parameters for the function 'getLabel' and runInScope. callee will only be usable by macro functions.
+
+		//other features from last revision
+			//powerful lib "std.0xmin",
+			//types,
+			//lambda functions,
+			//new 'high level' phase made up from the 'meta (#)' phace,
+			//..prototype as a list of prototypes, for multi inheritence
+			//eval
+			//powerful statechecking
+			//more powerful '$' phase, more similar to '#' phase. '$' is the 'state' phase, and is more declarative(and somewhat reactive),
+			//customisable assembly language
+			//increment/decrement '++i' 'i++' i#++ == #i #<-> i#+1
+			//using £() or '<>' for non-operator overloading blocks
+			//different sizes of data. infinite sized numbers, for different word lengths
+				//this is similar to a string, except it is not simply a list of chars, it is a list of bits
+				e.g. {0x12345678912456789123456789}//returns a string that acts like a number. similar to '{{"\x12\x34";...etc}}'
+				0x0001//16 bit number of value 1
+				0x5//4 bit number of value 1
+				123s16//returns '123' as a 16 bit number
+				123s0x1e//returns '123' as a 30 bit number 
+				0xmin.number(size,value)//returns a number of size 
+				//this variable size number will be a new part of the 0xmin label object.
+				//it can be accessed with ..size and ..value
+				//use int by default
+			//allowing '""{"a";"b";"c"}' --> '""...{"a";"b";"c"}' for shorter conversion to strings ``
+	//list of value types: (new #label 'let a:>', #label 'a', #symbol '¬a', #number, #string, $, @)
+	//list of array/codeObj types:
+		//label, function (#), state code ($), assembly (@), number, string
+	//tptasm example
+	tptasmExample_registerState{
+		let static(obj){
+			constructor..splice(0,-1,{def this});
+		};
+		let staticData = static()<:{0;0;0};
+		defer: def static; //could also do ..defer..splice(0,-1,()->{def static});
+		let foo = static()<:{
+			[staticData.(0)] = 2;
+			push r0;
+			def let r0State;
+			r0 = [staticData.(1)]
+			[staticData.(2)] = r0;
+			pop r0;
+			:block;
+			$block..state.r0 => r0State..state.r0;
+			return;
+			$0bmin=>0xmin.unknown;//using '0bmin' for the current entire CPU state
+		};
+		$staticData[0]..state.isRead => 0;
+		$staticData[0]..state -> foo
+		call foo;//idea: do not store CPU state on labels themselves but store things that reference those labels.
+	};
+};

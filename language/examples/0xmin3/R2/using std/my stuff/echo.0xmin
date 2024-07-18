@@ -1,0 +1,20 @@
+#"tptasm";
+import lib"R2/print.0xmin";
+print("hello world");
+hault;
+
+import "../type.0xmin";
+${:loop;
+	let string = String();//string:[]static
+	print("echo:");
+	string.push("'");
+	readString(string);
+	string.push("'");
+	print("\n");
+	string.print();
+	print("\n");
+	string.clear();
+	jump->loop;
+};
+def static.memory;
+def heap.data;

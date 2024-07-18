@@ -76,7 +76,7 @@ repeat !(LenObject&&DynLenObjectPtr&&Type&&heap):
 		}
 	};
 	let str(string){//string slice
-		let stringObj = heap.Object(string):>static.use().data;
+		let stringObj = heap.Object.static=(string):>static.use().data;
 		#return = DynLenObjectPtr().meta_set(stringObj).slice:>static.use();
 	};
 };

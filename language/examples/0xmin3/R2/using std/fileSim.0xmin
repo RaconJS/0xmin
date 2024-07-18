@@ -201,7 +201,6 @@ reg.weakScope()<:(reg){:printFile;
 			print("/");
 		};
 	};
-	$debugger+startDir;
 	meta.assert(+currentDir.name == 0);{
 		$set fileAsName=>currentDir;
 		fileAsName.printString();
@@ -258,6 +257,18 @@ def let linkDir.copy{:handleLinkDir_copy;
 			print(""...{"\pb0";repeat UIstring..length" "});
 		};
 	};
+};
+{:ignoreKeys;
+	let ignore(charList){
+		meta.forEach(charList)<:(charTest,i){
+			%char - charTest;
+			if == 0 jump -> getChar;
+		};
+	};
+	%char - "~";
+	jump -> getChar if > 0 !signed;
+	ignore("\n\r\t");
+	//only normal letters/numbers
 };
 delete getChar;
 def reg.weakScope()<:(reg){:clearScreen;
@@ -361,7 +372,6 @@ reg.weakScope()<:(reg){:checkKey_delete;
 			let directoryToDelete = Pointer(File())<-> reg();
 			%directoryToDelete = %currentDir;
 			call static.use()<:{:unrefFile;
-				print("[");//TEST
 				{:unrefLinks;
 					let i = usize() <-> temp;
 					let links = Pointer()<:DynLenObjectPtr().data <-> temp1;
@@ -378,17 +388,22 @@ reg.weakScope()<:(reg){:checkKey_delete;
 						RegSet.save_onStack({i;links;directoryToDelete})<:(){heap.unref(directoryToDelete,{call unrefFile})};
 					});
 				};
-				print(".");null;//TEST
 				{:deleteFileArrays;
 					let object = Pointer()<:DynLenObjectPtr().slice.data<->temp;
+					let deleteNullableObject = static()<:{
+						let end;
+						jump->end if == 0;
+						heap.unref(object);
+						return #def end;
+					};
 					%object = [%directoryToDelete+directoryToDelete.name.data];
-					heap.unref(object);
+					call deleteNullableObject.use();
 					%object = [%directoryToDelete+directoryToDelete.links.data];
-					heap.unref(object);
+					call deleteNullableObject.use();
 					%object = [%directoryToDelete+directoryToDelete.info.data];
-					heap.unref(object);
+					call deleteNullableObject.use();
 					%object = [%directoryToDelete+directoryToDelete.data.data];
-					heap.unref(object);
+					call deleteNullableObject.use();
 				};
 				return;
 			};
@@ -572,6 +587,7 @@ def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
 						[%newFile+newFile.name.capacity] = %temp;
 					};
 				};
+				heap.checkValidObject.assert(newFile);
 				[%store_linksArray+0] = %currentDir;
 				{:refreshStringBuffer;
 					%heap.malloc.inputs.(0) = 4;

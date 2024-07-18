@@ -864,6 +864,9 @@ repeat !(meta&&heap&&for):...{
 	let DynamicLengthObjectPointer = DynLenObjPtr;
 	let DynLenObjectPtr = DynLenObjPtr;
 	let Dlop = DynLenObjPtr;
+	let LengthObjectPointer = DynLenObjPtr.Slice;//:{objectPointer;length}
+	let LenObjPtr = DynLenObjPtr.Slice;
+	let Lop = DynLenObjPtr.Slice;
 	let DynLenObjPtr.Slice()={//:{@[l]*,@l}
 		def let data<=>NullableReference(Object);//:@any*?
 		def let size<=>usize(0);//:@usize

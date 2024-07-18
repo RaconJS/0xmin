@@ -1,7 +1,9 @@
 //search words: BODGED, OBSILETE, TYPE NOTE, TODO, UNFINISHED
 //heap
 void #set:(){//documentation
-	heap{//TYPE NOTE: using the newer '[]#' annotation as an array. e.g. {1;2}:[2]int
+	heap{
+		//TYPE NOTE: using the newer '[]#' annotation as an array. e.g. {1;2}:[2]int
+		//TYPE NOTE: using '&T' for a non-consuming 'T'. T has the same type state at the end of the function.
 		#type int{i29};
 		#type Function{
 			@(...[]%)->[]% & {@};    //non-macro(#) function(->) that takes in a list(...) of register names(%) that store memory addresses([]) and outputs it to a single output register(%) that stores a memory location([]).
@@ -19,7 +21,7 @@ void #set:(){//documentation
 		#type StaticPage{
 			isUsed:-1;
 			data:@[]any;
-		}
+		};
 		Page.size:#int;
 		Page.size:int;
 		//use '0' for null pointers
@@ -43,6 +45,13 @@ void #set:(){//documentation
 		realloc:Function(%Object*,%int16,onMovePage:%(@()->bool & flag(if==0))*,%int16)->%Object|onMovePage();
 		ref:#(%Object*)->{@};
 		unref:#(%Object*,{@}?,#(!!label)?)->{@};
+
+		checkValidObject:Function(&%Object*)->%bool;
+		checkValidObject{
+
+		};
+		printHeap:Function(&%Object*)->void;
+
 		memory{
 			@Page;//start page
 			#list of intended actions{
@@ -55,7 +64,9 @@ void #set:(){//documentation
 };
 void #set: 0xmin.settings.language("tptasm");
 void #let set: heap{#;
-	#let: free,malloc,clear,memset,resize,shift,checkObject,alloc;//@functions
+	#let: UseDebugMode;//:#?
+	#let: free,malloc,clear,memset,resize,shift,alloc,checkValidObject,printHeap;//@functions
+	#let: error,error.invalidObject;
 	#let: Object,Object.pointer,Object.static;//data types
 	#let: ref,unref;//:#()->{@}
 	#let version<->2;
@@ -73,27 +84,16 @@ void #let set: heap{#;
 	#let: Call;
 	#set: Call(foo,inputRegs){//call functionName,args
 		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-inputRegs..length);
-		#let: i=0;
-		let inputRegs <=> inputRegs;//make a copy to prevent mutations
+		let inputRegs = {} <=> inputRegs;//make a copy to prevent mutations
 		let stack = {};
-		repeat (foo.nextReg.n):{//TODO: don't push the input inputRegs
-			repeat 0 {
-				//UNFINISHED system
-				let includesReg = inputRegs..indexOf(+i);
-				let inputReg = inputRegs[i];
-				repeat !!includesReg: {
-					@push %includesReg;
-					#inputRegs[includesReg]=¬;
-				};
-				repeat !!includesReg: {
-					@push %includesReg;
-					#inputRegs[includesReg]=¬;
-				};
-				repeat !includesReg: @push %i;
-			};
+		#let: i=foo.outputs..length;
+		:scope;
+		repeat (foo.nextReg.n-foo.outputs..length):{//save registers
 			@push %i;
+			def(i):>(i)=>{defer return @pop %i}();
 			#set: i=i+1;
 		};
+		delete i;
 		{//set inputs
 			#let: i=0;
 			repeat foo.inputs..length:{//assume {def a}[0] == {$def a;$set a}
@@ -107,11 +107,6 @@ void #let set: heap{#;
 			repeat !inputRegs[i];
 		};
 		call foo.use();
-		repeat (foo.nextReg.n):{
-			#set: i=i-1;
-			repeat (+i>=foo.outputs..length):@pop %i;
-			repeat (+i==(foo.outputs..length-1)):@sp+=foo.outputs..length;
-		};
 		#let: startI=0;
 		//UNFINISHED
 	}::{
@@ -125,13 +120,31 @@ void #let set: heap{#;
 	};
 	#let intoHeapFunction;
 	{
+		let UseDebugMode;//:{}?
 		#set intoHeapFunction(foo,argumentsLength){
 			#let: foo.use(){
 				#data.usedFunctions::{repeat(foo..defs..length==0):#def:foo};
 				#return=foo;
 			};
+			repeat !!UseDebugMode #{
+				repeat(foo!=checkValidObject) #{
+					let i=0;
+					repeat foo.inputs..length #{
+						repeat(foo.inputs[+i]..constructor==Page.pointer) #{//safe, debug mode
+							foo..splice(0,0,checkValidObject.try_catch(foo.inputs[+i],{},error.invalidObject.call()));
+						};
+						#i+=1;
+					};
+				};
+			};
 			#set: Call.addCaller(foo,argumentsLength);
 			let foo.regsUsed <-> foo.nextReg.n;
+		};
+		let error{
+			#let: use(){
+				#data.usedFunctions::{repeat(..this..defs..length==0):#def:..this};
+				#return=..this;
+			};
 		};
 	};
 	#let: Page()={
@@ -618,34 +631,37 @@ void #let set: heap{#;
 		};
 		//UNFINISHED
 	}::{void #set: intoHeapFunction(..this,4);};
-	#set:checkObject{//checks if an address is an object on the heap.
+	#set:error.invalidObject{
+		import lib "R2/print.0xmin";
+		//assume: checkValidObject.inputs.isValid is free
+		print("\p90\c04ERROR: ip:");
+		let temp=checkValidObject.inputs.isValid;
+		%temp=[sp+4];
+		print.register(temp);
+		print("\n @");
+		repeat(temp==checkValidObject.outputs.object)throw"assersion failed";
+		print.register(checkValidObject.outputs.object);
+		print(" is not on heap\c0f");
+		hlt;
+		return;
+	}::{void #set: intoHeapFunction(..this,0);};
+	#set:checkValidObject{//checks if an address is an object on the heap.
 		let nextReg=enum(0);
 		let inputs{
 			def let object=Object.pointer=()<->nextReg();
 		};
 		let outputs{
-			def let object=inputs.object;
+			def let isValid<->nextReg();//:%bool
+			def let object<->inputs.object;
 		};
 		let startPage=malloc.data.startPage;
-		let currentPage=Page.pointer=()<->nextReg();
+		let currentPage=Page.pointer=()<->outputs.isValid;
 		let targetPage=Page.pointer=()<->inputs.object;
 		{%targetPage-=Page.size;
 			%currentPage=page0;
 			let startLoop;
 			jump->startLoop;
 			#def:{:forLoop;
-				{//UNFINISHED
-					[%currentPage+currentPage.next] - %currentPage;
-					let fail;
-					jump->fail..return if > 0;
-					def fail{
-						%targetPage+=Page.size;
-						let temp = currentPage;
-						%temp = 0;
-						%temp - %targetPage;//assume %targetPage > 0 !signed
-						return;
-					};
-				};
 				%currentPage = [%currentPage+currentPage.next];
 				#def startLoop;
 				%targetPage-%currentPage;
@@ -653,33 +669,36 @@ void #let set: heap{#;
 			};
 		%targetPage+=Page.size};//convet back into object
 		%currentPage+=Page.size;
-		%targetPage-%currentPage;
-		//assert: success:flag(0) | fail:flag(<0!signed)
+		{repeat(+currentPage!=+outputs.isValid):throw "assumption failed"};{
+			%outputs.isValid -= %targetPage;
+		};
+		//assert: success:flag(0) | fail:flag(>0!signed)
 		return;
 	}::{
 		void #set: intoHeapFunction(..this,1);
-		let useNumber = 0;
+		let useNumber=0;
 		let try_catch(object,then,else,finally){
-			#object = object||0;
-			#then = then||{
+			#object=object||0;
+			#then=then||{
 				import lib "R2/print.0xmin";
 				print("\c19valid"...+useNumber);
 				print.register(0);
 				print("\c0f");
 			};
-			#else = else||{
+			#else=else||{
 				import lib "R2/print.0xmin";
 				print("\c4cinvalid #"...+useNumber...":");
 				print.register(0);
 				print("\c0f");
 				hlt;
 			};
-			#useNumber += 1;
-			#finally = finally||{};
+			#useNumber+=1;
+			#finally=finally||{};
 			push r0;
 			push r1;
 				call ..this.use();//#def:..this.call(object);
-				jump->else if != 0;
+				%..this.outputs.isValid|0;
+				jump->else if!=0;
 				def then;
 				jump->else..return;
 				def else;
@@ -687,20 +706,55 @@ void #let set: heap{#;
 			pop r0;
 			def finally;
 		};
-		let test(object,expectInvalid,message){//:#(%(heap[]?)*,#?,#{string,string}?)->@()->Result<hlt|()> & pure
+		let assert(object,expectInvalid,message){//:#(%(heap[]?)*,#?,#{string,string}?)->@()->Result<hlt|()> & pure
 			//UNSTABLE
-			repeat !object #object = 0;
-			def ..this.call(object);
-			let expectOnHeap = !!expectOnHeap && {} || ¬;
-			repeat !!expectOnHeap:jump->return..return if == 0;
-			repeat !expectOnHeap:jump->return..return if != 0;
-			import lib "R2/print.0xmin";
-			print("\p00\c4C"...(message[0]||"ERROR:"));
-			print.register(object);
-			print(message[1]||({{"is"};{"is not"}}[!!expectOnHeap]..."on heap\c0f"));
-			hlt;
+			push r0;
+			push r1;
+			let handleError;
+			{:block;
+				repeat !object #object = 0;
+				def ..this.call(object);
+				%..this.outputs.isValid|0;
+				let expectOnHeap = !expectInvalid && {} || ¬;
+				repeat !!expectOnHeap:jump->block..return if == 0;
+				repeat !expectOnHeap:jump->block..return if != 0;
+				def handleError{
+					import lib "R2/print.0xmin";
+					print("\pA0\c4C"...(message[0]||"ERROR:"));
+					print.register(object);
+					print(message[1]||(({{"is"};{"is not"}}[+!!expectOnHeap])..."on heap\c0f"));
+					hlt;
+				};
+			};
+			pop r1;
+			pop r0;
 		};
 	};
+	#set:printHeap{
+		let nextReg=enum(0);
+		push r0;
+		let currentPage = Page.pointer=() <-> 0;
+		let start;
+		%currentPage = heap.page0;
+		import lib "R2/print.0xmin";
+		${:loop;
+			[%currentPage+currentPage.isUsed]|0;
+			jump->loop..return if == 0;
+			print.register(currentPage);
+			%currentPage = [%currentPage+currentPage.next];
+			%currentPage + 1;
+			jump->loop if != 0;
+		};
+		let lastPageSize = currentPage;
+		%lastPageSize -= [%currentPage+currentPage.last];
+		%lastPageSize &= 0xf;
+		%lastPageSize = [print.number.charSet+%lastPageSize];
+		print("|");
+		print.char(lastPageSize);
+		pop r0;
+		return;
+	}::{void #set: intoHeapFunction(..this,0);};
+	delete error;
 	//garbidge collection
 		#set: ref(r_address){//#([%Page.data])->{@}
 			//can be used when adding a reference
@@ -816,3 +870,5 @@ void #set:(){//examples
 	};
 };
 void #...let set heap;
+malloc.call();
+virtual{def heap.data;};
