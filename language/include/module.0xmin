@@ -1,0 +1,64 @@
+#"ZASM3";
+let ModuleManager{
+	let Module(symbol,nameSpaceCode){//#()->Module
+		//:[]#()->#()->any & []defer
+		//symbol:0xmin..static
+		//nameSpaceCode:#()->{#}&Module
+		globalModule(symbol,return);
+		return = nameSpaceCode(globalModule.global);
+	};//import lib "module.0xmin";Module(0xmin..static)<:(global,0xmin){let a{};let b{};defer global};
+	let metaConstants{
+		let =0xmin;
+		let global;
+	};
+	let globalModule(staticSymbol,moduleScope,globalScope)<-{
+		//always returns the same value ; breaks if code has been run somewhere else
+		#globalScope = globalScope || constructor.metaConstants.global || ..this;
+		repeat !moduleScope: ...(){
+			repeat !.self ...(){
+				:self;
+				#moduleScope = self;
+				delete self;
+			};
+		};
+		repeat !![¬staticSymbol]: ...(){
+			...codeof labelsof [¬staticSymbol];
+			break moduleScope;
+		};
+		repeat ![¬staticSymbol]: ...(){
+			defer moduleScope: let globalScope[¬return..constructor.isValid_symbol];
+			#return = ¬;
+			let globalScope[¬staticSymbol] = moduleScope;
+		};
+	}:>(this)=>{
+		let this.isValid_symbol = {0xmin..static}[0];
+		let this.metaConstants = metaConstants;
+	}();
+	def globalModule;
+}:>(obj)=>{let obj.metaConstants.global = [¬0xmin..static]||..this;}();
+...labelsof codeof ModuleManager;
+#(){:examples_of_use;
+	{:example1;
+		{import lib "module.0xmin"}<-(0xmin..static);
+	};
+	{:example2;
+		let moduleA(){
+			//this could be another file. `import` still injects raw code just like `...run`
+			{import lib "module.0xmin"}<-(0xmin..static);
+			let foo(a,b){#return = a + b};
+			let bar{1;2;3};
+			defer:def bar;
+		};
+		let a = {...moduleA};//let a = {import "moduleA"};
+		let b = {...moduleA};//let b = {import "moduleA"};
+		//assert: a.foo == b.foo
+		{
+			...moduleA;
+			//debugger foo(2,3);
+		};
+		{
+			...moduleA;//does not run the code twice;
+			//debugger bar[1];
+		};
+	};
+};
