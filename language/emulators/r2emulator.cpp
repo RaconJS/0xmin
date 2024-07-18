@@ -166,7 +166,8 @@ class R2Terminal{
 			;
 			//"┘└┐┌┴├┬"
 			int charAsInt = charOut&0xff;
-			if(0){}
+			if(charAsInt<0x7f)cout<<charOut;
+			else if(charAsInt==0x7f)cout<<ctx.col(fgColor,fgColor)<<" ";//█
 			else if(charAsInt==0xd9)cout<<"─";
 			else if(charAsInt==0xda)cout<<"│";
 			else if(charAsInt==0xdf)cout<<"┘";
@@ -179,7 +180,8 @@ class R2Terminal{
 			else if(charAsInt==0xe5)cout<<"┬";
 			else if(charAsInt==0xe6)cout<<"┤";
 			else if(charAsInt==0xe7)cout<<"┼";
-			else cout<<charOut;
+			else if(charAsInt<0x85)cout<<"■⯁⬥•◘"[charAsInt&0x7f];
+			else cout<<"\x01";
 		}
 	}
 	void nextX(){
@@ -303,7 +305,7 @@ class R2KeyBoard{
 			gotoInputPos();
 		}
 		void gotoInputPos(){
-			cout<<ctx.moveTo(terminal.dims[0]+terminal.offset_x+1,terminal.offset_y);
+			cout<<ctx.moveTo(terminal.dims[0]+terminal.offset_x+1,terminal.dims[1]+terminal.offset_y);
 		}
 		static void inputListener();
 		void innit(){
@@ -396,6 +398,12 @@ class r2CPU:public FiltCPU{
 			u16 outputPointer;
 			u16 arg1Value;//:int | address
 			u16 arg2Value;//:int | address
+		public:
+			struct{
+				bool isReadHigh;
+				u8 R1;
+				u8 R2;
+			}readHigh;
 		void getDataFromValue(u32 command){
 			value = command;
 			{//opand data: bits 0-19
@@ -418,6 +426,13 @@ class r2CPU:public FiltCPU{
 				if(arg1FromRam && !includeR1)R2 = R1;//handle `OPER [U16_I1], REG_R2`
 				includeR2 = !(opandType&0x2);
 			}
+			{//handle readHigh
+				readHigh.isReadHigh = (command & 0x1ffff00f) == 0x11100001;
+				if(readHigh.isReadHigh){
+					R1 = readHigh.R1 = (command >> 8) & 0xf;
+					R2 = readHigh.R2 = (command >> 4) & 0xf;
+				}
+			};
 		}
 	}commandData;
 	void reset_all(){
@@ -449,7 +464,7 @@ class r2CPU:public FiltCPU{
 	void updateState(u32 value,bool write){
 		internalValue = commandData.arg1Value;
 		flags.sign = value & 0x8000;
-		flags.zero = value == 0;
+		flags.zero = (value & 0xffff) == 0;
 		flags.overflow = 0;
 		flags.carry = 0;
 		if(write)setValue(value);
@@ -465,11 +480,14 @@ class r2CPU:public FiltCPU{
 		flags.overflow = ((a>>15) != (b>>15)) && ((b>>15) == ((o>>15)&1));
 	}
 	void disassemble(CommandData commandData){
-		cout<<(std::string[]){
-			"mov", "and", "or", "xor", "add", "adc", "sub", "sbb", "swm", "ands", "ors", "xors", "adds", "adcs", "subs", "sbbs", "hlt", "j", "rol", "ror", "shl", "shr", "scl", "scr", "bump", "wait", "send", "recv", "push", "pop", "call", "ret"
-		}[commandData.opcode];
-		if(commandData.opcode == 0x11){
-			cout<<(std::string[]){"mp", "n", "b", "ae", "o", "no", "s", "ns", "z", "nz", "le", "g", "l", "ge", "be", "a"}[commandData.jumpType];
+		if(commandData.readHigh.isReadHigh)cout<<"readHigh";
+		else {
+			cout<<(std::string[]){
+				"mov", "and", "or", "xor", "add", "adc", "sub", "sbb", "swm", "ands", "ors", "xors", "adds", "adcs", "subs", "sbbs", "hlt", "j", "rol", "ror", "shl", "shr", "scl", "scr", "bump", "wait", "send", "recv", "push", "pop", "call", "ret"
+			}[commandData.opcode];
+			if(commandData.opcode == 0x11){
+				cout<<(std::string[]){"mp", "n", "b", "ae", "o", "no", "s", "ns", "z", "nz", "le", "g", "l", "ge", "be", "a"}[commandData.jumpType];
+			}
 		}
 		char addOrSub = "+-"[commandData.subRB];
 		cout<<" ";
@@ -514,7 +532,10 @@ class r2CPU:public FiltCPU{
 		else commandData.outputPointer = 0;
 		commandData.arg1Value = arg1;
 		arg2 = commandData.includeR2?registers[commandData.R2]:commandData.includeR1?commandData.I1:(u16)commandData.I2;
-		if(commandData.arg2FromRam)arg2 = 0xffff & getFromRam(arg2,commandData);
+		if(commandData.arg2FromRam){
+			u32 data = getFromRam(arg2,commandData);
+			arg2 = commandData.readHigh.isReadHigh ? 0x1fff & (data >> 16) : 0xffff & data; 
+		}
 		commandData.arg2Value = arg2;
 		bool hasJumped = false;
 		bool silent = true;
@@ -596,6 +617,9 @@ class r2CPU:public FiltCPU{
 						ip = b;
 						break;
 					case 0x1://JN			FALSE	NOP
+						if(commandData.readHigh.isReadHigh){//readHigh rA,[rB]
+							updateState(b,true);//the logic for 'readHigh' is handled by `getDataFromValue` and other areas in `update`.
+						}
 						break;
 					case 0x2://JB/JNAE/JC	C = 1
 						if(flags.carry)ip = b;
@@ -758,7 +782,7 @@ void R2KeyBoard::inputListener(){
 				// throw;
 			}
 		}
-		cout<<keyboard.inputChar<<endl;
+		cout<<keyboard.inputChar;
 		keyboard.inputWasPressed=true;
 		if(cpu.haulted)return;
 	}
@@ -859,7 +883,7 @@ int main(int argc, char const *argv[]){
 	if(TEST){
 		//mainThread();
 		cout<<ctx.clear();
-		for(int i=0;i<100;i++){
+		for(int i=0;i<300;i++){
 			cpu.update();
 			cpu.display();
 			cout<<endl;
