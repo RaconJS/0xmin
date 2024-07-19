@@ -1,85 +1,15 @@
-break;
-£
-	%
-	*
-	heap[]()<:
-	Dlop()<:
-	heap[]()<:
-	4^int() //£[4](int)
-;
-£Vec(4,int);
-let Array2D = £@^ ^{0};//uses templates instead of type functions
-let a = Array2D();
-
-let a = int(2);
-let b = {int(2);float(2)};
-let ref_of_B = £*b;
-//REJECTED: a!b == `Result<Ok:a,Err:b>` since it adds new patterns; conflicts with `repeat a !jump->10` 
-import lib "std.0xmin";
-let object = String("hello world");
-defer:{:freeObject;
-	r0 = [object];
-	call heap.free;
-};
-//idea:'£' convert to operator overloading type syntax
-	//can use '¬' to convert it back
-//if > 0 jump 2; //fixed
-let a =£%^&*<>?2;
-let vec1={1;2},vec2={3;4};
-let vec3=£vec1+vec2;
-let Dlop(){
-	def let data = £@*heap[](£!sized)¬();
-	def let capasity = £@usize¬();
-	def let size = £@usize¬();
-};
-let type = £[];
-let arrayOfInts = £%*[](int)¬();
-//let £(b:>£%()) = 2;
-debugger {1;2}[¬1];
-#"tptasm";
-{:foo;
-	send r0 "h";
-	send r0 "i";
-	hault;
-};
-#(){
-	//#"tptasm";#"len";#"table";
-	import lib "var_const.0xmin";
-	import lib "heap.0xmin";
-	import lib "R2/print.0xmin";
-	defer: def heap.data;
-	defer: def var,const;
-	defer: def print.number.charSet;
-	print("Hello world!");
-	let Unsized;//{@}
-	let Pointer;//*
-	let Option;//?
-	let Box;//~
-	let inbuiltType{
-		let range(start,end)={
-			0;
-			let[¬constructor]={@#(start||0);@#(end||(1/0))};
-		};
-	};
-	let DynLenObj(){//{c:@,l:@,@[l]}
-		@0#def let capasity;
-		@0#def let length;//len
-		@0#def let object{let.[¬Unsized]};
-	};
-	let DynLenObjPtr(){
-		//:Dlop&{c:usize,l:usize,(@[l])*?} where c>l
-		let capasity;$capasity=>return+0;
-		let length;$length=>return+1;//len
-		let ptr{let.[¬Option]={let.[¬Pointer]{let.[¬Unsized]}}};
-		$ptr=>return+2;
-	};
-	let LinkedList(item){
-		0#def let next{let.[¬Option]{let.[¬Pointer]=..this}};
-		def item;
-	};
-	let data{repeat 5 @0;};
-	virtual{$;
-		ram=>data;
-		def: DynLenObjPtr();
+let vectorAddition{
+	let..oper;
+	let..oper["_+_"](a,b){
+		let i=-1;
+		repeat a..length @(a[i+=1]+b[i]);
+		repeat(this!=a&&(this!=b))throw "assersion failed";
+		#return..oper=..oper;
+		debugger(this==a);
 	};
 };
+let a<=>vectorAddition¬::{2;3};
+let b{4;1};
+let c = £a+b;
+debugger +c[0];//6
+debugger +c[1];//4

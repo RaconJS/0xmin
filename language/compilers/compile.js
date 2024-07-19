@@ -685,7 +685,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							else{
 								startValue=value;
 							}
-							({value:startValue,index}=contexts.expression_fullExtend({statement,index,scope,value:startValue}));//allow '#let a:>foo()'->'#let a;#set a:>foo();'
+							({value:startValue,index}=contexts.expression_fullExtend({statement,index,scope,value:startValue,allowOperatorOverloading:false}));//allow '#let a:>foo()'->'#let a;#set a:>foo();'
 							if(startValue.refType=="internal"){
 							}
 						}
@@ -1070,7 +1070,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				}if(endingStringList.includes(statement[index]))failed=true;
 				return {index,failed:failed??index>=statement.length};
 			},
-			arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true}){
+			arguments({index,statement,scope,callType,includeBrackets=true,argsObj=undefined,shouldEval=true,allowOperatorOverloading}){
 				//'(a, b, c) <:{} <:{}'
 				//always includes brackets
 				if(argsObj == contexts.noPipeLineing)argsObj=undefined;
@@ -1100,7 +1100,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						index+=3;
 						if(shouldEval)
 						for(const statement of argBlock){
-							let {value,index,spreadArgsObj}=contexts.expression({index:0,statement,scope,includeBrackets:false});
+							let {value,index,spreadArgsObj}=contexts.expression({index:0,statement,scope,includeBrackets:false,allowOperatorOverloading});
 							addArgs(value,spreadArgsObj);
 						}
 					}else throw Error("compiler error: contexts.arguments() starts at '('")
@@ -1112,13 +1112,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						}
 						index++;
 						let value;
-						({value,index,spreadArgsObj}=contexts.expression_short({index,statement,scope,shouldEval}));
+						({value,index,spreadArgsObj}=contexts.expression_short({index,statement,scope,allowOperatorOverloading,shouldEval}));
 						addArgs(value,spreadArgsObj);
 					}
 				}
 				return {index,argsObj};
 			},
-			expression_short({index,statement,scope,argsObj=undefined,shouldEval=true,includeBrackets=false,noSquaredBrackets=false}){//a().b or (1+1)
+			expression_short({index,statement,scope,argsObj=undefined,shouldEval=true,includeBrackets=false,noSquaredBrackets=false,allowOperatorOverloading=false}){//a().b or (1+1)
 				if(includeBrackets){statement=statement[index+1];index=0;}//assumes statement[index]=="("
 				if(!statement[index])return{index};
 				//shouldEval = true: can cause mutations, false: just needs to return where the expression ends.
@@ -1136,25 +1136,23 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(shouldEval)value=new Value({string,type:"string",array});
 				}else if(!({index,value,failed}=contexts.declareFunctionOrObject({index,statement,scope,shouldEval,startValue:value})).failed){}
 				else if(word=="("){//'(label)'
-					({index,value}=contexts.expression({index,statement,scope,includeBrackets:true,shouldEval}));
+					({index,value}=contexts.expression({index,statement,scope,includeBrackets:true,shouldEval,allowOperatorOverloading}));
 					value??=null;//'()' ==> `undefined`. Used for 'foo(());'
 				}else if(contexts.operators_Left.hasOwnProperty(word)){//'!!label'
 					const operator=contexts.operators_Left[word];//:function (Value) => Value
 					index++;
-					if(word=="£")value.allowOperatorOverloading=true;//allows for '£+a' instead of '+£a'
-					({index,value}=contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false}));
-					let {allowOperatorOverloading}=value;
+					if(word=="£")allowOperatorOverloading=true;//allows for '£+a' instead of '+£a'
+					else if(word=="¬")allowOperatorOverloading=false;//allows for '¬+a' instead of '+¬a'
+					({index,value}=contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false,allowOperatorOverloading}));
 					if(shouldEval){
-						if(word!="¬"&&allowOperatorOverloading){//'+a' in '£+a'
-							({index,value}=context.operatorOverload({index,statement,scope,args:[value]}));
+						if(word!="¬"&&word!="£" && allowOperatorOverloading){//'+a' in '£+a'
+							({index,value}=contexts.operatorOverload({index,statement,scope,args:[value]}));
 						}
 						else{
 							value=operator(value);
-							if(word=="¬")value.allowOperatorOverloading=false;//'¬£a' == '¬a'; '¬' converts back to non-overloaded / old meta syntax
-							else value.allowOperatorOverloading||=allowOperatorOverloading;
 						}
 					}
-					return {index,value};
+					return {index,value,allowOperatorOverloading};
 				}else if(word.match(nameRegex)){//'label'
 					if(shouldEval){
 						value=new Value();
@@ -1169,17 +1167,17 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					//value=new Value();
 					if(!TESTING)return {index,value:undefined};
 				}
-				({index,value}=contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets}));
+				({index,value}=contexts.expression_fullExtend({value,index,statement,scope,argsObj,shouldEval,noSquaredBrackets,allowOperatorOverloading}));
 				if(false)if(statement[index]==":"){
 					index++;
 					({index,value}=contexts.typeSystem({value,index,statement,scope,shouldEval}));
 				};
-				return {index,value};
+				return {index,value,allowOperatorOverloading};
 			},
 			//expression_short:
-				getIndexedPropertyName({index,statement,scope}){
+				getIndexedPropertyName({index,statement,scope,allowOperatorOverloading}){
 					let name,failed=false;
-					({index,value:name}=contexts.expression({index,statement,scope,includeBrackets:true}));
+					({index,value:name}=contexts.expression({index,statement,scope,includeBrackets:true,allowOperatorOverloading}));
 					if(name){
 						if(name.type=="label"){
 							if(name.refType=="symbol")name=name.label?.symbol??undefined;//'a[¬b]'
@@ -1191,13 +1189,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}else failed=true;
 					return {index,name,failed};
 				},
-				expression_fullExtend({value,index,statement,scope,argsObj=undefined,shouldEval=true,noSquaredBrackets=false}){
+				expression_fullExtend({value,index,statement,scope,argsObj=undefined,shouldEval=true,noSquaredBrackets=false,allowOperatorOverloading}){
 					for(let i=index;i<statement.length;i++){//'.property'
 						if(index>=statement.length)break;
 						let word=statement[index];
 						let oldIndex=index;
 						if(word=="["&&noSquaredBrackets)break;
-						({value,index}=contexts.extend_value({index,statement,scope,value,argsObj,shouldEval}));
+						({value,index}=contexts.extend_value({index,statement,scope,value,argsObj,shouldEval,allowOperatorOverloading}));
 						if(index==oldIndex)break;
 					}
 					value??=null;
@@ -1205,7 +1203,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				},
 				noPipeLineing:Symbol("noPipeLineing"), //used in '#let' to allow 'let a:>foo()' == 'let a{} :> foo();'
 				getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
-				extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true}){//.b or [] or ()
+				extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true,allowOperatorOverloading}){//.b or [] or ()
 					let word=statement[index];
 					if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
 						//'()'-> null, '' -> undefined
@@ -1244,7 +1242,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							({index,value:name}=contexts.number({index,statement,scope}));
 							if(name!==undefined)nameFound=true;
 						}if(!nameFound&&["(", "["].includes(word)){//'a.("b")' or 'a["b"]' ?
-							({index,name,failed:nameFound}=contexts.getIndexedPropertyName({index,statement,scope}));
+							({index,name,failed:nameFound}=contexts.getIndexedPropertyName({index,statement,scope,allowOperatorOverloading}));
 							nameFound=!nameFound;
 						}
 						if(!nameFound){
@@ -1293,10 +1291,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 						}
 						//'foo=>()=>{}' ==> 'foo => #()=>{}'let argsObj;
-						({index,argsObj}=contexts.arguments({index,statement,scope,callType,argsObj,shouldEval}));
+						({index,argsObj}=contexts.arguments({index,statement,scope,callType,argsObj,shouldEval,allowOperatorOverloading}));
 						if(shouldEval)
 						if(value.type=="label"&&value.label!=undefined){
-							({value}=value.label.callFunction({args:argsObj,value,scope,callType,statement}));
+							({value}=value.label.callFunction({args:argsObj,value,scope,callType,statement}))??{};
 						}
 						argsObj.obj={};
 						argsObj.list=[];
@@ -1309,7 +1307,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								index++;
 								if(value?.name!=undefined)argsObj.obj[value.name]=value;
 								argsObj.list.push(value);
-								({value,index}=contexts.expression_short({index,statement,scope,argsObj}));
+								({value,index}=contexts.expression_short({index,statement,scope,argsObj,allowOperatorOverloading}));
 							}else break;
 						}
 					}
@@ -1324,8 +1322,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					return {index,value};
 				},
-				typeSystem({index,statement,scope,value,shouldEval=true}){
-					({index}=contexts.expression_short({index,statement,scope,shouldEval:false}));
+				typeSystem({index,statement,scope,value,shouldEval=true,allowOperatorOverloading=true}){//UNUSED
+					({index}=contexts.expression_short({index,statement,scope,shouldEval:false,allowOperatorOverloading}));
 					return {index,value};
 				},
 				delcare_typeChecks({index,statement,scope},isExtension,startValue){
@@ -1422,14 +1420,18 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						return v1;
 					}
 				},
-				"£":(v)=>{//v:Value
+				"£":(v)=>{//v:Value ; similar to '¬' but the opposite. also does operator overloading
 					if(v===null||v===undefined){//'¬()' and '(¬)' --> empty, undeclared label
 						v=new Value({type:"label",label:null});
 					}
-					else v=new Value(v??{});
-					v.allowOperatorOverloading=true;
+					else v=new Value(v);
+					if(v.refType=="symbol")v.refType="name";//TODO: unsure if "name" is the correct one to use or if it's "property"
 					return v;
 				},
+				"&":(value)=>value,//type-reference ; is for non-owned data and is not a pointer, unlike in Rust
+				"*":(value)=>value,//type-pointer
+				"%":(value)=>value,//type-register 
+				"^":(value)=>value,//type-array of ; '3^int' == `int[3]`, '^int' == `int[]`
 			},
 			operators:{
 				"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
@@ -1520,20 +1522,21 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				else if(value.type=="array")return !!value.array;
 				else return false;
 			},
-			operatorOverload({index,statement,scope,args,operator,numOfArgs=2}){//:{Value} ; for '£a + b' --> 'a.._+_()'
+			operatorOverload({index,statement,scope,args,operator,numOfArgs=2}){//:{Value} ; for '£a+b' --> 'a.._+_()'
 				//(args:Value[],scope:Scope,operator:String&operator)
 				let operatorLabel;//:Variable&function'#(){}'
 				let label,parent;//parent:Some<> if operator found
 				let arg;
-				if(arg=args[args.length-1]?.label)({label,parent}=arg.findOperatorOverload(operator));
-				if(arg=args[args.length-2]?.label)({label,parent}=arg.findOperatorOverload(operator));
-				if(!parent)scope.findOperatorOverload(operator);
+				let operName=Variable.getOperatorOverloadName(operator,numOfArgs>0,numOfArgs>1);
+				if(arg=args[args.length-1]?.label)({label,parent}=arg.findOperatorOverload(operName));
+				if(arg=args[args.length-2]?.label)({label,parent}=arg.findOperatorOverload(operName));
+				if(!parent)({label,parent}=scope.findOperatorOverload(operName));
 				let operatorArgs=args.splice(args.length-numOfArgs,numOfArgs);
-				let value=label.callFunction({index,statement,scope,argsObj:new ArgsObj({list:operatorArgs})});
+				let {value}=label?.callFunction({index,statement,scope,value:new Value({refType:"property",label,parent,name:operName}),args:new ArgsObj({list:operatorArgs})});
 				args.push(value);
 				return {index,value};
 			},
-			expression({index,statement,scope,startValue=undefined,argsObj=undefined,includeBrackets=false,shouldEval=true}){//a + b
+			expression({index,statement,scope,startValue=undefined,argsObj=undefined,includeBrackets=false,shouldEval=true,allowOperatorOverloading}){//a + b
 				let value=new Value();
 				const args=[];//:Value[]
 				const operatorRegex=/[+\-*/]/;//:Regex
@@ -1574,7 +1577,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							));
 						}
 						let value;//don't need to do `index++` here
-						({value,index}=contexts.expression({statement,index,scope,includeBrackets:false}));
+						({value,index}=contexts.expression({statement,index,scope,includeBrackets:false,allowOperatorOverloading}));
 						//value??=new Value();
 						{
 							if(assignmentType==undefined&&word=="="){//evals 'a = b'
@@ -1618,11 +1621,12 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 												label.code=[];
 												label.prototype=null;
 												label.supertype=null;
+												label.operators=null;
 												//label.securityLevel=0;
 												label.functionPrototype=null;
 												label.functionSupertype=null;
+												label.functionOperators=null;
 												label.functionConstructor=null;
-												label.functionSupertype=null;
 											}
 											else switch (value.type){
 												case"label"://object,array,function
@@ -1631,11 +1635,12 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 													label.code=[...(value.label?.code??[])];
 													label.prototype=value.label?.prototype;
 													label.supertype=value.label?.supertype;
+													label.operators=value.label?.operators;
 													label.securityLevel=value.label?.securityLevel;
 													label.functionPrototype=value.label?.functionPrototype;
 													label.functionSupertype=value.label?.functionSupertype;
 													label.functionConstructor=value.label?.functionConstructor;
-													label.functionSupertype=value.label?.functionSupertype;
+													label.functionOperators=value.label?.functionOperators;
 													break;
 												case"array":
 												label.code=[...value.array];
@@ -1657,10 +1662,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						break;
 					}
 					else if(args.length>0&&!({index,value}=contexts.declareFunctionOrObject({index,statement,scope,startValue:args[args.length-1],shouldEval})).failed){
-						({value,index}=contexts.expression_fullExtend({value,index,statement,scope}));
+						({value,index}=contexts.expression_fullExtend({value,index,statement,scope,allowOperatorOverloading,shouldEval}));
 					}else if(word=="¬" && args.length>0){//extend value 'a+1¬.b'==> '(a+1).b'
 						index++;let value=args.pop();
-						({value,index}=contexts.expression_fullExtend({value,index,statement,scope,shouldEval}));
+						({value,index}=contexts.expression_fullExtend({value,index,statement,scope,allowOperatorOverloading}));
 						args.push(value);
 					}else if(contexts.operators.hasOwnProperty(word)){//'+-*/' 'a+b'
 						index++;
@@ -1673,32 +1678,30 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								let arg1=args.pop(),bool1=contexts.truthy(arg1);
 								if(operator.is2Args){
 									let shouldEval=operator.needsSecondArg(bool1);
-									({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
+									({index,value,allowOperatorOverloading}=contexts.expression_short({index,statement,scope,shouldEval,allowOperatorOverloading}));
 									value=operator.operator(bool1,contexts.truthy(value),arg1,value);
 								}else value=operator.operator(bool1,null,arg1,null);//for '!a'
 								args.push(value);
 							}
 							else {//operator:Operator_numeric
-								({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
+								({index,value,allowOperatorOverloading}=contexts.expression_short({index,statement,scope,shouldEval,allowOperatorOverloading}));
 								args.push(value);
 								//note: argsObj is only used for '...label' operator
-								let {allowOperatorOverloading} = args[args.length-2]??{};
 								if(allowOperatorOverloading){
 									let value;
-									({index,value}=contexts.operatorOverload({index,statement,scope,args,operator:word,numOfArgs:operator.operator?2:1}));//TODO: confirm that numOfArgs is always 2 here 'a+b'.
+									({index,value}=contexts.operatorOverload({index,statement,scope,args,operator:word,numOfArgs:operator.operation?2:1}));//TODO: confirm that numOfArgs is always 2 here 'a+b'.
 									if(word=="...")({spreadArgsObj}=operator.do({args,hasEquals,argsObj,index,statement,scope})??{});//
 								}
 								else ({spreadArgsObj}=operator.do({args,hasEquals,argsObj,index,statement,scope})??{});
-								args[args.length-1].allowOperatorOverloading||=allowOperatorOverloading;
 							}
 						}else{
-							({index}=contexts.expression_short({index,statement,scope,shouldEval}));
+							({index,allowOperatorOverloading}=contexts.expression_short({index,statement,scope,shouldEval,allowOperatorOverloading}));
 						}
 					}
 					else if(!nameLast){//not: 'name name'
 						if(!endingStringList.includes(word)){//word.match(nameRegex)||["(", "[", "{"].includes(word)){
 							let value;
-							({index,value}=contexts.expression_short({index,statement,scope,shouldEval}));
+							({index,value,allowOperatorOverloading}=contexts.expression_short({index,statement,scope,shouldEval,allowOperatorOverloading}));
 							args.push(value);
 						}
 					}
@@ -1706,7 +1709,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				value=args[0];
 				if(includeBrackets)return {index:nextIndex,value,spreadArgsObj};
 				else{
-					return {index,value,spreadArgsObj};
+					return {index,value,spreadArgsObj,allowOperatorOverloading};
 				}
 			},
 		//----
@@ -2515,18 +2518,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				name=undefined;///@string
 				labels={};//{[string|Symbol]:Variable|null|undefined}; aka properties; undefined:write only, null:can be read and written empty label
 				symbol=Symbol(Variable.objectNum++);
-				prototype=null;//:Variable? ; used in prototype chain similar to javascript `object.__proto__`
-				supertype=null;//:Variable? ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
 				securityLevel=0;//used with '..secure'
-				operatorOverLoadLabels={};//: Map(String=>Variable?); 'a.._+_'
+				functionOperators=null;//:Variable? ; 'a..oper.["_+_"]' operator overloading
+				functionPrototype=null;//:Variable? ; used in prototype chain similar to javascript `object.__proto__`
+				functionSupertype=null;//:Variable? ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
+				functionConstructor;//:Variable?;
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
 				//uses `label.code` for the list of functionScopes to run
 				//scope=null;//the scope that the code should be called with. the scope contains the code
-				functionPrototype=null;//:Variable?
-				functionSupertype=null;//:Variable?
-				functionConstructor;//:Variable?;
+				prototype=null;//:Variable?
+				supertype=null;//:Variable?
+				operators=null;//:Variable?
 			//as assembly
 				returnLineNumber;//:number; defined in collectCode
 				returnCpuState;//:CpuState
@@ -2624,18 +2628,20 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//this.lineNumber=undefined;
 				return this;
 			}
-			getOperatorOverloadName(operatorBaseName,hasLeftArg,hasRightArg){//:(string,bool,bool)->string
+			static getOperatorOverloadName(operatorBaseName,hasLeftArg,hasRightArg){//:(string,bool,bool)->string
 				//e.g. : `("+",false,true)->"+_"`
-				return ["","_"][+!!hasLeftArg]+operatorName+["","_"][+!!hasRightArg];
+				return ["","_"][+!!hasLeftArg]+operatorBaseName+["","_"][+!!hasRightArg];
 			}
 			findOperatorOverload(operatorName){//:{label:Variable|null|undefined,parent:Variable?}
 				if(this.isSearched)return {label:undefined,parent:undefined};
 				this.isSearched=true;
 				let label,parent;//:Variable?
-				({label,parent}=this.supertype.findOperatorOverload(operatorName));
-				if(label===undefined&&this.operatorOverLoadLabels.hasOwnProperty(operatorName))
-					({label,parent}=this.operatorOverLoadLabels[operatorName]);
-				if(label===undefined)({label,parent}=this.prototype.findOperatorOverload(operatorName));
+				({label,parent}=this.functionSupertype?.findOperatorOverload(operatorName)??{});
+				if(label===undefined&&this.functionOperators?.labels?.hasOwnProperty(operatorName)){
+					label=this.functionOperators?.labels?.[operatorName];
+					parent=this;
+				}
+				if(label===undefined)({label,parent}=this.functionPrototype?.findOperatorOverload(operatorName)??{});
 				this.isSearched=false;
 				return {label,parent};
 			}
@@ -2832,11 +2838,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					//`obj.prototype`
 						"prototype":({label})=>new InternalValue({label,name:"prototype"},"prototype"),
 						"supertype":({label})=>new InternalValue({label,name:"supertype"},"supertype"),
+						"operators":({label})=>new InternalValue({label,name:"operators"},"operators"),
 					//from parent function
 					//`obj.constructor`
 					"construtor_":({label})=>new InternalValue({label,name:"construtor"},"functionConstructor"),
 						"proto":({label})=>new InternalValue({label,name:"proto"},"functionPrototype"),
 						"super":({label})=>new InternalValue({label,name:"super"},"functionSupertype"),
+						"oper":({label})=>new InternalValue({label,name:"oper"},"functionOperators"),//operator overloads
 					//other
 					"defs":({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
 					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args,scope,statement})=>{
@@ -2929,28 +2937,33 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 
 						}).toValue("label");
 					},
-					"iterate":new BuiltinFunctionFunction("iterate",({label,args,scope,statement})=>{
+					"iterate":new BuiltinFunctionFunction("iterate",({label,args,scope,statement})=>{//
 						let oldCode=[...label.code];
-						let ans;//:Variable
+						let ans=new Value({type:"label"});//:Value&label
 						throw Error("compiler error: UNFINISHED");
-						if(args.length >= 2)
+						if(args.length>=2){
+							let startValue=args[0];
+							let reduceFunction=args[1].label
 							ans=oldCode.reduce((s,v,i,a)=>{
-								([s,v,i,a]=[s,v,i,label].map(v=>new Value().fromCode(v)));
-								label.callFunction({
+								v=new Value().fromCode(v);
+								i=new Value.Number(i);
+								a=label;
+								return reduceFunction?.callFunction({
 									args:{list:[s,v,i,a],obj:{s,v,i,a}},
 									value:callingValue,callType:undefined,scope,statement
 								})
-							})
-						;
-						else if(args.length >= 1)
-							ans=oldCode.reduce((s,v,i,a)=>{
+							},startValue);
+						}
+						else if(args.length>=1){
+							let mapFunction=args[0];
+							ans=oldCode.map((s,v,i,a)=>{
 								([s,v,i,a]=[s,v,i,a].map(v=>new Value().fromCode(v)));
-								label.callFunction({
+								return mapFunction?.callFunction({
 									args:{list:[s,v,i,a],obj:{s,v,i,a}},
 									value:callingValue,callType:undefined,scope,statement
 								})
-							})
-						;
+							});
+						}
 						return ans;
 					}),
 					"static":({label,scope})=>{
@@ -3162,6 +3175,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.var=instanceScope;
 						newLabel.functionPrototype??=functionLabel.prototype;
 						newLabel.functionSupertype??=functionLabel.pupertype;
+						newLabel.functionOperators??=functionLabel.operators;
 						middleLabel.labels["this"]=newLabel;
 						middleLabel.labels["return"]=newLabel;
 						middleLabel.labels["arguments"]=argsObj;
@@ -3886,6 +3900,33 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					this.labels[i]=Variable.fromValue(new Value.Number(Math[i]),null);
 				}
 				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),null);
+				Object.doubleFreeze(this.labels);
+			}
+		}),
+		"Type":Object.doubleFreeze(new class Type extends Variable{
+			static typeLabel(name,argNames){//:Variable&BuiltinFunction
+				let newTypeLabel=new BuiltinFunction(({args})=>{
+					let labels={};
+					let newLabel=new Variable({
+						name:"<"+self.name+">",
+						code:args.map(v=>Variable.fromValue(v)),
+						labels,
+						functionConstructor:newTypeLabel,
+						functionPrototype:null,//TODO add properties
+					});
+					labels[newTypeLabel.symbol]=newLabel;//'a[¬0xmin.Type.T]' retuns the T part of a
+					for(let i=0;i<argNames.length;i++){
+						labels[argNames[i]]=(args[i]??=new Value()).toValue();
+					}
+					return newLabel.toValue();
+				})
+				return newTypeLabel;
+			}
+			constructor(){
+				super({name:"Type"});
+				for(let i of ["Usize", "Array", "Object", "Reference", "Register", "Pointer"]){
+					this.labels[i]=Object.doubleFreeze(new Variable({name:i}));
+				}
 				Object.doubleFreeze(this.labels);
 			}
 		}),

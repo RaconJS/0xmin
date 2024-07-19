@@ -62,7 +62,7 @@ variables:
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|text|len|labels|ZASM3|ZASM4)' #'!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)'
-  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|constructor|prototype|supertype|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON)\b|@\$|@|\$|#|{{expressionOperator}})'
+  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON)\b|@\$|@|\$|#|{{expressionOperator}})'
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|model|language))?|Math(?:\s*\.\s*())?)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
