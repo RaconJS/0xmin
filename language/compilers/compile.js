@@ -523,7 +523,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 							let value;
 							({value,index}=contexts.expression_short({index,statement,scope}));
-							let labelFromValue=value?Variable.fromValue(value):undefined;
+							let labelFromValue=value?Variable.fromValue(value,scope):undefined;
 							let scopeOfLabel;//s:Scope? where s.label == labelFromValue
 							if(labelFromValue){//check for label in scope parents
 								scopeOfLabel=scopeSearch(scope,labelFromValue);
@@ -1498,6 +1498,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								scope,
 							}).toValue("label");
 						}
+						if(hasEquals)if(arg0?.type=="label"&&arg0.parent&&arg0.parent.labels[arg0.name]!==undefined){
+							arg0.parent.labels[arg0.name]=ans.label;
+						}
 						args.push(ans);
 					}else if(arg1){//'...a' 1 arg ; spread operator for 'foo(...args)'
 						let label=arg1.toType("label").label;
@@ -1682,6 +1685,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 									value=operator.operator(bool1,contexts.truthy(value),arg1,value);
 								}else value=operator.operator(bool1,null,arg1,null);//for '!a'
 								args.push(value);
+								//if(hasEquals)if(value)//value.toType("label").label//TODO fix 'a||=b'
+								if(hasEquals){if(arg1?.type=="label"&&arg1.parent&&arg1.parent.labels[arg1.name]!==undefined){
+									arg1.parent.labels[arg1.name]=Variable.fromValue(value,scope);
+								}}
 							}
 							else {//operator:Operator_numeric
 								({index,value,allowOperatorOverloading}=contexts.expression_short({index,statement,scope,shouldEval,allowOperatorOverloading}));
@@ -3897,9 +3904,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 				}
 				for(let i of ["E", "LN10", "LN2", "LOG10E", "LOG2E", "PI", "SQRT1_2", "SQRT2"]){
-					this.labels[i]=Variable.fromValue(new Value.Number(Math[i]),null);
+					this.labels[i]=Variable.fromValue(new Value.Number(Math[i]),globalScope);
 				}
-				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),null);
+				this.labels["TAU"]=Variable.fromValue(new Value.Number(Math.PI*2),globalScope);
 				Object.doubleFreeze(this.labels);
 			}
 		}),
@@ -3909,7 +3916,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					let labels={};
 					let newLabel=new Variable({
 						name:"<"+self.name+">",
-						code:args.map(v=>Variable.fromValue(v)),
+						code:args.map(v=>Variable.fromValue(v,globalScope)),
 						labels,
 						functionConstructor:newTypeLabel,
 						functionPrototype:null,//TODO add properties
