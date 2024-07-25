@@ -1,70 +1,25 @@
-let a=¬;
-#a||=2;//TODO commit "fixes `a||=b`"
-debugger a;
-#"tptasm";
-let int(value){
-	let code;
-	#caller...=code;
-}::{
-	let..operators<=>{let
-		.["_+_"](a,b){
-			#return..this();
-		},
-		.["_-_"](a,b){
-			#return..this();
-		},
-	};
-};
-//ItemOn(Struct,Item,Index), Index(Struct,Item) "", Item(Struct,Index) "+",
-//Type(T)[:]
-//Struct(Index,Item)
-//^
-//struct->struct,index->item,struct->item
+#"tptasm";#"table";
+let a = {@[2]};
+@$a=2;
 
-//£;
-let a{0;1#def let b};
-let c=%0;
-let int()={}::{//Index=Obj+Item, Item=Obj[], #{*Obj,Obj+Item}
-	let..operators{
-		let.["="](a,b){
-			...labelsof 0xmin.Type;
-			repeat(a..constructor==Register) ...run(){
-				repeat(a[0]..constructor==Pointer)...run(){
-					repeat(b..constructor==Register)
-						@[%a]=%b;
-					repeat(!.[0])
-						@[%a]=b;
-				};
-				repeat(a[0]..constructor==ItemOn)...run(){
-					repeat(b..constructor==Register)
-						@[%a+a.(0)]=%b;
-					repeat(!.[0])
-						@[%a+a.(0)]=b;
-				};
-				repeat(!.[0])...run(){
-					repeat(!.[0])
-						@%a=b;
-				};
-			};
-			repeat(a..constructor==Pointer) ...run(){
-				repeat(b..constructor==Register)
-					@[a]=%b;
-				repeat(!.[0])
-					@[a]=b;
-			};
-		};
-	}
+
+
+
+...labelsof 0xmin.Type;
+let Pointer(template){
+	@[$template];
 };
-{
-	let a;
-	a;
-	:block;
-	debugger block"label.code";
+let Register(getter){
+	...codeof getter({@%return});
 };
-/*let sum = %int() = 0;//let sum = 0;
-for((){£;let i=0;i<10;i++})<:(data){£;
-	#...labelsof data;
-	sum += i;
+let Getter(getterTemplate,contenceTemplate){
+	let template=contenceTemplate;
+	$set template;
+	...labelsof template;
+	let value = getterTemplate;
+	...codeof getterTemplate;
 };
-print(sum);*/
-//*{a}
+let int(template){@template};
+let a = Getter(Register()<:Pointer)<:int();
+#a.value<->3;
+@$a = 2;
