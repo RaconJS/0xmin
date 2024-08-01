@@ -1,3 +1,4 @@
+#"tptasm";
 ...labelsof (){
 	#return{let
 		heap = ¬,
@@ -215,6 +216,9 @@
 					do(regEnum);
 				};
 			};
+			let isRegister(register){
+				#return = register[¬type_register];
+			};
 		};
 		let reg = RegEnum();
 		#return = {let
@@ -304,57 +308,71 @@
 				#(
 					?i:%&#{isFree:#?},
 					start:#(i:%)->{@},
-					condision:#(i:%,to:@,isJumpOnSuccess:#?)->{@;@jump->isJumpOnSuccess if flag;},
-					do:#(i:%)->{@}
+					condision:#(i:%,to:@,isJumpOnFail:#?)->{@;@jump->to if flag;},
+					do:#(i:%,break:@)->{@}
 				)->{@}
 			};
 			#i = arguments[-5]||(¬);
 			#start = arguments[-4]||(i){%i = 0};
-			#condision = arguments[-3]||(i,breakOrContinue,isContinue){
-				repeat !!isContinue:{
-					let continue = breakOrContinue;
-					if < 0 jump->continue;
+			#condision = arguments[-3]||(i,continue,isBreak){
+				repeat !!isBreak ...codeof{
+					let: breakAddress = continue;
+					if < 0 !signed jump -> breakAddress;
 				};
-				repeat !isContinue:{
-					let break = breakOrContinue;
-					if >= 0 jump->break;
-				};
+				repeat !isBreak if >= 0 !signed jump -> continue;
 			};
 			#next = arguments[-2]||(i){%i += 1};
 			#do = arguments[-1]||(i){};
 			let hasReg = !!i;
 			let isSaveReg = !hasReg||!i.isFree;
-			let isJumpToContinue = for!=..constructor;
-			#isJumpToContinue = !!isJumpToContinue &&{} ||¬;
 			repeat !+hasReg:{
 				#i = 1;
 			};
 			repeat !+hasReg push %i;
 			def let start = start(i);
+			let entry;
+			def let jumpToEntry;
 			recur do..flat def let loop{
 				let jumpTo;
-				def let condision = condision(i,jumpTo,isJumpToContinue);
-				def let do = do(i);
+				def jumpTo;
+				def let do = do(i,..return);
 				def let next = next(i);
-				jump -> loop;
+				def let condision = condision(i,jumpTo,isJumpToContinue);
+			};
+			#jumpToEntry{
+				jump->loop.condision;
 			};
 			...labelsof loop;
-			def loop.jumpTo;
 			repeat !+hasReg pop %i;
 		}::{
 			let ..prototype{
 
 			};
 			:this;
+			let nextFor(i,start,condision,next,do)={//runs `next` at the end of `start`
+				delete this;
+				...run this;
+				jumpToEntry<=>{jump->loop.next};
+			};
 			let doFor(i,start,condision,next,do)={//1 cycle faster version of `for`
 				delete this;
 				...run this;
-				#loop::{
-					undef condision;
-					#..splice(-1,1,{def condision});
-					undef jumpTo;//note: '#def' already '#undef's jumpTo. This is only here to be more clear.
-					#..splice(0,0,{def jumpTo});
-				};
+				undef jumpToEntry;
+			};
+			let auto(reg,args){//for.auto(reg)<:(i){i = 10;if >= 0;i -= 1}
+				repeat!!RegEnum.isRegister(reg) let i = reg;
+				repeat!RegEnum.isRegister(reg) let i <-> reg();//default
+				let entry,loop,exit;
+				let args = args(i,reg,exit,entry);
+				let start=args[0],condision=args[1],next=args[2],do=args..splice(3,-1);
+				#i::{%..this};
+				def start;
+				jump->entry;
+				def loop;
+				def do;
+				def next;
+				def entry;
+				@:$condision loop;
 			};
 		};
 		let for_start_repeat(i_reg,getLength,do){//:#(%usize,{@}->%usize?,{@})->{@} ; similar to doFor

@@ -1,25 +1,43 @@
 #"tptasm";#"table";
 let a = {@[2]};
 @$a=2;
-
+$0-=2;//fixed; BUG
 
 
 
 ...labelsof 0xmin.Type;
-let Pointer(template){
-	@[$template];
-};
-let Register(getter){
-	...codeof getter({@%return});
-};
-let Getter(getterTemplate,contenceTemplate){
-	let template=contenceTemplate;
+let Pointer(value,template)={
 	$set template;
-	...labelsof template;
-	let value = getterTemplate;
-	...codeof getterTemplate;
+	let unwrap(code){
+		let code1={
+			$def((template..constructor==Part)&&{@[$code+template]}||{@[$code]});
+		};
+		$def(template.unwrap(code1)||code1);
+	};
+};
+let Part(value,template)={
+	$set template;
+	let unwrap(code){
+		let code1={@$code};
+		$def(template.unwrap(code1)||code1);
+	};
+};
+let Register(value,template)={
+	//$set template;
+	let unwrap(){
+		let code={%..this};
+		$def(template.unwrap(code)||code);
+	};
+	unwrap();
+};
+let Getter(value,template)={
+	$set template;
+	let unwrap(code){
+		def(code||{0});
+		let return..proto=template;
+	};
 };
 let int(template){@template};
-let a = Getter(Register()<:Pointer)<:int();
-#a.value<->3;
+let a = Register(¬)<:Pointer(¬)<:Part(¬)<:Getter(¬)<:int(¬);
+#a<->3;
 @$a = 2;

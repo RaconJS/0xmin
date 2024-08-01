@@ -1,4 +1,4 @@
-module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLine,MetaLine,Variable,throwError,Value,loga,mainObjectGetter})=>
+module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLine,MetaLine,Variable,throwError,Value,loga,mainObjectGetter,valueCharToNumber})=>
 	new class InstructionSet extends Language{
 		//main_assembly:#()->{@}
 		//compileAssemblyLine:@(@)->{0}
@@ -211,15 +211,45 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				return{index};
 			}
 			let value;
-			({index,value}=contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
+			if(!"+-".includes(statement[index])||statement[index+1]!="="){//BODGED to patch a compile.js BUG: bug in expression_short where it parses `-` a a single short expression
+				({index,value}=contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
+			}
 			if(value){arg.push(value);}
 			return {index};
 		}
 		asm_operator({statement,index,scope,operator,optionals,hasAssignment}){//#:string|undefined
 			let word=statement[index];
 			let hasOverwritableOperator;//:bool
-			if(!hasOverwritableOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
-				let oper1=word;
+			let macro,failed;
+			let extraArgs;//extraArgs:Argument[]?
+			let oper1;
+			const handleOper=(newOperator)=>{//:mutates hasOverwritableOperator&hasAssignment
+				if(newOperator=="="||newOperator=="=>"||newOperator=="mov"){//'%register = pop;'
+					word=statement[index];
+					if(["pop", "recv", ""].includes(word)){
+						newOperator=word;
+						index++;
+					}
+				}
+				const hasAnExistingOperator=!!operator;
+				if(!hasAnExistingOperator||this.operators[newOperator]!="jmp")operator=this.operators[newOperator];
+				if(newOperator=="="){
+					hasAssignment=true;
+					hasOverwritableOperator=false;
+				}
+				else hasOverwritableOperator=true;
+			}
+			if(!({index,macro,failed}=this.handleMicroAssemblyMacros({statement,index,scope})).failed){
+				if(!hasOverwritableOperator&&this.operators.hasOwnProperty(macro[0])&&macro[0]!="dw"&&isNaN(+macro[0])){
+					operator = macro[0];//TODO push rest of args
+					hasOverwritableOperator = false;
+					extraArgs = macro.splice(1,macro.length);
+					handleOper(operator);
+				}
+				else extraArgs = macro;
+			}
+			else if(!hasOverwritableOperator&&this.operators.hasOwnProperty(word)&&this.operators[word]!=null){
+				oper1=word;
 				index++;
 				if((oper1.match(/^\W+$/)||1)&&["=", "->"].includes(statement[index])){//'a + = b'
 					index++;//note: '=' is not required for 'a oper= b' although it is recomended for strict syntax
@@ -230,21 +260,9 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 						optionals["store"]="!";
 					}
 				}
-				if(oper1=="="||oper1=="=>"){//'%register = pop;'
-					word=statement[index];
-					if(["pop", "recv", ""].includes(word)){
-						oper1=word;
-						index++;
-					}
-				}
-				if(!operator||this.operators[oper1]!="jmp")operator=this.operators[oper1];
-				if(oper1=="="){
-					hasAssignment=true;
-					hasOverwritableOperator=false;
-				}
-				else hasOverwritableOperator=true;
+				handleOper(oper1);
 			}
-			return {index,operator,hasOverwritableOperator,hasAssignment};
+			return {index,operator,hasOverwritableOperator,hasAssignment,extraArgs};
 		}
 		asm_arg({statement,index,scope}){//#:(string|Value)[]
 			let word=statement[index];
@@ -256,11 +274,11 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				arg.push("[");
 				for(let i=0;i<word.length&&i<1;i++){
 					let statement=word[i],index=0;
-					({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 					if("+-".includes(statement[index])){
 						arg.push(statement[index++]);
 						({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 					}
+					({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 				}
 				index+=2;
 				arg.push("]");
@@ -288,7 +306,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				index++;
 				let value;
 				({value,index}=contexts.expression_short({statement,index,scope,noSquaredBrackets:true}));
-				value.toType("label");
+				value=value.toType("label");
 				if(!value.label)throw Error(throwError({statement,index,scope}, "# type", "label '"+value.name?.toString?.()+"' is unassigned"));
 				let {label}=value;
 				flattenTree(label);
@@ -306,7 +324,10 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 							flattenTree(codeObj);
 						}
 						else if(codeObj instanceof Scope)continue;
-						else if(codeObj instanceof HiddenLine)continue;
+						else if(codeObj instanceof HiddenLine){
+							if(codeObj instanceof HiddenLine.Define)flattenTree(codeObj.label);
+							else continue;
+						}
 						else if(codeObj instanceof MetaLine)continue;
 						else continue;
 					}
@@ -322,9 +343,10 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			let hasIf=false,hasOverwritableOperator=false,hasAssignment=false;//note: hasOverwritableOperator excludes '=' to allow for 'a=b+c' --> 'add a,b,c'
 			let operator,args=[],optionals={};//optionals:Map
 			for(let i=0;i<12;i++){
-				let arg;
+				let arg,extraArgs;
 				if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
-				if(!hasOverwritableOperator)({index,operator,hasOverwritableOperator,hasAssignment}=this.asm_operator({statement,index,scope,operator,optionals,hasAssignment}));
+				if(!hasOverwritableOperator)({index,operator,hasOverwritableOperator,hasAssignment,extraArgs}=this.asm_operator({statement,index,scope,operator,optionals,hasAssignment}));
+				if(extraArgs)args.push(extraArgs);
 				//if(!hasAssignment)({index,operator,hasAssignment}=this.asm_assignment({statement,index,scope,operator,optionals}));
 				{
 					let failed;
@@ -414,6 +436,47 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			:value instanceof Operator?this.doOperator(value,level+1)//TODO: remove this case
 			:[];
 		};
+		compile_preprocessor({instruction}){//UNUSED
+			preprocessor:{//assert: does not mutate instruction
+				let args1=[];
+				for(let i=0;i<args.length;i++){
+					if(args[i]=="$"){//handle macros
+						i+=1;
+						let value=args[i];
+						value=value?.toType("label");
+						if(!value?.label){
+							args1.push(args[i]);
+							continue;
+						}
+						let {label}=value;
+						args1.push(...flattenTree(label,[]));
+						function flattenTree(label,macro=[]){//uses macro
+							if(label.isSearched1)return macro;
+							label.isSearched1=true;
+							for(let codeObj of label.code){
+								if(codeObj instanceof AssemblyLine){
+									let args = codeObj.args;
+									//assume will always at least have 'dw' or another instruction at `args[0]`. This works for tptasm.
+									if(args[0]=="dw")args=args.slice(1,args.length);
+									macro.push(...this.compile_preprocessor({instruction}));
+								}
+								else if(codeObj instanceof Variable){
+									flattenTree(codeObj,macro);
+								}
+								else if(codeObj instanceof Scope)continue;
+								else if(codeObj instanceof HiddenLine)continue;
+								else if(codeObj instanceof MetaLine)continue;
+								else continue;
+							}
+							label.isSearched1=false;
+							delete label.isSearched1;
+							return macro;
+						}
+					}
+				}
+				args=args1;
+			}
+		}
 		compileAssemblyLine({instruction,cpuState,assemblyCode}){//@
 			const {mainObject}=mainObjectGetter();
 			//asm -> tptasm
@@ -469,5 +532,21 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			}
 			return {failed};
 		};
+		valueCharToNumber(value,join=false){//:string-> number | ([] & tptasm command string)
+			let v=value;//:String
+			let ary=v==undefined?[]:[
+				v==undefined?v:
+				v.length==1?assemblyCompiler.assembly.extraInstructions.string_char
+				:v[1]=="x"?assemblyCompiler.assembly.extraInstructions.string_char
+				:v[1]=="p"?assemblyCompiler.assembly.extraInstructions.string_pos
+				:v[1]=="c"?assemblyCompiler.assembly.extraInstructions.string_col
+				:v[1]=="a"?assemblyCompiler.assembly.extraInstructions.string_confirm
+				:v[1]=="e"?assemblyCompiler.assembly.extraInstructions.input_emptyBuffer
+				:v[1]=="h"?assemblyCompiler.assembly.extraInstructions.hault
+				:0,
+				v.length==1?v.charCodeAt(0):+("0x"+v.substr(2))||0,
+			];
+			return join?ary[0]|ary[1]:["dw", "0x"+((ary[0]|ary[1])&0xffff).toString(16)];
+		}
 	}
 ;

@@ -1,7 +1,7 @@
 //start at ~15:50 17:20 (works), 17:27 stop time,
 //TODO: use chain add for >16 bit comparison
 #"tptasm";//R2 computer
-#"len";#"table";
+#"len";//#"table";
 import "../std v1.0xmin";
 //import "../type.0xmin";
 //import "../RegState.0xmin";
@@ -179,6 +179,51 @@ repeat !!doExtraPrinting: reg.weakScope()<:(reg){:prints;
 	%arrayLen = [%input.arrayPtr+input.arrayPtr.size];
 	printReg.call(arrayLen);
 	print("\nwith 34 bit ints\n");
+};
+def let mergeSort=reg.blockScope()<:(){
+	let reg=RegEnum();
+	reg.weakScope()<:(reg){
+		meta.assert(nums_static.itemSize==2,"expected to need to divide by 2");//assumed to use `nextFor` to divide by `i` by 2 at the start
+		let arraySize = reg();
+		let partSize = reg();
+		%arraySize=[%input.arrayPtr+input.arrayPtr.size];
+		let partA=reg(),partB=reg(),carry=reg();
+		let doublePartSize = reg();
+		for.nextFor(partSize,
+			(i){%partSize=1;%doublePartSize=2},
+			(i,do){
+				%doublePartSize-%arraySize;
+				jump->do if>=0 !signed;
+			},
+			(i){%doublePartSize<<=1;%i<<=1},//does `@repeat log2(array.size)`
+		)<:(i){
+			let: breakAddress;
+			for(partA,
+				(partA){
+					%partA=[%input.arrayPtr+input.arrayPtr.size];
+					%partA-=1;
+				},//let i = input.array.length
+				(i,do){jump->do if>=0!signed},//i >= 0
+				(i){%partA-=%doublePartSize},// i--
+			)<:(i,break){
+				%partB=%partA;
+				%partB-=%partSize;
+				if<0 !signed jump->break;
+
+			};
+		};
+	};
+};
+#(){
+	reg.weakScope()<:(reg){
+		for(reg(),(i){%i=10},(i,do){if>=0!signed jump->do},(i){%i-=1})<:(i){
+			print("hello world");
+		};
+	};
+	let for=for.auto;
+	for(reg,(i){i = 10;if >= 0;i -= 1;
+		print("hello world");
+	});
 };
 reg.weakScope()<:(reg){
 	let forLoop(reg,doFor,start,condition,next,do){//:#(RegEnum,#->@,#->@,#->@,#?,#->@)->{@}

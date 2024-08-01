@@ -6,19 +6,19 @@ import "RegState.0xmin";
 //note: using '[]ram' for 'an item on the ram' and 'T~' for 'an invalid (write only) type T'
 let File()={
 	:self;
-	def let name<=>DynLenObjectPtr();//:String ; note: has a `meta.assert` that name:+0
-	let printString()=>{
-		$(Pointer(DynLenObjectPtr())<->..this).printString();
+	def let name<=>DynLenObjPtr();//:String ; note: has a `meta.assert` that name:+0
+	let printString()=>{//:#(&self)->@(%&self)->mutate terminal
+		$(Pointer(DynLenObjPtr())<->..this).printString();
 	};
-	def let parent{
-		def let parent<=>Pointer(File());
+	def let parent{//:InvertedTree<.parent>
+		def let parent<=>Pointer(File());//:Owner<self> is dropped if/when parent.links[_].parent==parent
 		//#Wrapper.wrap(..this,parent);
 		def let itemPtr<=>Pointer()<:Item(parent[¬Pointer].data.links,Pointer(self));
 	};
 	delete self;
-	def let info<=>DynLenObjectPtr();//:String
-	def let data<=>DynLenObjectPtr();//:Object*
-	def let links<=>DynLenObjectPtr();//:File[]* & Graph<File>
+	def let info<=>DynLenObjPtr();//:String
+	def let data<=>DynLenObjPtr();//:Object*
+	def let links<=>DynLenObjPtr();//:File[]* & Graph<File>
 }:>Type():>Trait.impl()<:(File){
 	//TODO: refactor code into methods
 	//UNFINISHED formal methods are not fully implemented yet. this is currently dead code
@@ -191,7 +191,7 @@ def onEnter;
 def let start;
 let loopThroughNames;//inline function
 reg.weakScope()<:(reg){:printFile;
-	let fileAsName <=> Pointer()<:DynLenObjectPtr();
+	let fileAsName <=> Pointer()<:DynLenObjPtr();
 	{:ifBlock;
 		%lastFile - 0;
 		jump->ifBlock..return if == 0;
@@ -237,7 +237,7 @@ let clearString{//:@(%usize)->clears terminal ; assigned later
 		stringLength;
 	};//:RegSet
 }:>static();
-let reg1 = RegEnum(DynLenObjectPtr.push.regsUsed);
+let reg1 = RegEnum(DynLenObjPtr.push.regsUsed);
 let char:>reg1()<:Char();
 def let getChar = awaitInput(char);
 def let linkDir.copy{:handleLinkDir_copy;
@@ -362,20 +362,29 @@ reg.weakScope()<:(reg){:checkKey_delete;
 				[%itemPtr] = %lastItemOnArray;//:File* & lastItemOnArray*
 			};
 			{//finishes up the `lastFile.links.pop()`
-				let array = Pointer()<:DynLenObjectPtr()<->temp;//:%File().links*
+				let array = Pointer()<:DynLenObjPtr()<->temp;//:%File().links*
 				%array = [%currentDir+currentDir.parent];
 				%array += Pointer(File()).links;
 				array.pop(Pointer()<:File());//TODO: work out why this pops from currentDir.name instead of 'array'.
 			};
 		};
+		let handleLinkDir(){
+			%linkDir-%currentDir;
+			jump->return..return if != 0;
+			%linkDir = startDir;//BODGED todo: set it to null. TODO: change linkDir to a nullable type
+		};
+		{:handleCase_fileOnStatic;//BODGED
+			handleLinkDir();//the deconstructor is not called on static memory
+		};
 		heap.unref(currentDir,reg.weakScope()<:(reg){
 			let directoryToDelete = Pointer(File())<-> reg();
 			%directoryToDelete = %currentDir;
 			call static.use()<:{:unrefFile;
+				handleLinkDir();
 				{:unrefLinks;
 					let i = usize() <-> temp;
-					let links = Pointer()<:DynLenObjectPtr().data <-> temp1;
-					for_start_repeat(i,{//assume: File():DynLenObjectPtr[]
+					let links = Pointer()<:DynLenObjPtr().data <-> temp1;
+					for_start_repeat(i,{//assume: File():DynLenObjPtr[]
 						%i = [%directoryToDelete+directoryToDelete.links.size];
 						%i -= 1;
 						jump->unrefLinks..return if < 0 !signed;
@@ -389,7 +398,7 @@ reg.weakScope()<:(reg){:checkKey_delete;
 					});
 				};
 				{:deleteFileArrays;
-					let object = Pointer()<:DynLenObjectPtr().slice.data<->temp;
+					let object = Pointer()<:DynLenObjPtr().slice.data<->temp;
 					let deleteNullableObject = static()<:{
 						let end;
 						jump->end if == 0;
@@ -555,7 +564,7 @@ def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
 						};
 					};
 					{:getNewFileName;
-						let data = DynLenObjectPtr().data<->temp;
+						let data = DynLenObjPtr().data<->temp;
 						%data = [string.data];
 						[%data+0] = %char;
 						[string.size] = 1;
@@ -597,17 +606,17 @@ def reg.weakScope()<:(reg){:handleChar;//check for file and change directory
 			};
 		};
 		call pushFile::{//does: currentDir.links.push(newFile)
-			let links = Pointer()<:DynLenObjectPtr() <-> temp;//:%File().links*&%File[]**
+			let links = Pointer()<:DynLenObjPtr() <-> temp;//:%File().links*&%File[]**
 			%links = %currentDir;
 			%links += currentDir.links;
-			meta.assert(+newFile!=+DynLenObjectPtr.push.outputs.newItem);
+			meta.assert(+newFile!=+DynLenObjPtr.push.outputs.newItem);
 			RegSet.save_onStack({newFile;currentDir})<:()->{
 				links.push(1);
 				delete links;
 				let currentDir = ¬;//is consumed, is invalid untill the end of this blockScope
 			};
-			meta.assert(+DynLenObjectPtr.push.outputs.newItem!=+newFile);
-			[%DynLenObjectPtr.push.outputs.newItem] = %newFile;
+			meta.assert(+DynLenObjPtr.push.outputs.newItem!=+newFile);
+			[%DynLenObjPtr.push.outputs.newItem] = %newFile;
 			return;
 		}:>static.use();
 		{:changeDirectory;

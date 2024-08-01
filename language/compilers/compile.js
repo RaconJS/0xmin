@@ -1399,6 +1399,23 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 				},
 			//---
+			operator_type(value,typeName){//:Value
+				if(value===null||value===undefined){//'¬()' and '(¬)' --> empty, undeclared label
+					value=new Value({type:"label",label:null});
+				}
+				else value=new Value(v);
+				value=value.toType("label");
+				let oldLabel=value.label;//:Variable?
+				let typeObject=mainObject.labels["Type"].labels[typeName];
+				let newLabel=new Variable({
+					name:"<"+typeName+">",
+					code:[oldLabel],
+					functionPrototype:oldLabel,
+					functionConstructor:typeObject,
+				});
+				value.label.labels[typeObject.symbol]=newLabel;
+				return value;
+			},
 			operators_Left:{
 				"+":(value)=>value?value.toType("number"):new Value.Number(NaN),
 				"-":(value)=>value?-value.toType("number"):new Value.Number(NaN),
@@ -1428,10 +1445,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					if(v.refType=="symbol")v.refType="name";//TODO: unsure if "name" is the correct one to use or if it's "property"
 					return v;
 				},
-				"&":(value)=>value,//type-reference ; is for non-owned data and is not a pointer, unlike in Rust
-				"*":(value)=>value,//type-pointer
-				"%":(value)=>value,//type-register 
-				"^":(value)=>value,//type-array of ; '3^int' == `int[3]`, '^int' == `int[]`
+				"&":(value)=>contexts.operator_type(value,"Reference"),//type-reference ; is for non-owned data and is not a pointer, unlike in Rust
+				"*":(value)=>contexts.operator_type(value,"Pointer"),//type-pointer
+				"%":(value)=>contexts.operator_type(value,"Register"),//type-register 
+				"^":(value)=>contexts.operator_type(value,"Array"),//type-array of ; '3^int' == `int[3]`, '^int' == `int[]`
+				"%%":(value)=>contexts.operator_type(value,"Array"),
 			},
 			operators:{
 				"+":new Operator_numeric((a,b)=>a+b,0,a=>+a),
@@ -3350,7 +3368,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		};
 	//----
 	const assembler={//oper,label
-		tptasm:require("./ZASM_tptasm.js")({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLine,MetaLine,Variable,throwError,Value,loga,mainObjectGetter:()=>({mainObject})}),
+		tptasm:require("./ZASM_tptasm.js")({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLine,MetaLine,Variable,throwError,Value,loga,valueCharToNumber,mainObjectGetter:()=>({mainObject})}),
 		"0xmin":new class extends Language{//UNFINISHED
 			keywords={move:0,jump:1,nor:2,red:3,blue:4,set:5};
 			;

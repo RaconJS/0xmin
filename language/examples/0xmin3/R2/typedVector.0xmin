@@ -7,23 +7,23 @@ let vec(x,y){
 	let vecOper(a,b,foo){
 		..this()<:{repeat 0xmin.Math.min(a..length,b..length):foo()[0];
 	};
-	#..prototype{let
-		..+_(a,b){
+	#..operators{let
+		.["+_"](a,b){
 			#return <=> vecOper(a,b,(b){def +b});
-		}::{#£..metaState.enter=£(template,template)->template¬()},
-		..-_(a,b){
+		}::{#£..metaState.enter=#(template,template)->template¬()},
+		.["-_"](a,b){
 			#return <=> vecOper(a,b,(b){def -b});
-		}::{#£..metaState.enter=£(template,template)->template¬()},
-		.._+_(a,b){
+		}::{#£..metaState.enter=#(template,template)->template¬()},
+		.["_+_"](a,b){
 			#return <=> vecOper(a,b,(a,b){def a+b});
-		}::{#£..metaState.enter=£(template,template)->template¬()},
-		.._-_(a,b){
+		}::{#£..metaState.enter=#(template,template)->template¬()},
+		.["_-_"](a,b){
 			#return <=> vecOper(a,b,(a,b){def a-b});
 		},
-		.._*_(a,b){
+		.["_*_"](a,b){
 			#return <=> vecOper(a,b,(a,b){def a*b});
 		},
-		.._/_(a,b){
+		.["_/_"](a,b){
 			#return <=> vecOper(a,b,(a,b){def a/b});
 		},
 	};

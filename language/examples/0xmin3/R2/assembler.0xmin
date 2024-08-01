@@ -1,0 +1,121 @@
+#"tptasm";
+//text editor and assembler
+//using low or minimal abstractions
+:global;
+let RegEnum(n){
+	#return<->n||0;
+	()={
+		#this<->constructor;
+		repeat(constructor>=14)throw"out of registers";
+		#constructor+=1;
+	};
+};
+let assert(condision,do)={
+	repeat !condision throw "assersion #"...n..." failed";
+	#n+=1;
+}::{let..prototype{let n=0;}};
+let assembler{//:@(%Lop&%*str)->%Lop
+	let input{
+		def let string;
+	};
+	let output{
+		def let code;
+	};
+	...labelsof input,output;
+	let instructionSet=#(){//:#
+		mov  0x00000000;
+		and  0x01000000;
+		or   0x02000000;
+		xor  0x03000000;
+		add  0x04000000;
+		adc  0x05000000;
+		sub  0x06000000;
+		sbb  0x07000000;
+		swm  0x08000000;
+		ands 0x09000000;
+		ors  0x0A000000;
+		xors 0x0B000000;
+		adds 0x0C000000;
+		adcs 0x0D000000;
+		subs 0x0E000000;
+		sbbs 0x0F000000;
+		hlt  0x10000000;
+		jmp  0x11000000;
+		rol  0x12000000;
+		ror  0x13000000;
+		shl  0x14000000;
+		shr  0x15000000;
+		scl  0x16000000;
+		scr  0x17000000;
+		bump 0x18000000;
+		wait 0x19000000;
+		send 0x1A000000;
+		recv 0x1B000000;
+		push 0x1C000000;
+		pop  0x1D000000;
+		call 0x1E000000;
+		ret  0x1F000000;
+		
+		jn   0x11000001;
+		jb   0x11000002;jnae 0x11000002;jc   0x11000002;
+		jnb  0x11000003;jae  0x11000003;jnc  0x11000003;
+		jo   0x11000004;
+		jno  0x11000005;
+		js   0x11000006;
+		jns  0x11000007;
+		je   0x11000008;jz   0x11000008;
+		jne  0x11000009;jnz  0x11000009;
+		jle  0x1100000A;jng  0x1100000A;
+		jnle 0x1100000B;jg   0x1100000B;
+		jl   0x1100000C;jnge 0x1100000C;
+		jnl  0x1100000D;jge  0x1100000D;
+		jbe  0x1100000E;jna  0x1100000E;
+		jnbe 0x1100000F;ja   0x1100000F;
+	}[0];
+	let matches{
+		let i=-1;
+		let namesTree;//:Tree(char->Node,#)
+		let flatMatchList;
+		repeat instructionSet..length#{
+			#i+=1;
+			let instruction = instructionSet[i][0];
+			let instructionData = instructionSet[i];
+			let i=-1,end;
+			let namesSubTree = namesTree;
+			repeat(end&&instruction..length)#{
+				#i+=1;
+				let char = instruction[i];
+				repeat !namesSubTree[""...char]:#{
+					let namesSubTree[""...char];
+					#namesSubTree..splice(-0,0,{$def:namesSubTree[""...char]});
+					#flatMatchList..splice(-0,0,{$def:namesSubTree[""...char]});
+				};
+				#namesSubTree = namesSubTree[""...char];
+			};
+			namesSubTree <=> instructionData[1]..asNumber;
+		};
+		let i=-1;
+		repeat flatMatchList..length {
+			#i+=1;
+			let match = flatMatchList[i];
+
+		};
+	};
+	let parseOperator{
+
+	};
+	{:forLoop;
+
+	};
+}::{defer global def ..this};
+let string = ""
+	...'push r0\n'
+	...'mov r0 0\n'
+	...'send r0 "h"\n'
+	...'send r0 "i"\n'
+	...'pop r0\n'
+;
+defer:def string;
+r0 = string;
+r1 = string..length;
+call assembler;
