@@ -1,0 +1,58 @@
+//UNFINISHED
+#"x86";
+let Enum(cases)={//object:#[]&# ; {def let ...}
+	#let i = -1;
+	let indexes{
+		#let largestObj,maxSize=0,size;
+		repeat cases..length ...codeof{
+			let case = cases[i+=1];
+			@case;
+			repeat (maxSize<(size=case..@..length))
+				#largestObj=obj,maxSize=case..@..length;
+		};
+		delete;
+		...labelsof cases;
+		#..compile;
+	};
+	let template{
+		#let i = -1;
+		repeat cases..length ...codeof{
+			let case = cases[i+=1];
+			repeat(largestObj!=case): virtual def case;
+			repeat(largestObj==case): def case;
+		};
+		delete i;
+		...labelsof cases;
+		#..compile;
+	};
+
+	...labelsof cases;
+	let object=cases;
+};
+let Label()={
+
+};
+let ValueTrait()={
+	def let 
+}::{
+	let enum = Enum()<:{def let
+		Default = Enum()<:{
+			let.[¬ValueTrait]{
+				//let 
+			};
+			def let label{
+				def let isSymbol{0s8};
+				def let label=Label();
+			};
+			def let number{0};
+			def let string{
+				0#def let pointer;
+				0#def let size;
+			};//:Dlop(str) & {char[]*;usize;usize}
+			def let array{
+				0#def let pointer;
+				0#def let length;
+			};//:LenArrayPtr(Lop(str))
+		},
+	};
+};

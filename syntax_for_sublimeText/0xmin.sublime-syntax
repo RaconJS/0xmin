@@ -66,7 +66,7 @@ variables:
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|model|language))?|Math(?:\s*\.\s*())?)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
-  tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b'
+  tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b|\!\s*\bsync\b'
   meta_statementTypes: '\b(?:let|set|def)\b'
 contexts:
   main:
@@ -472,7 +472,7 @@ contexts:
       scope: support.constant
     - match: '\b(r[0-9]|r1[0-5]|ip|sp)\b'
       scope: support.constant
-    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask|push|pop|mov|send)\b'
+    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask|push|pop|mov|send|ld|st|exh)\b'
       scope: keyword.control
     - match: '{{assembly_commands_start}}\b(invoke|do)\b'
       scope: keyword.control

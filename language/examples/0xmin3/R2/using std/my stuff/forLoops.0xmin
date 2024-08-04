@@ -1,0 +1,36 @@
+#"table";
+#"tptasm";
+import "../std v1.0xmin";
+for.auto(reg)<:(i){
+	@$i = 10;
+	if > 0;
+	@$i -= 1;
+	print("hello world");
+};
+for.auto(reg,(i){
+	@$i = 10;
+	if > 0;
+	@$i -= 1;
+})<:(){
+	print("hello world");
+};
+reg.weakScope()<:(reg){
+	let i = reg();
+	for(i,
+		(i){%i=0},
+		(i,do){jump->do if i>0},
+		(i){%i-=1}
+	)<:(i){
+		print("hello world");
+	};
+};
+reg.weakScope()<:(reg){
+	let i = reg();
+	let entry;
+	jump->entry;
+	${:loop;
+		print("hello world");
+		%i-=1;
+		jump->loop if >= 0 #def entry;
+	};
+};

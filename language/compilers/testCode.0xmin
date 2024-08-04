@@ -1,43 +1,48 @@
-#"tptasm";#"table";
-let a = {@[2]};
-@$a=2;
-$0-=2;//fixed; BUG
+#"tptasm";
+#"table";
 
 
+let a{let b{let c}};
+let =(a.b.c);//same as `let c = a.b.c`
+debugger c;
 
-...labelsof 0xmin.Type;
-let Pointer(value,template)={
-	$set template;
-	let unwrap(code){
-		let code1={
-			$def((template..constructor==Part)&&{@[$code+template]}||{@[$code]});
+
+let print(string,reg,isValid)={
+	repeat !reg #reg = 1;
+	repeat !isValid {
+		let temp_static;
+		defer return: def temp_static;
+		st %reg temp_static;
+		defer return: ld %reg temp_static;
+		exh %reg 0x2002;
+	};
+	let i = -1;
+	repeat string..length st string.(i+=1) r1;
+	jump->return..return;
+}::{
+	def let temp_static{0};//:[]static
+};
+defer: def print;
+print("Hello, world!");
+
+
+let Var()={
+}::{//static memory management
+	let ..prototype{
+		let alloc(object){
+
 		};
-		$def(template.unwrap(code1)||code1);
+		let free(object){
+
+		};
+		let ..prototype(){
+			;
+		};
+	};
+	let newTemplate(object){
+		object;
+	};
+	let call(from,to){//:#(Var,Var)->#?
+		let =to.using;
 	};
 };
-let Part(value,template)={
-	$set template;
-	let unwrap(code){
-		let code1={@$code};
-		$def(template.unwrap(code1)||code1);
-	};
-};
-let Register(value,template)={
-	//$set template;
-	let unwrap(){
-		let code={%..this};
-		$def(template.unwrap(code)||code);
-	};
-	unwrap();
-};
-let Getter(value,template)={
-	$set template;
-	let unwrap(code){
-		def(code||{0});
-		let return..proto=template;
-	};
-};
-let int(template){@template};
-let a = Register(¬)<:Pointer(¬)<:Part(¬)<:Getter(¬)<:int(¬);
-#a<->3;
-@$a = 2;

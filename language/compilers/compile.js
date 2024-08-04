@@ -651,7 +651,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							let willCreateLabel=!(statement[index+hasOperator]=="="&&statement[index+1+hasOperator]!="(");
 							if(["name", "property"].includes(value.refType)){//'let a;' or 'let a.b;'
 								const newLabel=isHoistingAssignment?value.label??null:new Variable({name:value.name});
-								let labelParent=["name"].includes(value.refType)?scope.let.label:value.parent;
+								let labelParent=isHoistingAssignment||["name"].includes(value.refType)?scope.let.label:value.parent;
 								if(labelParent)//BODGED; TODO: add refType to callFunction, or make a better default refType for Values.
 								if(willCreateLabel){//'let a;' and not 'let a = ...' ==> makes default label;
 									if(metaState["set"]){//'let set a.b;' ==> `a.b??={};` 

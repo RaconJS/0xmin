@@ -32,7 +32,11 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			},
 			"store":{
 				map:{"add":"adds", "addc":"addcs", "sub":"subs", "sbb":"sbbs", "and":"ands", "xor":"xors", "or":"ors"},
-				defaultSymbols:["", "!"],
+				defaultSymbols:["!"],
+			},
+			"flags":{
+				map:{"mov":"movf"},
+				defaultSymbols:["", "&"],
 			},
 			"internal":{
 				map:{"shl":"scl", "shr":"scr"},
@@ -46,6 +50,31 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				useArray:true,
 				map:{"jg":["ja", "!"], "jl":["jb", "!"], "jge":["jae", "!"], "jle":["jbe", "!"]},
 				defaultSymbols:["", "!"],
+			},
+			"sync":{
+				map:{
+					"jmp":"jy",
+					"jn":"jyn",
+					"jz":"jyz",
+					"jnz":"jnyz",
+					"jc":"jyc",
+					"jnc":"jnyc",
+					"jo":"jyo",
+					"jno":"jnyo",
+					"js":"jys",
+					"jns":"jnys",
+					"jge":"jgye",
+					"jle":"jlye",
+					"je":"jye",
+					"jne":"jnye",
+					"jg":"jyg",
+					"jl":"jyl",
+					"ja":"jya",
+					"jb":"jyb",
+					"jae":"jaye",
+					"jbe":"jbye",
+				},
+				defaultSymbols:["!"],
 			},
 		});
 		operatorsToCheckForNoStore=Object.freeze([
@@ -131,6 +160,38 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			"jae":"jae",
 			"jbe":"jbe",
 			"swm":"swm",
+			//commands for x86
+			"*":"mul",
+			"mul":"mul",
+			"imul":"imul",
+			"/":"div",
+			"div":"div",
+			"idiv":"div",
+			"movsxd":"movsxd",
+			"movsx":"movsx",
+			"jy":"jy",
+			"jyn":"jyn",
+			"jyz":"jyz",
+			"jynz":"jynz",
+			"jyc":"jyc",
+			"jync":"jync",
+			"jyo":"jyo",
+			"jyno":"jyno",
+			"jys":"jys",
+			"jyns":"jyns",
+			"jyge":"jyge",
+			"jyle":"jyle",
+			"jye":"jye",
+			"jyne":"jyne",
+			"jyg":"jyg",
+			"jyl":"jyl",
+			"jya":"jya",
+			"jyb":"jyb",
+			//commands for R3
+			"exh":"exh",
+			"st":"st",
+			"ld":"ld",
+			"movf":"movf",
 		});
 		flags={
 			"0"       :{map:"ZF",jumpMap:["jnz", "jz"]},
@@ -274,11 +335,11 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				arg.push("[");
 				for(let i=0;i<word.length&&i<1;i++){
 					let statement=word[i],index=0;
+					({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 					if("+-".includes(statement[index])){
 						arg.push(statement[index++]);
 						({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 					}
-					({index}=this.asm_NumberOrRegister({statement,index,scope},{arg}));
 				}
 				index+=2;
 				arg.push("]");
@@ -298,7 +359,6 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			};
 			return {index,hasAssignment,operator};hasAssignment
 		}
-		///interface
 		handleMicroAssemblyMacros({statement,index,scope}){//'@$label' ; for 'a{[r1]};@$a=b' --> '@[r1]=b'
 			let failed=true,macro=[];
 			if(statement[index]=="$"){
@@ -337,6 +397,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			}
 			return {index,macro,failed};
 		}
+		///interface
 		generateAssemblyLine({statement,index,scope}){//:void & mutates scope
 			const instruction=new AssemblyLine({scope});
 			let argsList=[];
@@ -346,7 +407,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				let arg,extraArgs;
 				if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
 				if(!hasOverwritableOperator)({index,operator,hasOverwritableOperator,hasAssignment,extraArgs}=this.asm_operator({statement,index,scope,operator,optionals,hasAssignment}));
-				if(extraArgs)args.push(extraArgs);
+				if(extraArgs)args.push(...extraArgs);
 				//if(!hasAssignment)({index,operator,hasAssignment}=this.asm_assignment({statement,index,scope,operator,optionals}));
 				{
 					let failed;
@@ -381,7 +442,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 						instruction.dataType="number";
 						instruction.dataValue=args[0][0].number;//:number
 					}
-				}else throw Error(throwError({statement,index,scope},"#/@ syntax", "invallid assembly line: expected a string, a number or a command."));
+				}//else throw Error(throwError({statement,index,scope},"#/@ syntax", "invallid assembly line: expected a string, a number or a command.")); //is commented out to 
 			}
 			else{
 				for(let i in optionals){//optionals[number]:string & symbol

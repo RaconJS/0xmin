@@ -1,0 +1,50 @@
+#"tptasm";
+:global;
+let RegEnum()={
+	#return <-> 0;
+	()={
+		#..this <-> ..constructor;
+		#..constructor+=1;
+	};
+	let ..prototype = {
+		let move(newReg)<-{
+			#newReg<->this; 
+		}::{
+			let ..prototype = {
+				let = this;
+			};
+		};
+	};
+};
+let grid = {
+	let edge={0x0100;0x0200;0x0400;0x0800};
+	let edgeMask = 0x0f00;
+	let l=edge[0],r=edge[1],u=edge[2],d=edge[3];
+	(l|u);u;u;(r|u);
+	    l;0;0;r;
+	    l;0;0;r;
+	(l|d);d;d;(r|d);
+	let size{4;4};
+};
+let regEnum = RegEnum();
+let inputChar = regEnum()::{@%..this};
+{
+	let match(a,b,shiftValue,do){
+		@:$a - "w";
+		jump->return..return if == 0;
+		do;
+	};
+	match(inputChar,"w",-grid.size[1])<:{
+
+	};
+	match(inputChar,"a",-1)<:{
+
+	};
+	match(inputChar,"s",grid.size[1])<:{
+
+	};
+	match(inputChar,"d",1)<:{
+
+	};
+	
+};

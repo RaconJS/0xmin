@@ -1,4 +1,4 @@
-#"tptasm";#"len";//#"table";
+#"tptasm";#"len";#"table";
 ...(){
 	let Register;
 	let: var = Register(){:this;
@@ -495,7 +495,7 @@ let main{
 	jump->waitForValidInput;
 };
 //registors
-debugger var.used"label.code.map(v=>0|v.lineNumber).join('')";
+//debugger var.used"label.code.map(v=>0|v.lineNumber).join('')";
 {
 	{
 		call main#def let start;
@@ -503,7 +503,7 @@ debugger var.used"label.code.map(v=>0|v.lineNumber).join('')";
 	};
 	def main;
 	def data{
-	0x31111111;
+		0x31111111;
 		def Buyables;
 		def codeBlock;
 		def String;

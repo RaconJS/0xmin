@@ -283,3 +283,27 @@
 		call foo;//idea: do not store CPU state on labels themselves but store things that reference those labels.
 	};
 };
+{//revising the 0@$# symbols
+	#let;
+	#;
+	#def;
+	#undef;
+	#ins;//inserts code, runs `#...codeof` at `$` phase
+	#set;//sets state
+	#...;
+	#repeat;
+	#recur;
+	$def;//defines state
+	//defaults
+	#a();//#set:a();
+	$a();//#ins:a();
+	@a();//#ins:$+#(a());
+	//e.g.
+	@$a = @$(a+1);//
+	@$a = $(a+1);
+	let ...codeof: a = 2;
+	//alternative possible version: use `@` for insterting code like `@...codeof` & use `$` for address and state code
+		#a;//+#$(a)
+		@a;//...codeof $(a)
+		$a;//+$(a)
+};

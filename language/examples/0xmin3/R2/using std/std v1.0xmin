@@ -310,7 +310,19 @@
 					start:#(i:%)->{@},
 					condision:#(i:%,to:@,isJumpOnFail:#?)->{@;@jump->to if flag;},
 					do:#(i:%,break:@)->{@}
+				)->{@}|
+				|#(//for.auto
+					RegEnum&()->%,
+					(%usize,RegEnum,#@,#@)->{
+						{@},
+						{@}->@jump,
+						@
+					}
 				)->{@}
+			};
+			repeat(arguments..length == 2)...run(){
+				#return = constructor.auto(...arguments);
+				break;
 			};
 			#i = arguments[-5]||(¬);
 			#start = arguments[-4]||(i){%i = 0};
@@ -359,19 +371,36 @@
 				...run this;
 				undef jumpToEntry;
 			};
-			let auto(reg,args){//for.auto(reg)<:(i){i = 10;if >= 0;i -= 1}
-				repeat!!RegEnum.isRegister(reg) let i = reg;
-				repeat!RegEnum.isRegister(reg) let i <-> reg();//default
-				let entry,loop,exit;
-				let args = args(i,reg,exit,entry);
-				let start=args[0],condision=args[1],next=args[2],do=args..splice(3,-1);
+			let auto(regEnum,argsFunction,doFunction){//for.auto(reg)<:(i){i = 10;if >= 0;i -= 1}
+				#(){
+					#(
+						RegEnum&()->%,
+						(%usize,RegEnum,#@,#@)->{
+							{@},
+							{@}->@jump,
+							@
+						},
+						?(%usize,RegEnum,#@,#@)->{@},
+					)->{@}
+				};
+				let reg = regEnum;
+				let i;
+				repeat !!reg #{
+					let bool = RegEnum.isRegister(reg);
+					repeat!!RegEnum.isRegister(reg): #i = reg;
+					repeat!RegEnum.isRegister(reg): #i <-> reg();//default
+				};
 				#i::{%..this};
+				let entry,loop,exit;
+				let args = argsFunction(i,reg,exit,entry);
+				let start=args[0],condision=args[1],next=args[2],do=doFunction()||args..splice(3,-1);
+				delete args;
 				def start;
 				jump->entry;
 				def loop;
 				def do;
 				def next;
-				def entry;
+				repeat !entry..defs..length def entry;
 				@:$condision loop;
 			};
 		};
