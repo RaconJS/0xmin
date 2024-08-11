@@ -980,10 +980,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						switch(fileType){
 							case"text":
 								fileData=oxminCompiler.fileLoader(filePath);
+								let value = new Value({type:"string",string:fileData,array:fileData.split(""),scope});
+								let label = Variable.fromValue(value,scope);
+								scope.label.code.push(...label.code);
 							break;
 							case"bin":
 							case"u32":
 								fileData=oxminCompiler.fs.readFileSync(filePath);
+								scope.label.code.push(...fileData.map(v=>Variable.fromValue(Value.Number(v),scope).code[0]));
 								throw Error("compiler error: unsupported file import type: '"+fileType+"'. UNFINISHED");
 							break;
 							default:throw Error("compiler error: unsupported file import type: '"+fileType+"'.")
@@ -2962,34 +2966,40 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 
 						}).toValue("label");
 					},
-					"iterate":new BuiltinFunctionFunction("iterate",({label,args,scope,statement})=>{//
+					"iterate":new BuiltinFunctionFunction("iterate",({label,args,value})=>{//
 						let oldCode=[...label.code];
-						let ans=new Value({type:"label"});//:Value&label
-						throw Error("compiler error: UNFINISHED");
+						let newValue=new Value({type:"label"});//:Value&label
+						let ans;
+						const callingValue = value;
+						//throw Error("compiler error: UNFINISHED");
 						if(args.length>=2){
 							let startValue=args[0];
-							let reduceFunction=args[1].label
+							let reduceFunction=Variable.fromValue(args[1]);
 							ans=oldCode.reduce((s,v,i,a)=>{
 								v=new Value().fromCode(v);
 								i=new Value.Number(i);
-								a=label;
-								return reduceFunction?.callFunction({
+								a=label.toValue();
+								return reduceFunction?.callFunction?.({
 									args:{list:[s,v,i,a],obj:{s,v,i,a}},
-									value:callingValue,callType:undefined,scope,statement
+									value:callingValue,callType:undefined,scope:callingValue.scope//,statement
 								})
 							},startValue);
 						}
 						else if(args.length>=1){
-							let mapFunction=args[0];
-							ans=oldCode.map((s,v,i,a)=>{
-								([s,v,i,a]=[s,v,i,a].map(v=>new Value().fromCode(v)));
-								return mapFunction?.callFunction({
-									args:{list:[s,v,i,a],obj:{s,v,i,a}},
-									value:callingValue,callType:undefined,scope,statement
-								})
+							let mapFunction=Variable.fromValue(args[0]);
+							ans=oldCode.map((v,i,a)=>{
+								v=new Value().fromCode(v);
+								i=new Value.Number(i);
+								a=label.toValue();
+								return Variable.fromValue(mapFunction?.callFunction?.({
+									args:{list:[v,i,a],obj:{v,i,a}},
+									value:callingValue,callType:undefined,scope:callingValue.scope//,statement
+								}).value);
 							});
+							newValue.array = ans;
+							newValue.label = new Variable({name:"<{iterate}>",code:ans});
 						}
-						return ans;
+						return newValue;
 					}),
 					"static":({label,scope})=>{
 						let labels = scope.code.symbolLabel??={};//:Map(Symbol->Variable)

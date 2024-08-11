@@ -1,0 +1,19 @@
+let Rc(data)={
+	let rc = {
+		def let counter <=> int();
+		def let = data;
+	};
+	let rcAddress;
+	let code = {
+		...codeof data.code;
+		(rcAddress=alloc(rc)).code;
+	};
+	let getReference(){
+		let code{
+			@$counter += 1;
+		};
+		#return = rcAddress;
+	};
+	let obj = getReference();
+	#code::{obj.code};
+};

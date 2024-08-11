@@ -1,10 +1,14 @@
-#"tptasm";
+#"ZASM3";#"tptasm";#"len";//#"table";
 :global;
-let RegEnum()={
-	#return <-> 0;
+#import lib "R2/print.0xmin";
+#import lib "R2/getInput.0xmin";
+let RegEnum(start)={
+	#return <-> start||0;
 	()={
 		#..this <-> ..constructor;
-		#..constructor+=1;
+		repeat(+..constructor>=14)throw "out of registers";
+		#..constructor<->..constructor+1;
+		%..this;
 	};
 	let ..prototype = {
 		let move(newReg)<-{
@@ -17,34 +21,283 @@ let RegEnum()={
 	};
 };
 let grid = {
-	let edge={0x0100;0x0200;0x0400;0x0800};
-	let edgeMask = 0x0f00;
-	let l=edge[0],r=edge[1],u=edge[2],d=edge[3];
-	(l|u);u;u;(r|u);
-	    l;0;0;r;
-	    l;0;0;r;
-	(l|d);d;d;(r|d);
+	"    ";
+	"    ";
+	"    ";
+	"    ";
 	let size{4;4};
+	let nullChar = +" ";
+	:self;
+	defer global def self;
+};
+let random{
+	defer global def ..this;
+	let numbers{
+		defer global def ..this;
+		repeat 200 @(0x10000*0xmin.Math.random()|0);
+	};
+	let currentNumber = {@numbers};//:@{@*}
+	defer global def currentNumber;
+	let output = {0};
+	defer global def output;
+	push r0;
+	r0 = [currentNumber];
+	r0 = [r0];
+	//{:TEST;print(" ");print.register(0);};
+	[output] = r0;
+	[currentNumber] += 1;
+	let reset{
+		push r0;
+		r0 = numbers;
+		[currentNumber] = r0;
+		pop r0;
+		return;
+	};defer ..this def reset;
+	{:block;
+		r0 = numbers..return;
+		[currentNumber] - r0;
+		jump -> block..return if <= 0 !signed;
+		call reset;
+	};
+	pop r0;
+	return;
 };
 let regEnum = RegEnum();
-let inputChar = regEnum()::{@%..this};
-{
-	let match(a,b,shiftValue,do){
-		@:$a - "w";
-		jump->return..return if == 0;
-		do;
+let inputChar = regEnum();
+let const_0 = regEnum();
+let score = regEnum();
+%const_0 = 0;
+call random.reset;
+let printGrid{
+	let regEnum=RegEnum(regEnum);
+	//let currentTilePtr = regEnum();
+	//%i = grid.size.(1);
+	//%currentTilePtr = grid;
+	let printGrid_meta(printPartGetter){
+		#let grid_n<->0;
+		$grid_n=>grid;
+		//send %const_0 "\p00";
+		let i = -1;
+		repeat +grid.size[1]{
+			repeat +grid.size[0]{
+				printPartGetter(grid_n);
+				$grid_n=>grid_n+1;
+			};
+			#i+=1;
+			repeat(i < (grid.size[1]-1)):{
+				send %const_0 "\n";
+			};
+		};
 	};
-	match(inputChar,"w",-grid.size[1])<:{
-
+	printGrid_meta((grid_n){send %const_0 [grid_n]});
+	return;
+	let blank{
+		printGrid_meta((grid_n){send %const_0 " "});
+		return;
 	};
-	match(inputChar,"a",-1)<:{
-
+	defer:def blank;
+};defer: def printGrid;
+sp = 0;
+${:main;
+	{:pick_randomTile;
+		let regEnum = RegEnum(regEnum);
+		let tileNumber = regEnum();
+		//%tileNumber = #(grid.size[0]*grid.size[1]-1);
+		let randomNumber = regEnum();
+		let i = regEnum();
+		let temp = regEnum();
+		let randomNumber_store{0#def let randomNumber;1#def let i};
+		defer global def randomNumber_store;
+		%randomNumber = [randomNumber_store.randomNumber];
+		%i = [randomNumber_store.i];
+		${:loop;
+			{:block;
+				%randomNumber >>= 4;
+				%i -= 1;
+				jump->block..return if !=0;
+				%i = 4;
+				call random;
+				%randomNumber = [random.output];
+			};
+			%tileNumber = %randomNumber;
+			%tileNumber &= 0xf;//(grid.size[0]*grid.size[1]-1)
+			%tileNumber+=grid;
+			%temp = [%tileNumber];
+			%tileNumber-=grid;
+			%temp - grid.nullChar;
+			jump -> loop if != 0;
+		};
+		[randomNumber_store.randomNumber] = %randomNumber;
+		[randomNumber_store.i] = %i;
+		%tileNumber += grid;
+		:block;
+		{
+			let =i,=randomNumber,=temp;//:%int,%bool
+			let bit <-> temp;
+			#block::{delete i,randomNumber};
+			let randomBits_store{0;1#def let i};
+			defer global def randomBits_store;
+			%randomNumber = [randomBits_store];
+			%i = [randomBits_store.i];
+			{:checkNeedNextRandom;
+				:block;
+				%i -= 1;
+				jump -> block..return if > 0;
+				%i = 16;
+				call random;
+				%randomNumber = [random.output];
+			};
+			{:block;
+				%bit = %randomNumber;
+				%bit &= 1;
+				let newTile <-> bit;
+				%newTile += "A";
+				[%tileNumber] = %newTile;
+			};
+			%randomNumber >>= 1;
+			[randomBits_store] = %randomNumber;
+		};
+		%tileNumber -= grid;
 	};
-	match(inputChar,"s",grid.size[1])<:{
-
+	send %const_0 "\p00";
+	call printGrid;
+	{:checkEndGame;
+		let regEnum = RegEnum(regEnum);
+		let temp_nullChar = regEnum();
+		%temp_nullChar = grid.nullChar;
+		let i = -1;
+		let pos;
+		$pos=>grid;
+		repeat(grid.size[0]*grid.size[1]):{
+			%temp_nullChar - [pos];
+			jump -> checkEndGame..return if == 0;
+			$pos=>pos + 1;
+		};
+		{:endGame;
+			print("gameOver\nscore:");
+			hlt;
+		};
 	};
-	match(inputChar,"d",1)<:{
-
+	${:handleInput;
+		let isEqual(a,b,do){
+			@:subs $(a) $(b);//BUG: @$a-$b; throws an error
+			jump->return..return if != 0;
+			def do;
+		};
+		let moveTiles{
+			let regEnum = RegEnum(regEnum);
+			defer global:def ..this;
+			let temp <-> inputChar;let inputChar = ¬;
+			let stepSize = regEnum();//:%const int
+			let startingTile = regEnum();
+			let reshift = regEnum();
+			let inputs{
+				let =stepSize,=startingTile,=reshift;
+			};
+			let currentTile <-> startingTile;
+			let currentFreeTile = regEnum();//:([]grid)*
+			%currentTile += grid;//:%([]grid)* & %&mut(mut*)
+			let changeMade = regEnum();
+			%changeMade = 0;
+			let i=regEnum(),j=regEnum();
+			let entry;
+			%i = grid.size.(1);
+			${:loop;//doFor
+				%j = #(grid.size.(0)-1);
+				#{repeat (+grid.size.(0)!=+grid.size.(1))throw "assertion failed";};
+				%currentFreeTile = %currentTile;
+				%currentTile += %stepSize;
+				//%currentTile += %stepSize;
+				${:loop;//doFor
+					let nextTile = regEnum();//:%[]grid
+					let getNextTile = {@[%currentTile+%stepSize]};
+					let thenPlace, thenStack, thenShift_increase;
+					{:cases;
+						let currentTileValue <-> temp;
+						let finally;
+						%currentTileValue = [%currentTile];
+						%currentTileValue - grid.nullChar;
+						jump->cases..return if == 0;//assert: `[%currentTile]` != nullChar
+						[%currentFreeTile] - grid.nullChar;
+						jump->finally if == 0;
+						[%currentFreeTile] - %currentTileValue;
+						jump->thenShift_increase if == 0;
+						def thenStack{//'A B' -> 'AB '
+							%currentFreeTile += %stepSize;
+							jump->finally;
+						};
+						def thenShift_increase{//'A A' -> 'B  '
+							%currentTileValue += 1;
+							{:checkWin;
+								%currentTileValue - (10+"A");
+							};
+						};
+						def finally{
+							#def thenPlace;
+							%currentTile - %currentFreeTile;
+							jump -> ..return if == 0;
+							%changeMade = 1;
+							[%currentFreeTile] = %currentTileValue;
+							[%currentTile] = grid.nullChar;
+						};
+					};
+					%currentTile += %stepSize;
+					%j -= 1;
+					jump->loop if > 0;
+				};
+				%currentTile += %reshift;
+				%i -= 1;
+				jump->loop if > 0;
+			};
+			return;
+		};
+		awaitInput(inputChar);
+		{:moveTiles_block;
+			isEqual(inputChar,+"w")<:{
+				...moveTiles.inputs;
+				%startingTile = 0;//:%grid+
+				%stepSize = grid.size.(0);
+				%reshift = #(1 -(grid.size.(0)*grid.size.(1)) & 0xffff);
+				call moveTiles;
+				jump->handleInput..return;
+			};
+			isEqual(inputChar,+"a")<:{
+				...moveTiles.inputs;
+				%startingTile = 0;//:%grid+
+				%stepSize = 1;//grid.size.(0);
+				%reshift = 0;//#(grid.size.(0)*(grid.size.(1)-1)+1);
+				call moveTiles;
+				jump->handleInput..return;
+			};
+			isEqual(inputChar,+"s")<:{
+				...moveTiles.inputs;
+				%startingTile = #(grid.size.(0)*(grid.size.(1)-1));//:%grid+
+				%stepSize = #(-grid.size.(0) & 0xffff);
+				%reshift = #(1 + (grid.size.(0)*grid.size.(1)));
+				call moveTiles;
+				jump->handleInput..return;
+			};
+			isEqual(inputChar,+"d")<:{
+				...moveTiles.inputs;
+				%startingTile = #(grid.size.(0)-1);//:%grid+
+				%stepSize = #(-1 & 0xffff);//grid.size.(0);
+				%reshift = #(grid.size.(0)*2);//#(grid.size.(0)*(grid.size.(1)-1)+1);
+				call moveTiles;
+				jump->handleInput..return;
+			};
+			isEqual(inputChar,+"S")<:{
+				repeat 0 {
+					let string{import "2048.0xmin" as text};
+					let i = -1;
+					let size = 3;
+					repeat(string..length/size):@(string[(i+=1)*size]|(string[i*size+1]<<8)|(string[i*size+2]<<16));
+				};
+				jump->handleInput;
+			};
+			jump->handleInput;
+		};
+		%moveTiles.changeMade|0;
+		jump->handleInput if == 0;
 	};
-	
+	jump->main;
 };

@@ -1,48 +1,75 @@
 #"tptasm";
 #"table";
-
-
-let a{let b{let c}};
-let =(a.b.c);//same as `let c = a.b.c`
-debugger c;
-
-
-let print(string,reg,isValid)={
-	repeat !reg #reg = 1;
-	repeat !isValid {
-		let temp_static;
-		defer return: def temp_static;
-		st %reg temp_static;
-		defer return: ld %reg temp_static;
-		exh %reg 0x2002;
-	};
-	let i = -1;
-	repeat string..length st string.(i+=1) r1;
-	jump->return..return;
-}::{
-	def let temp_static{0};//:[]static
+let Value(){
+	let set code;//:{@}
+	let set value;//:T ; return value
+	let set isOwned;//:#?
 };
-defer: def print;
-print("Hello, world!");
-
-
-let Var()={
-}::{//static memory management
-	let ..prototype{
-		let alloc(object){
-
+...labelsof(){
+	defer:#return = {let=Allocator};
+	let freeValuesSetSymbol;
+	let Allocator(){
+		let:.[¬freeValuesSetSymbol]{
+			let freeValues{};
+			let next = 0;		
 		};
-		let free(object){
-
+		let union(allocator){
+			let this = ..this;
+			#return = Allocator()::{
+				#[¬freeValuesSetSymbol].freeValues = {}...allocator[¬freeValuesSetSymbol].freeValues...this[¬freeValuesSetSymbol].freeValues;
+				#[¬freeValuesSetSymbol].next = 0xmin.Math.min(allocator[¬freeValuesSetSymbol].next,this[¬freeValuesSetSymbol].next);
+			};
 		};
-		let ..prototype(){
-			;
+		let intersection(allocator){
+			let this = ..this;
+			#return = Allocator()::{
+				#.[¬freeValuesSetSymbol].freeValues = allocator[¬freeValuesSetSymbol].freeValues..iterate({},(s,v,i){
+					#repeat(this[¬freeValuesSetSymbol].freeValues..indexOf(v)!=-1):#s::{v};
+					#return = s;
+				});
+				#.[¬freeValuesSetSymbol].next = 0xmin.Math.max(allocator[¬freeValuesSetSymbol].next,this[¬freeValuesSetSymbol].next);
+			};
 		};
+		def let next(){
+			let =.[¬freeValuesSetSymbol].freeValues;
+			let bool = freeValues..length > 0;
+			repeat +bool #{
+				#return = freeValues;
+				#freeValues..splice(freeValues..indexOf(return),1);
+			};
+			repeat !+bool #{
+				#return = values.next;
+				#values.next += 1;
+			};
+		};
+		let free(value){
+			let =.[¬freeValuesSetSymbol].freeValues;
+			repeat(freeValues..indexOf(value)==-1)#freeValues::{value};
+			#return = ..this;
+		}
 	};
-	let newTemplate(object){
-		object;
-	};
-	let call(from,to){//:#(Var,Var)->#?
-		let =to.using;
+}();
+let operator(do,a,b){
+	let value = a[¬Allocator].union(b[¬Allocator])();
+	let code = a.code ... b.code ... do(value,a,b);
+};
+let int()={
+	let ..operators{
+		let.["_+_"](a,b){
+			operator((value,a,b){@$(value) = $(a.value) + $(b.value);},a,b);
+		};
+		let.["_-_"](a,b){
+			operator((value,a,b){@$(value) = $(a.value) + $(b.value);},a,b);
+		};
+		let.["_*_"](a,b){
+			operator((value,a,b){
+				mul.call(value,a,b);
+			},a,b);
+		};
+		let.["_/_"](a,b){
+			operator((value,a,b){
+				div.call(value,a,b);
+			},a,b);
+		};
 	};
 };

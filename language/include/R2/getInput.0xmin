@@ -1,0 +1,79 @@
+#"ZASM3";
+#"tptasm";
+#(){:docs;
+	getInput:#(out:%~char,#?&bool)->{@} & @->mutate out;
+	awaitInput:#(out:%~char)->{@} & @->mutate out;
+	getInput:#(out:%~char)->{@} & @->mutate out;
+};
+let getInput(outputReg,await_bool,doWhile_wait,miniProcess,portReg){//:#(%?,#?,{@}?,{@}?,%?)->{@} & @mutate terminal
+	repeat !await_bool : awaitInput(outputReg,doWhile_wait,miniProcess,portReg);
+	repeat !!await_bool: checkInput(outputReg,miniProcess,portReg);
+}::{
+	let awaitInput(outputReg,doWhile_wait,miniProcess,portReg){//:#(%?,{@}?,{@}?,%?)->{@} & @mutate terminal
+		let hasPort = !!portReg;
+		let hasOutputReg = !!outputReg;
+		repeat !+hasPort #{
+			#portReg = outputReg||0 +1 %14;//:%
+			let storeRegs;
+		};
+		repeat !+hasPort {
+			push %portReg;
+			%portReg = 0;
+		};
+		def let check;
+		def let waitLoop{
+			repeat !!doWhile_wait def doWhile_wait||{};
+			wait %portReg;
+			jump -> waitLoop if sign;
+		};
+		def let bump{bump %portReg};
+		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
+		repeat !!miniProcess def miniProcess;
+		repeat !!+hasOutputReg def let getOutputLoop{
+			recv %outputReg %portReg;
+			jump -> getOutputLoop if !carry;
+		};
+		repeat !+hasPort pop %portReg;
+		let testInput(string)=>{//(string,%)->{@} ; builder pattern
+			let i;
+			let tempReg = 0;
+			:self;
+			push %tempReg;
+			%tempReg = [i];
+			%tempReg - string..length;
+			{:block;
+				jump->block..return if >= 0;//when out of chars, use user input as normal
+				[i] += 1;
+				def doWhile||{};
+				%outputReg = [string + %tempReg];
+				pop %tempReg;
+				def miniProcess||{};
+				jump -> self..return;
+				{:data;
+					def string;
+					@0 #def i;
+				};
+			};
+			pop %tempReg;
+			def return;
+		};
+	};
+	let await = awaitInput;
+	let checkInput(outputReg,miniProcess,onSome,onNone,portReg){//:#(%?,{@}?&@[0-14]?,{@}?,{@}?,%?)->{@} & @mutate terminal
+		awaitInput(outputReg,(),miniProcess,portReg)::{
+			undef waitLoop;
+			delete waitLoop;
+			#check::{
+				wait %portReg;
+				jump->onNone if sign;//TODO add on success and on fail
+			};
+			def onSome;
+			jump-> onNone..return;
+			def onNone;
+		};
+	};
+	let getInput = {...codeof ..this};
+	let get = {...codeof ..this};
+	let check = checkInput;
+};
+#let =getInput.awaitInput,=getInput.checkInput;

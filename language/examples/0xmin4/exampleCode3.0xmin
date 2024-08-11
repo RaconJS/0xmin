@@ -1,0 +1,13 @@
+//0xmin redesign, written for ZASM3
+#"ZASM3";
+let BinaryBlock()={
+	let internal_size(){
+		#return = this..iterate();
+	};
+};
+let Label()={
+	let code{};//:Value[]
+	let returnValue;//
+};
+let a = {1;2;3}..iterate((v,i){i});
+debugger a[0];

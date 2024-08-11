@@ -360,6 +360,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			return {index,hasAssignment,operator};hasAssignment
 		}
 		handleMicroAssemblyMacros({statement,index,scope}){//'@$label' ; for 'a{[r1]};@$a=b' --> '@[r1]=b'
+			//note: this feature `@$a` is not refined and contains bugs.
 			let failed=true,macro=[];
 			if(statement[index]=="$"){
 				failed=false;
@@ -407,7 +408,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				let arg,extraArgs;
 				if(!hasIf)({index,operator,hasIf}=this.asm_ifStatement({statement,index,scope,operator,hasIf}));
 				if(!hasOverwritableOperator)({index,operator,hasOverwritableOperator,hasAssignment,extraArgs}=this.asm_operator({statement,index,scope,operator,optionals,hasAssignment}));
-				if(extraArgs)args.push(...extraArgs);
+				if(extraArgs&&extraArgs.length>0)args.push(extraArgs);
 				//if(!hasAssignment)({index,operator,hasAssignment}=this.asm_assignment({statement,index,scope,operator,optionals}));
 				{
 					let failed;
@@ -442,7 +443,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 						instruction.dataType="number";
 						instruction.dataValue=args[0][0].number;//:number
 					}
-				}//else throw Error(throwError({statement,index,scope},"#/@ syntax", "invallid assembly line: expected a string, a number or a command.")); //is commented out to 
+				}//else throw Error(throwError({statement,index,scope},"#/@ syntax", "invallid assembly line: expected a string, a number or a command.")); //is commented out to allow `@$r0;`
 			}
 			else{
 				for(let i in optionals){//optionals[number]:string & symbol
