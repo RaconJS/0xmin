@@ -1,0 +1,40 @@
+#"ZASM3";#"tptasm";
+#"word=0s32";
+//dynamic(ly) size(d) object pointer
+import lib "include.0xmin";
+import lib "heap.0xmin";
+let Dsop()={
+	def let size{0};
+	def let objectPointer{0};
+	def let capacity{0};
+}::{
+	let template = ..this()..compile;
+	:Self;
+	let method{
+		let push{
+			let input{
+				let self = Self()<->0;//:mut & Self
+				let size = {0}<->1;
+			};
+			let output{
+				let self = input.self;//:Self & mutated
+			};
+		};
+		let pop{
+			let input{
+
+			};
+			let output{
+
+			};
+		};
+	};
+};
+let Sop(){
+	def let size{0};
+	def let objectPointer{0};
+}::{let template = ..this()..compile;};
+let So(){
+	def let size{0};
+	def let object{};
+}::{let template = ..this()..compile;};

@@ -1,0 +1,59 @@
+...labelsof codeof (){
+	{
+		let symbol = 0xmin..static;
+		let self = [¬0xmin..static];
+		let alreadyLoaded = !!self;
+		repeat !!+alreadyLoaded #{
+			let returnScope = return;
+			#return = self;
+			break return;
+		};
+		repeat !+alreadyLoaded:let set ..this[¬0xmin..static] = return;
+	};
+	let parent = ..this;
+	let heap{import lib "heap.0xmin";};
+	let static(obj)={
+		let use(){
+			repeat !obj[¬0xmin..static] static.data::{def obj};
+			let set obj[¬0xmin..static];
+		};
+		let obj[¬static]
+	}::{let data};
+	defer parent:def heap.data;
+	defer parent:def static.data:
+	let Code(){
+		(){
+			let 
+		}
+	};
+	let Temp(){
+		#return:>static();
+	};
+	let temps = {
+
+	}:>static().use();
+	let add(a,b)={
+		repeat a[¬Code]: .[¬Code] = {
+			a[¬Code];
+			let temp = static(0);
+			temp.use() = a.a;
+		}
+		let ans = static(0);
+		let .[¬Code] = {
+			r0 = [a];
+			r0 += [b];
+		};
+	};
+	let sub(a,b)={
+		let .[¬Code] = {
+			r0 = [a];
+			r0 -= [b];
+		};
+	};
+	let assign(a,b)={
+		let .[¬Code] = {
+			r0 = [a];
+			r0 += [b];
+		};
+	};
+}();

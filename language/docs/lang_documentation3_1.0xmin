@@ -1,174 +1,209 @@
-//general patterns:
-	//function:
-		( params ) { statements }
-		( params ) functionType { statements }
-	//functionType:
-		   //default
-		=  //class
-		=> //arrow
-		<= //using
-		-> //weak
-		<- //macro
-	//params:
-		//param:
+//patterns:
+	//general patterns:
+		//function:
+			( params ) { statements }
+			( params ) functionType { statements }
+		//functionType:
+			   //default
+			=  //class
+			=> //arrow
+			<= //using
+			-> //weak
+			<- //macro
+		//params:
+			//param:
+				name
+				...name //not supported yet
+			param
+			,//joined with commas in a list
+			params , param
+			params , ,
+		//string literal
+			"string"
+			'string'
+			`string`
+			"\c00"
+			"\u0000"
+			"\x00"
+			"\p00"
+			"\h"
+			"\n"
+			"\r"
+			"\t"
+		//number literal
+			123
+			0xabc
+			0xABC
+			0123
+			0b10011
+			//0d123 //note: decimal (bace 10) with '0d123' is not supported yet
+	//statement:
+		//patterns:
+			#;
+			$;
+			@;
+
+			# meta ;
+			$ state ;
+			@ assembly ;
+
+			{ statements };
+			( params ){ statements };
+			
+			assembly //matched by keyword
+			meta //matched by keyword
+			state //matched by keyword
+			
+			name( params ){ statements };
+			name{ statements };
+			
+			state
+
+	//expressions:
+
+		expression operator short_expression
+		expressions, 
+		//operator:
+			+ - * / ** %% //
+			! && || ^^ //note: `a ^^ b` == `a XOR b` returns 0 if both inputs are 1. bool operators are lazy.
+			~ & | ^ //note: `a~b` == `~(a|b)`
+			>= == <=
+		//short_operator
+			+
+			-
+			!
+			~
+		//short_expression:
 			name
-			...name //not supported yet
-		,//joined with commas in a list
-	//string literal
-		"string"
-		'string'
-		`string`
-		"\c00"
-		"\u0000"
-		"\x00"
-		"\p00"
-		"\h"
-		"\n"
-		"\r"
-		"\t"
-	//number literal
-		123
-		0xabc
-		0xABC
-		0123
-		0b10011
-		//0d123 //note: decimal (bace 10) with '0d123' is not supported yet
-//statement:
-	//patterns:
-		#;
-		$;
-		@;
-
-		# meta ;
-		$ state ;
-		@ assembly ;
-
-		{ statements };
-		( params ){ statements };
-		
-		assembly //matched by keyword
-		meta //matched by keyword
-		state //matched by keyword
-		
-		name( params ){ statements };
-		name{ statements };
-		
-		state
-
-//expressions:
-	expression operator short_expression
-	expressions, 
-	//operator:
-		+ - * / ** %% //
-		! && || ^^ //note: `a ^^ b` == `a XOR b` returns 0 if both inputs are 1. bool operators are lazy.
-		~ & | ^ //note: `a~b` == `~(a|b)`
-		>= == <=
-	//short_operator
-		+
-		-
-		!
-		~
-	//short_expression:
-		name
-		123 //number literal
-		"string"//string literal
-		short_operator short_expression
-		#( expressions )
-		( expressions )
-		[ expression ]
-		{ statements }
-//meta:
-	metaStatement
-	//metaKeywords
-		let
-		set
-		delete
-		def
-
-		repeat //
-		recur //
-
-		import
-		
-		defer //
-		break //
-		...
-	//metaStatement
-		importStatment
-		metaStatement_labels
-		iterationSatement
-		injectStatement
-	//metaStatement_labels
-		metaKeyword_labelsList expressions
-		metaKeyword_labelsList: expressions
-		//metaKeyword_labelsList
+			123 //number literal
+			"string"//string literal
+			short_operator short_expression
+			short_expression . name
+			short_expression . [ expression ]
+			. [ expression ]
+			short_expression ( expressions )
+			short_expression [ expression ]
+			#( expressions? )
+			( expressions? )
+			[ expression? ]
+			{ statements? }
+	//starterSettings:
+		//#"ZASM1";
+		//#"ZASM2";
+		#"ZASM3";
+		#"ZASM4";
+		#"tptasm";
+		#"0xmin";
+		#"code";
+		#"text";
+		#"len";
+		#"table";
+	//meta:
+		metaStatement
+		//metaKeywords
 			let
 			set
-			def
 			delete
-			metaKeyword_labelsList metaKeyword_labelsList
-	//importStatment:
-		import this "string" as 0xmin;
-		import fromKeyword "string";
-		import fromKeyword "string" as fileTypeKeyword;
-		//fromKeyword:
-			     //default
-			lib
-			this
-			main
-		//fileTypeKeyword:
-			      //default
-			0xmin
-			bin
-			text
-	//iterationSatement:
-		iterationSatement_keyword short_expression metaStatement
-		iterationSatement_keyword short_expression: metaStatement
-		//iterationSatement_keyword
-			repeat
-			recur
-	//injectStatement
-		... expressions
-		... injectKeywords expressions
-		//injectKeywords
-			let
-			set
 			def
-			labelsof
-			codeof
-			run
-			injectKeywords injectKeywords
-	//scopeBasedStatement
-		break scopeLabel
-		defer scopeLabel metaStatement
-		defer scopeLabel: metaStatement
-		scopeBasedStatement_keyword scopeLabel 
-		//scopeLabel
-			short_expression
-//state:
-	//UNFINISHED
-//assembly
-	0xminAssembly
-	//0xminAssembly:
-		0xminAssembly_instruction short_expression
-		0xminAssembly_pointer arrow short_expression
-		//0xminAssembly_pointer
-			move
-			jump
-		//arrow
-			->
-			<-
-			=>
-			<=
-		//0xminAssembly_instruction
-			move
-			jump
-			set
-			get
-			and
-			or
-			nor
-			if
-			xor
-			get jump -1
-			set jump +3
+
+			repeat //
+			recur //
+
+			import
+			
+			defer //
+			break //
+			...
+		//metaStatement
+			importStatment
+			metaStatement_labels
+			iterationSatement
+			injectStatement
+		//metaStatement_labels
+			metaKeyword_labelsList expressions
+			metaKeyword_labelsList: expressions
+			//metaKeyword_labelsList
+				let
+				set
+				def
+				delete
+				metaKeyword_labelsList metaKeyword_labelsList
+		//importStatment:
+			//common example `import this "moduleName.0xmin" as 0xmin;`
+			import fromKeyword "string";
+			import fromKeyword "string" as fileTypeKeyword;
+			//fromKeyword:
+				     //default
+				lib
+				this
+				main
+			//fileTypeKeyword:
+				      //default
+				0xmin
+				bin
+				text
+		//iterationSatement:
+			iterationSatement_keyword short_expression metaStatement
+			iterationSatement_keyword short_expression: metaStatement
+			//iterationSatement_keyword
+				repeat
+				recur
+		//injectStatement
+			... expressions
+			... injectKeywords expressions
+			//injectKeywords
+				injectKeyword
+				injectKeywords injectKeyword
+			//injectKeyword
+				let
+				set
+				def
+				labelsof
+				codeof
+				run
+		//scopeBasedStatement
+			break scopeLabel
+			defer scopeLabel metaStatement
+			defer scopeLabel: metaStatement
+			scopeBasedStatement_keyword scopeLabel 
+			//scopeLabel
+				short_expression
+	//state:
+		//UNFINISHED
+	//assembly:
+		0xminAssembly
+		//0xminAssembly:
+			0xminAssembly_Base
+			0xminAssembly_Base #meta
+			//0xminAssembly_Base:
+				0xminAssembly_instruction short_expression
+				0xminAssembly_pointer arrow short_expression
+				binary
+				//0xminAssembly_pointer:
+					move
+					jump
+				//arrow:
+					->
+					<-
+					=>
+					<=
+				//0xminAssembly_instruction:
+					move
+					jump
+					set
+					get
+					and
+					or
+					nor
+					if
+					xor
+					get jump -1
+					set jump +3
+				//binary:
+					number_literal
+					string_literal
+		//tptasm:
+			tptasm_Base
+			tptasm_Base #meta
+			//tptasm_Base:
+				#(expressions)

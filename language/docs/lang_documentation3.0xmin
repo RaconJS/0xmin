@@ -1164,7 +1164,7 @@ compilation_settings;{
 			};
 		};
 	};
-	hoisting;{
+	hoisting;{//IS_NOW_IMPLEMENTED
 		let a = 2;
 		let b = 3;
 		let object{
@@ -1193,5 +1193,12 @@ compilation_settings;{
 
 			};
 		};
+	};
+	..function;{
+		The list of functions will be contained inside the ..function object, instead of the code part of a label.
+		let foo(){};
+		foo..function..length;//1
+		foo..length;//0
+		..function
 	};
 };

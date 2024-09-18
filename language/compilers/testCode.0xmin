@@ -1,75 +1,28 @@
-#"tptasm";
-#"table";
-let Value(){
-	let set code;//:{@}
-	let set value;//:T ; return value
-	let set isOwned;//:#?
-};
-...labelsof(){
-	defer:#return = {let=Allocator};
-	let freeValuesSetSymbol;
-	let Allocator(){
-		let:.[¬freeValuesSetSymbol]{
-			let freeValues{};
-			let next = 0;		
-		};
-		let union(allocator){
-			let this = ..this;
-			#return = Allocator()::{
-				#[¬freeValuesSetSymbol].freeValues = {}...allocator[¬freeValuesSetSymbol].freeValues...this[¬freeValuesSetSymbol].freeValues;
-				#[¬freeValuesSetSymbol].next = 0xmin.Math.min(allocator[¬freeValuesSetSymbol].next,this[¬freeValuesSetSymbol].next);
-			};
-		};
-		let intersection(allocator){
-			let this = ..this;
-			#return = Allocator()::{
-				#.[¬freeValuesSetSymbol].freeValues = allocator[¬freeValuesSetSymbol].freeValues..iterate({},(s,v,i){
-					#repeat(this[¬freeValuesSetSymbol].freeValues..indexOf(v)!=-1):#s::{v};
-					#return = s;
-				});
-				#.[¬freeValuesSetSymbol].next = 0xmin.Math.max(allocator[¬freeValuesSetSymbol].next,this[¬freeValuesSetSymbol].next);
-			};
-		};
-		def let next(){
-			let =.[¬freeValuesSetSymbol].freeValues;
-			let bool = freeValues..length > 0;
-			repeat +bool #{
-				#return = freeValues;
-				#freeValues..splice(freeValues..indexOf(return),1);
-			};
-			repeat !+bool #{
-				#return = values.next;
-				#values.next += 1;
-			};
-		};
-		let free(value){
-			let =.[¬freeValuesSetSymbol].freeValues;
-			repeat(freeValues..indexOf(value)==-1)#freeValues::{value};
-			#return = ..this;
-		}
+...{
+	let match(){
 	};
-}();
-let operator(do,a,b){
-	let value = a[¬Allocator].union(b[¬Allocator])();
-	let code = a.code ... b.code ... do(value,a,b);
+	let label;
 };
-let int()={
-	let ..operators{
-		let.["_+_"](a,b){
-			operator((value,a,b){@$(value) = $(a.value) + $(b.value);},a,b);
-		};
-		let.["_-_"](a,b){
-			operator((value,a,b){@$(value) = $(a.value) + $(b.value);},a,b);
-		};
-		let.["_*_"](a,b){
-			operator((value,a,b){
-				mul.call(value,a,b);
-			},a,b);
-		};
-		let.["_/_"](a,b){
-			operator((value,a,b){
-				div.call(value,a,b);
-			},a,b);
-		};
+let enum{
+	0#def let a(){};
+	0#def let b(){};
+	0#def let c(){};
+	#..compile;
+};
+let value = {@enum[0];enum[0]()};
+match(value)<:{
+	{@enum.a}::(value){
+		;
+	};
+	{@enum.b}::(value){
+		;
+	};
+	{@enum.c}::(value){
+		;
 	};
 };
+let array{@#let{{1;2;3}:>static()}};
+let item{@{1;2;3}:>static()}<->0;
+$set label;
+let a;
+a{1;2;3};
