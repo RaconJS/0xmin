@@ -9,5 +9,184 @@ let Label()={
 	let code{};//:Value[]
 	let returnValue;//
 };
-let a = {1;2;3}..iterate((v,i){i});
-debugger a[0];
+//let a = {1;2;3}..iterate((v,i){i});
+//debugger a[0];
+#(){//redesign for x86
+	//return type: struct, address/number,
+	//language: assembly, state, meta
+	@label//struct ; like dw by default
+	$label//number + type
+	#label//object, is `$` when used in `$` or `@`
+	@#def let i = 2;//'#def let i = #({2}<->2);' in ZASM3
+	//everything is an expression
+	//
+	$#label+4;//'@:#(label+4)'
+	@#label+4;//'@'
+	$ x//state of x
+	@ x//assembly of x
+	# x//meta of x, returns x i.e. x as a label
+	@11s128;
+	//note: return values are still unambiguous, i.e. "`!!label + 3` is always a number" paradigm.
+	@:#repeat 10:
+	@#repeat 10 0s16;
+	//having syntax for word sizes:
+		//prevents:
+			{0s3};//from breaking alignments by taking the ceil for the space it uses.
+			//use `|` to convert bewteen number types
+			#let numberTwo = 2;
+			#let sizeTwo = numberTwo|0s0;
+			#let floatTwo = sizeTwo|0f;
+			232fx
+	//use ..wordsize
+	//have system for settings, better than the old '{#; ... }' syntax
+	#repeat;
+	#recur;
+	#defer;
+	#import;
+	#def ;  //'$def set: #( );' inserts object into array without affecting `@` or `$` phases
+	#undef;
+	#let;//#let?
+	#set;//use for destructureing and `#set = a` without 
+	#redef;//'#def'
+	#
+	#debugger;
+	#...labelsof codeof run;
+	//these can be combined
+	#...labelsof let def i = 2;
+	//since there are no statements, using '#' even in short expressions can contain keywords
+	//examples:
+		let string = #import "sometext.txt" as text;
+		let one = 1;
+		let two = 2;
+		let sum = #one + #two;
+		//this syntax is inconsistant since we need `#x` to be a long expression for `#let i = 2` and a short expression for `@:%4 += #(2);`
+		//concept 1. maybe have syntax like `#:x+y` + `#x` for long and short expressions. TODO
+		//concept 2. using `#keyword` is long, `#:expression` or `#expression` is a short expression.
+		//concept 3. using `# ...` for long and `#()`, `#[]`, `#{}` are short expressions
+		$:#a <-> #(#repeat 10 @#i += 1)[3];
+		//using array value type more, which acts like string: it is spread when put in code, and is converted into a label when used.
+	{:bootHelloWorld_withoutUsingAutoInferedPhases;
+		@org 0x7C00;
+		@bits 16;
+		$wordSize: 8;
+		#let hault;
+		$#redef 0xmin.start;
+			@cli;
+			@mov si, msg;
+			@mov ah, 0x0E;
+			@{:loop;
+				@lodsb;
+				@or al, al;
+				@jz halt;
+				@int 0x10;
+				@jmp loop;
+			};
+		hlt $redef# halt;
+		@#redef msg{@"Hello, World!" 0};
+		//Magic numbers
+		@$repeat(510 - (org - 0xmin)) 0s8;//510 - ($ - $$) 0s8;
+		0xAA55s16;
+	};
+	//idea: '@' includes '$' and does `#def` ; rejected since we also need to support `insert register::{1;2;3}`
+	@{#"ZASM3";#let label;#def label};
+	@{#"ZASM4";#let label;@@label;@jump->label};
+	@#let arrayOfFunctions{
+		@( ... ){ ... };
+		@( ... ){ ... };
+		@( ... ){ ... };
+	};
+	//defaults:
+		(){} -> @#(){};
+		{} -> @#def {};
+		label -> @#def label;
+		$label;
+	let struct = {#def let
+		a{0},
+		b{0;0;0},
+		c{0;0}
+	};
+	let a,b,c;
+	let array = @${a;b;c};
+	let array = {@$a,b,c};
+	//idea: have ..compile and ..enum for building registers, and rust-like enums
+	//the first '@' in a statement is for assembly instruction syntax.
+	//we need: (in psudocode)
+		//@ +label ; insert address
+		//@#def +label ; def insert address
+		//@ ...codeof label ; insert
+		//#def +label ; def
+		//#def +label;@...codeof label ; def insert
+	let label{1;2;3};
+	@//insert as code
+	$//insert as state
+	#//variable
+	#def//$define and $insert ..code ; since '@' is for assembly instruction and since '#def' does not insert '#' variables, we can use '#def' for '@def'
+	$def//$define and $insert ..state
+	@@//$insert ..code
+	@$//$insert address
+	@$def//$define and $insert address
+	@#def//$define and insert code
+	$#//insert ..state
+	##//void
+	@#let//#creates label and inserts code
+	@$let//$creates label and inserts address
+	@#$//inserts code
+	//issue
+		//we want
+		@a - b;
+		//and
+		@a - #(b[2]);
+		
+		//instead of
+		@$(a) - $(b);
+		//and
+		@$(a) - $(#:b[2]);
+	@a - @(b);
+	//in expressions `@`, `$` and `#` always returns code
+	//idea: `$( )` and `#( )` are the same as `$(#: )` and `#(#: )`. They are both `#` syntax on the inside
+	//idea: we can use 2 symbols for the return type and inner syntax phase
+	$$() and $#();
+	//alternate idea: `$` is just the meta version of `@`, it produces both state and assembly lines,
+		@$(+a);//inserts address of `a`
+		@a - $(b[2]);//inserts the code of `b[2]`
+		@$(#:b[2]);//inserts the code of `b[2]`
+		//this is the ZASM3 system and it is more text-space-efficient to use.
+			//i.e. is more convinient where it matters.
+			//it makes code insertions harder which does not matter too much.
+	$enum:{};//compiles using enum mode
+	$wordSize 30:{};
+	$compile:{};
+	//idea: use '#set'/'$set' for insert
+	let array{#set 1,2,3};
+	let enum{#def let a;b;c;#..compile};
+	{:helloWorld;
+		:block;
+		#0xmin.section.data = {
+			block.hello{..wordSize=0s8;'Hello, World!';10};    // 'Hello, World!' plus a linefeed character
+			virtual block.helloLen{@hello[$]..@..length};             // Length of the 'Hello world!' string
+		};
+		#0xmin.section.text{//the global scope's code would go into 0xmin.section.text anyway, although the scope would not be the same
+			//@$#:$;//idea: use 'ABC:X' syntax for handling keyword syntax settings, the symbols are in order of which one to use/match first.
+			$def 0xmin;
+			let systemWrite <-> 4;
+			let systemExit <-> 1;
+			@mov eax $systemWrite; // The system call for write (sys_write)
+			@mov ebx 1;            // File descriptor 1 - standard output
+			@mov ecx hello;        // Put the offset of hello in ecx
+			@mov edx [@helloLen];  // helloLen is a constant, so we don't need to say
+			                       //  mov edx,[helloLen] to get it's actual value
+			@int 0x80;             // Call the kernel
+			@mov eax systemExit;   // The system call for exit (sys_exit)
+			@mov ebx #{@#let exitCode=0}[0];            // Exit with return "code" of 0 (no error)
+			@int 0x80;
+		};
+		#{
+			//insert
+		};
+	};
+	{
+	};
+};
+let a;
+#a[-4] = 2;
+debugger a"label.code";

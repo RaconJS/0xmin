@@ -26,7 +26,7 @@ scope: source.0xmin
 #
 variables:
   baseNumber_size: '(?x)
-      (?:s(?:
+      (?:[s](?:
         0x(?:[0-9]|[a-f]|[A-F])+
         |0b[01]+
         |(?:0|[1-9])[0-9]*
@@ -41,9 +41,12 @@ variables:
         |0[0-7]+(?:\.[0-7]+)?
       )
     '
+  numberType: '(?:u|i|f|fx)'
   baseNumber: '(?x)
-    \b{{baseNumber_value}}{{baseNumber_size}}?\b
-    |\b0{{baseNumber_size}}(?:v{{baseNumber_value}})?\b
+    \b(?:
+      {{baseNumber_value}}{{baseNumber_size}}?
+      |0{{baseNumber_size}}(?:{{baseNumber_value}})?
+    )(?:{{numberType}})?\b
     '
   number: '\b(?:undefined|null)\b|{{baseNumber}}' #\b(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
   signedNumber: '(?:\b|[+\-*/]\s*){{baseNumber}}' #(?:0b[0-1]+|0x[0-9a-fA-F]+|[0-9]+)\b'
@@ -67,7 +70,7 @@ variables:
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
   tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b|\!\s*\bsync\b'
-  meta_statementTypes: '\b(?:let|set|def)\b'
+  meta_statementTypes: '\b(?:let|set|def|undef|redef)\b'
 contexts:
   main:
     - match: '^'
@@ -478,7 +481,7 @@ contexts:
       scope: keyword.control
 
 
-    - match: '\b(?:{{meta_statementTypes}}|undef)\b'
+    - match: '\b(?:{{meta_statementTypes}})\b'
       scope: keyword.declaration.meta.0xmin
     - match: '\b(?:this|constructor|return|arguments|caller)\b'
       scope: variable.parameter

@@ -1,0 +1,4 @@
+//build and run with: `0xmin -a R2 -r helloworld2.0xmin`
+//build with: `0xmin helloworld2.0xmin -o helloworld.bin`
+import lib "R2/print.0xmin";
+print("Hello, world!");

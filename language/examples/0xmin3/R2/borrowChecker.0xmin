@@ -1,0 +1,261 @@
+//UNFINISHED
+let BuyChecker{
+	:dataState;
+	let Raw,Invalid,WriteLocked,Valid,ReadLocked;
+	let read,write,reference,endReference;
+	//Raw -> Invalid -> WriteLocked -> Valid -> ReadLocked
+	//Raw <- Invalid <- Valid
+	//Raw -(buy)-> Invalid -(lock)-> WriteLocked -(write)-> Valid -(lock)-> ReadLocked
+	//Raw -(buy)->  Invalid -(write)-> Valid
+	//-(buy)-> Raw -(add template)-> Invalid -(write)-> Valid
+	//<-(sell)- Raw <-(toRaw)- Invalid <-(toInvalid)- Valid
+	//even the `Raw` follows these rules: e.g. static:{@} -(buy part)-> Invalid<Raw> -> WriteLocked<Raw> -(Raw has no constraints)-> Valid<Raw> -(IntoTemplate<T>)-> Invalid<T> -> WriteLocked<T> -(inisialise)-> Valid<T>
+	//data can only be read/writen to with ReadLocked/WriteLocked. Parts of structs can be read/write locked individually
+	//all locks on a ReadLocked/WriteLocked must be removed before they are promoted/demoted.
+	//Each lock has a `¬key` assosiated with it, only code with the key can read/write to a ReadLocked/WriteLocked piece of data.
+	//A single `¬key` can be used by multiple pieces of code.
+	//A WriteLocked piece of data can have only 1 lock. This is so data is valid at the end of the write lock This is similar to rust's "one mutable reference or any immutable references".
+	//A ReadLocked piece of data can have any number of locks.
+	//A single lock must be resolved in a single block of code. i.e. through block functions, Read:#(t:Valid<T>,#()->{@})->({@},t) and Write:#(t:Invalid<T>,#()->{@})->({@},t:Valid<T>),
+	let setDataState(label,data){
+		#return = label;
+		let[¬dataState] = data;
+	};
+	let Raw(label,size)={//raw bytes from any memory static, heap etc..
+		let=size;
+	}::{
+		let..prototype{
+			let free(){};
+			let toInvalid(template){#return = Invalid(template)<->this};
+		};
+	};//raw bytes
+	let Invalid(){
+
+	}::{
+		let..prototype{
+			let toRaw(){#return = Raw(this..@..length)};
+			let toRaw(){#return = Invalid(this)};
+		};
+	};
+	let WriteLocked()={};
+	let Valid()={};
+	let ReadLocked()={};
+	...labelsof(){
+		defer#return={let=buy,=sell,write,reference,endReference,read};
+		let buy(allocator,size){};
+		let sell(allocator,size,label){};
+		let write(label,block){
+			let key;
+			let lock = write_mutReference(label,key);
+			block(label,key);
+			delete lock[¬key];
+			#label[¬dataState] = Valid=(label);
+			delete;
+		};
+		let write_mutReference(label,key){
+			repeat(label[¬dataState]..constructor==Valid)#label[¬dataState] = Invalid=(label);
+			repeat(label[¬dataState]..constructor!=Invalid)throw;
+			let hadLock = label[¬dataState]..constructor == WriteLocked;
+			repeat +hadLock #let label[¬dataState] = WriteLocked=();
+			#let label[¬dataState] = WriteLocked=();
+			#label[¬dataState]::{
+				#..this ||= 0;
+				#..this += 1;
+				let.[¬key] = return;
+			};
+			#return = label[¬dataState];
+		};
+		let Pointer()={
+			let dereference(){
+				#reference(..this);
+				let:clone(blockFunc){
+					blockFunc();
+					#endReference(..this);
+				};
+				let:delete(){#endReference(..this);};
+			};
+			let read(){};
+			let write(){};
+		};
+		let reference(label){
+			repeat(
+				  label[¬dataState]..constructor != Valid
+				&&label[¬dataState]..constructor != ReadLocked
+			)throw;
+			let hadLock = label[¬dataState]..constructor == ReadLocked;
+			repeat +hadLock #let label[¬dataState] = ReadLocked=(label);
+			let key;
+			let lock = label[¬dataState];
+			#label[¬dataState]::{
+				#..this ||= 0;
+				#..this += 1;
+				let.[¬key] = return;
+			};
+			#return = key::{
+				#def let: delete(free){
+					repeat(label[¬dataState] != lock)throw"assertion failed";
+					repeat !!lock[¬key]#{
+						#delete lock[¬key];
+						#lock -= 1;
+						#repeat(+lock == 0)#label[¬dataState] = Valid=(label);
+					};
+					free();
+				};
+			};
+		};
+		let endReference(label,key){
+			repeat(
+				  label[¬dataState]..constructor != Valid
+				&&label[¬dataState]..constructor != ReadLocked
+			)throw;
+			#repeat(label[¬dataState]..constructor == Valid)break;
+			let lock = label[¬dataState];
+			repeat !!lock[¬key]#{
+				#delete lock[¬key];
+				#lock -= 1;
+				#repeat(+lock == 0)#label[¬dataState] = Valid=(label);
+			};
+		};
+		let read(label,block){
+			let key = reference(label);
+			block(label,key);
+			#key.delete();
+			#delete key;
+		};
+	}();
+};
+#(){//example 1
+	let struct{
+		def let a{0};
+		def let b{0};
+	};
+	let label{
+		let value;
+		let template = struct;
+	};
+	let static.buy(struct..@..length);
+	#struct:>Invalid.new(rawData,struct);
+	//struct:Invalid
+	#write(struct)<:(writerKey){
+		@$(writerKey.use.a) = 1;
+		@$(writerKey.use.b) = 2;
+	};
+	#read(struct)<:(reader){
+		print({@$(reader.use.a)});
+		print({@$(reader.use.b)});
+	};
+};
+#(){//example 2
+	#0xmin.settings.wordSize
+	def let label <=> BuyChecker.buy()<:{
+		def let a{0};
+		def let b{0};
+	};
+	//label:Invalid
+	label.write()<:(writer){
+		writer({1;2});
+	};
+	label.read()<:(reader){
+		print(reader);
+	};
+	let reference = label.part().a;
+	label.sell();//this is fine until we try to read or write to reference later
+	repeat 0 label.write()<:(){};//would throw error
+	delete label;
+	let string <=> BuyChecker.buy()<:"hello world";
+	let pointer <=> BuyChecker.buy()<:{0};
+	pointer.write()<:(writer){
+		writer({@string}:>static());
+	};
+	let charIndex <=> BuyChecker.buy()<:{0};
+	charIndex.write()<:(writer){
+		writer({4});
+		let charIndex.pointer = pointer;
+		let charIndex.reference = pointer[¬BuyChecker.reference];//reference, changes with every `write`, and is set to null when invalid.
+	};
+	let char <=> BuyChecker.buy()<:{0};
+	charIndex.read()<:(reader_index){
+		charIndex.reference.read()<:(reader_pointer){//throws an error if pointer is not in the "state" (i.e. value) as when the reference was declared
+			assert(pointer[¬BuyChecker.reference] == charIndex.reference);
+			char.write()<:(writer){
+				repeat 0 writer(Item.get(reader_pointer,reader_index));//in this case this would generate something like `[b] = [[ptr]+[index]]` with pushes, and tempory registers
+				repeat 1 assume(Register.is(reader_pointer)){
+					writer.fromAssembly(@[%reader_pointer+$(reader_index)]);
+				};
+			};
+		};
+	};
+	char.read()<:(reader){
+		print(reader);
+	};
+};
+#(){//example 3
+	let a = Invalid.buy({repeat 2 i16()});
+	let b = Invalid.buy(i16());
+	let c = Invalid.buy(i16());
+	b.write()<:(writer){awaitReadInput(writer)};
+	c.write()<:(writer){awaitReadInput(writer)};
+	a.write({b;c})<:(writer,values){
+		writer[0].write()<:(writer){writer(values[0])};
+		writer[1].write()<:(writer){writer(values[1])};
+	};
+	{
+		let a = Invalid()<:{repeat 2 i16()};
+		let b = i16();
+		let c = i16();
+		awaitReadInput(b);
+		awaitReadInput(c);
+		a.set({b;c});
+	};
+};
+#(){//example 4
+	let =Invalid;
+	let =Validate, =Invalidate;
+	let T()={};
+	let a = Invalid({T()});
+	//can only call `Validate(a:~T) -> a:T` if
+		//all parts of `a` are valid.
+		//the optional 2nd argument to check that `a`s value id is the same as the 2nd argument.
+		//Some functions also can return valid types, e.g. literal constants.
+	Validate(a[0]);
+	Validate(a);
+	let a = Invalid({T()});
+	let a_value = a.getSymbol();
+	Validate(a[0],,a_value);
+	repeat 0 Set(a[0],Valid(T()));//would cause the `Validate(a,a_value)` line to throw an error since the mutation does not belong to `a_value`.
+	Set(a[0],Valid(T()),a_value);//would work
+	Validate(a,a_value);
+	delete a_value;
+};
+#(){
+	//idea: using symbols to do operations on data
+	let symbol = Symbol();
+	let T()={};
+	let a = symbol.Invalid({T()});
+	symbol.Set(a[0],Valid(T()));
+	Symbol().Validate(a,symbol);
+	//can only read through a[¬Valid].read
+};
+#(){
+	...({let=ValueState,=ValueSymbol}):>(using)<={
+		...using;
+		#return = {
+			let Validate(template,symbol){
+				#template..iterate()<:(part){
+					repeat(part[¬ValueState]!=Valid):throw;
+					repeat(part[¬ValueState]!=Valid):throw;
+				};
+				let part[¬ValueState] = Valid;
+				let part[¬ValueSymbol] = symbol;
+			};
+		};
+	}();
+};
+let searcher(obj,foo,recurValue){
+	let symbol = 0xmin..static;//using static
+	recur recurValue foo(obj);
+	repeat obj[¬symbol] break;
+	let obj[¬symbol];
+	recur recurValue obj..iterate((v){recur recurValue searcher(v,foo)});
+	delete obj[¬symbol];
+};
