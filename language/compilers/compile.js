@@ -553,6 +553,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							);
 							index++;
 						}
+						//'{ ... };' -> '#ins { ... };'
 						let value,failed=true;
 						if(state.phase=="")//||state.phase=="$"
 							({value,failed}=contexts.declareFunctionOrObject({statement,index,scope}));
@@ -565,7 +566,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								if(state.phase==""){//auto detect phase
 									word=statement[index];
 									const isInInstructionSet=assemblyCompiler.assembly.instructionSet.hasOwnProperty(word);
-									if(["let", "def", "set"].includes(word)&&!isInInstructionSet)
+									if(["let", "def", "set", "ins"].includes(word)&&!isInInstructionSet)
 										state.phase="#";
 									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]|::/)&&!isInInstructionSet))
 										state.phase="$";
@@ -626,6 +627,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				const metaState={
 					"let":false,
 					"set":false,
+					"ins":false,
 					"def":false,
 				};
 				let found;
@@ -692,6 +694,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					let value;
 					({index,value}=contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
+					if(metaState["ins"])block:{//'#let ins obj;' ; for building '#' arrays or for enumed template-objects
+						if(value)value=value.toType("label");
+						scope.label.code.push(value.label);
+						//if(value?.label)value.label.defs.push(scope.label);
+					}
 					if(metaState["def"]){//same as '$undef def set: obj;' ==> redefines and inserts code block;
 						if(value instanceof Value && value.type=="label")
 						if(value.label){//for '@null $def: label'
@@ -1069,7 +1076,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//used to spit expresions e.g. '(){}'==>[function] '() #{}' ==> [expression,object]
 				let failed=false;
 				if("@$#".includes(statement[index])){
-					if("([{".includes(statement[index+1]))index++;
+					if("([{\\".includes(statement[index+1]))index++;
 					else failed=true;
 				}if(endingStringList.includes(statement[index]))failed=true;
 				return {index,failed:failed??index>=statement.length};
@@ -1206,7 +1213,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					return{value,index};
 				},
 				noPipeLineing:Symbol("noPipeLineing"), //used in '#let' to allow 'let a:>foo()' == 'let a{} :> foo();'
-				getIndexNumber:(index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index,//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
+				getIndexNumber:((index,label)=>(Infinity/index==-Infinity)?index+label.code?.length:index),//'a[-1]' => 'a[a..length-1]' 'a[-0]'=>'a[a..length]'
 				extend_value({index,statement,scope,value,argsObj=undefined,shouldEval=true,allowOperatorOverloading}){//.b or [] or ()
 					let word=statement[index];
 					if([".", "..", "["].includes(word)){// 'a.' or 'a..' or 'a['
@@ -1342,6 +1349,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						}
 					}
 				},
+				declareLambdaFunction({index,statement,scope,shouldEval}){
+					if(word=="\\" || (word.match(/\b\w+\b/)&&statement[index+3]=="\\") || (word=="("&&statement[index+3]=="\\")){
+
+					}
+					let {parameters}=contexts.parameters({index:0,statement:statement[index+1],scope});
+					let value;
+					return {value,failed:false};
+				},
 				declareFunctionOrObject({index,statement,scope,startValue=undefined,shouldEval=true}){
 					//note: 'a = () = {}' ==> 'a=() = {}' ==> '(a=()) = ({})'
 					//note: for functions it is advised to use 'a = #()={}' instead of 'a=() = {}' to prevent this
@@ -1350,8 +1365,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					let word=statement[index];
 					if(word=="("&&(
 						statement[index+3]=="{"||
-						functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"
-					)){//function declaration '(){}'
+						functionCallTypes.includes(statement[index+3])&&statement[index+4]=="{"||
+						statement[index+3]=="\\"//'(a,b,c)=>'
+					)){//function declaration '(){}' and '()\short_exp'
+						//design note: the '\' lambda function having short-expression makes it usable in pipelining without needing `((a,b)\a+b)`
 						contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
 						let {parameters}=contexts.parameters({index:0,statement:statement[index+1],scope});
 						index+=3;
@@ -1361,25 +1378,30 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							callType=word||"";
 							index++;
 						}
-						word=statement[index+1];//word== '...' in '(){...}'
-						let code=word;
-						let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
-							parameters,
-							callType,
-							label:new Variable({name:"(scope function)",code:word}),//:this label is not accessable so the `code:Statement[]` here should be fine
-							parent:scope,
-							code,
-						});
-						let functionObj;//:Variable
-						if(shouldEval){
-							if(isExtension)functionObj=startValue.label;
-							else functionObj=new MacroFunction({type:"function",});//:Variable
-							value=functionObj.toValue("label");
-							functionObj.code.push(functionScope);
-							functionObj.prototype??=new Variable({name:"(prototype)"});
-							functionObj.supertype??=new Variable({name:"(supertype)"});
+						if(callType=="\\"){
+							throw Error("compiler error: TODO: lambda syntax '\\' is not supported yet.");
 						}
-						index+=3;//skip '(' '...' ')' in '(...){}'
+						else{
+							word=statement[index+1];//word== '...' in '(){...}'
+							let code=word;
+							let functionScope=new FunctionScope({fromName:"declareFunctionOrObject/function",
+								parameters,
+								callType,
+								label:new Variable({name:"(scope function)",code:word}),//:this label is not accessable so the `code:Statement[]` here should be fine
+								parent:scope,
+								code,
+							});
+							let functionObj;//:Variable
+							if(shouldEval){
+								if(isExtension)functionObj=startValue.label;
+								else functionObj=new MacroFunction({type:"function",});//:Variable
+								value=functionObj.toValue("label");
+								functionObj.code.push(functionScope);
+								functionObj.prototype??=new Variable({name:"(prototype)"});
+								functionObj.supertype??=new Variable({name:"(supertype)"});
+							}
+							index+=3;//skip '{' '...' '}' in '(){...}'
+						}
 						return {index,value,failed:false};//isExtension&&!startValue};
 					}else if(word=="{"){//'{}' object declaration
 						contexts.delcare_typeChecks({index,statement,scope},isExtension,startValue);
@@ -1407,7 +1429,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(value===null||value===undefined){//'¬()' and '(¬)' --> empty, undeclared label
 					value=new Value({type:"label",label:null});
 				}
-				else value=new Value(v);
+				else value=new Value(value);
 				value=value.toType("label");
 				let oldLabel=value.label;//:Variable?
 				let typeObject=mainObject.labels["Type"].labels[typeName];
