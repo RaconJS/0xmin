@@ -229,7 +229,7 @@
 		//operator overloading,
 		//allow for 'foo(){};' and 'bar{};' statements as 'def let set bar{};'
 		//have '#defer', statement that runs the code at the end of a scope, stored in '..defer' as functions. '..defer' is then cleared after all the '..defer' functions have been run and pushed to the end.
-		//have '..functions' for an array of functions, instead of using the normal code block array ('label..code')
+		//have '..function' for an array of functions, instead of using the normal code block array ('label..code')
 		//improved macro function type, 'foo()<-{}' with inbuilt parameters for the function 'getLabel' and runInScope. callee will only be usable by macro functions.
 
 		//other features from last revision

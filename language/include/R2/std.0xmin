@@ -1,34 +1,11 @@
-//tptasm/R2
-let main{};//language note: the {} does nothing, i just use it to denote Objects instead of labels.
-jump->main;
-...let:{import this "heap.0xmin";};
-let Function(block)={
-	let function={...set block};
-	let call(){
-		call function;
-	};
-	def function;
+#"tptasm";
+let global,heap,print,getInput,awaitInput,checkInput;
+let global = ..this;
+//let use,require,RegEnum,getInput,static,meta
+#heap{import lib "heap.0xmin"};
+...labelsof#(){defer#return={let=print};import lib "R2/print.0xmin"}();
+...labelsof#(){defer#return={let=getInput,=awaitInput,=checkInput};import lib "R2/getInput.0xmin"}();
+defer global:{
+	//def static;
+	def heap.data;
 };
-void #set:(){
-	Module{
-		isUsed:bool;
-	};
-};
-let modules{};
-let dynamic_std(code){
-	void:{#;
-		#let this=optimise;
-		#let i=0;
-		repeat modules..length:{
-			#i+=1;
-			repeat modules[i].isUsed:{
-				i
-			};
-		};
-	};
-}
-def malloc;
-def free;
-def memFill;
-def main;
-def heap;

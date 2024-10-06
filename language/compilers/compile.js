@@ -98,8 +98,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				const settingsList={
 					//v:bool
 					"make file"(v){buildSettings.makeFile=v},
-					"0xmin"(v){setLanguage("0xmin")},
-					"tptasm"(v){setLanguage("tptasm")},
+					"0xmin"(v){setLanguage("0xmin");buildSettings.arch="0xmin";},
+					"tptasm"(v){setLanguage("tptasm");buildSettings.arch="R216K8B";},
 					"asm"(v){setLanguage("asm")},
 					"int"(v){setLanguage("int")},
 					"text"(v){setLanguage("text")},
@@ -107,6 +107,16 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"table"(v){labels["log_table"].lineNumber=v},
 					"len"(v){labels["log_length"].lineNumber=v},
 					"labels"(v){labels["include_labels"].lineNumber=v},
+					"arch 0xmin"(v){
+						buildSettings.arch = "0xmin";
+						if(0)labels["arch"].code = Value.String(JSON.stringify("0xmin")).toType("label").label.code;
+					},
+					"arch R2"(v){
+						buildSettings.arch = "R216K8B";
+					},
+					"arch x86"(v){
+						buildSettings.arch = "x86";
+					},
 				}
 				settings.forEach(v=>{
 					let turnOn=true;
@@ -566,11 +576,20 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								if(state.phase==""){//auto detect phase
 									word=statement[index];
 									const isInInstructionSet=assemblyCompiler.assembly.instructionSet.hasOwnProperty(word);
-									if(["let", "def", "set", "ins"].includes(word)&&!isInInstructionSet)
-										state.phase="#";
-									else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]|::/)&&!isInInstructionSet))
+									if(isInInstructionSet)
+										state.phase="@";
+									else if(["undef", "ram"].includes(word))
 										state.phase="$";
+									else if(["let", "def", "set", "ins"].includes(word)||word[0].match(/[a-zA-Z_]|::/))
+										state.phase="#";
 									else state.phase="@";
+									if(0){//is compatable with older '{label}' --> '{$label}' mechanics
+										if(["let", "def", "set", "ins"].includes(word)&&!isInInstructionSet)
+											state.phase="#";
+										else if(word&&(["undef", "ram"].includes(word)||word[0].match(/[a-zA-Z_]|::/)&&!isInInstructionSet))
+											state.phase="$";
+										else state.phase="@";
+									}
 								}
 								if(state.phase=="@")({index}=contexts.main_assembly({statement,index,scope:newScope}));
 								if(statement[index]=="$"){state.phase="$";index++;}
@@ -1688,6 +1707,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 													label.functionSupertype=value.label?.functionSupertype;
 													label.functionConstructor=value.label?.functionConstructor;
 													label.functionOperators=value.label?.functionOperators;
+													label.function=value.label?.function;//sets 'label..function'
 													break;
 												case"array":
 												label.code=[...value.array];
@@ -2568,27 +2588,28 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//names: [value],(compiler generated/inbuilt),<instance>,{important inbuilt constant},pointer*
 				name=undefined;///@string
 				labels={};//{[string|Symbol]:Variable|null|undefined}; aka properties; undefined:write only, null:can be read and written empty label
-				symbol=Symbol(Variable.objectNum++);
-				securityLevel=0;//used with '..secure'
-				functionOperators=null;//:Variable? ; 'a..oper.["_+_"]' operator overloading
-				functionPrototype=null;//:Variable? ; used in prototype chain similar to javascript `object.__proto__`
-				functionSupertype=null;//:Variable? ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
-				functionConstructor;//:Variable?;
+				symbol=Symbol(Variable.objectNum++);//'[¬label]'
+				securityLevel=0;//used with '..secure' ;
+				functionOperators=null;//:Variable? ; '..oper'  ; 'a..oper.["_+_"]' operator overloading
+				functionPrototype=null;//:Variable? ; '..proto' ; used in prototype chain similar to javascript `object.__proto__`
+				functionSupertype=null;//:Variable? ; '..super' ; used in supertype chain. 'supertype' is like prototype but they can't be over written.
+				functionConstructor=null;//:Variable? ; '..constructor'
 			//as array
 				code=[];//:(CodeLine|Variable|Scope)[]
 			//as function
 				//uses `label.code` for the list of functionScopes to run
 				//scope=null;//the scope that the code should be called with. the scope contains the code
-				prototype=null;//:Variable?
-				supertype=null;//:Variable?
-				operators=null;//:Variable?
+				prototype=null;//:Variable? ; '..prototype'
+				supertype=null;//:Variable? ; '..supertype'
+				operators=null;//:Variable? ; '..operators'
+				function=null;//:Variable? ; '..function' ; BODGED:for backwards compatibility function `label.code` will also be used for function calls
 			//as assembly
 				returnLineNumber;//:number; defined in collectCode
 				returnCpuState;//:CpuState
 				relAddress=0;//number UNUSED
-				lineNumber=undefined;//:number|NaN|undefined; Is used as the number value of a variable. Is returned from '+label'
+				lineNumber=undefined;//:number|NaN|undefined ; '+label' ; Is used as the number value of a variable. Is returned from '+label'
 				cpuState;//:CpuState
-				defs=[];//:Variable[]; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
+				defs=[];//:Variable[] ; '..defs' ; for removing def's of a label. stores places where '$def this;' and '$set this;' are used: '#undef: this;'
 				//defineLine=null;//instanceof AssemblyLine
 			//extra labels
 				returnLabel;//:Variable
@@ -2618,7 +2639,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				let codeBlock;//(Statemnent)
 				if(this.isSearched)return codeBlock;
 				if(!Object.isFrozen(this))this.isSearched=true;
-				this.code.reduce((s,v)=>{
+				let codeArray = this.function?.code??this.code;//:Variable
+				codeArray.reduce((s,v)=>{
 					///v: Variable ?? CodeLine|FunctionScope
 					if(v instanceof FunctionScope)s.push(v);
 					//else if(v instanceof HiddenLine.Define)s.push(v.label?.getCode?.(n+1));//pushes :...FunctionScope|code tree //I am not sure about this feature, although it does make the language more intuitive
@@ -2790,7 +2812,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				type="label";//: const
 				refType="internal";//: const
 				#propertyName;//: string
-				get(){
+				get(){//:Variable
 					return this.parent[this.#propertyName];
 				}
 				set(label){
@@ -2897,6 +2919,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						"super":({label})=>new InternalValue({label,name:"super"},"functionSupertype"),
 						"oper":({label})=>new InternalValue({label,name:"oper"},"functionOperators"),//operator overloads
 					//other
+					"function":({label})=>new InternalValue({label,name:"function"},"function"),//future feature; TODO: implement ..function on `Variable().function` as a separate list of functions
 					"defs":({label})=>new Variable({name:"defs",code:label.defs,lineNumber:label.defs.length}).toValue("label"),
 					"indexOf":new BuiltinFunctionFunction("indexOf",({label,args,scope,statement})=>{
 						let ans;
@@ -3231,7 +3254,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.let=instanceScope;
 						instanceScope.var=instanceScope;
 						newLabel.functionPrototype??=functionLabel.prototype;
-						newLabel.functionSupertype??=functionLabel.pupertype;
+						newLabel.functionSupertype??=functionLabel.supertype;
 						newLabel.functionOperators??=functionLabel.operators;
 						middleLabel.labels["this"]=newLabel;
 						middleLabel.labels["return"]=newLabel;
@@ -3241,7 +3264,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					case"=>"://arrow function, has no special labels, impure, let scope
 						instanceScope.let=instanceScope;
 						newLabel.functionPrototype??=functionLabel.prototype;
-						newLabel.functionSupertype??=functionLabel.pupertype;
+						newLabel.functionSupertype??=functionLabel.supertype;
 					break;
 					case"<="://'using(){}' super strong scope macro function
 						instanceScope.let=instanceScope;
@@ -3255,7 +3278,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.let=scope.let;
 						instanceScope.var=scope.var;
 						newLabel.functionPrototype??=functionLabel.prototype;
-						newLabel.functionSupertype??=functionLabel.pupertype;
+						newLabel.functionSupertype??=functionLabel.supertype;
 						middleLabel.labels["scope"]??=scope.label;
 						middleLabel.labels["arguments"]=argsObj;
 						middleLabel.labels["return"]=returnObj;
@@ -3294,7 +3317,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.var=this.var;
 				};
 				if(this instanceof Scope.CodeObj)
-					contexts.main({statement:this.code,dinstanceScope});
+					contexts.main({statement:this.code,instanceScope});
 				else evalBlock(this.code,undefined,instanceScope,statement);
 				//evalBlock(codeBlock,undefined,instanceScope,statement);
 				//if no return label created, it returns the
@@ -3505,7 +3528,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
 				"log_length":new Variable({name:"log_length",lineNumber:0}),//:1|0
 				"include_labels":new Variable({name:"include_labels",lineNumber:0}),//:1|0
-				"model":new Variable({name:"model",lineNumber:0}),//:1|0
+				"model":new Variable({name:"model",lineNumber:0}),//arch
 				"language":new BuiltinFunction("language",({args})=>{
 					if(args[0]){//args[0]:Value
 						let str=args[0].toType("string").string;
@@ -3667,9 +3690,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			+(settingsObj["log_table"].lineNumber?"\n"+outputLogTable():"")
 		);
 	}
-	return {file:outputBinary,defaultFileName};
+	let outputAssembler = {"tptasm":"tptasm"}[assemblyCompiler.assembly.language]??null;
+	return {file:outputBinary,defaultFileName,assembler:outputAssembler,architecture:buildSettings.arch};
 };
-let buildSettings={makeFile:true}
+let buildSettings={makeFile:true,arch:""};
 {
 	//possible names: 
 	//  0xmin Assembly Small Macro language or (ZASM)
@@ -3712,7 +3736,7 @@ let buildSettings={makeFile:true}
 			return [inputFile,fileName];
 		})();
 		let outputFile=null;
-		let fileWriter=(outputFile,defaultFileName)=>new Promise((resolve,reject)=>{//a.filt
+		let fileWriter=(outputFile,defaultFileName,assembler="",architecture)=>new Promise((resolve,reject)=>{//a.filt
 			let newFileName=process.argv[3];
 			if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
 			//else{console.log("made file")}
@@ -3724,10 +3748,11 @@ let buildSettings={makeFile:true}
 			}
 			fs.writeFile(newFileName, content, err => {
 				if (err)reject(err);
-				else {
-					if(typeof content=="string" && !newFileName.match(/\.(asm)$/)){//if tptasm ; convert to binary
+				else if(buildSettings.outputAsAssembly)handleExternalAssemblers:{
+					//uses assembler and architecture(aka model) to use an external assembler like e.g. clang, or tptasm
+					if(assembler=="tptasm"){//if tptasm ; convert to binary
 						const { exec } = require("child_process");
-						exec("\""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model=R216K8B", (error, stdout, stderr) => {
+						exec("\""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model="+architecture, (error, stdout, stderr) => {
 							if (error) {
 								console.log(`error: ${error.message}`);
 								return;

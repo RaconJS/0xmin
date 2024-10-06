@@ -1,4 +1,6 @@
 #"ZASM3";
+//for importable module files.
+//For function-like that should only be called once
 let ModuleManager{
 	let Module(symbol,nameSpaceCode){//#()->Module
 		//:[]#()->#()->any & []defer
@@ -60,5 +62,9 @@ let ModuleManager{
 			...moduleA;//does not run the code twice;
 			//debugger bar[1];
 		};
+	};
+	{:example3;
+		import lib "module.0xmin";
+		ModuleManager.Module(0xmin..static)		
 	};
 };

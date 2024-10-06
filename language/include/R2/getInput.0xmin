@@ -3,7 +3,8 @@
 #(){:docs;
 	getInput:#(out:%~char,#?&bool)->{@} & @->mutate out;
 	awaitInput:#(out:%~char)->{@} & @->mutate out;
-	getInput:#(out:%~char)->{@} & @->mutate out;
+	checkInput:#(out:%~char)->{@} & @->mutate out;
+	//note: there are extra parameters, not shown in these docs, for optimisations but they are less important for general use
 };
 let getInput(outputReg,await_bool,doWhile_wait,miniProcess,portReg){//:#(%?,#?,{@}?,{@}?,%?)->{@} & @mutate terminal
 	repeat !await_bool : awaitInput(outputReg,doWhile_wait,miniProcess,portReg);
