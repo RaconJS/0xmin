@@ -48,7 +48,9 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			},
 			"signed":{
 				useArray:true,
-				map:{"jg":["ja", "!"], "jl":["jb", "!"], "jge":["jae", "!"], "jle":["jbe", "!"]},
+				map:{"jg":["ja", "!"], "jl":["jb", "!"], "jge":["jae", "!"], "jle":["jbe", "!"], "jo":["jc","!"], 
+					"ja":"jg", "jb":"jl", "jae":"jge", "jbe":"jle", "jc":"jo",//reverse direction
+				},
 				defaultSymbols:["", "!"],
 			},
 			"sync":{

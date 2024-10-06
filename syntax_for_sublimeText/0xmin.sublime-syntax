@@ -62,15 +62,16 @@ variables:
   assembly_commands_start: '(?<=^|;|@|:|{)\s*'
   assembly_commands_end: '(?=;|#|})'
   assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump|or_input|get_jump|set_jump)\b'
+  assembly_commands_tptasm: '\b(?:call|ret|hlt|hault|port|mask|push|pop|mov|send|ld|st|exh|jmp|jn|jn?(?:e|[abgl]e?|[zsco])|ad[cd]s?|s[ub]bs?|xor|and|or)\b'
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '!?(make file|code|table|0xmin|tptasm|asm|int|text|len|labels|ZASM3|ZASM4)' #'!?(make file|log.code|log.table)'
   functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)'
-  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON)\b|@\$|@|\$|#|{{expressionOperator}})'
+  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|function|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON)\b|@\$|@|\$|#|{{expressionOperator}})'
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|model|language))?|Math(?:\s*\.\s*())?)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
   tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b|\!\s*\bsync\b'
-  meta_statementTypes: '\b(?:let|set|def|undef|redef)\b'
+  meta_statementTypes: '\b(?:let|set|def|ins|undef|redef)\b'
 contexts:
   main:
     - match: '^'
@@ -475,7 +476,7 @@ contexts:
       scope: support.constant
     - match: '\b(r[0-9]|r1[0-5]|ip|sp)\b'
       scope: support.constant
-    - match: '{{assembly_commands_start}}\b(call|ret|hlt|hault|port|mask|push|pop|mov|send|ld|st|exh)\b'
+    - match: '{{assembly_commands_start}}({{assembly_commands_tptasm}})'
       scope: keyword.control
     - match: '{{assembly_commands_start}}\b(invoke|do)\b'
       scope: keyword.control
