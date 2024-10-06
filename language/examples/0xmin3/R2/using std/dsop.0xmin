@@ -1,26 +1,125 @@
-#"ZASM3";#"tptasm";
+//dynamic array module
+#"ZASM3";#"tptasm";#"table";
 #"word=0s32";
 //dynamic(ly) size(d) object pointer
-import lib "include.0xmin";
+//import lib "include.0xmin";
 import lib "heap.0xmin";
-let Dsop()={
+import lib "R2/print.0xmin";
+def let Dsop()={//:#()->[]{@}*
 	def let size{0};
 	def let objectPointer{0};
 	def let capacity{0};
+	#..compile;
 }::{
 	let template = ..this()..compile;
 	:Self;
+	let use(block)={//allocator
+		repeat !block..defs..length def constructor.data..splice(-0,0,{1;def block});
+		#return = block;
+	}::{let data};
+	def use.data;
+	defer:delete use;
+	let edgeCaseError{
+		let sizeOverflow{
+			push r0;{
+				print("\p90\c04Error:\noverflow\n#");
+				r0 = [sp+1];
+				print.register(0);
+				print("\c0f");
+			};pop r0;
+			hlt;
+			return;
+		};
+	};
 	let method{
-		let push{
-			let input{
-				let self = Self()<->0;//:mut & Self
-				let size = {0}<->1;
-			};
-			let output{
-				let self = input.self;//:Self & mutated
+		defer:delete input,output,enum;
+		let Enum(n)={
+			#return<->n||0;
+			(){#return<->..this;#..this+=1;};
+			let clone(){
+				#return<=>..this;
+				#return<->..this;
 			};
 		};
-		let pop{
+		let input{
+			let self = Self() <-> 0;//:%Self*
+			let size = {0} <-> 1;//:%u
+		}::{
+			let enum = Enum(2);
+		};
+		let output{
+			let self <=> input.self;#self <-> input.self;
+			let newItem = {0} <-> 1;//:[]self
+			let error{
+				let Ok{};
+				let sizeOverflow{};//
+			} <-> newItem;
+		};
+		let push{//UNTESTED
+			let safeMode;//:#?
+			%output.newItem = [%input.self+input.self.objectPointer];
+			%output.newItem += input.self.size;
+			[%input.self+input.self.size] += %input.size;
+			repeat !!safeMode {:block;
+				jump -> block..return if !overflow;
+				call edgeCaseError.sizeOverflow:>use();
+			};
+			let regEnum = input.enum.clone();
+			let newSize <-> regEnum();
+			let array <-> regEnum();//:%{@}* & %[]heap*
+			%newSize = [%input.self+input.self.size];//temp:%usize
+			push %output.newItem;
+			defer: pop %output.newItem;
+			[%input.self+input.self.capacity] - %newSize;
+			{:updateCapacity;
+				:block;
+				jump -> block..return if < 0 !signed;
+				%array = [%input.self+input.self.objectPointer];
+				let newSize <-> regEnum();
+				%heap.resize.inputs.object = %array;
+				%heap.resize.inputs.size = %newSize;
+				{push %input.self;
+					call heap.resize.use();
+					{:handleCase_outOfSpace;
+						:block;
+						jump -> block..return if !sign;
+						def let growArray{:block;//handle not enough space
+							let temp<->heap.malloc.inputs[0];
+							%temp = [sp];//:%Self* & input.self
+							%heap.malloc.inputs.(0) = [%temp+input.self.capacity];
+							%heap.malloc.inputs.(0) <<= 1;//double size of array
+							call heap.malloc.use();
+							def let copyOverData;
+							let newArray,self,oldArray,i;
+							repeat!(+heap.malloc.output[0] != 0)throw "assertion failed";
+							let enum = Enum(heap.malloc.output[0]);
+							#newArray<->enum();
+							#oldArray<->enum();
+							#self = enum()<=>Self();
+							let i = enum();
+							let tempItem = enum();//:%[]Self.objectPointer
+							%self = [sp];
+							%oldArray = [%self + self.objectPointer];
+							%i = [sp+1];//:old array size
+							let loopEntry;
+							jump -> loopEntry;
+							${:loop;//for loop
+								defer:{
+									%i -= 1;
+									def loopEntry;
+									jump -> loop if > 0;
+								};
+								%tempItem = [%oldArray+%i];
+								[%newArray+%i] = %tempItem;
+							};
+							delete loopEntry;
+							[%self+self.objectPointer] = %newArray;
+						};
+					};
+				pop %output.self;};
+			};
+		};
+		let pop{//UNFINISHED
 			let input{
 
 			};
@@ -38,3 +137,23 @@ let So(){
 	def let size{0};
 	def let object{};
 }::{let template = ..this()..compile;};
+#(){:example;
+	import lib "R2/regEnum.0xmin";
+	let regEnum = RegEnum();
+	let array = Dsop();
+	let static{};
+	static::{array};
+	{//array.push(...[1,2,3])
+		let items = {0;1;2};
+		r0 = array;
+		r1 = items..@..length;
+		call Dsop.push.use();
+		r1 = [items.(0)];//r0 = [$(items+0)]
+		[r0+0] = r1;
+		r1 = [items.(1)];//r0 = [$(items+1)]
+		[r0+1] = r1;
+		r1 = [items.(2)];//r0 = [$(items+2)]
+		[r0+2] = r1;
+	};
+
+};

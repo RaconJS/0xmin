@@ -1,0 +1,248 @@
+#"ZASM3";
+#"code";
+...labelsof(){
+	defer:return = {let=use};
+	//rewriting
+	let Dependancies(allocatorObj,ownerObject)={//:({object:{@}}|{@;[¬Dependancies]})[]
+		let allocatorObj = allocatorObj;//:{@}?
+		let object = ownerObject;//:{}?
+	}::{
+		let ..prototype{//to use without macros
+			let use(object,allocatorObj){
+				repeat !object[¬Dependancies] let object[¬Dependancies] = Dependancies(allocatorObj);
+				let dependancy = object[¬Dependancies];
+				#dependancy.object||=object;
+				#this..indexOf(dependancy)||this..splice(-0,0,{ins dependancy});
+				#return = object;
+			};
+			let compile(allocatorObj){
+				let = static;//local symbol 'static:{@}'
+				#allocatorObj = allocatorObj||this.allocatorObj||(static.data||static.memory||static);
+				#this..flat..iterate((dependancies){
+					repeat !dependancies[¬isDefined_symbol]#{
+						let dependancies[¬isDefined_symbol] = allocatorObj;
+						repeat !!dependancies.object #allocatorObj..splice(-0,0,{dependancies.object});
+					};
+				});
+			};
+		};
+	};
+	let use(object,allocatorObj,ownerObject)<-{
+		#{
+			let list = ownerObject[¬Dependancies]||[¬Dependancies];
+			repeat !object[¬Dependancies] let object[¬Dependancies] = Dependancies(allocatorObj);
+			let dependancy = object[¬Dependancies];
+			#dependancy.object||=object;
+			#list..indexOf(dependancy)||list..splice(-0,0,{ins dependancy});
+			#return = object;
+		};
+	}::{
+		let ..supertype{
+			let =Dependancies;
+		};
+		
+		let: new(allocatorObj,ownerObject)<-{//:#(({@}&[]global)?,{@}?)->Dependancies & mutate
+			repeat !!ownerObject let ownerObject[¬Dependancies] = Dependancies(allocatorObj);
+			repeat !ownerObject let .[¬Dependancies] = Dependancies(allocatorObj);
+			#return = ownerObject&&ownerObject[¬Dependancies]||.[¬Dependancies];
+		}::{
+			let ..supertype{
+				let =Dependancies;
+			};
+		};
+		let compile(allocatorObj,ownerObject)<-{
+			{
+				let = static;//local symbol 'static:{@}'
+				let dependancies = ownerObject[¬Dependancies]||[¬Dependancies]||..this;
+				#allocatorObj = allocatorObj||dependancies.allocatorObj||(static.data||static.memory||static);
+				#dependancies..flat..iterate((dependancies){
+					repeat !dependancies[¬isDefined_symbol]#{
+						let dependancies[¬isDefined_symbol] = allocatorObj;
+						repeat !!dependancies.object #allocatorObj..splice(-0,0,{dependancies.object});
+					};
+				});
+			};
+		}::{
+			let ..supertype{
+				let =Dependancies;
+				let isDefined_symbol;
+			};
+		};
+		let get(obj){
+			#return = obj[¬Dependancies]
+		};
+	};
+	repeat 0 #{
+		let Use(){
+			(){
+				;
+			};
+		}::{
+			let: new(){
+				
+			};
+		};
+	};
+}();
+...labelsof(){
+	defer:#return={let=Function};
+	let Function(){
+
+	};
+	let typeSymbol{
+		let Value{let //:Symbol => Enum
+			Raw,//default
+			Invalid,
+			//else value symbol
+			;//:[]Enum
+		}::{
+			let get(v){
+				#return = v;
+				repeat !v #return = Raw;
+			};
+		};
+		let Path{let//{#=>Symbol}
+			Register(template){ins template}:>,// %T
+			Pointer(template){ins template}:>,// *T
+			Item(object,itemTemplate){ins let object,item=itemTemplate}:>,//[]U
+			Index(owner,index){ins let=owner,=index}:>,//U+T
+		};
+		let Constraint;//:(Symbol => #(any,any)->#bool) & ([]Type|[](Template & T:Type))
+		let Type{//:Symbol
+			let U16;
+			let I16;
+			let Fx16;
+			let Array(t){t};//where t:Template
+		};
+		let Cleanup{let//:Symbol => Enum
+			Owned,
+			Moved(t){t},//where t:{[¬Cleanup]}
+		};
+	};
+	let AddToSymbol(class,symbol){
+		repeat !symbol #symbol = class;
+		#class..function::{
+			ins class
+		};
+	};
+	let compairTypes(a,b){//:(#<->bool) & (#1&error:<T>{T;T}) | (#0&#path_to_value): 
+		let error = ¬;
+		//idea: '?foo().a.b.c' '#def ?obj;' ; use '?' syntax to allow nullable objects, similar to '!jump->10;' in '#"0xmin";'
+		#{
+			:block;
+			let recurValue = a..flat;
+			let compairTypes_recursive(a,b){
+				let fail(reason){//:#(#)->break
+					#error = reason;
+					break block;
+				};
+				let isEqual(symbol){
+					#a[¬symbol]&&(a[¬symbol]!=b[¬symbol])&&fail({ins a[¬symbol],b[¬symbol]});
+				};
+				let meetsConstraint(constraint,b){//constraint:#()->bool
+					#constraint&&(constraint(b)||fail());
+				};
+				...labelsof typeSymbol;
+				#(!!a..constructor&&(a..constructor!=b..constructor))&&fail({ins a..constructor,b..constructor});
+				#isEqual(Type);
+				#isEqual(Cleanup);
+				#isEqual(Path);
+				#meetsConstraint(a[¬Constraint],b);
+				#meetsConstraint(a[¬Type][¬Constraint],b);
+				repeat(!a[¬Value]||!!{Value.Valid;Value.Invalid}..indexOf(a[¬Value]..constructor)
+					#a..iterate((v,i){
+						recur recurValue #compairTypes_recursive(v,b[i]);
+					})
+				;
+			};
+			#compairTypes_recursive(a,b);
+		};
+		#return = {let fail=error}<->!error;//:#true
+	};
+	#(){:example;
+		...labelsof typeSymbol;
+		let Int()={};
+		let a{{let.[¬Type]=Int};Int()},
+			b{{let.[¬Type]=Int}},
+		;
+		let foo{
+			let input{def let a,b};
+			let output{};
+			let call(in,out){
+				repeat !+compairTypes({in;out},{input;output}) throw;
+				...labelsof in,out;
+			};
+		};
+		debugger +compairTypes(a,b);
+	}();
+	#(){:example;
+		let add<=>Function()<:{
+			def let enum = Enum(0);
+			def let input{Register()<:Int()<->enum();Register()<:Int()<->enum()};
+			def let output{def Register()<:Int()<->input[0]};
+			%output.(0) = %input.(0);
+			%output.(0) += %input.(1);
+			repeat(+output[0]!=+print.number.input[0]) %print.number.input.(0) = %output.(0);
+			call use(print.number);
+			return;
+		};
+		let add<=>Function()<:{
+			let a=£%int(),b=£%int();
+			£a+b;
+		};
+		let enum = Enum(0);
+		let a = Register()<:Int()<->enum();
+		let b = Register()<:Int()<->enum();
+		def add.call({owned(a);owned(b)},{owned(a)});
+
+	};
+}();
+#(){:example;
+	let bar{1;2;3};
+	let baz{4;5;6};
+	let foo1{
+		#Use.new();
+		use()<:bar;
+		use()<:baz;
+	};
+	let foo2{
+		let use = Use.new();
+		use()<:bar;
+	};
+	let owner1{
+		let use = Use.new();
+		use()<:foo1.use;//
+	};
+	let owner2{
+		let use = Use();
+		use()<:foo1.use;
+		use()<:foo2.use;
+		#use.onUse ||= (data)=>{//onUse is only called at the very end, inside `(Use()).compile()`
+			let i = 0;
+			repeat data..length def data[i-=1];
+			//lets say we want the data to be in reversed order
+			#..this::{def data};
+		};
+	};
+	foo.use.compile();
+};
+#(){:example;
+	let a = {
+		1;2;3
+	};
+	let static;
+	defer: def static;
+	let a{1;2;3};
+	let b{4;
+		#use.new();
+		#use(a);1;
+	};
+	let c{5;
+		#use.new();
+		@use(a);
+	};
+	use.new();
+	#use(c);
+	:global;
+	#use.compile(static);
+};
