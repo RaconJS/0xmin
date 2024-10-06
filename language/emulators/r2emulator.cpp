@@ -471,13 +471,13 @@ class r2CPU:public FiltCPU{
 	}
 	void setFlagsForAdd(u32 arg1,u32 arg2,u32 output){//where: o = f(a,b);
 		auto a = arg1, b = arg2, o = output;
-		flags.carry = (o >> 16)&1;
-		flags.overflow = ((a>>15) == (b>>15)) && (((o>>15)&1) != (b>>15));
+		flags.carry = (o >> 16)&1;//unsigned
+		flags.overflow = ((a>>15) == (b>>15)) && (((o>>15)&1) != (b>>15));//signed
 	}
 	void setFlagsForSub(u32 arg1,u32 arg2,u32 output){//where: o = f(a,b);
 		auto a = arg1, b = arg2, o = output;
 		flags.carry = (a < b);//unsigned
-		flags.overflow = ((a>>15) != (b>>15)) && ((b>>15) == ((o>>15)&1));
+		flags.overflow = ((a>>15) != (b>>15)) && ((b>>15) == ((o>>15)&1));//signed
 	}
 	void disassemble(CommandData commandData){
 		if(commandData.readHigh.isReadHigh)cout<<"readHigh";
@@ -543,6 +543,7 @@ class r2CPU:public FiltCPU{
 		arg2&=0xffff;
 		u32 output=arg2;//require: output is assigned in all cases
 		u32 a=arg1,b=arg2,&o=output;
+		u32 b1=b;//:b|(b + flags.carry); used with add, sub, adc, sbb
 		const u32 R2TERM_PORT = 0;//terminal port
 		const u32 R2TERM_PORT_IN = 0;//keyboard port
 		switch(commandData.opcode){
@@ -577,13 +578,14 @@ class r2CPU:public FiltCPU{
 				updateForAddision:{
 					if(!silent)setValue(output);
 					updateState(output,false);
-					setFlagsForAdd(a,b,o);
+					setFlagsForAdd(a,b1,o);
 					break;
 				}
 			case 0x05://ADC
 				silent = false;
 			case 0x0D://ADCS
 				output = a + b + flags.carry;
+				b1 += flags.carry;
 				goto updateForAddision;
 			case 0x06://SUB
 				silent = false;
@@ -592,7 +594,7 @@ class r2CPU:public FiltCPU{
 				updateForSubtration:{
 					if(!silent)setValue(output);
 					updateState(output,false);
-					setFlagsForSub(a,b,o);
+					setFlagsForSub(a,b1,o);
 					break;
 				}//R_flag(q3);F_Carr = (q1 < q2);F_Over = ((q1>>15)!=(q2>>15)) && ((q2>>15)==(q3>>15));
 				break;
@@ -600,6 +602,7 @@ class r2CPU:public FiltCPU{
 				silent = false;
 			case 0x0F://SBBS
 				output = a - b - flags.carry;
+				b1 += flags.carry;
 				goto updateForSubtration;
 			case 0x08://SWM
 				output = b;

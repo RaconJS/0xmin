@@ -112,8 +112,8 @@ using namespace std ;
 		filt30(u32 v){value=(v&0x3fffffff);if(value==0)value=30;}
 		operator u32(){return value;}
 		filt30 operator ++(int a){value++;return value;}
-		filt30 operator =(u32 v){value=(filt30)v;}
-		filt30 operator =(filt30 v){if(v!=0 or value==0)value=v;}
+		filt30 operator =(u32 v){value=(filt30)v;return *this;}
+		filt30 operator =(filt30 v){if(v!=0 or value==0)value=v;return *this;}
 	};
 	struct bray30{//2^30 states
 		public:
@@ -121,16 +121,17 @@ using namespace std ;
 		u32 value=0x3fffffff;
 		bray30(u32 v){value=v;}
 		operator u32(){return value;}
-		filt30 operator =(u32 v){value=(bray30)v;}
-		filt30 operator =(bray30 v){if(value!=0)value=v;}
-		filt30 operator =(filt30 v){if(v!=0 or value==0)value=v;}
+		operator filt30(){return (filt30)value;}
+		filt30 operator =(u32 v){value=(bray30)v;return (filt30)*this;}
+		filt30 operator =(bray30 v){if(value!=0)value=v;return (filt30)*this;}
+		filt30 operator =(filt30 v){if(v!=0 or value==0)value=v;return (filt30)*this;}
 	};
 	struct pistonAddressN{
 		public:
 		u64 value;
 		pistonAddressN(u64 v){value=v;}
 		operator u64(){return value;}
-		filt30 operator =(u64 v){value=(pistonAddressN)v;}
+		filt30 operator =(u64 v){value=(pistonAddressN)v;return (filt30)value;}
 	};
 	class GetKeyInput{
 		struct termios oldt, newt;
