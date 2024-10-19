@@ -1,2 +1,3 @@
+#"table";
 import lib "R2/std.0xmin";
-print("Hello, world!");
+print("Hello, world!",0,{});

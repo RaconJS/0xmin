@@ -1,6 +1,6 @@
 #"ZASM3";
 #"code";
-...labelsof(){
+...labelsof(){//use
 	defer:return = {let=use};
 	//rewriting
 	let Dependancies(allocatorObj,ownerObject)={//:({object:{@}}|{@;[¬Dependancies]})[]
@@ -83,11 +83,60 @@
 			};
 		};
 	};
+	#(){:example;
+		let bar{1;2;3};
+		let baz{4;5;6};
+		let foo1{
+			#Use.new();
+			use()<:bar;
+			use()<:baz;
+		};
+		let foo2{
+			let use = Use.new();
+			use()<:bar;
+		};
+		let owner1{
+			let use = Use.new();
+			use()<:foo1.use;//
+		};
+		let owner2{
+			let use = Use();
+			use()<:foo1.use;
+			use()<:foo2.use;
+			#use.onUse ||= (data)=>{//onUse is only called at the very end, inside `(Use()).compile()`
+				let i = 0;
+				repeat data..length def data[i-=1];
+				//lets say we want the data to be in reversed order
+				#..this::{def data};
+			};
+		};
+		foo.use.compile();
+	};
+	#(){:example;
+		let a = {
+			1;2;3
+		};
+		let static;
+		defer: def static;
+		let a{1;2;3};
+		let b{4;
+			#use.new();
+			#use(a);1;
+		};
+		let c{5;
+			#use.new();
+			@use(a);
+		};
+		use.new();
+		#use(c);
+		:global;
+		#use.compile(static);
+	};
 }();
-...labelsof(){
-	defer:#return={let=Function};
+...labelsof(){//type checking
+	defer:#return={let=compairTypes,=Function};
 	let Function(){
-
+		;
 	};
 	let typeSymbol{
 		let Value{let //:Symbol => Enum
@@ -118,61 +167,119 @@
 			Owned,
 			Moved(t){t},//where t:{[¬Cleanup]}
 		};
+		let Code{//:Symbol
+			let Entry,Current,Exit;//:Symbol => t:Template
+			let finalCode;//:Symbol => c:@ ; used in '@:$(c)'
+			(entry,exit,codeBlock){//:(Template,Template,{@})->Code&{@}
+				def codeBlock;
+				let .[¬Entry] = entry;
+				let .[¬Exit] = exit;
+				let .[¬Code] = return;
+				let .[¬Type] = {ins Code,entry,exit};
+			};
+		};
 	};
 	let AddToSymbol(class,symbol){
 		repeat !symbol #symbol = class;
-		#class..function::{
-			ins class
+		let foo = class..function;
+		(){
+			#return = foo(...arguments);
+			#let return[¬symbol] = return;
 		};
+		#let class..function = return..function;
+		#return = class;
 	};
-	let compairTypes(a,b){//:(#<->bool) & (#1&error:<T>{T;T}) | (#0&#path_to_value): 
+	let compairTypes(a,b,isStrictEquality){//:# & (#<->bool) & (#1&error:<T>{T;T}) | (#0&#path_to_value): 
+		//isStrictEquality:#?
+		//- checks 'a' is contained in 'b' i.e. 'a ⊆ b' e.g. {1} ⊆ {1;2} ; aka if 'a' is (contained in)/(is a less strict form of) than 'b'
+		//- strict mode checks that a ⊆ b and a ⊇ b e.g. {1} = {1}
 		let error = ¬;
 		//idea: '?foo().a.b.c' '#def ?obj;' ; use '?' syntax to allow nullable objects, similar to '!jump->10;' in '#"0xmin";'
 		#{
 			:block;
 			let recurValue = a..flat;
-			let compairTypes_recursive(a,b){
-				let fail(reason){//:#(#)->break
-					#error = reason;
-					break block;
+			let compairTypes_recursive(a,b,isStrictEquality){//:#(template,template,#?)->void
+				repeat(1+isStrictEquality):#{
+					let fail(reason){//:#(#)->break
+						#error = reason;
+						break block;
+					};
+					let isEqual(symbol){
+						#
+							  !!a[¬symbol]
+							&&(a[¬symbol]!=b[¬symbol])
+							//&&!+compairTypes_recursive(a[¬symbol],b[¬symbol],¬)
+							&&fail({ins a[¬symbol],b[¬symbol]})
+						;
+					};
+					let meetsConstraint(constraint,b){//constraint:#()->bool
+						#constraint&&(constraint(b)||fail());
+					};
+					...labelsof typeSymbol;
+					#(!!a..constructor&&(a..constructor!=b..constructor))&&fail({ins a..constructor,b..constructor});
+					#isEqual(Type);
+					#isEqual(Cleanup);
+					#isEqual(Path);
+					#meetsConstraint(a[¬Constraint],b);
+					#meetsConstraint(a[¬Type][¬Constraint],b);
+					repeat(!a[¬Value]||!!{Value.Valid;Value.Invalid}..indexOf(a[¬Value]..constructor))
+						#a..iterate((v,i){
+							recur recurValue #compairTypes_recursive(v,b[i],¬);
+						})
+					;
+					repeat !!isStrictEquality #{let carry_a=a#a=b;#b=carry_a;};//swap them over for the reverse
 				};
-				let isEqual(symbol){
-					#a[¬symbol]&&(a[¬symbol]!=b[¬symbol])&&fail({ins a[¬symbol],b[¬symbol]});
-				};
-				let meetsConstraint(constraint,b){//constraint:#()->bool
-					#constraint&&(constraint(b)||fail());
-				};
-				...labelsof typeSymbol;
-				#(!!a..constructor&&(a..constructor!=b..constructor))&&fail({ins a..constructor,b..constructor});
-				#isEqual(Type);
-				#isEqual(Cleanup);
-				#isEqual(Path);
-				#meetsConstraint(a[¬Constraint],b);
-				#meetsConstraint(a[¬Type][¬Constraint],b);
-				repeat(!a[¬Value]||!!{Value.Valid;Value.Invalid}..indexOf(a[¬Value]..constructor)
-					#a..iterate((v,i){
-						recur recurValue #compairTypes_recursive(v,b[i]);
-					})
-				;
 			};
-			#compairTypes_recursive(a,b);
+			#compairTypes_recursive(a,b,isStrictEquality);
 		};
 		#return = {let fail=error}<->!error;//:#true
+	};
+	let compairTypes.jumpTo(caller_from,callee_to){
+		...labelsof typeSymbol;
+		#return = compairTypes(caller_from[¬Code.Current],callee_to[¬Code.Entry]);
+	};
+	let compairTypes.callFunction(caller_from,callee_to,input,output){
+		...labelsof typeSymbol;
+		#return =
+			//check state lines up
+				compairTypes(caller_from[¬Code.Current],callee_to[¬Code.Entry])
+				&&compairTypes(callee_to[¬Code.Exit],caller_from[¬Code.Current])
+			//compair function signiture
+				&&compairTypes(input,callee_to.input)
+				&&compairTypes(output,callee_to.output)
+		;
+	};
+	let compairTypes.call.join(callee_to,callee_to){
+		...labelsof typeSymbol;
+		#return = compairTypes(callee_to[¬Code.Exit],callee_to[¬Code.Entry]);
 	};
 	#(){:example;
 		...labelsof typeSymbol;
 		let Int()={};
 		let a{{let.[¬Type]=Int};Int()},
 			b{{let.[¬Type]=Int}},
+			c{let.[¬Type]=Int},
 		;
 		let foo{
-			let input{def let a,b};
-			let output{};
+			let input{def let a=Int(),b=Int()};
+			let output{Int()};
 			let call(in,out){
-				repeat !+compairTypes({in;out},{input;output}) throw;
-				...labelsof in,out;
+				repeat !+compairTypes({input;output},{in;out}) throw;
+				let entryType <=> input;
+				let exitType <=> output;
+				//...labelsof in,out;
+				repeat 0 {//code
+					in.a.get();
+					%input.a = $(in.a.get.final());
+					in.b.get();
+					%input.b = $(in.b.get.final());
+					call ..this;
+					def out[0].get();
+					@:$(in.b.get.final()) = %output.(0);
+				};
 			};
 		};
+		#foo.call({Int();Int()},{Int();Int()});
 		debugger +compairTypes(a,b);
 	}();
 	#(){:example;
@@ -186,63 +293,86 @@
 			call use(print.number);
 			return;
 		};
-		let add<=>Function()<:{
+		let add1<=>Function()<:{
 			let a=£%int(),b=£%int();
 			£a+b;
+		};
+		//let add(a,b){a+b};
+		let add2 = Function(a:£%int(),b:£%int(),int())::{//form design
+			//idea, can use '(key:value)' for setting labels in the 'arguments' object
+			//does 'let arguments.key = value'
+			//idea: have ..operator[","] and ..operator[";"] for the end of short and long expressions.
+			£a+b;
+		};
+		let add3 = Function()<:{//form design
+			let input{def let a = %int()<->0, b = int()<->1};
+			let output{def let c = %int()<->0};
+			...labelsof input,output;
+			£c = a + b;//c:#0 & %int
 		};
 		let enum = Enum(0);
 		let a = Register()<:Int()<->enum();
 		let b = Register()<:Int()<->enum();
 		def add.call({owned(a);owned(b)},{owned(a)});
-
 	};
 }();
-#(){:example;
-	let bar{1;2;3};
-	let baz{4;5;6};
-	let foo1{
-		#Use.new();
-		use()<:bar;
-		use()<:baz;
-	};
-	let foo2{
-		let use = Use.new();
-		use()<:bar;
-	};
-	let owner1{
-		let use = Use.new();
-		use()<:foo1.use;//
-	};
-	let owner2{
-		let use = Use();
-		use()<:foo1.use;
-		use()<:foo2.use;
-		#use.onUse ||= (data)=>{//onUse is only called at the very end, inside `(Use()).compile()`
-			let i = 0;
-			repeat data..length def data[i-=1];
-			//lets say we want the data to be in reversed order
-			#..this::{def data};
+...labelsof(){
+	defer:#return={let=Code};
+	let Code(code)={let
+		=code,//:{@}
+		final,//:(%|{@}) & #{isOwned:bool&#?}
+		memoryState,//:{freeRegisters:%[];registersUsed:#usize&%;}
+	}::{
+		let ..operators={let
+			//.["_-_"],
+			.["_ "](a){//end of shot expression
+				;
+			},
+			.["_,"](a){//end of long expression
+				#return = a.code;
+			},
+			.["_;"](a){//end of statement ; this may not be added and might just have ',' and ';' instead for short/long expressions 
+				#return = a.code;
+			},
 		};
 	};
-	foo.use.compile();
-};
-#(){:example;
-	let a = {
-		1;2;3
+	let Int()={}::{
+		let ..operators{let
+			..proto = Code..operators,
+			.["_+_"](a,b){
+				repeat !(a[¬Code]&&b[¬Code]) throw;
+				let memoryState = {
+					let freeRegisters =
+						a.memoryState.freeRegisters...b.memoryState.freeRegisters
+						¬..iterate({},(s,v,i,a){
+							repeat(+i == +a..indexOf(v)) #s::{v};
+						})
+					;
+					#usedRegisters <-> 0xmin.Math.max(a.memoryState.usedRegisters,b.memoryState.usedRegisters);
+				};
+				let final;//final:{@%}&%
+				let code = {
+					//where 
+					def a.code;
+					def b.code;
+					let freedData = {
+						ins a.final.isOwned&&a.final;
+						ins a.final.isOwned&&a.final;
+					};
+					let temp = ¬;
+					...codeof:
+						  (!!a.final.isOwned && {@: $a.final += $b.final})
+						||(!!b.final.isOwned && {@: $b.final += $a.final})
+						||({
+							#temp = {:self;@%self;delete self};
+							#temp<->memoryState.freeRegisters..splice(-1,1)[0]||{ins ¬+usedRegisters;#usedRegisters+=1}[0];
+							let temp.isOwned = 1;
+							#final = temp;
+							@: $temp += $a.final;
+						})
+					;
+				};
+			},
+		};
 	};
-	let static;
-	defer: def static;
-	let a{1;2;3};
-	let b{4;
-		#use.new();
-		#use(a);1;
-	};
-	let c{5;
-		#use.new();
-		@use(a);
-	};
-	use.new();
-	#use(c);
-	:global;
-	#use.compile(static);
 };

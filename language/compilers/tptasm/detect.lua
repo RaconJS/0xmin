@@ -8,6 +8,12 @@ local function enumerate_standard(id)
 		local dx   = xbit32.band(              dxdyprop,      0xF)
 		local dy   = xbit32.band(xbit32.rshift(dxdyprop, 4),  0xF)
 		local prop = xbit32.band(xbit32.rshift(dxdyprop, 8), 0x1F)
+		if dx > 8 then
+			dx = dx - 16
+		end
+		if dy > 8 then
+			dy = dy - 16
+		end
 		if dx == 0 and dy == 0 then
 			dx = 1
 		end
@@ -31,7 +37,7 @@ local function enumerate_standard(id)
 			while true do
 				offs = offs + 1
 				local ctype = prop_of(offs)
-				if not ctype then
+				if not ctype or ctype < 0 or ctype > 255 then
 					name_intact = false
 					break
 				end
@@ -123,7 +129,19 @@ local function enumerate_cpus()
 end
 
 local function all_cpus()
-	local co = coroutine.create(enumerate_cpus)
+	local co = coroutine.create(function()
+		local rethrow = false
+		xpcall(function()
+			enumerate_cpus()
+		end, function(err)
+			printf.err("error inside xpcall: %s", tostring(err))
+			printf.info("%s", debug.traceback())
+			rethrow = true
+		end)
+		if rethrow then
+			error("rethrowing error from inside xpcall")
+		end
+	end)
 	return function()
 		if coroutine.status(co) ~= "dead" then
 			local ok, x, y, id_model, id_target = coroutine.resume(co)
@@ -195,16 +213,18 @@ local function make_anchor(model, dxstr, dystr, propname, leetid)
 		printf.err("invalid dx")
 		return
 	end
-	if dx < 0 then
-		dx = dx + 16
+	local edx = dx
+	if edx < 0 then
+		edx = edx + 16
 	end
 	local dy = tonumber(dystr or "0")
 	if dy ~= math.floor(dy) or dy >= 8 or dy < -8 then
 		printf.err("invalid dy")
 		return
 	end
-	if dy < 0 then
-		dy = dy + 16
+	local edy = dy
+	if edy < 0 then
+		edy = edy + 16
 	end
 	local x, y = sim.adjustCoords(tpt.mousex, tpt.mousey)
 	local function spawn(offs, ty)
@@ -215,7 +235,7 @@ local function make_anchor(model, dxstr, dystr, propname, leetid)
 	end
 	sim.partProperty(spawn(-1, elem.DEFAULT_PT_FILT), prop, leetid or 1337)
 	local anchor = spawn(0, elem.DEFAULT_PT_QRTZ)
-	sim.partProperty(anchor, "tmp2", dx + dy * 0x10 + prop * 0x100)
+	sim.partProperty(anchor, "tmp2", edx + edy * 0x10 + prop * 0x100)
 	sim.partProperty(anchor, "ctype", 0x1864A205)
 	local checksum = 0
 	for ix = 1, #model do

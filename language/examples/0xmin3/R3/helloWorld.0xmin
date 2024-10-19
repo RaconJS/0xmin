@@ -1,0 +1,106 @@
+//build with: `0xmin hello\ world.0xmin -o hello\ world.bin`
+#"tptasm/R316";//sets the language
+#"table";//debug data settings
+#"target_assembly"; //uncomment for: `0xmin hello\ world.0xmin -o hello\ world.asm`
+{//simpler version ; over commented to try to explain some of the syntax
+	//define register labels, with type annotation comments 
+	//(side note: we could write a compile type handler is we wanted to, or import an existing one.)
+	//- counting from 1 since r0 is read only "0x20000000"
+	#let port = 1;//:%terminal*
+	#let char = 2;//:%Char8
+	#let i = 3;//:%U16
+	#let string = "hello world";//:String
+	#let memorySafetyHandler{//:{#} ; declares 'memorySafetyHandler' like an object with 3 properties
+		#let registerStorage{def ¬0,¬0,¬0};//:{@} & @any[3]
+		#let pushRegisters{//:{@}
+			st r1 registerStorage.(0);
+			st r2 registerStorage.(1);
+			st r3 registerStorage.(2);
+		};
+		#let popRegisters{//:{@} ; '{@}' denotes a block of run time code or any object of unspecified size
+			ld r1 registerStorage.(0);
+			ld r2 registerStorage.(1);
+			ld r3 registerStorage.(2);
+		};
+	};
+	#def memorySafetyHandler.pushRegisters;
+	//main program starts here:
+	{:inisialisation;
+		exh %port 0x2001;//same as `exh %1 %1 0x2001`
+		exh %char 0x2002;//0x2002XXXX is for output for the R2term
+		%i = 0;
+	};
+	//assert %port == 0x2001000
+	#let loopEntry;
+	jump -> loopEntry;
+	{//'{ ... }' creates a new code block scope, similar to c-like languages.
+		#def let loop;//creates the label 'loop' and assigns it to this line
+		{#def let syncLoop;
+			jump -> syncLoop !sync;//same as `jy syncLoop`
+		};
+		#def loopEntry;//defines the `loopEntry` label ; we do not need to sync on the first iteration, this can improve speed. 
+		ld %char %i string;
+		st %char %port 0;
+		%i += 1;//`add %i %i 1`
+		r0 = %i - string..length;//`sub r1 %i 1`
+		jump -> loop;
+	};
+	def memorySafetyHandler.popRegisters;
+	hlt;
+	jump -> 0;
+	#def memorySafetyHandler.registerStorage;
+	#def string;
+};
+#(){//the over engineered DRY but scalable version
+	:global;
+	//'use' is a macro for allocating static memory at compile time
+	let use(object,ownerObject,symbol)={//:#(#,obj:{@},#¬?)->obj
+		repeat(!!symbol && !ownerObject[¬symbol])#{
+			let ownerObject[¬symbol];#ownerObject = ownerObject[¬symbol]
+		};
+		repeat(arguments..length < 2) #ownerObject = object;
+		repeat !!ownerObject,useSymbol[¬constructor] break;
+		let ownerObject,useSymbol[¬constructor] = object||{};
+		#constructor.data::{def object};
+		#return = object;
+	}::{//
+		let data;
+		defer global:#global..splice(-0,0,{def ..this.data});
+	};
+	let print(string,port_reg,char_reg,index_reg,isTermValue){//:#(String,%?,%?,{}?)->{@}
+		let inputReg(inputReg,lastVariableObj)=>{//:#(%?,Self?)
+			let reg = inputReg;//:%
+			let oldValue = use({0},constructor,0xmin..static);
+			let isFromArgument = !!inputReg;
+			repeat !reg #reg = lastVariableObj.reg||0 +1;
+			repeat(!isFromArgument):{
+				st %reg oldValue;//st a -> [b]
+				defer return #return..splice(-0,0,{ld %reg oldValue});//ld a <- [b]
+			};
+		};
+		def let port = inputReg(port_reg);
+		def let char = inputReg(char_reg,port);
+		def let index = inputReg(index_reg,char);
+		repeat !isTermValue {
+			exh %port.reg 0x2001;
+			%port.reg = 0x0000;
+			%index.reg = 0;
+			exh %char.reg 0x2002;
+		};
+		let loopEntry;
+		let sync(){jump->return !sync};
+		jump->loopEntry;
+		{def let printer;
+			sync();
+			def loopEntry;//just after sync
+			ld %char.reg %index.reg use(string);
+			st %char.reg %port.reg;
+			%index.reg += 1;
+			r0 = %index.reg - string..length;
+			jump->printer if < 0;
+		};
+	};
+	print("hello world");
+	hlt;
+	jump 0;
+};

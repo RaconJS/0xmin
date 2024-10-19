@@ -1201,4 +1201,19 @@ compilation_settings;{
 		foo..length;//0
 		..function
 	};
+	private variables{
+		//variables that are not accessable through `a.b` only on in scopes where they were defined
+		//private variables are accessable ontop of normal scopes
+		let a = {
+			priv privateLabel = 2;
+			{
+				:self;
+				debugger privateLabel;//2
+				let privateLabel = 1;
+				debugger privateLabel;//2
+				debugger self.privateLabel;//1
+			};
+		};
+		debugger a.privateLabel;//undefined
+	}
 };

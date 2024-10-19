@@ -7,5 +7,5 @@ let global = ..this;
 ...labelsof#(){defer#return={let=getInput,=awaitInput,=checkInput};import lib "R2/getInput.0xmin"}();
 defer global:{
 	//def static;
-	def heap.data;
+	def heap.memory;
 };

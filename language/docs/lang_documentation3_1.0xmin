@@ -206,4 +206,17 @@
 			tptasm_Base
 			tptasm_Base #meta
 			//tptasm_Base:
+				tptasm_assembly_expression
+				[tptasm_assembly_expression]
+			//tptasm_assembly_expression_2
+				[tptasm_assembly_expression_2]
+				[tptasm_assembly_expression_2 + tptasm_assembly_expression_2]
+				[tptasm_assembly_expression_2 - tptasm_assembly_expression_2]
+			//tptasm_assembly_expression_1
+				tptasm_assembly_expression_0
+				%tptasm_assembly_expression_0
+			//tptasm_assembly_expression_0:
+				label
 				#(expressions)
+				$(expressions)
+				

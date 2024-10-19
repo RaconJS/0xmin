@@ -585,7 +585,7 @@ def let program{
 		//printHexFromMemory(counterLabel,0);
 		hault;
 		jump->0;
-		repeat 1 {//desplay info
+		repeat 0 {//desplay info
 			let startReg = parse..prototype.newFoo.onCallStart.startReg;
 			def let logData()={call constructor}::{
 				let stackSize;
@@ -604,9 +604,11 @@ def let program{
 		}
 	};
 	def main;
-	#let counter;
-	#heap[-1][-1]..splice(1,0,{#def counterLabel;0 #def counter;});
-	#heap.malloc..splice(0,0,{[counter]+=1});
-	#heap.free..splice(0,0,{[counter]-=1});
+	repeat 0 ...(){//also desplay info
+		#let counter;
+		#heap[-1][-1]..splice(1,0,{#def counterLabel;0 #def counter;});
+		#heap.malloc..splice(0,0,{[counter]+=1});
+		#heap.free..splice(0,0,{[counter]-=1});
+	};
 	def heap;
 };

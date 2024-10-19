@@ -63,7 +63,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		const endingStringList=":;])}";
 		const functionCallTypes=["->", "=>", "=", "<=", "<-"];
 		const settingsRegex=       /(?:\s*#\s*"[^"]*"\s*;)/g;
-		const startOfFileRegex=/^(?:(?:\s*#\s*"[^"]*"\s*;)|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*/;
+		const startOfFileRegex=/^(?:(?:\s*#\s*"[^"]*"\s*;)|\/\/[^\n]*\n|\s+|\/\*[\s\S]*?\*\/)*/;
 	//----
 	//inputFile -> code tree
 		//(long string,string) => (array of words)
@@ -92,7 +92,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					inputFile=comments+inputFile.substr(settings[0].length);
 					settings[0]=settings[0].replaceAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,"");
 				}
-				settings=(settings[0].match(/"([^"]+)"/g)??[]).map(v=>v.match(/(?<=")[\s\S]*?(?=")/));	
+				settings=(settings[0].match(/"([^"]+)"/g)??[]).map(v=>v.match(/(?<=")[\s\S]*?(?=")/));
 				const labels=mainObject.labels.settings.labels;
 				const setLanguage=str=>assemblyCompiler.assembly.setLanguage(str)
 				const settingsList={
@@ -103,20 +103,19 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"asm"(v){setLanguage("asm")},
 					"int"(v){setLanguage("int")},
 					"text"(v){setLanguage("text")},
+
+					"tptasm/R216"(v){
+						setLanguage("tptasm");
+						buildSettings.arch = "R216K8B";
+						if(0)labels["arch"].code = Value.String(JSON.stringify("0xmin")).toType("label").label.code;
+					},
+					"tptasm/R316"(v){setLanguage("tptasm");buildSettings.arch = "R3AM16";},
+					"x86"(v){setLanguage("tptasm");buildSettings.arch = "x86";},
 					"code"(v){labels["log_code"].lineNumber=v;},//language: raw number output
 					"table"(v){labels["log_table"].lineNumber=v},
 					"len"(v){labels["log_length"].lineNumber=v},
 					"labels"(v){labels["include_labels"].lineNumber=v},
-					"arch 0xmin"(v){
-						buildSettings.arch = "0xmin";
-						if(0)labels["arch"].code = Value.String(JSON.stringify("0xmin")).toType("label").label.code;
-					},
-					"arch R2"(v){
-						buildSettings.arch = "R216K8B";
-					},
-					"arch x86"(v){
-						buildSettings.arch = "x86";
-					},
+					"target_assembly"(v){buildSettings.outputAsAssembly = v},//tempory name
 				}
 				settings.forEach(v=>{
 					let turnOn=true;
@@ -382,9 +381,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 		main({statement,index=0,scope,deferedParentScopeCodeObj=undefined}){//codeObj; Bash-like statements
 			//deferedParentScopeCodeObj:Scope? ; used for 'defer' statements ; BODGED
 			let {codeObj,newScope}=contexts.getNewScope({statement,scope});
-			let state={void:false,static:false,virtual:false,phase:scope.defaultPhase};
+			let state={void:false,static:false,virtual:false,phase:scope.defaultPhase,subPhase:[]};
 			let wasUsed=false;
 			statement.maxRecur;
+			//assert state.subPhase:String[]?
 			if(0){
 				if(index==0){
 					statement.recur??=0;
@@ -534,23 +534,22 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							let value;
 							({value,index}=contexts.expression_short({index,statement,scope}));
 							let labelFromValue=value?Variable.fromValue(value,scope):undefined;
-							let scopeOfLabel;//s:Scope? where s.label == labelFromValue
+							let throwToScope;//:Scope
 							if(labelFromValue){//check for label in scope parents
-								scopeOfLabel=scopeSearch(scope,labelFromValue);
+								throwToScope=scopeSearch(scope,labelFromValue);
 							}else {
-								scopeOfLabel = scope;
-								labelFromValue = scope.label;
+								throwToScope=scope;
 							}
 							if(statement[index]==":")index++;
 							//'#defer: ...dostuff ;'
-							let label = labelFromValue??scope.label;//note: this can cause 
-							if(scopeOfLabel){
-								if(word=="defer")scopeOfLabel.defer.push(
+							throwToScope??=scope;//:Scope ; note: this can cause
+							if(throwToScope){
+								if(word=="defer")throwToScope.defer.push(
 									(({statement,index,scope})=>
 											(newScope)=>contexts.main({statement,index,scope,deferedParentScopeCodeObj:newScope})
 									)({statement,index,scope}),
 								);//BODGED: this works but it is prefered not to use closure functions as a programming style.
-								else if(word=="break")throw label;//is caught by `evalBlock`, with the matching scope.
+								else if(word=="break")throw throwToScope;//is caught by `evalBlock`, with the matching scope.
 							}
 							else throw Error(throwError({statement,index,scope}, "# scope", "label '" + labelFromValue?.name + "' is not a scope in the scope chain"));
 						}
@@ -564,25 +563,32 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							index++;
 						}
 						//'{ ... };' -> '#ins { ... };'
-						let value,failed=true;
+						let startValue,failed=true;
 						if(state.phase=="")//||state.phase=="$"
-							({value,failed}=contexts.declareFunctionOrObject({statement,index,scope}));
-						if(!failed&&value?.label){
-							newScope.label.code.push(value.label);
+							({value:startValue,failed,index}=contexts.declareFunctionOrObject({statement,index,scope}));
+						if(!failed){
+							newScope.label.code.push(startValue.label);
 						}
 						else if(statement[index]!=";"&&index<statement.length){
 							assemblyPart:{
-								let value;
 								if(state.phase==""){//auto detect phase
 									word=statement[index];
 									const isInInstructionSet=assemblyCompiler.assembly.instructionSet.hasOwnProperty(word);
+									//matches keywords first, then patterns
 									if(isInInstructionSet)
 										state.phase="@";
 									else if(["undef", "ram"].includes(word))
 										state.phase="$";
-									else if(["let", "def", "set", "ins"].includes(word)||word[0].match(/[a-zA-Z_]|::/))
+									else if(["let", "def", "set", "ins"].includes(word))
 										state.phase="#";
-									else state.phase="@";
+									else if(word[0].match(/^[a-zA-Z_]/)){//matches patterns 'label' `{}` `(){}`
+										state.phase="#";state.subPhase=["def"];
+									}
+									else if(startValue){//matches patterns 'label' `{}` `(){}`
+										state.phase="#";state.subPhase=["ins"];
+									}
+									else
+										state.phase="@";
 									if(0){//is compatable with older '{label}' --> '{$label}' mechanics
 										if(["let", "def", "set", "ins"].includes(word)&&!isInInstructionSet)
 											state.phase="#";
@@ -595,7 +601,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								if(statement[index]=="$"){state.phase="$";index++;}
 								if(state.phase=="$")({index}=contexts.main_hidden({statement,index,scope:newScope}));
 								if(statement[index]=="#"){state.phase="#";index++;}
-								if(state.phase=="#")({index}=contexts.main_meta({statement,index,scope:newScope,virtualLine}));
+								if(state.phase=="#")({index}=contexts.main_meta({statement,index,scope:newScope,virtualLine,startKeywords:state.subPhase,startValue}));
 								;
 								newScope.data_phase=state.phase;
 							}
@@ -642,7 +648,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(word==":")index++;
 				return {index,found,keywords};
 			},
-			main_meta({statement,index,scope,virtualLine}){//'#' ==> '# let set a;'
+			main_meta({statement,index,scope,virtualLine,startKeywords=[],startValue=undefined}){//'#' ==> '# let set a;'
 				const metaState={
 					"let":false,
 					"set":false,
@@ -650,9 +656,14 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"def":false,
 				};
 				let found;
+				if(startKeywords){
+					for(let i=0;i<startKeywords.length;i++){
+						metaState[startKeywords[i]] = true;
+					}
+				}
 				({index,found}=contexts.keyWordList({statement,index,scope,keywords:metaState}));
 				let word=statement[index];
-				let startValue;//:Value
+				startValue=undefined??startValue;//:Value
 				if(!found)metaState["set"]=true;//'#: a=b;' ==> '#set: a=b;'
 				for(let i=0;i<statement.length&&index<statement.length;i++){//'#let a,b,c;'
 					let word;
@@ -713,7 +724,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					let value;
 					({index,value}=contexts.expression({statement,index,scope,startValue,includeBrackets:false}));
-					if(metaState["ins"])block:{//'#let ins obj;' ; for building '#' arrays or for enumed template-objects
+					if(metaState["ins"]){//'#let ins obj;' ; for building '#' arrays or for enumed template-objects
 						if(value)value=value.toType("label");
 						scope.label.code.push(value.label);
 						//if(value?.label)value.label.defs.push(scope.label);
@@ -747,12 +758,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			},
 			main_hidden({statement,index,scope}){
 				let value,word,found;
-				const state={"def":false,"set":false,"undef":false};
+				const state={"def":false,"set":false,"undef":false,"ins":false};
 				({index,found}=contexts.keyWordList({index,statement,scope,keywords:state}));
 				//note: '$def' is used instead of '$insert' to reduce number of keywords
 				//state["undef"]=state["let"];
 				//state["assign"]=state["let"];
-				state["insert"]=state["def"];
+				state["insert"]=state["def"]||state["ins"];
+				if(0)if(state["def"])throw Error(throwError({statement,index,scope},"#/$ syntax","using '$def' for instering is OBSILETE use '$ins' instead."))
 				if(!found){//sets defaults
 					state["undef"]=true;
 					state["set"]=true;//'$set label;' assigns line number to labels
@@ -2028,6 +2040,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						assemblyCompiler.assembly.instructionSet=assemblyCompiler.assembly.instructionSet_0xmin;
 						this.language="0xmin";
 						break;
+						case"asm":
 						case"tptasm":
 						{//use R2
 							this.pointers[name="jump"]=new Pointer(name);
@@ -2035,6 +2048,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 							assemblyCompiler.compileAssemblyLine=(...args)=>assembler.tptasm.compileAssemblyLine(...args);
 							assemblyCompiler.assembly.instructionSet={...assembler.tptasm.operators,...assembler.tptasm.otherKeywords,};
 							//assemblyCompiler.nullValue.asmValue="dw 0";
+							buildSettings.arch ||= "R216K8B";
+							this.language = "tptasm";
 						}break;
 						case"text":
 						{//'#"text";'
@@ -2657,7 +2672,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 			callFunction({args,value:callingValue,callType,scope,statement}){//:{value}
 				const codeBlock=this.getCode();//:Scope[] & Statement;new code instance
 				const newLabel=new Variable({name:"<"+this.name?.toString?.()+">",functionConstructor:this});
-				let newReturnObj;
+				let newReturnObj;//:Variable|null|undefined
 				for(let codeScope of codeBlock){//codeScope:Scope
 					({newReturnObj}=codeScope.callFunction({newReturnObj,newLabel,functionLabel:this,args,value:callingValue,callType,scope,statement}));
 				}//evalBlock(codeBlock,undefined,instanceScope,statement);
@@ -3073,7 +3088,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				:0,
 				v.length==1?v.charCodeAt(0):+("0x"+v.substr(2))||0,
 			];
-			return join?ary[0]|ary[1]:outputAsBinary()?ary:["dw", "0x"+((ary[0]|ary[1])&0xffff).toString(16)];
+			return join?ary[0]|ary[1]:!hasIntermidiateAssemblyOutput()?ary:["dw", "0x"+((ary[0]|ary[1])&0xffff).toString(16)];
 		}
 		function valueStringToArray(value,scope){//:Variable
 			if(value?.type=="string"){
@@ -3177,6 +3192,8 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				defer=[];//:(closure&()->mutate scope)[] ; is a list of functions that are run at the end of a scope
 			//line data, for debugging code only
 				data_phase;//: "#" | "$" | "@";  main()
+			//
+				numOnStack=0;//the current number of times this scope is on the stack ; Is used with `break label` to 
 			//scope
 			findLabel(name){
 				const parent=this.findLabelParent(name);//:Variable
@@ -3246,7 +3263,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					label:newLabel,
 					code:this.code,
 				});
-				let returnObj=newLabel;
+				let returnObj=newLabel;//proposal: `returnObj=newReturnObj??newLabel`
 				let useParentVarScope=false;//unused; TODO: fix var scope
 				//'='->strong scope, '-'->weak scope, '>'->impure,'<'->pure
 				switch(callType){
@@ -3265,6 +3282,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.let=instanceScope;
 						newLabel.functionPrototype??=functionLabel.prototype;
 						newLabel.functionSupertype??=functionLabel.supertype;
+						newLabel.functionOperators??=functionLabel.operators;
 					break;
 					case"<="://'using(){}' super strong scope macro function
 						instanceScope.let=instanceScope;
@@ -3279,6 +3297,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 						instanceScope.var=scope.var;
 						newLabel.functionPrototype??=functionLabel.prototype;
 						newLabel.functionSupertype??=functionLabel.supertype;
+						newLabel.functionOperators??=functionLabel.operators;
 						middleLabel.labels["scope"]??=scope.label;
 						middleLabel.labels["arguments"]=argsObj;
 						middleLabel.labels["return"]=returnObj;
@@ -3286,6 +3305,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					case"->"://'weak(){}' impure function
 					break;
 					default:
+						//design note: cannot add ..proto and ..super in functions since this would prevent consistancy in function chains '{(){};(){}}'
 						instanceScope.let=instanceScope;
 						middleLabel.labels["arguments"]=argsObj;
 						middleLabel.labels["constructor"]=argsObj;
@@ -3338,7 +3358,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				//#set 0xmin.settings.log_table=1;
 				//#set 0xmin.settings.language("tptasm");
 				//#set 0xmin.settings.language("0xmin");
-				//#set 0xmin.settings.model="R216K2A";
+				//#set 0xmin.settings.target="R216K2A";
 			}
 			label=new Variable({
 				name:["GlobalObject"],
@@ -3473,22 +3493,29 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 					callStack.push(statement);
 				}
+				scope.numOnStack++;
+				function cleanUp(){
+					scope.numOnStack--;
+					if(checkRecur){
+						recur[symbol]--;
+						if(recur[symbol]==0)delete recur[symbol];
+						callStack.pop();
+					}
+				}
 				try{contexts.main({statement,scope});}catch(error){//allows for '#break;' to work
 					//error:Error|Variable
-					if(error instanceof Variable && (error==scope.label || scope instanceof GlobalScope)){
+					cleanUp();
+					if(error instanceof Scope && (scope instanceof GlobalScope || scope.numOnStack==0 && error==scope)){
 						break;//prevent 'break' from throwing an error
 					}else throw error;
-				}
-				if(checkRecur){
-					recur[symbol]--;
-					if(recur[symbol]==0)delete recur[symbol];
-					callStack.pop();
-				}
+				}cleanUp();//assert: `scope.numOnStack--` is ran only once in all cases
 			}
-			for(let i=scope.defer.length-1;i>=0;i--){
-				scope.defer[i](scope);
+			{
+				for(let i=scope.defer.length-1;i>=0;i--){
+					scope.defer[i](scope);
+				}
+				scope.defer=[];
 			}
-			scope.defer=[];
 			scope.defaultPhase="";
 			return scope;
 		}
@@ -3528,7 +3555,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				"log_table":new Variable({name:"log_table",lineNumber:0}),//:1|0
 				"log_length":new Variable({name:"log_length",lineNumber:0}),//:1|0
 				"include_labels":new Variable({name:"include_labels",lineNumber:0}),//:1|0
-				"model":new Variable({name:"model",lineNumber:0}),//arch
+				"target":new Variable({name:"target",lineNumber:0}),//arch
 				"language":new BuiltinFunction("language",({args})=>{
 					if(args[0]){//args[0]:Value
 						let str=args[0].toType("string").string;
@@ -3597,7 +3624,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	callStack.getData=function(){
 		return [...this.map(v=>["l:"+(v.data.line+1),...v.map(v=>typeof v=="string"?v:"_")].join(" "))];
 	};
-	let outputAsBinary=()=>["0xmin", "int", "text"].includes(assemblyCompiler.assembly.language);
+	let hasIntermidiateAssemblyOutput=()=>!["0xmin", "int", "text"].includes(assemblyCompiler.assembly.language);//excludes tptasm or nasm/x86
 	let parts=inputFile;
 	parts=parseFile(parts);
 	parts=bracketPass(parts);
@@ -3605,17 +3632,17 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	parts=evalAssembly(parts);
 	//chars->words->expression->statement->codeObj->block
 	//
-	let outputFile=outputAsBinary()?parts.asBinary():parts.asAssembly();
-	let outputBinary=outputAsBinary()?
+	let outputFile=!hasIntermidiateAssemblyOutput()?parts.asBinary():parts.asAssembly();
+	let outputBinary=!hasIntermidiateAssemblyOutput()?
 		(
 			assemblyCompiler.assembly.language=="text"?new Uint8Array(outputFile)
 			:new Uint32Array(outputFile)
 		):
-		""//"_Model \""+compileData.model+"\"\n"//R216K2A
+		""//"_Model \""+buildSettings.arch+"\"\n"//""//"_Model \""+compileData.model+"\"\n"//R216K2A
 		+"%include \"common\"\n"
 		+"start:\n"
 		+outputFile.map(v=>v.match(/\w+:/)?v:"\t"+v).join("\n");
-	let defaultFileName=outputAsBinary()?"a.filt":"a.asm";
+	let defaultFileName=buildSettings.outputAsAssembly?"a.asm":"a.filt";
 	const fillText=(txt,len,space=" ",map=(t,s)=>t+s)=>map(txt,space.repeat(len-txt.length));
 	const hex30ToStr=(v,len=8)=>{v=(v|0).toString(16);return "0".repeat(len-v.length)+v;};
 	const hex8ToStr=v=>hex30ToStr(v,2);
@@ -3693,7 +3720,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	let outputAssembler = {"tptasm":"tptasm"}[assemblyCompiler.assembly.language]??null;
 	return {file:outputBinary,defaultFileName,assembler:outputAssembler,architecture:buildSettings.arch};
 };
-let buildSettings={makeFile:true,arch:""};
+let buildSettings={makeFile:true,arch:"",outputAsAssembly:false};
 {
 	//possible names: 
 	//  0xmin Assembly Small Macro language or (ZASM)
@@ -3736,7 +3763,7 @@ let buildSettings={makeFile:true,arch:""};
 			return [inputFile,fileName];
 		})();
 		let outputFile=null;
-		let fileWriter=(outputFile,defaultFileName,assembler="",architecture)=>new Promise((resolve,reject)=>{//a.filt
+		let fileWriter=({outputFile,defaultFileName,assembler="",architecture})=>new Promise((resolve,reject)=>{//a.filt
 			let newFileName=process.argv[3];
 			if(!newFileName&&!buildSettings.makeFile){resolve("no file");return;}
 			//else{console.log("made file")}
@@ -3748,11 +3775,11 @@ let buildSettings={makeFile:true,arch:""};
 			}
 			fs.writeFile(newFileName, content, err => {
 				if (err)reject(err);
-				else if(buildSettings.outputAsAssembly)handleExternalAssemblers:{
+				else if(!buildSettings.outputAsAssembly)handleExternalAssemblers:{
 					//uses assembler and architecture(aka model) to use an external assembler like e.g. clang, or tptasm
 					if(assembler=="tptasm"){//if tptasm ; convert to binary
-						const { exec } = require("child_process");
-						exec("\""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model="+architecture, (error, stdout, stderr) => {
+						const { exec } = require("child_process");//R216K8B
+						exec("lua \""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model="+architecture, (error, stdout, stderr) => {
 							if (error) {
 								console.log(`error: ${error.message}`);
 								return;
@@ -3774,8 +3801,8 @@ let buildSettings={makeFile:true,arch:""};
 			if(fileName.match(process.env.HOME)?.index==0){
 				fileName=fileName.replace(process.env.HOME,"~");
 			}
-			let {file:outputFile,defaultFileName}=oxminCompiler(inputFile,fileName,);
-			await fileWriter(outputFile,defaultFileName);
+			let {file:outputFile,defaultFileName,assembler,architecture}=oxminCompiler(inputFile,fileName,);
+			await fileWriter({outputFile,defaultFileName,assembler,architecture});
 			return outputFile;
 		})();
 	}
