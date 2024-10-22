@@ -1,25 +1,42 @@
-# 0xmin
-The 0xmin1 is currently, in 2023, the worlds smallest 30 bit computer in ThePowderToy(https://powdertoy.co.uk/).
+# 0xmin lang
+
+A higher level assembly and meta language
 
 
-comes with a programming language with a compiler, emulator.cpp, and the actual 0xmin computer save itself.
+```js
+import lib "R2/std.0xmin";
+print("Hello, world!");
+hault;
+```
 
-old computer documentation
 
-https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
+supports:
+- 0xmin
+- 0xmin/0xMin1.6 CPU (386P)
+- tptasm/R216 https://github.com/LBPHacker/R216 https://github.com/LBPHacker/tptasm
+- tptasm/R316 https://github.com/LBPHacker/R316
 
-## to install
-### through terminal
+may support in future:
+- x86
+- wat (web assembly)
+- 0xmin/0xMin1 CPU (231P) https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
+
+
+## how to install:
+### option 1: through terminal
 1. enter the directory where you want 0xmin compiler to be stored.
 2. run the following commands
 `sudo apt update`
-`sudo apt install git` #installs git if it is not already
 `git clone https://github.com/RaconJS/0xmin.git --depth 1` #downloads files
-`./0xmin/install.sh` runs the auto installer
+``
+`sudo apt install git` #installs git if it is not already
+`./0xmin/install.sh` runs the automated installer
 
 3. make sure you have nodeJS version 16+ installed.
 Check nodejs version by running:
 `nodejs -v`
+
+4. make sure you have lua
 
 if this is not the case, run:
 ```
@@ -42,13 +59,9 @@ The compiler used javascript features: private properties `#property` and `??`
 
 ## how to use
 ### the compiler:
-For help run `0xmin -help` or `./compiler.sh -help`
+just compiling: `0xmin filename.0xmin -o outputName.filt`
 
-To compile an 0xmin assembly file you can use the following:
-
-For binary output: `0xmin filename.0xmin -o outputName.filt`
-
-For lua output: `0xmin filename.0xmin -o outputName.lua`
+For help run `0xmin -help` or `./0xmin.sh -help`
 
 To run in TPT: `0xmin filename.0xmin` to autimaticly send it to The Powder Toy. Then run it on the 0xmin save by doing `compile()` in the tpt comandline. Then unpause the save.
 
@@ -56,25 +69,36 @@ compile and run: `0xmin -r filename.0xmin`, you can also find the compiled files
 
 ### the emulator
 To run `.filt` 0xmin-binary files run: `0xmin -e filename.filt` (-e for execute)
+
 Optionally the speed of the emulator can be controlled with the `-s` and `-sm` (speed multiple) flags
+
 e.g. `0xmin -e filename.filt -sm 4` runs emulator at 4 times normal speed (4 * 60 cycles per second)
+
+
+For using the R2 emulator `-a R2` can be added for the R2 architecture 
+
 
 ## requirements:{
 the following are required for the full 0xmin experience.
+
 ### node.js v16
 For the `compiler.js`. It uses "`a??b`" and "`a?.b`".
 
 node.js v16 can be installed with the `installer.sh`
+
 ### linux/ubuntu: this system has not been tested on other operating systems.
 Otherwise you will have to:
 
 	change the file paths in `compile.sh` that point to The_powder_toy.
 
 	translate the bash file: `compiler.sh` into another format.
+
 ### sublime-text3, from `snap`
 For syntax highlighting to make writing 0xmin code easier.
+
 ### the powder toy, from `snap`
-instead of using the emulator.cpp, it gives you the actual visual computer.
+instead of using the inbuilt emulator, it gives you the actual visual computer.
+
 ## }
 
 # ZASM
@@ -136,10 +160,10 @@ The first part is the maximum iteration and the 2nd is any single statement.
 
 
 The meta language is very powerful and flexible wich makes up for the lack of non-meta language features.
-For example, a type can look like this
-`let myListOfStrings:>list(string);`
+For example, a theoretical "type" can look like this
+`let myListOfStrings:>list(string);//aka let myListOfStrings:list<string> in rust`
 
-Unlike many compiled languages with meta-programming 0xmin/ZASM's meta language is heavilly used, and feels close to the code.
+Unlike many compiled languages with meta-programming 0xmin/ZASM's meta language is heavilly used, and feels closer to the code.
 
 ### types
 There is only 1 variable type: the label. It contains a number, list, properties and a few internal properties.
@@ -156,6 +180,17 @@ By default the language is set to 0xmin.
 The language modes affects the syntax for assembly (`@`) code, and how strings convert to numbers.
 
 ### #"0xmin";
+
+The 0xmin1 is currently, in 2024, the worlds smallest 32 bit computer in ThePowderToy(https://powdertoy.co.uk/).
+
+
+comes with a programming language with a compiler, emulator.cpp, and the actual 0xmin computer save itself.
+
+old computer documentation
+
+https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
+
+
 #### command set:
 0xmin currently has 16 commands (1 unused one). They are:
 
@@ -194,7 +229,11 @@ The language modes affects the syntax for assembly (`@`) code, and how strings c
 0x100XY: `"\xXY"` (aka print char)
 
 
-hello world example in ZASM/0xmin: `"hello world\h";`
+hello world example for the 0xmin CPU:
+```js
+#"0xmin";
+"hello world\h";
+```
 
 The "\h" haults the program. It is a shorthand for `jump +0;`.
 
@@ -215,3 +254,28 @@ In order to jump from A to B the `move` pointer must have the same "state".
 To ignore this rule `!` can be added at the begining of a command.
 e.g. `jump +2; move +5; null` throughs an error
 `!jump +2; move +5; null`
+
+### #"tptasm";
+
+The Powder Toy Assembly (tptasm) is a common lanugage supporting many TPT computers.
+
+Currently the sub-language of 0xmin's version of tptasm is designed specificly for the R2 and R3.
+
+It includes all the normal assembly instructions and even works with 0xmin labels.
+
+```js
+def let a;
+0;
+add [a] 4;
+```
+
+
+It also has extra features for writing assembly:
+- infix commands `r1 add r2`
+- symbols for commands e.g. `+=` instead of `add`
+- using labels for registers e.g. `%#(4)` or `%bar` --> `r4`
+  These get assigned at `@` compile time same as line numbers
+- flags and tags:
+	e.g. `jump a if > 0` and `jump b if !sign` instead of `jl` and `jns`
+	e.g. `%a -= %b +carry`
+
