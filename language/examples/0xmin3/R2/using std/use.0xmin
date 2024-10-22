@@ -1,5 +1,6 @@
 #"ZASM3";
-#"code";
+#"tptasm";
+#"table";
 ...labelsof(){//use
 	defer:return = {let=use};
 	//rewriting
@@ -280,7 +281,7 @@
 			};
 		};
 		#foo.call({Int();Int()},{Int();Int()});
-		debugger +compairTypes(a,b);
+		repeat !+compairTypes(a,b) throw "assertion failed";
 	}();
 	#(){:example;
 		let add<=>Function()<:{
@@ -317,12 +318,26 @@
 	};
 }();
 ...labelsof(){
-	defer:#return={let=Code};
+	defer:#return={let=Code,=Int};
 	let Code(code)={let
 		=code,//:{@}
-		final,//:(%|{@}) & #{isOwned:bool&#?}
-		memoryState,//:{freeRegisters:%[];registersUsed:#usize&%;}
+		final{let isOwned},//:(%|{@}) & #{isOwned:bool&#?}
+		memoryState{let
+			freeRegisters={},//:%[]
+			usedRegisters=0,//:#usize&%
+		};
+		def code;
 	}::{
+		let nextRegister(code){//#(c:Code)->% & mutate c
+			let = code.memoryState.freeRegisters;
+			let = code.memoryState.usedRegisters;
+			#return = freeRegisters..splice(-1,1)[0]||{ins ¬+usedRegisters;#usedRegisters+=1}[0];
+		};
+		let freeRegister(code,register){//#(c:Code)->% & mutate c
+			let = code.memoryState.freeRegisters;
+			let = code.memoryState.usedRegisters;
+			#(+usedRegisters == +register)&&{#usedRegisters-=1}||freeRegisters..splice(-0,0,{ins register});
+		};
 		let ..operators={let
 			//.["_-_"],
 			.["_ "](a){//end of shot expression
@@ -336,13 +351,34 @@
 			},
 		};
 	};
-	let Int()={}::{
+	let Int(register)={
+		let.[¬Code] = Code=({});
+		...labelsof .[¬Code];
+		#memoryState;
+		repeat !!register #final <-> register;
+		#final={
+			:self;
+			@%self;
+			delete self;
+			let isOwned = !!register&&{}||¬;
+		};
+		def .[¬Code];
+	}::{
 		let ..operators{let
 			..proto = Code..operators,
 			.["_+_"](a,b){
-				repeat !(a[¬Code]&&b[¬Code]) throw;
-				let memoryState = {
-					let freeRegisters =
+				let oper = {
+					(a,b){@ $a + $b};
+					(a,b){@ $a += $b;}
+				};
+				let oper.get = oper[0];
+				let oper.assign = oper[1];
+				#return=Int=();
+				let =return.code,=return.final,=return.memoryState;
+				repeat !(a[¬Code]&&b[¬Code]) throw "type error";
+				#{
+					...labelsof(v){let=v.freeRegisters,=v.usedRegisters}()<:return[¬Code].memoryState;
+					#freeRegisters <=> 
 						a.memoryState.freeRegisters...b.memoryState.freeRegisters
 						¬..iterate({},(s,v,i,a){
 							repeat(+i == +a..indexOf(v)) #s::{v};
@@ -350,29 +386,50 @@
 					;
 					#usedRegisters <-> 0xmin.Math.max(a.memoryState.usedRegisters,b.memoryState.usedRegisters);
 				};
-				let final;//final:{@%}&%
-				let code = {
-					//where 
-					def a.code;
-					def b.code;
-					let freedData = {
-						ins a.final.isOwned&&a.final;
-						ins a.final.isOwned&&a.final;
+				#code <=> {
+					...codeof a.code;
+					...codeof b.code;
+					repeat(0*a.final!=0):{
+						#a.final<->Code.nextRegister(return);
+						#a.final.isOwned = {};
 					};
-					let temp = ¬;
+					repeat(0*b.final!=0):{
+						#b.final<->Code.nextRegister(return);
+						#b.final.isOwned = {};
+					};
+					repeat !!a.final.isOwned: {Code.freeRegister(return,a.final)};
 					...codeof:
-						  (!!a.final.isOwned && {@: $a.final += $b.final})
-						||(!!b.final.isOwned && {@: $b.final += $a.final})
+						(!!a.final.isOwned && {
+							#final<->a.final;
+							let final.isOwned = a.final.isOwned;
+							repeat !!b.final.isOwned: {Code.freeRegister(return,b.final)};
+							debugger;
+							oper.assign(final,b.final);
+						})
+						||(!!b.final.isOwned && {
+							repeat !!a.final.isOwned: {Code.freeRegister(return,a.final)};
+							#final<->b.final;
+							oper.assign(final,a.final);
+						})
 						||({
-							#temp = {:self;@%self;delete self};
-							#temp<->memoryState.freeRegisters..splice(-1,1)[0]||{ins ¬+usedRegisters;#usedRegisters+=1}[0];
-							let temp.isOwned = 1;
-							#final = temp;
-							@: $temp += $a.final;
+							let = return[¬Code].final;
+							let final.isOwned = {};
+							#final<->Code.nextRegister(return);
+							@: $final = $a.final;
+							oper.assign(final,b.final);
 						})
 					;
+					delete final;
 				};
+				#let ..constructor = Int;
 			},
+			//.[""](){},
 		};
 	};
-};
+}();
+let a = Int();
+let b = Int();
+%a.final = 2;
+%b.final = 3;
+ins £ a + b + b;
+//debugger c.code..@"label.code.map(v=>v.args.map(v=>typeof v == 'string'?v:v?.label?v.label?.lineNumber:v.number))";

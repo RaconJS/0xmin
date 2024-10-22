@@ -1610,7 +1610,9 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 				if(arg=args[args.length-2]?.label)({label,parent}=arg.findOperatorOverload(operName));
 				if(!parent)({label,parent}=scope.findOperatorOverload(operName));
 				let operatorArgs=args.splice(args.length-numOfArgs,numOfArgs);
-				let {value}=label?.callFunction({index,statement,scope,value:new Value({refType:"property",label,parent,name:operName}),args:new ArgsObj({list:operatorArgs})});
+				//if(value.type=="label"&&value.label!=undefined){
+				let {value}=label?.callFunction({index,statement,scope,value:new Value({refType:"property",label,parent,name:operName}),args:new ArgsObj({list:operatorArgs})})??{value:new Value()};
+				//}
 				args.push(value);
 				return {index,value};
 			},
@@ -3039,11 +3041,13 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								v=new Value().fromCode(v);
 								i=new Value.Number(i);
 								a=label.toValue();
-								return reduceFunction?.callFunction?.({
+								let {value} = reduceFunction?.callFunction?.({
 									args:{list:[s,v,i,a],obj:{s,v,i,a}},
 									value:callingValue,callType:undefined,scope:callingValue.scope//,statement
-								})
+								});
+								return value;
 							},startValue);
+							newValue.label = ans;
 						}
 						else if(args.length>=1){
 							let mapFunction=Variable.fromValue(args[0]);
@@ -3051,10 +3055,11 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 								v=new Value().fromCode(v);
 								i=new Value.Number(i);
 								a=label.toValue();
-								return Variable.fromValue(mapFunction?.callFunction?.({
+								let {value} = mapFunction?.callFunction?.({
 									args:{list:[v,i,a],obj:{v,i,a}},
 									value:callingValue,callType:undefined,scope:callingValue.scope//,statement
-								}).value);
+								});
+								return Variable.fromValue(value);
 							});
 							newValue.array = ans;
 							newValue.label = new Variable({name:"<{iterate}>",code:ans});
@@ -3779,7 +3784,7 @@ let buildSettings={makeFile:true,arch:"",outputAsAssembly:false};
 					//uses assembler and architecture(aka model) to use an external assembler like e.g. clang, or tptasm
 					if(assembler=="tptasm"){//if tptasm ; convert to binary
 						const { exec } = require("child_process");//R216K8B
-						exec("lua \""+compilerFolder+"\"/tptasm/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model="+architecture, (error, stdout, stderr) => {
+						exec("lua \""+compilerFolder+"\"/tptasm/src/main.lua source=\""+newFileName+"\" target=\""+newFileName+"\" model="+architecture, (error, stdout, stderr) => {
 							if (error) {
 								console.log(`error: ${error.message}`);
 								return;
