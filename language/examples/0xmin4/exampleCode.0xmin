@@ -307,3 +307,37 @@
 		@a;//...codeof $(a)
 		$a;//+$(a)
 };
+{//test code
+	//observation in tptasm the '$' phase isn't used in 0xmin3
+	//add extra support to aid with the Rust JIT 0xmin compiler, improving performance at 0xmin compiletime
+	//idea: model ownership contracts with state checker,
+	//idea: add more fixed str
+	//using a more traditional function syntax for `@()->@` types (aka assembly funcitons)
+	import lib "dlop";
+	let concat=@(a:dlop,b:dlop){
+		let c = dlop();
+		push c.size;
+		call malloc;
+		pop c;
+		c.push(a);
+		c.push(b);
+		return c
+	};
+	let foo{
+		let a,b;
+		$let a..value;
+		[a] = 2;
+		$let a..value;
+		${
+			assert a..value;
+		};
+	};//value is tracked across the program and 
+	//reusing idea: have ..state track values of important variables. also have variables with the ..value or ..state on them are state checked at `$` time
+	let enum{
+		{1;2;3};
+		{4;5;6};
+	}..compile;
+	let Label(){
+		let:def{},ins{},
+	};
+};
