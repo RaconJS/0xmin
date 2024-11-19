@@ -6,28 +6,23 @@
 	//define register labels, with type annotation comments 
 	//(side note: we could write a compile type handler is we wanted to, or import an existing one.)
 	//- counting from 1 since r0 is read only "0x20000000"
-	#let port = 1;//:%terminal*
-	#let char = 2;//:%Char8
-	#let i = 3;//:%U16
-	#let string = "hello world";//:String
+	#let char = 1;//:%Char8
+	#let i = 2;//:%U16
+	#let string = "\c0f\p00hello world";//:String
 	#let memorySafetyHandler{//:{#} ; declares 'memorySafetyHandler' like an object with 3 properties
 		#let registerStorage{def ¬0,¬0,¬0};//:{@} & @any[3]
 		#let pushRegisters{//:{@}
 			st r1 registerStorage.(0);
 			st r2 registerStorage.(1);
-			st r3 registerStorage.(2);
 		};
 		#let popRegisters{//:{@} ; '{@}' denotes a block of run time code or any object of unspecified size
 			ld r1 registerStorage.(0);
 			ld r2 registerStorage.(1);
-			ld r3 registerStorage.(2);
 		};
 	};
 	#def memorySafetyHandler.pushRegisters;
 	//main program starts here:
 	{:inisialisation;
-		exh %port 0x2001;//same as `exh %1 %1 0x2001`
-		exh %char 0x2002;//0x2002XXXX is for output for the R2term
 		%i = 0;
 	};
 	//assert %port == 0x2001000
@@ -40,10 +35,13 @@
 		};
 		#def loopEntry;//defines the `loopEntry` label ; we do not need to sync on the first iteration, this can improve speed. 
 		ld %char %i string;
-		st %char %port 0;
+		exh %char %char;
+		mov %char %char 0x2002;//0x2002XXXX is for output for the R2term
+		exh %char %char;
+		st %char r0 0x9000;//0x9000 to output to the R2 terminal
 		%i += 1;//`add %i %i 1`
 		r0 = %i - string..length;//`sub r1 %i 1`
-		jump -> loop;
+		jump -> loop if < 0;
 	};
 	def memorySafetyHandler.popRegisters;
 	hlt;
@@ -78,12 +76,10 @@
 				defer return #return..splice(-0,0,{ld %reg oldValue});//ld a <- [b]
 			};
 		};
-		def let port = inputReg(port_reg);
 		def let char = inputReg(char_reg,port);
 		def let index = inputReg(index_reg,char);
+		let terminalPort = 0x9000;//:@*
 		repeat !isTermValue {
-			exh %port.reg 0x2001;
-			%port.reg = 0x0000;
 			%index.reg = 0;
 			exh %char.reg 0x2002;
 		};
@@ -94,13 +90,14 @@
 			sync();
 			def loopEntry;//just after sync
 			ld %char.reg %index.reg use(string);
-			st %char.reg %port.reg;
+			let terminalPort = 0x9000;
+			st %char.reg terminalPort;
 			%index.reg += 1;
 			r0 = %index.reg - string..length;
 			jump->printer if < 0;
 		};
 	};
-	print("hello world");
+	print("\c0f\p00hello world");
 	hlt;
 	jump 0;
 };

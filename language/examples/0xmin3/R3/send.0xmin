@@ -1,0 +1,13 @@
+#"tptasm/R316";//sets the language
+#"target_assembly";
+#"table";
+nop;
+def let send{
+	let terminalPort = 0x9000;//:Port & *@
+	let value = 1;//:%char
+	@exh %value r0 0x2002;
+	@%value = "h";
+	@st %value r0 0x9000;//0x9000 is the terminal address
+};
+${:_sync;jump _sync !sync}; 
+jmp send;
