@@ -1,0 +1,6 @@
+#"code";
+let subleq(a,b,c,know_willJump){@a;@b;@(c||know_willJump&&return..return)};
+let temp;
+-1;@temp;2;
+0#def temp;
+//UNFINISHED

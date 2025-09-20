@@ -55,7 +55,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 	"compiler error: type error;";
 	//string consts
 		const wordsRegex=//does not include: /\s+/
-		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|([&|\^])\2?|[><!]=|={1,3}|>{1,3}|<{1,3}|\*\*|[!\$%*()-+=\[\]{};:@#~\\|,/?¬]|\S|\n|\s+/g
+		/\/\/[\s\S]*?(?:\n|$)|\/\*[\s\S]*?\*\/|(["'`])(?:\1|[\s\S]*?[^\\]\1)|\b0x(?:[0-9]|[a-f]|[A-F])+(?:\.(?:[0-9]|[a-f]|[A-F])+)?\b|\b0b[01]+(?:\.[01]+)?\b|\b(?:0|[1-9])[0-9]*(?:\.[0-9]+)?\b|[\w_]+|<[=-]>|[=-]>|<[=-]|::|:>|<:|\.{1,3}|([&|\^])\2?|[><!]=|={1,3}|>{1,3}|<{1,3}|\*\*|(?:£|##)|[!\$%*()-+=\[\]{};:@#~\\|,/?¬]|\S|\n|\s+/g
 		;
 		const nameRegex=/^[\w_]/;
 		const stringRegex=/^["'`]/;
@@ -1187,7 +1187,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					else if(word=="¬")allowOperatorOverloading=false;//allows for '¬+a' instead of '+¬a'
 					({index,value}=contexts.expression_short({index,statement,scope,shouldEval,includeBrackets:false,allowOperatorOverloading}));
 					if(shouldEval){
-						if(word!="¬"&&word!="£" && allowOperatorOverloading){//'+a' in '£+a'
+						if(word!="¬"&&word!="£"&&allowOperatorOverloading){//'+a' in '£+a'
 							({index,value}=contexts.operatorOverload({index,statement,scope,args:[value]}));
 						}
 						else{
@@ -1214,6 +1214,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					index++;
 					({index,value}=contexts.typeSystem({value,index,statement,scope,shouldEval}));
 				};
+				const endShortExpressionOperatorName = "_ ";//TODO: decide on better name instead of "_ " "_," and "_;"
+				if(allowOperatorOverloading&&value?.label?.functionOperators?.["_ "]){
+					value=value.label.functionOperators["_ "].callFunction({argsObj:{list:[value],obj:{}}});
+				}
 				return {index,value,allowOperatorOverloading};
 			},
 			//expression_short:
@@ -1792,7 +1796,10 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					}
 				}
 				value=args[0];
-				if(includeBrackets)return {index:nextIndex,value,spreadArgsObj};
+				if(allowOperatorOverloading&&value?.label?.functionOperators?.labels?.["_,"]){//e.g.'£(a*2)' end of expression operator
+					({value}=value.label.functionOperators.labels["_,"].callFunction({args:{list:[value],obj:{}},value,scope,statement}));
+				}
+				if(includeBrackets)return {index:nextIndex,value,spreadArgsObj,allowOperatorOverloading};
 				else{
 					return {index,value,spreadArgsObj,allowOperatorOverloading};
 				}

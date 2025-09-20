@@ -119,6 +119,7 @@
 		};
 		let static;
 		defer: def static;
+		defer: #use.compile(static);
 		let a{1;2;3};
 		let b{4;
 			#use.new();
@@ -131,7 +132,6 @@
 		use.new();
 		#use(c);
 		:global;
-		#use.compile(static);
 	};
 }();
 ...labelsof(){//type checking
@@ -321,22 +321,133 @@
 	defer:#return={let=Code,=Int};
 	let Code(code)={let
 		=code,//:{@}
-		final{let isOwned},//:(%|{@}) & #{isOwned:bool&#?}
+		final{let dropOnUse},//:(%|{@}) & #{dropOnUse:bool&#?}
 		memoryState{let
 			freeRegisters={},//:%[]
 			usedRegisters=0,//:#usize&%
 		};
+		#code||={};
 		def code;
 	}::{
+		let addType(object){
+			#let object[¬Code] = Code=();
+			#object <=> object...{...labelsof object[¬Code];def object[¬Code]};
+		};
 		let nextRegister(code){//#(c:Code)->% & mutate c
-			let = code.memoryState.freeRegisters;
-			let = code.memoryState.usedRegisters;
+			let = code[¬Code].memoryState.freeRegisters;
+			let = code[¬Code].memoryState.usedRegisters;
+			repeat !(freeRegisters&&usedRegisters):{
+				throw "assertion failed: type error";
+			};
 			#return = freeRegisters..splice(-1,1)[0]||{ins ¬+usedRegisters;#usedRegisters+=1}[0];
 		};
 		let freeRegister(code,register){//#(c:Code)->% & mutate c
-			let = code.memoryState.freeRegisters;
-			let = code.memoryState.usedRegisters;
+			let = code[¬Code].memoryState.freeRegisters;
+			let = code[¬Code].memoryState.usedRegisters;
 			#(+usedRegisters == +register)&&{#usedRegisters-=1}||freeRegisters..splice(-0,0,{ins register});
+		};
+		let add(a,b){
+			#return = addToExpressionUsingRegister({a;b},DefaultRegisterCodeType})
+				<:(a,b){@ $a += $b}
+				<:(a,b){@ $a + $b}
+			;
+		};
+		let sub(a,b){
+			#return = addToExpressionUsingRegister()
+				<:{a;b}
+				<:DefaultRegisterCodeType
+				<:(a,b){@ $a -= $b}
+				<:(a,b){@ $a - $b}
+			;
+		};
+		let mul(a,b){
+			#return = addToExpressionUsingRegister({a;b},DefaultRegisterCodeType)
+				<:(a,b){
+					let temp = Code.nextRegister(a.parent);
+					#temp.isUsed = 1;
+					%temp = $a;
+					[mul.input.(0)] = %temp;
+					%temp = $b;
+					[mul.input.(1)] = %temp;
+					call mul.use();
+					[mul.output.(0)] | 0;
+				}
+				<:(a,b){
+					let temp = Code.nextRegister(a.parent);
+					#temp.isUsed = 1;
+					%temp = $a;
+					[mul.input.(0)] = %temp;
+					%temp = $b;
+					[mul.input.(1)] = %temp;
+					call mul.use();
+					%temp = [mul.output.(0)];
+					$a = %temp;
+				}
+				<:(a,b){}
+			;
+		};
+		let DefaultRegisterCodeType()={
+			#Code.addType(return);
+			#.[¬Code].final::{@%final};
+		};
+		let addToExpressionUsingRegister(args,outputType,code_assign,code_get,code_general){
+			#outputType ||= DefaultRegisterCodeType;
+			#code_get ||= code_assign;
+			#code_general ||= (){};
+			#(){
+				let oper = {
+					(a,b){@ $a + $b};
+					(a,b){@ $a += $b;};
+					(a,b){};
+				};
+			};
+			let a=args[0],b=args[1];
+			let oper;
+			let oper.get = code_get;
+			let oper.assign = code_assign;
+			let oper.code = code_general();
+			#return=outputType=();
+			let =return[¬Code].code,=return[¬Code].final,=return[¬Code].memoryState;
+			#final.dropOnUse = {};
+			repeat !a[¬Code] {throw "type error"};
+			repeat !b[¬Code] {throw "type error"};
+			repeat !return[¬Code] {throw "type error"};
+			#{
+				...labelsof(v){let=v.freeRegisters,=v.usedRegisters}()<:return[¬Code].memoryState;
+				#freeRegisters <=> 
+					a.memoryState.freeRegisters...b.memoryState.freeRegisters
+					¬..iterate({},(s,v,i,a){
+						repeat(+i == +a..indexOf(v)) #s::{v};
+					})
+				;
+				#usedRegisters <-> 0xmin.Math.max(a.memoryState.usedRegisters,b.memoryState.usedRegisters);
+			};
+			#code <=> {
+				...codeof a.code;
+				...codeof b.code;
+				def oper.code(a,b);
+				repeat(0*a[¬Code].final!=0):#a.final<->Code.nextRegister(return);
+				repeat(0*b[¬Code].final!=0):#b.final<->Code.nextRegister(return);
+				...codeof:
+					(!!a[¬Code].final.dropOnUse && {
+						repeat !!b[¬Code].final.dropOnUse: {Code.freeRegister(return,b[¬Code].final)};
+						#final<->a[¬Code].final;
+						oper.assign(final,b[¬Code].final);
+					})
+					||(!!b[¬Code].final.dropOnUse && {
+						repeat !!a[¬Code].final.dropOnUse: {Code.freeRegister(return,a[¬Code].final)};
+						#final<->b[¬Code].final;
+						oper.assign(final,a[¬Code].final);
+					})
+					||({
+						let = return[¬Code].final;
+						let final.isOwned = {};
+						#final<->Code.nextRegister(return);
+						@: $final = $a.(¬Code).final;
+						oper.assign(final,b[¬Code].final);
+					})
+				;
+			};
 		};
 		let ..operators={let
 			//.["_-_"],
@@ -350,78 +461,90 @@
 				#return = a.code;
 			},
 		};
+		let isNumberLiteral(value){
+			#return = #(!value..constructor) && (value*0!=0) && value || ¬;
+		};
+		let isLiteral(value){
+			#return = #(!value..constructor) && value || ¬;
+		}
+		let isStringLiteral(){
+			#return = #(!value..constructor) && (value*0!=0) && value || ¬;
+		};
+		let handle_obj_oper_literal(obj,value,outputType,foo){
+			#return = #(outputType||Code)();
+			#return[¬Code].memoryState<=>obj[¬Code].memoryState;
+			repeat(0*obj[¬Code].final!=0)#obj.final<->Code.nextRegister(return);//register is moved to new value
+			#return[¬Code].final<->
+				!!obj[¬Code].final.dropOnUse
+					&& obj[¬Code].final
+					|| Code.nextRegister(return);
+			#let return[¬Code].final.dropOnUse = {};
+			#return[¬Code].code::{
+				def obj.code;
+				foo(obj.final,value);
+			};
+		};
 	};
 	let Int(register)={
 		let.[¬Code] = Code=({});
 		...labelsof .[¬Code];
 		#memoryState;
 		repeat !!register #final <-> register;
-		#final={
-			:self;
-			@%self;
-			delete self;
-			let isOwned = !!register&&{}||¬;
+		#final<=>{
+			@%final;
+			#let dropOnUse = ¬;
 		};
 		def .[¬Code];
 	}::{
+		let ..prototype{
+			let own(){
+				#return = this;
+				#this.final.dropOnUse = {};
+			};
+		};
 		let ..operators{let
 			..proto = Code..operators,
+			.["_,"](a){
+				#return = a;
+				#a.final.dropOnUse = ¬;
+			},
+			.["_~_"](a,b){
+				#return =
+					Code.isLiteral(b)
+					&&Code.handle_obj_oper_literal(a,b,Int,(a,b){@ $a = b})
+					||Code.addToExpressionUsingRegister(
+						{a;b},Int,
+						(a,b){@ $a = $b},
+						(a,b){@ $b | 0},
+					)
+				;
+			},
+			.["_^_"](a,b){
+				#return =
+					Code.isLiteral(b)
+					&&Code.handle_obj_oper_literal(a,b,Int,(a,b){@ xor $a b})
+					||Code.addToExpressionUsingRegister(
+						{a;b},Int,
+						(a,b){@ xor $a $b},
+					)
+				;
+			},
 			.["_+_"](a,b){
-				let oper = {
-					(a,b){@ $a + $b};
-					(a,b){@ $a += $b;}
-				};
-				let oper.get = oper[0];
-				let oper.assign = oper[1];
-				#return=Int=();
-				let =return.code,=return.final,=return.memoryState;
-				repeat !(a[¬Code]&&b[¬Code]) throw "type error";
-				#{
-					...labelsof(v){let=v.freeRegisters,=v.usedRegisters}()<:return[¬Code].memoryState;
-					#freeRegisters <=> 
-						a.memoryState.freeRegisters...b.memoryState.freeRegisters
-						¬..iterate({},(s,v,i,a){
-							repeat(+i == +a..indexOf(v)) #s::{v};
-						})
-					;
-					#usedRegisters <-> 0xmin.Math.max(a.memoryState.usedRegisters,b.memoryState.usedRegisters);
-				};
-				#code <=> {
-					...codeof a.code;
-					...codeof b.code;
-					repeat(0*a.final!=0):{
-						#a.final<->Code.nextRegister(return);
-						#a.final.isOwned = {};
-					};
-					repeat(0*b.final!=0):{
-						#b.final<->Code.nextRegister(return);
-						#b.final.isOwned = {};
-					};
-					repeat !!a.final.isOwned: {Code.freeRegister(return,a.final)};
-					...codeof:
-						(!!a.final.isOwned && {
-							#final<->a.final;
-							let final.isOwned = a.final.isOwned;
-							repeat !!b.final.isOwned: {Code.freeRegister(return,b.final)};
-							debugger;
-							oper.assign(final,b.final);
-						})
-						||(!!b.final.isOwned && {
-							repeat !!a.final.isOwned: {Code.freeRegister(return,a.final)};
-							#final<->b.final;
-							oper.assign(final,a.final);
-						})
-						||({
-							let = return[¬Code].final;
-							let final.isOwned = {};
-							#final<->Code.nextRegister(return);
-							@: $final = $a.final;
-							oper.assign(final,b.final);
-						})
-					;
-					delete final;
-				};
-				#let ..constructor = Int;
+				#return = 
+					Code.isLiteral(b)
+					&&Code.handle_obj_oper_literal(a,b,Int,(a,b){@ $a += b})
+					||Code.addToExpressionUsingRegister(
+					{a;b},Int,
+					(a,b){@ $a += $b},
+					(a,b){@ $a + $b},
+				);
+			},
+			.["_-_"](a,b){
+				#return = Code.addToExpressionUsingRegister(
+					{a;b},Int,
+					(a,b){@ $a -= $b},
+					(a,b){@ $a - $b},
+				);
 			},
 			//.[""](){},
 		};
@@ -429,7 +552,13 @@
 }();
 let a = Int();
 let b = Int();
-%a.final = 2;
-%b.final = 3;
-ins £ a + b + b;
+let c = Int();
+ins £ a ~ 17;
+%b.final = 23;
+let c = £ a - b + a;
+#c = £ c ^ 0xffff + a;
+c;
+//import lib "R2/print.0xmin";
+//print.register(c.final);
+hlt;
 //debugger c.code..@"label.code.map(v=>v.args.map(v=>typeof v == 'string'?v:v?.label?v.label?.lineNumber:v.number))";

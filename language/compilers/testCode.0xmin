@@ -1,3 +1,5 @@
-#"table";
+//#"table";
+debugger (1+(2=3));
 import lib "R2/std.0xmin";
 print("Hello, world!",0,{});
+let a = {1;2};
