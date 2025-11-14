@@ -653,6 +653,7 @@ const oxminCompiler=function(inputFile,fileName,language="0xmin"){//language:'0x
 					"let":false,
 					"set":false,
 					"ins":false,
+					"mod":false,
 					"def":false,
 				};
 				let found;

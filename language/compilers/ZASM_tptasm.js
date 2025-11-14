@@ -35,7 +35,8 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				defaultSymbols:["!"],
 			},
 			"flags":{
-				map:{"mov":"movf"},
+				useArray:true,
+				map:{"mov":["movf"], "exh":["exhs","!"]},
 				defaultSymbols:["", "&"],
 			},
 			"internal":{
@@ -191,6 +192,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			"jyb":"jyb",
 			//commands for R3
 			"exh":"exh",
+			"exhs":"exhs",
 			"st":"st",
 			"ld":"ld",
 			"movf":"movf",
@@ -200,6 +202,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 			"carry"   :{map:"CF",jumpMap:["jnc", "jc"]},
 			"overflow":{map:"OF",jumpMap:["jno", "jo"]},
 			"sign"    :{map:"SF",jumpMap:["jns", "js"]},
+			"sync"    :{map:null,jumpMap:["jy", "jmp"]},
 		};
 		ifOperations={//!>=,>=
 			"true":"jmp",
@@ -497,7 +500,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 				isNaN(value=value.toType("number").number)?
 					NaN//Error("label is not assigned")
 				:""+value
-			:value instanceof Operator?this.doOperator(value,level+1)//TODO: remove this case
+			//:value instanceof Operator?this.doOperator(value,level+1)//TODO: remove this case ; note this case comes up in `@temp = %value` I have no idea why.
 			:[];
 		};
 		compile_preprocessor({instruction}){//UNUSED
@@ -560,7 +563,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 						}
 						let v1=this.getArg(v);
 						if(!isNaN(+v1)&&a[i-1]!="r"){
-							v1="0x"+(0x1fffffff&v1).toString(16);
+							v1="0x"+(0x7fffffff&v1).toString(16);//note on `0x7fffffff`: in javascript `0xffffffff|0` == -1 because of 32 signed ints bitewise operators.
 						}
 						failed||=(v1!==v1)?Error(
 							(["1st", "2nd", "3rd"][i]??i+"th")+" argument: '"+
@@ -574,7 +577,7 @@ module.exports=({Language,contexts,assemblyCompiler,AssemblyLine,Scope,HiddenLin
 					})
 					.flat()
 					.join("")
-					.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x1fffffff&m).toString(16))
+					.replaceAll(/-?\b([0-9]+)\b/g,(m)=>"0x"+(0x7fffffff&m).toString(16))
 					+(
 						!mainObject.labels["settings"].labels["include_labels"].lineNumber?""
 						:" ; " + args.map(v=>v instanceof Value&&v.type=="label"?

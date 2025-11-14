@@ -55,14 +55,14 @@ variables:
   equalSigns: '<=>|<=|=>|=|==|<->|<-|->'
   assembly_operators: '<->|<-|->'
   operators: '{{expressionOperator}}|[@$#]'
-  expressionOperator: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!><]=|[!%*\-+=~|<>/?¬]'
+  expressionOperator: '[&|^]{1,2}|>{1,3}|<{1,2}|\.\.\.|[!><]=|[!%*\-+=~|<>/?¬\\]'
   operators_functionCallArgs: ':>|<:'
-  objectExtentionSymbol: '::'
+  objectExtentionSymbol: ':::?'
   assembly_commands_special: '\b(?:get\s+jump\s+\-1|set\s+jump\s+\+3|or\s+input)\b'
   assembly_commands_start: '(?<=^|;|@|:|{)\s*'
   assembly_commands_end: '(?=;|#|})'
   assembly_commands: '\b(?:nor|red|blue|or|and|xor|get|set|if|move|jump|or_input|get_jump|set_jump)\b'
-  assembly_commands_tptasm: '\b(?:call|ret|hlt|hault|port|mask|push|pop|mov|send|ld|st|exh|jmp|jn|jn?(?:e|[abgl]e?|[zsco])|ad[cd]s?|s[ub]bs?|xor|and|or)\b'
+  assembly_commands_tptasm: '\b(?:call|ret|hlt|hault|port|mask|push|pop|mov|send|ld|st|exh|exhs|jmp|jn|jn?(?:e|[abgl]e?|[zsco])|ad[cd]s?|s[ub]bs?|xor|and|or)\b'
   assembly_registers: '\b(?:jump|move|alu|ram|new|del)\b' #new and del are for heap memories. e.g: multi registor cpu's
   startFile: '(?x)
     !?(
@@ -82,13 +82,13 @@ variables:
       |ZASM3
       |ZASM4
     )' #'!?(make file|log.code|log.table)'
-  functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)'
-  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|function|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON)\b|@\$|@|\$|#|{{expressionOperator}})'
+  functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)' #removed `=>`
+  inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|function|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON|enum)\b|@\$|@|\$|#|{{expressionOperator}})'
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|target|language))?|Math(?:\s*\.\s*())?)\b'
   line_start_endLinePart: ':|(?=\S)'
   typeChain: '(?::>\s*{{labelName}}\([^()]*?\)\s*)*'
-  tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b|\!\s*\bsync\b'
-  meta_statementTypes: '\b(?:let|set|def|ins|undef|redef)\b'
+  tptasm_optionals: '[+!]\s*\b(carry)\b|\+\s*\b(internal|chain)\b|\!?\s*\b(store|signed)\b|[&!]\bflags\b|\!\s*\bsync\b'
+  meta_statementTypes: '\b(?:let|set|def|ins|mod|var|undef|redef)\b'
 contexts:
   main:
     - match: '^'
@@ -448,11 +448,15 @@ contexts:
         2: string.fileName.0xmin
         3: keyword.control.import.as.0xmin
         4: support.constant.import.fileType.0xmin
-    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*\=\s*){)' #'foo()={}' or 'foo:>type()::()={}'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*\=\s*){)' #'foo()={}' or 'foo:>type()::()={}'
       scope: entity.name.class
-    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
+    - match: '{{labelName}}\s*(?=\\\\)' #'Struct\\(...)'
+      scope: entity.name.struct.0xmin
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function
-    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}::\s*)?{)' #'foo{}'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*=>\s*))' #'foo(a,b)=>(a+b);'
+      scope: entity.name.function
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?{)' #'foo{}'
       scope: entity.name.namespace
     - match: '\)' #'foo = ()=>{}' function declaration
       push: potentialFunctionDeclaration
@@ -527,7 +531,7 @@ contexts:
       scope: keyword.objectExtender.0xmin
     - match: '{{operators}}'
       scope: keyword.operator
-    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:{{functionCallSymbols}}\s*)?{)' # foo(param1,param2){}
+    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:(?:{{functionCallSymbols}}\s*)?{|(?<!<)=>))' # foo(param1,param2){}
       push: parameters
       scope: punctuation.0xmin
     - match: '[\(\)\[\]\{\},;]'
@@ -542,8 +546,12 @@ contexts:
       pop: true
     - include: mainScope
   parameters:
-    - match: '{{labelName}}'
+    - match: '(?<=[(,])\s*{{labelName}}'
       scope: variable.parameter
+    - match: '{{labelName}}' # `(param:Type){ }`
+      scope: storage.type
+    #- match: '\(\s*'
+    #  push: mainScope
     - match: '\)\s*'
       scope: punctuation.0xmin
       pop: true

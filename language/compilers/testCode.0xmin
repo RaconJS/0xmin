@@ -1,5 +1,5 @@
-//#"table";
-debugger (1+(2=3));
-import lib "R2/std.0xmin";
-print("Hello, world!",0,{});
-let a = {1;2};
+#"table";
+#"target_assembly";
+import lib "R2/print.0xmin";
+//import lib "R2/std.0xmin";
+print("Hello, world!",0);

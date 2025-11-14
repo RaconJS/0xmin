@@ -1,0 +1,93 @@
+#"len";
+#"tptasm/R316";
+...(){//quality of life functions & macros
+	:global;
+	let var(obj)={
+		#obj||={};
+		#constructor.data::{def obj};
+		let = obj;
+	}::{
+		let data;
+		defer global def data;
+	};
+	let stack::{
+		let owner=¬;
+		#..this <-> -1 & 0xffff;
+	};
+	let assert(bool_or_obj,msg){
+		repeat !bool_or_obj throw "assertion failed: "...(msg()||msg);
+	};
+	let assume(bool_or_obj,msg,foo)<-{//:macro
+		repeat !bool_or_obj throw "assumption failed: "...(msg()||msg);
+		...foo;
+	};
+};
+let binaryTree:>var();
+let Node(value,parent,children)={//:#(@b32,@Node*,#Node[2])->Node
+	def let value<=>{@(value||0)};//@u32 & @char[4]
+	def let parent<=>{@(parent||0)};//:@Node*
+	def let children<=>{
+		def let left{@(children[0]||0)};
+		def let right{@(children[1]||0)};
+	};
+	let ref(register){//:#(%)->Node.Ptr&@this*
+		...labelsof Node.Ptr();
+		@..this;
+	};
+}::{
+	:Self;
+	let Ptr()={
+		...labelsof codeof Self();
+		#..compile;
+	};
+};
+let Node.methods{
+	let sharedParameters{
+		repeat 2 0;
+	}:>var();
+	let assignFunctionIO()<-{
+		#assert(inputs..@..length<=2);
+		#assert(outputs..@..length<=2);
+		defer ..this {
+			virtual{
+				ram => sharedParameters;
+				def inputs;
+				ram => sharedParameters;
+				def outputs;
+			};
+		};
+	};
+	defer:delete assignFunctionIO,sharedParameters;
+	let printValue(nodeIndexm,temp1,temp2){
+		%nodeIndex += binaryTree;
+		#temp1||=30;
+		#temp2||=29;
+		let value;//#{@}*
+		$set value => binaryTree + Node.Ptr().value;
+		//TODO
+		ld %temp1 %nodeIndex value;
+		@exh %value = 0x2002;
+		exh %temp1 |= 0x1000;
+	};
+	let printBinaryTree{
+		...{
+			let regsUsed<->2;
+			let inputs{
+				let node;//
+				let returnPtr <-> 31;
+			};
+			let outputs{
+				def let node{0};
+			};
+			...assignFunctionIO;
+		};
+		let temp <-> 1;//:%
+		let temp2 <-> 2;//:%
+		//TODO
+	}:>var();
+};
+let dynArray2{//:{value;}[]*&
+	let push(){
+
+	};
+};

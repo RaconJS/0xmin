@@ -42,14 +42,14 @@ def let Dsop()={//:#()->[]{@}*
 			};
 		};
 		let input{
-			let self = Self() <-> 0;//:%Self*
-			let size = {0} <-> 1;//:%u
+			ins let self = Self() <-> 0;//:%Self* & %const
+			ins let size = {0} <-> 1;//:%u & %mut
 		}::{
 			let enum = Enum(2);
 		};
 		let output{
-			let self <=> input.self;#self <-> input.self;
-			let newItem = {0} <-> 1;//:[]self
+			ins let self <=> input.self;#self <-> input.self;
+			ins let newItem = {0} <-> 1;//:[]self
 			let error{
 				let Ok{};
 				let sizeOverflow{};//
@@ -57,9 +57,8 @@ def let Dsop()={//:#()->[]{@}*
 		};
 		let push{//UNTESTED
 			let safeMode;//:#?
-			%output.newItem = [%input.self+input.self.objectPointer];
-			%output.newItem += input.self.size;
 			[%input.self+input.self.size] += %input.size;
+			//drop:%input.size
 			repeat !!safeMode {:block;
 				jump -> block..return if !overflow;
 				call edgeCaseError.sizeOverflow:>use();
@@ -118,6 +117,8 @@ def let Dsop()={//:#()->[]{@}*
 					};
 				pop %output.self;};
 			};
+			%output.newItem = [%input.self+input.self.objectPointer];
+			%output.newItem += [%input.self+input.self.size];
 		};
 		let pop{//UNFINISHED
 			let input{
@@ -128,7 +129,7 @@ def let Dsop()={//:#()->[]{@}*
 			};
 		};
 	};
-};
+}.data;
 let Sop(){
 	def let size{0};
 	def let objectPointer{0};

@@ -23,6 +23,42 @@ function tptasm(doLog)
 	if doLog=="bin" then arg1="minFilt.bin" end
 	return loadfile("tptasm/main.lua")("scripts/a.asm",arg1,str);--tester.asm");
 end
+function r3(doLog)
+	local function read_file_u32(filename)
+		local function read_u32(file)
+			local number = 0
+			data = file:read(4)
+			if not data or #data < 4 then return nil end
+			--local bytes = data:byte(1,4)
+			b0,b1,b2,b3 = data:byte(1,4)
+			return
+				b3*0x1000000 +
+				b2*0x10000 +
+				b1*0x100 +
+				b0*0x1
+		end
+		local list = {}
+		local file = assert(io.open(filename, "rb"))
+		while true do
+			local value = read_u32(file)
+			if not value then break end
+			table.insert(list,value)
+		end
+		file:close()
+		return list
+	end
+	startPos={112,118}
+	size={128,16}
+	local ram = read_file_u32("scripts/a.bin")
+	for i,v in ipairs(ram) do
+		posX=startPos[1]+(i-1)%size[1]
+		posY=startPos[2]+math.floor((i-1)/size[1])
+		tpt.delete(posX,posY)
+		local n=tpt.create(posX,posY,"filt") 
+		tpt.set_property("ctype",v,n)
+		tpt.set_property("tmp",0,n)
+	end
+end
 function compile(computer)
 	if(computer==1)then
 		--riskete
@@ -39,21 +75,24 @@ function compile(computer)
 			tpt.set_property("ctype",v,n)
 			tpt.set_property("tmp",0,n)
 		end
+		tpt.log(table.getn(ram))
 	else
-		oxmin()
+		tpt.log(oxmin())
 	end
-	tpt.log(startPos[1],startPos[2])
+	--startPos[1],startPos[2])
 end
 function oxmin(fileName)
 	--0xmin
-	local file=io.open(fileName or "a.filt", "rb");
+	local file=io.open(fileName or "scripts/a.filt", "rb");
 	if not file then return "file not found" end
 	startPos={141,72}
 	if not (x==nil) then startPos[1]=x end
 	if not (y==nil) then startPos[2]=y end	
+	fileSize = 0
 	for i=0,627 do --
 		local bytes=file:read(4)
 		if not bytes then break end
+		fileSize = fileSize + 1
 		local value=0
 		for i=1,4 do
 			value=value+bit.lshift(string.byte(bytes,i),i-1)
@@ -69,6 +108,7 @@ function oxmin(fileName)
 		end
 	end
     file:close()
+    return fileSize
 	--[[
 		dofile("scripts/minFilt.lua");
 		startPos={141,72}

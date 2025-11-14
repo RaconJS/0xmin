@@ -843,7 +843,7 @@
 							send %const_0 %cursor;
 						};
 						[data.cursor] = %cursor;
-						IO:>static.use().cursorPos = %cursor;
+						[IO:>static.use().cursorPos] = %cursor;
 					};
 					{:processChar;
 						%char - "\r";
