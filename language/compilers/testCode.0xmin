@@ -1,5 +1,7 @@
 #"table";
+#"target_assembly";
 ...let set{import lib "R2/std.0xmin"};
+print("??");
 let static;
 {:main;
 	let string = "hello world";
