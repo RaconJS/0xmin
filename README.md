@@ -4,6 +4,7 @@ A higher level assembly and meta language
 
 
 ```js
+//run with `0xmin -r hello.0xmin -a R2`
 import lib "R2/std.0xmin";
 print("Hello, world!");
 hault;
