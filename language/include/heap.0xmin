@@ -28,7 +28,7 @@ void #set:(){//documentation
 		#type Object:Page.data & heap[];
 		Object{
 			pointer:#()->Object* & heap[]* ; is the end of a Page
-			static:#()->Object* & static[]* ; is the end of a StaticPage
+			static:#({@})->Object* & static[]* ; is the end of a StaticPage
 		};
 		regsUsed:#int & %;
 		alloc:Function(%Object*?,length:%int,offset:%int);//not implemented yet
@@ -82,7 +82,7 @@ void #let set: heap{#;
 	};
 	//each of the functions has a '.call(...args)' method
 	#let: Call;
-	#set: Call(foo,inputRegs){//call functionName,args
+	#set: Call(foo,inputRegs){//call functionName,args ; assumes output regs are free
 		#let: repeatNum = foo.nextReg.n + (foo.inputs..length-inputRegs..length);
 		let inputRegs = {} <=> inputRegs;//make a copy to prevent mutations
 		let stack = {};
@@ -98,10 +98,11 @@ void #let set: heap{#;
 			#let: i=0;
 			repeat foo.inputs..length:{//assume {def a}[0] == {$def a;$set a}
 				repeat !!inputRegs[+i]
-				repeat #(+inputRegs[+i] != +foo.inputs[+i])
-					@ %(foo.inputs[+i]) = %(inputRegs[+i]);
-				repeat (!inputRegs[+i] && !!foo.inputs[+i].default)
-					@ %(foo.inputs[+i]) = #(foo.inputs[+i].default);
+					repeat #(+inputRegs[+i] != +foo.inputs[+i])
+						@ %(foo.inputs[+i]) = %(inputRegs[+i]);
+				repeat !inputRegs[+i]
+					repeat (!inputRegs[+i] && !!foo.inputs[+i].default)
+						@ %(foo.inputs[+i]) = #(foo.inputs[+i].default);
 				#set: i=i+1;
 			};
 			repeat !inputRegs[i];

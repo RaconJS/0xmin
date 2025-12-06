@@ -106,7 +106,6 @@ let File()={
 
 	};
 };
-
 let startDir = File()::{:root;
 	#parent.parent<=>{@..this};
 	#parent.itemPtr<=>0;//is not needed since the root cannot be deleted

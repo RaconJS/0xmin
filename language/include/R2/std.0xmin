@@ -1,11 +1,15 @@
-#"tptasm";
+#"tptasm/R216";
 let global,heap,print,getInput,awaitInput,checkInput;
-let global = ..this;
+#global = ..this;
 //let use,require,RegEnum,getInput,static,meta
 #heap{import lib "heap.0xmin"};
 ...labelsof#(){defer#return={let=print};import lib "R2/print.0xmin"}();
 ...labelsof#(){defer#return={let=getInput,=awaitInput,=checkInput};import lib "R2/getInput.0xmin"}();
-defer global:{
-	//def static;
-	def heap.memory;
-};
+repeat !!.std_scope: throw "label clash: 'std_scope' already exists in this scope but would be overwritten by library std.0xmin";
+:std_scope;
+repeat(global != std_scope)://only defer data if std is wraped '...labelsof codeof {import lib "R2/std.0xmin"};'
+	defer global:{//note if std_scope == global then it will only run the inside of '#defer' to the end of this file
+		def heap.data;
+	}
+;
+delete std_scope;

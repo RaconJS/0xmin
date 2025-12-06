@@ -16,6 +16,13 @@ function loadBinaryFile(name)
 	return data
 	--return data;
 end
+function r2(doLog) -- loads binary file
+	local str=nil
+	local arg1=nil --0xDEAD
+	if doLog=="log" then str="tptasm.log" end
+	if doLog=="bin" then arg1="minFilt.bin" end
+	return loadfile("tptasm/main.lua")("scripts/a.filt",arg1,str);--tester.asm");
+end
 function tptasm(doLog)
 	local str=nil
 	local arg1=nil --0xDEAD

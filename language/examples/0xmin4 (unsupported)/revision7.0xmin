@@ -1,0 +1,199 @@
+//idea: use `\` as the insertion symbol:
+	//then `$` is only for state-phase code
+//idea: use `$$` as this line
+//e.g.
+//idea: inbuilt register states: \ip, \sp, \file, \ram
+//register state: {address:uint,owner_object:#?,type_state:#?}
+//revision: may use `$` for insertion instead since it is quicker & more eurganomic to type
+let a;
+\a <-> 0;
+@a;//0
+\a <-> 4;
+@a;//4
+let instruction = {@add};
+let opand_type = {@%};
+@$instruction $opand_type;
+let array = {$;a;b;c};
+$foo;
+$bar;
+$baz;
+$let a{1;2;3};
+{//object model
+	//idea: use `[...]` as trait system
+	//idea: use traits, can only access properties from public traits
+	let State(){
+		let owned//:#?
+		let value_state;//:ValueState
+		let value_symbol;//:#?
+	};
+	let ValueState{
+		\let None,Invalid,Valid;
+		#..enum;
+		let alloc(self){#;
+			let as_value_state = self[¬ValueState];
+			repeat as_value_state != None throw;
+			#self[¬ValueState] = Invalid;
+		};
+	};
+	let Label(){
+		let parent = ¬;//:#?
+		let traits{};//:(#)[] & {[]:#} ; i.e. label array and object with properties to labels
+		let properties{};//:{#}
+		let state{
+			let internal{//generally used in for-loops
+				let start;
+				let end;
+			};
+			let external{
+				let start;//call
+				let end;//return
+			};
+		};
+		let allocator{
+			let alloc{};//:{@} & @(self:#)->self:@Invalid ; assigns memory of size Self
+			let construct{};//:{@} & @(self:Invalid)->self:Valid ; inisialises
+			let deconstruct{};//:{@} & @(self:Valid)->self:Invalid ; userally does nothing, just a state marker
+			let free{};//:{@} & @(self:Invalid) -> self:#
+		};
+	}::{
+		let get_trait(label:Label,trait:Label){//label[¬trait]
+			#return = label.traits.¬traitObj;
+		};
+		let get_property(label:Label,property:String,is_symbol:Bool&#?){//same thing for symbol 
+			#return = {
+					repeat is_symbol let v = label.properties[¬property];
+					repeat !is_symbol let v = label.properties[""...property];
+				}.v//search properties
+				|| {//search traits
+					let i = 0;
+					let v = ¬;
+					repeat (!v && label.traits..length): {
+						v ||= get_property(label.traits[i]);
+					};
+				};
+				|| (label.parent && get_property(label.parent))
+		};
+		let get_item_by_index(label:Label,index:Uint){
+			#return = label.properties[""...property]//search properties
+				|| {//search traits
+					let i = 0;
+					let v = ¬;
+					repeat (!v && label.traits..length): {
+						v ||= get_property(label.traits[i]);
+					};
+				};
+				|| (label.parent && get_property(label.parent))
+		};
+	};
+};
+{//type annotations
+	//idea: have a function type checker internal method.
+	//idea: use `$` for type annotations: `short_exp $ type_short_exp`
+		//can use `$@()` `$#()` or `$$()` etc... for longer type expressions
+	//revision: idea: use `|>` as type operator
+	let foo(a:#Int,b:#Int){
+		#return = a + b;
+	};
+	let foo|>Int = 2;
+	let bar|>Int = 2;
+	let baz{:block_name |> @()->i64;
+	};
+	{//type system
+		//array:i32[] or i32[len] or [4]
+		//item:array^ or ^i32
+		//index:array~ or ~i32
+		//generic:#(<T>)->@()->T
+	};
+};
+{
+	let a;
+	let foo{
+		foo..start{};
+	};
+};
+{#;//traits and property syntax
+	a.property;//public property
+	a.¬symbol;//uses `.¬short_short_exp` so can also do `.¬(long expression)`
+	a[index];
+	a[""property_string];
+	traits{//trait patterns `[¬ trait_exp ]`
+		//returns a list of properties
+		//can assign to `a[¬T]`
+		a[¬trait];//special case: returns `a.¬(trait)`
+		a[¬trait1+trait2];//returns an object with both trait1 and trait2
+		a[¬trait1-trait2];//returns the traits unique to trait1 
+		a[¬trait1&trait2];//returns properties only in both trait1 and trait2, from trait2
+		a[¬trait1|trait2];//same as a[¬trait2&trait1]...a[¬trait] ; returns the properties of both trait1 and trait2, with trait1 ontop
+		a[¬trait1^trait2];//returns unique properties
+	};
+	{//functions with generics
+		let foo[T](a,b){//interacts with traits
+		};
+		//for declaring functions from index syntax `[]` use `[]::(){}`
+			let [¬foo]::(a){};
+		let Type,bar,baz;
+		#foo(Type,bar,baz);
+	};
+	let trait{
+		let ..proto{
+			let a = 2;
+			//let method[This,this](a,b,c){...};
+			let method(a,b,c)->{...};//idea: maybe use `()->{}` for methods
+			//idea: indead have `This` and `this` as inbuilt arguments, to respect the unnamed paradigm
+		};
+	};
+	let proto_trait{
+		let a;
+	}::(object){#;
+		#return = object;
+		let This = object;
+		let traitObj = {
+			let foo(this){
+			};
+		};
+		#object..trait ::: {\let [¬constructor] = traitObj};
+	};
+	let Trait;
+	let Struct;
+	let object{
+		let ..traits{
+			\let[¬Struct] = Struct:::{
+				let ..traits{
+					\let[¬Trait] = Trait:::{
+						let ..proto {
+							let a()->{
+								this.b;
+							};
+							let b;
+						};
+					};
+				};
+			};
+		};
+		
+	};
+};
+{//type model
+	let Types{
+		#let Code <=> Enum()<:{\
+			Assembly,
+			Number,
+			String,
+			Label,
+		};
+		#let Value <=> Enum()<:{
+			Number;//+a
+				Float64;//a+0f64
+				Int64;//a+0i64
+				//etc...
+			String;//""...a
+			Label;//¬a
+		};
+		#let Variable;
+	};
+};
+{//semi-high level version
+	let i;//:Raw
+	#i = Int();//:Invalid
+	#i<=>2;//Valid
+};

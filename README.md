@@ -21,6 +21,7 @@ may support in future:
 - wat (web assembly)
 - 0xmin/0xMin1 CPU (231P) https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
 
+comes with tptasm assembler: https://github.com/LBPHacker/tptasm
 
 ## how to install:
 ### option 1: through terminal
@@ -59,13 +60,33 @@ The compiler used javascript features: private properties `#property` and `??`
 
 ## how to use
 ### the compiler:
-just compiling: `0xmin filename.0xmin -o outputName.filt`
+#### just compiling:
+`0xmin filename.0xmin -o outputName.filt`
 
 For help run `0xmin -help` or `./0xmin.sh -help`
 
-To run in TPT: `0xmin filename.0xmin` to autimaticly send it to The Powder Toy. Then run it on the 0xmin save by doing `compile()` in the tpt comandline. Then unpause the save.
+#### To run in TPT:
 
-compile and run: `0xmin -r filename.0xmin`, you can also find the compiled files as: `./emulator/a.filt` and `./emulator/aOld.filt`. These are tempory files and can be safely removed at any time.
+##### running on R2:
+- remember to add: 
+```js
+#"target_assembly";
+```
+to the top of your code (`filename.0xmin`) so it runs in tptasm.
+
+- run: `0xmin filename.0xmin` to autimaticly send it to The Powder Toy.
+
+Then go into the tpt R2 save with terminal and run `tptasm()` in the tpt comandline.
+
+Finally start the R2 computer.
+
+##### running on 0xmin CPU:
+`0xmin filename.0xmin`
+
+similar to running on R2 but use `compile()` to move the `.filt` binary to the 0xmin cpu.
+
+#### compile and run in terminal:
+`0xmin -r filename.0xmin`, you can also find the compiled files as: `./emulator/a.filt` and `./emulator/aOld.filt`. These are tempory files and can be safely removed at any time.
 
 ### the emulator
 To run `.filt` 0xmin-binary files run: `0xmin -e filename.filt` (-e for execute)
@@ -75,7 +96,7 @@ Optionally the speed of the emulator can be controlled with the `-s` and `-sm` (
 e.g. `0xmin -e filename.filt -sm 4` runs emulator at 4 times normal speed (4 * 60 cycles per second)
 
 
-For using the R2 emulator `-a R2` can be added for the R2 architecture 
+For using the R2 emulator `-a R2` can be added for the R2 *a*rchitecture 
 
 
 ## requirements:{
@@ -87,11 +108,11 @@ For the `compiler.js`. It uses "`a??b`" and "`a?.b`".
 node.js v16 can be installed with the `installer.sh`
 
 ### linux/ubuntu: this system has not been tested on other operating systems.
-Otherwise you will have to:
+Otherwise you may have to:
 
-	change the file paths in `compile.sh` that point to The_powder_toy.
+	update variable `powderToyScriptsFolder` in `language/0xmin.sh` so that point to The_powder_toy's `scripts` folder.
 
-	translate the bash file: `compiler.sh` into another format.
+	translate the bash file: `language/0xmin.sh` into another format if you are not using a bash terminal.
 
 ### sublime-text3, from `snap`
 For syntax highlighting to make writing 0xmin code easier.
@@ -152,10 +173,27 @@ These properties exist on all labels. The names will not conflict with custom ma
 
 To avoid 0xmin/ZASM being turing complete at compile time: all iteration and recursion is fixed and must be stated before it can be done.
 
-Iteration can only be done through using the `#repeat` statement.
+Iteration can only be done through using the `#repeat` statement (and `variableName..iterate( )`).
 
 `#repeat list..length: list;//puts multiple copies of the list into the output file`
 The first part is the maximum iteration and the 2nd is any single statement.
+
+
+compile-time recursion can be allowed with the `#recur` statement. Recursion is by default not allowed and will silent error.
+
+The exact algorithm for working out how many times a line is recursive is subject to change, but it can be found in the source code.
+
+note: because of this using `#recur` to repeat a function a curtain number of times is ill-defined behaviour. `#recur n: exp;` is meant to be used to allow for running functions that are allready finitely recursive, not to force non-recursive functions to be.
+
+e.g.
+```js
+let factorial(n,maxRecursion){
+	#maxRecursion ||= n;
+	#repeat(n == 0):#return = 1;
+	#repeat(n > 0): #recur maxRecursion: #return = n * factorial(n - 1,maxRecursion);
+};
+#debugger +factorial(10);//3628800
+```
 
 
 

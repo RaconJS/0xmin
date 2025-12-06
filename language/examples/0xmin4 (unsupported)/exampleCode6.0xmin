@@ -1,0 +1,38 @@
+//idea: use `foo=(...)` for trait syntax
+traitA{
+	let foo = ¬;
+	method(other)={//method
+		other(this);
+	};
+	static(other)={
+		;
+	};
+};
+struct{
+	let a,b,c;
+};
+#struct:::{
+	let .[¬traitA]{
+		...labelsof traitA;
+		#foo=#(a)={
+			£this.a+a;
+		};
+	};
+	#let?..proto:::{
+		ins [¬traitA];
+	};
+};
+traitB{
+
+};
+let traitB;
+let obj
+	:>traitA=(a:2,b:3,c:3)
+	:>traitB=(a:2,b:3,c:3)
+;
+def?
+//ins
+//def mod
+//def mod
+//req ; require
+//#set

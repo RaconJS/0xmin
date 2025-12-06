@@ -1,5 +1,40 @@
 #"table";
-#"target_assembly";
-import lib "R2/print.0xmin";
-//import lib "R2/std.0xmin";
-print("Hello, world!",0);
+...let set{import lib "R2/std.0xmin"};
+let static;
+{:main;
+	let string = "hello world";
+	#string <-> 0;
+	{
+		let obj <=> {@(heap.Object.pointer()<->0)};
+		#static::{def obj};
+		r0 = 4;
+		heap.malloc.call();
+		[obj] = r0;
+		//defer main {
+			push r0;
+			r0 = [obj];
+			heap.free.call()//free does not seem to work;
+			pop r0;
+		//};
+	};
+
+
+	%string = string..length;
+	heap.malloc.call();
+	heap.free.call();
+	$string..iterate((v,i){r1 = v;[%string + i] = r1});
+	r1 = 0;
+	$string..iterate((v,i){send r1 [%string+i];});
+	heap.free.call(string);
+
+
+	let object = heap.Object.pointer=() <-> 0;
+	r0 = 16;
+	heap.malloc.call();
+	r1 = 0xffff;
+	r2 = 0xffff;
+	#heap.clear.use();
+	heap.memset.call();
+};
+hlt;
+def static;

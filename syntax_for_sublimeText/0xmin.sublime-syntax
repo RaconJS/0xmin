@@ -82,7 +82,7 @@ variables:
       |ZASM3
       |ZASM4
     )' #'!?(make file|log.code|log.table)'
-  functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|=)' #removed `=>`
+  functionCallSymbols: '(?<!<)(?:=>|<=|->|<-|-|=)' #removed `=>`
   inbuiltProperties: '(?:\b(?:length|code|splice|array|labels|compile|seal|freeze|this|return|proto|super|oper|constructor|prototype|supertype|function|operators|defs|indexOf|asNumber|state|flat|code_assembly|secure|iterate|static|toJSON|enum)\b|@\$|@|\$|#|{{expressionOperator}})'
   oxminNameSpace: '\b(null|settings(?:\s*\.\s*(log_code|log_table|log_length|target|language))?|Math(?:\s*\.\s*())?)\b'
   line_start_endLinePart: ':|(?=\S)'
@@ -454,8 +454,10 @@ contexts:
       scope: entity.name.struct.0xmin
     - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*(?:{{functionCallSymbols}})?\s*){)' #'foo(){}'
       scope: entity.name.function
-    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*=>\s*))' #'foo(a,b)=>(a+b);'
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*=>\s*))' #'foo(a,b)=>(a+b);' 'foo(a,b)\\'
       scope: entity.name.function
+    - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?(?:\([^()]*?\)\s*\\\\\s*))' #'foo(a:int,b:int)\\' assembly function
+      scope: entity.name.function.assembly_function.0xmin
     - match: '{{labelName}}\s*(?=(?:<=>\s*(?:\w+\(.*?\)\s*<:\s*)?)?(?:{{typeChain}}:::?\s*)?{)' #'foo{}'
       scope: entity.name.namespace
     - match: '\)' #'foo = ()=>{}' function declaration
@@ -531,7 +533,7 @@ contexts:
       scope: keyword.objectExtender.0xmin
     - match: '{{operators}}'
       scope: keyword.operator
-    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:(?:{{functionCallSymbols}}\s*)?{|(?<!<)=>))' # foo(param1,param2){}
+    - match: '\((?=(?:[^\(]|\([^\(]*\))*\)\s*(?:(?:{{functionCallSymbols}}\s*)?{|(?<!<)(=>|\\)))' # foo(param1,param2){} `(a,b)\\...` `(a,b)=>...`
       push: parameters
       scope: punctuation.0xmin
     - match: '[\(\)\[\]\{\},;]'

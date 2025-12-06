@@ -1,0 +1,207 @@
+//using experimental code
+//using rust version of the compiler
+//idea: `0xmin` is always accessable, `0xmin` object is immutable appart from settings
+//idea: `#def:` "borrows" item, and only inserts and assigns a line number if it is referenced in `$` phase ; preventing dead code
+//feat: `label(...){...}` -> `# let:label(...){...}`
+//idea: `value:::{...}` cannot read from this scope, but can write to it. a external safer version of `value::{...}`
+//feat: allow `labelA::labelB` == `labelA<=>labelA...labelB`
+//feat: property searching:
+	//`label[...]` == `label.[...]` --> searches prototype tree
+	//`label.name` == `label.["name"]`
+	//`label.(...)` ==  --> only looks in this label's properties (i.e. in `..labels`)
+//feat: use `\` operator: use `\short_exp` for a new struct/tuple class Value type, takes in named and unnamed arguments `(1,a:2)` and returns a struct Value type from them.
+	//idea: use `\\short_exp` == `\\short_exp`
+	//e.g. `\(a:1,1+3,b:2,a.b)` == `{let a=1;ins 1+3;let b=2;ins a.b}`
+	//e.g. `\\(a:A,b:3,c:,D,:E,:¬F)` == `(){let a=A(arguments.a),b=3,=arguments.c;ins D(arguments[0]);let E=E(arguments.E), [¬F] = arguments[¬F]}` ; 'Value(Label)' types are treated are treated as type-functions
+	//e.g. `\\(T;U)`
+//feat: internal properties on different Value varients:
+	//e.g. `2..sin` `1..add(3)`
+	//e.g. "1,2,3"..split(",") == ("1";"2";"3")
+//idea: reform the old 0xmin3 prototypal-OOP system to use a more rust-like struct (`\()`) & trait (`¬`) system
+#"ZASM4";
+#set// "settings" ; `#set` is for more specific/strict meta (`#`) keywords. prevents keyword expantions e.g. `#def:` == `#set def ins rec:` != `#set def`
+	let delete
+	def ins 
+	... labelsof codeof run
+	var//hoists short expression, running it at the start of a block ; useful with `#set var let:` assembly-like labels a bit like an reverse-defer ; 
+//feat: `label(...){...}` syntax only applies to start of let or auto (`$a(){};` == `#var let a = (){}`, ``) statements
+//idea: `track internal labels, created in a closure. cou
+//idea: '#unsafe'
+	#unsafe: statement;//marks a section of code as unsafe used to use less safe language features in strict blocks.
+#"strict";//used to mark a block as using the stricter syntax ; disallows more unsafe features such as `foo::{}` and mutating "foriegn" labels without using `label[¬key]` patterns ; strict mode is 
+#repeat n: statement;
+#recur n: statement;
+#import lib "name" as bin;
+#debugger label: debug_syntax;//debugger has it's own special debug_syntax e.g. `debugger a name` ; TODO: design debug_syntax
+#defer scope;
+#break scope;//name of the label of a scope
+#virtual exp;
+//TODO:rename keywords to make more sense
+//functions:
+	//function types:
+		normal(){#arguments,return,constructor,this};
+		weak()->{#arguments,return,constructor,this};//`this` works similar to javascript `a.b.c()` has `this == b` ; is the same accross all function types
+		class()={#arguments,return,constructor,this};//`this` still refers to the parent object, since `..this` already returns the instance object
+		strong()<={#arguments,return};//no access to external labels, although does have access to `0xmin`
+		macro()<-{#arguments,return,constructor,callee,caller,this};
+			//caller and callee are made of a prototype chain of the parent classes mimicking how normal variable accessing works (e.g. `let a;{def a}`)
+			//can read/write variables by using caller["name"].
+			//cannot mutate parent scopes ; TODO: design OOP system to support this
+		lambda()=>();//no extra function label
+	//function structure
+	let function_call_pollyfill(caller_object,function,args)<-{
+		{
+			:arguments;
+			let arguments..prototype{ 
+				let arguments = arguments;
+				let return;
+				let constructor = foo;
+				let this = caller_object;
+			};
+			delete arguments;
+			#arguments..prototype.return{
+				#arguments ...= args;
+				...run foo;
+			};
+		};
+	};
+	let standard_function(){
+		...function_body;
+	}::{
+		...function_properties;
+	};
+	//function extension
+	#standard_function:::(){
+
+	};
+let meta{
+	panic(reason){
+		throw "paniced:"...reason;
+	};
+	let enum_varient()<-{
+		#caller::{
+			let type = ..this;
+			let varientType = constructor;
+			...labelsof codeof arguments;
+			#return = ..this():::{
+				@varient;
+				def return;
+				let .[¬type] = ..this;
+				let .[¬varient] = return;
+			};
+		};
+	};
+	let macro()<-{
+		caller;//returns an object with parent closures using ..proto chain
+		//can use 
+		//can only be used in ()<-{} functions
+
+	};
+	Result(T:0xmin.Type,E:0xmin.Type)={
+		#..function()={
+			let unwrap(){
+			};
+		};
+		Ok{T}::(t){
+			t;//enum_varient<-();
+		};
+		Err{E}::(e){
+			e;//enum_varient<-();
+		};
+		let and_then(){
+
+		}
+		#..enum;
+	}::(){};
+	struct_old(a,b,c,d){
+		def let =a,=b,=c,=d;
+	};
+	struct_old2(a,b,c,d){...ins labelsof arguments};
+	require(){};
+};
+var object = \(a:,b:,c:);
+var struct = \\(a:,b:,c:);
+let enum(...)={//idea: use `...` to for unlimited named arguments in `arguments`, otherwise only parameters can be in `arguments`
+	...labelsof codeof arguments;
+	#..enum;
+	#{
+		let enum = ..this;
+		#..iterate(v=>v::(...){@constructor;arguments}:::{
+			#let ..prototype;
+			#..prototype:::{
+				def let .[¬enum];
+			};
+		});
+	};
+};
+//feat: depedancy support: `#mod:label` inserts a label but only adds it in the `..compile$` phase if the label's `..use` is referenced.
+	//`..use` returns the original object but marks the object as used so it will be added in all `#mod` areas
+	//can check if an object is used with `!!+label..uses`
+	testing_dependancies{
+		let module{repeat 100 0};
+		defer def mod module;
+		let useModule(){
+			@module..use[0];
+			@module..use[1];
+			@module..use[2];
+			@module..use[3];
+		};
+		useModule();
+		useModule();
+	};
+//@(){} for assembly functions
+@foo(a:%, b:%) -> c:% {
+	%c = %a + %b;
+};
+//#set def ins mod let foo
+mod let foo{
+	let parameters{
+		def let a=%();//0xmin.Register();
+		def let b=%();//0xmin.Register();
+		#..enum;
+	};
+	let result{
+		def let c=%();//0xmin.Register();
+		#..enum;
+	};
+	@%c = %a + %b;
+};
+//feat: more support for rust-like traits
+	//use `object.¬(trait)` to get that object as that trait
+	//`let object.¬(trait) = {let a=2,b=3};`
+	//is added to the prototype
+	//`object.¬(trait).a`
+	let: trait{let symbol1,symbol2;};
+	let object{
+		let .[¬trait.symbol1] = 1;
+		let ..proto
+		let .[¬trait.symbol1] = 2;
+	};
+	let part = object.¬trait;//
+	{
+		#let trait1{
+			#foo(self,a,b)->{};
+			#bar(self){};
+		};
+		#let trait2{
+			#foo(self,a,c)->{};
+			#baz(){};
+		};
+		#let type
+			:>trait1({
+				#foo(self,a,b){};
+				#bar(self){};
+			})
+			:>trait2({
+				#foo(self,a,c){};
+				#baz(){};
+			})
+		;
+	};
+//feat: generics
+	let Vec2(a:T,b:T)[T]{
+		a;
+		b;
+	};
+	let vec1 = Vec2(1,2);
+	let vec2 = Vec2("a","b");

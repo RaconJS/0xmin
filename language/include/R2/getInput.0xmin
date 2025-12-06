@@ -5,6 +5,8 @@
 	awaitInput:#(out:%~char)->{@} & @->mutate out;
 	checkInput:#(out:%~char)->{@} & @->mutate out;
 	//note: there are extra parameters, not shown in these docs, for optimisations but they are less important for general use
+	//notation note: '%~char' == 'register(%) containing a invalid(~) charactor(char)'
+	//notation note: '#?&bool' == 'an optional(?) meta variable(#), and a bool
 };
 let getInput(outputReg,await_bool,doWhile_wait,miniProcess,portReg){//:#(%?,#?,{@}?,{@}?,%?)->{@} & @mutate terminal
 	repeat !await_bool : awaitInput(outputReg,doWhile_wait,miniProcess,portReg);
@@ -28,7 +30,7 @@ let getInput(outputReg,await_bool,doWhile_wait,miniProcess,portReg){//:#(%?,#?,{
 			jump -> waitLoop if sign;
 		};
 		def let bump{bump %portReg};
-		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO";
+		repeat (miniProcess..@..length > 14) throw "mini process too long for R2 IO's delay";
 		repeat !!miniProcess def miniProcess;
 		repeat !!+hasOutputReg def let getOutputLoop{
 			recv %outputReg %portReg;

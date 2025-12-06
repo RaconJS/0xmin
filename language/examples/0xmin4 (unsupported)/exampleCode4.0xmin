@@ -1,0 +1,46 @@
+#"len";
+//re-imagining of 0xmin
+//problem: the current array systems:
+	#def;
+	#ins;
+	#undef;
+	#..splice;
+	#..defs;
+	$set;
+	$def;
+	#..#;
+	#..@;
+	#..@$;
+//need a way of delete
+//idea: locks
+	//#..seal;
+	//#..freeze;
+//ownership
+	//note
+		//due to the pattern
+		#(label){
+			repeat !label..defs..length def label;
+		};
+		//the ability for '#def' to expand to '$undef def ins' is not used
+		//#def will now only expand to '$ins set' instead of '$undef;$ins'
+//idea: add '$let' and have '$' be a complete meta language alone
+	#let;
+	#delete;
+	#..delete;//removes a variable entirely everywhere
+	$ins;
+	$set;
+	$def;
+	$unins;
+	$undef;
+//idea: then '#:' and '$:' can just be useful for their default syntax sugars
+//idea: have keywords for '@' where '@:' is normal assembly
+#:;#set:;
+$:;$ins:;
+label(){};$let ins label(){};
+label{1};$let ins def label{1};
+//idea: unsafe keyword, for doing things that should not be considered my library makers. Any code inside may break external modules.
+	//unsafe may allow:
+		#unsafe delete label;//deletes a label entirely from a program, including 
+	#mod{
+		//mod blocks
+	};

@@ -1,8 +1,11 @@
-#"ZASM3";#"tptasm";#"len";//#"table";
+//possible bug: breaking at "I" with score 0x1000???
+//BUG: double merging when "A" pressed with "AABC" pattern
+#"ZASM3";#"tptasm";#"len";
+//#"target_assembly";
 :global;
 #import lib "R2/print.0xmin";
 #import lib "R2/getInput.0xmin";
-let RegEnum(start)={
+let RegEnum(start:#)={
 	#return <-> start||0;
 	()={
 		#..this <-> ..constructor;
@@ -11,16 +14,25 @@ let RegEnum(start)={
 		%..this;
 	};
 	let ..prototype = {
-		let move(newReg)<-{
+		let move(newReg:%)<-{//note: I do not remember why this a macro
 			#newReg<->this; 
 		}::{
 			let ..prototype = {
 				let = this;
 			};
 		};
+		let share(reg:%){//this:!owned ; using type annotation comments (as of 14/11/25 there is no # type checking)
+			#reg<->this;
+		};
 	};
 };
-let grid = {
+let alloc{
+	let stack(obj:{@}){
+		defer global: def obj;
+		#return = obj;
+	};
+};
+let grid = {//:char[]
 	"    ";
 	"    ";
 	"    ";
@@ -63,13 +75,57 @@ let random{
 	return;
 };
 let regEnum = RegEnum();
-let inputChar = regEnum();
 let const_0 = regEnum();
 let score = regEnum();
 %const_0 = 0;
 call random.reset;
+let arrowKeysDisplay {
+	let inactiveColor = +"\c9f";
+	let activeColor = +"\c17";
+	let print_mod = print;
+	let Key(key:char,pos:char){
+		...labelsof arguments;
+		let print(){
+			print_mod(""...pos...key,const_0,{});
+		}::{
+			let active(){
+				send %const_0 activeColor;
+				$..this();
+			};
+			let inactive(){
+				send %const_0 inactiveColor;
+				$..this();
+			};
+		};
+	};
+	defer ..this:delete Key;
+	let W <=> Key("w","\p38");
+	let A <=> Key("a","\p47");
+	let S <=> Key("s","\p48");
+	let D <=> Key("d","\p49");
+};
 let printGrid{
 	let regEnum=RegEnum(regEnum);
+	let posChar = +"\p21";//sets offet for the board position
+	let drawBoarder{//draws cosmetic displays
+		//     0123456789ABCDEF
+		print(" \c0a2048\c07"...
+		           "    WASD to\c07",const_0,{});
+		print(" ----    move.\n",const_0,{});
+		print("|\p25|\n",const_0,{});
+		print("|\p35|\n",const_0,{});
+		print("|\p45|\n",const_0,{});
+		print("|\p55|\n",const_0,{});
+		print(" ----\n",const_0,{});
+		let score.drawColor = +"\c0b";
+		print("\c0fscore: "...score.drawColor..."0x0000\c0f\n",const_0,{});
+		let score.posChar = +"\p79";
+		let score.print{
+			send %const_0 score.posChar;
+			send %const_0 score.drawColor;
+			print.number(score);
+		};
+	};
 	//let currentTilePtr = regEnum();
 	//%i = grid.size.(1);
 	//%currentTilePtr = grid;
@@ -77,6 +133,7 @@ let printGrid{
 		#let grid_n<->0;
 		$grid_n=>grid;
 		//send %const_0 "\p00";
+		send %const_0 printGrid.posChar;
 		let i = -1;
 		repeat +grid.size[1]{
 			repeat +grid.size[0]{
@@ -85,19 +142,31 @@ let printGrid{
 			};
 			#i+=1;
 			repeat(i < (grid.size[1]-1)):{
-				send %const_0 "\n";
+				send %const_0 #(printGrid.posChar + ((i+1)<<4));
 			};
 		};
 	};
-	printGrid_meta((grid_n){send %const_0 [grid_n]});
+	print("\c0f",const_0,{});
+	printGrid_meta((grid_n){
+		send %const_0 [grid_n]
+	});
+	def score.print;
+	print("\c0f\n",const_0,{});//move to the bottom of display ready for extra printing
 	return;
 	let blank{
 		printGrid_meta((grid_n){send %const_0 " "});
-		return;
 	};
-	defer:def blank;
 };defer: def printGrid;
 sp = 0;
+def let resetGame {
+	%score = 0;
+	def printGrid.drawBoarder;
+	print(""...arrowKeysDisplay.inactiveColor,const_0,{});
+	arrowKeysDisplay.W.print();
+	arrowKeysDisplay.A.print();
+	arrowKeysDisplay.S.print();
+	arrowKeysDisplay.D.print();
+};
 ${:main;
 	{:pick_randomTile;
 		let regEnum = RegEnum(regEnum);
@@ -159,7 +228,6 @@ ${:main;
 		};
 		%tileNumber -= grid;
 	};
-	send %const_0 "\p00";
 	call printGrid;
 	{:checkEndGame;
 		let regEnum = RegEnum(regEnum);
@@ -173,12 +241,39 @@ ${:main;
 			jump -> checkEndGame..return if == 0;
 			$pos=>pos + 1;
 		};
+		let cellValue = regEnum();
+		let neighbourCellValue = regEnum();
+		let i = 0;
+		$pos=>grid;
+		repeat(grid.size[0]*grid.size[1]):{//checks neighbours
+			$pos => grid + i;
+			defer: #i = i + 1;
+			let x = i%grid.size[0];//:#int
+			let y = i/grid.size[0] |0;//:#int
+			repeat(i < (grid.size[0]*grid.size[1] - 1)): {//don't need to check the last one
+				%cellValue = [pos];
+				let checkNeighbour(pos,offset){//checks if neighbour is the same i.e. can be merged
+					let pos1;
+					$pos1 => pos + offset;
+					%cellValue - [pos1];
+					jump -> checkEndGame..return if == 0;
+				};
+				repeat(x < (grid.size[0]-1)):checkNeighbour(pos,1);
+				repeat(y < (grid.size[1]-1)):checkNeighbour(pos,grid.size[0]);
+			};
+		};
 		{:endGame;
-			print("gameOver\nscore:");
+			print("\p60\c0cgame over",const_0,{});
+			print("\c0f",const_0,{});
 			hlt;
+			print("\p60\c0f         ",const_0,{});
+			def printGrid.blank;
+			jump -> resetGame;
 		};
 	};
 	${:handleInput;
+		let regEnum = RegEnum(regEnum);
+		let inputChar = regEnum();
 		let isEqual(a,b,do){
 			@:subs $(a) $(b);//BUG: @$a-$b; throws an error
 			jump->return..return if != 0;
@@ -188,28 +283,31 @@ ${:main;
 			let regEnum = RegEnum(regEnum);
 			defer global:def ..this;
 			let temp <-> inputChar;let inputChar = ¬;
+			let changeMade = regEnum();//:%(u16 & bool) ; is true if any tiles moved after calling this function
 			let stepSize = regEnum();//:%const int
 			let startingTile = regEnum();
 			let reshift = regEnum();
+			let output{
+				let =changeMade;
+			};
 			let inputs{
 				let =stepSize,=startingTile,=reshift;
 			};
 			let currentTile <-> startingTile;
 			let currentFreeTile = regEnum();//:([]grid)*
 			%currentTile += grid;//:%([]grid)* & %&mut(mut*)
-			let changeMade = regEnum();
 			%changeMade = 0;
 			let i=regEnum(),j=regEnum();
 			let entry;
 			%i = grid.size.(1);
 			${:loop;//doFor
-				%j = #(grid.size.(0)-1);
+				%j = #(grid.size.(0)-1);//note: using 'len-1' since the end value cannot be moved
 				#{repeat (+grid.size.(0)!=+grid.size.(1))throw "assertion failed";};
 				%currentFreeTile = %currentTile;
 				%currentTile += %stepSize;
 				//%currentTile += %stepSize;
 				${:loop;//doFor
-					let nextTile = regEnum();//:%[]grid
+					//let nextTile = regEnum();//:%[]grid ; UNUSED
 					let getNextTile = {@[%currentTile+%stepSize]};
 					let thenPlace, thenStack, thenShift_increase;
 					{:cases;
@@ -227,9 +325,23 @@ ${:main;
 							jump->finally;
 						};
 						def thenShift_increase{//'A A' -> 'B  '
-							%currentTileValue += 1;
-							{:checkWin;
+							%currentTileValue += 1;//:char
+							{:updateScore;
+								let regEnum = RegEnum(regEnum);
+								let tileValueAsInt = regEnum();
+								%tileValueAsInt = %currentTileValue;
+								%tileValueAsInt -= "A";//:int
+								let tileScore = regEnum();
+								%tileScore = 2;
+								%tileScore <<= %tileValueAsInt;
+								%score += %tileScore;
+							};
+							${:checkWin;
 								%currentTileValue - (10+"A");
+								jump -> checkWin..return if <= 0;
+								print("\c0ayou win!");
+								hault;
+								jump -> resetGame;
 							};
 						};
 						def finally{
@@ -252,38 +364,46 @@ ${:main;
 			return;
 		};
 		awaitInput(inputChar);
-		{:moveTiles_block;
+		${:moveTiles_block;
 			isEqual(inputChar,+"w")<:{
 				...moveTiles.inputs;
 				%startingTile = 0;//:%grid+
 				%stepSize = grid.size.(0);
 				%reshift = #(1 -(grid.size.(0)*grid.size.(1)) & 0xffff);
+				arrowKeysDisplay.W.print.active();
 				call moveTiles;
-				jump->handleInput..return;
+				arrowKeysDisplay.W.print.inactive();
+				jump->moveTiles_block..return;
 			};
 			isEqual(inputChar,+"a")<:{
 				...moveTiles.inputs;
 				%startingTile = 0;//:%grid+
 				%stepSize = 1;//grid.size.(0);
 				%reshift = 0;//#(grid.size.(0)*(grid.size.(1)-1)+1);
+				arrowKeysDisplay.A.print.active();
 				call moveTiles;
-				jump->handleInput..return;
+				arrowKeysDisplay.A.print.inactive();
+				jump->moveTiles_block..return;
 			};
 			isEqual(inputChar,+"s")<:{
 				...moveTiles.inputs;
 				%startingTile = #(grid.size.(0)*(grid.size.(1)-1));//:%grid+
 				%stepSize = #(-grid.size.(0) & 0xffff);
 				%reshift = #(1 + (grid.size.(0)*grid.size.(1)));
+				arrowKeysDisplay.S.print.active();
 				call moveTiles;
-				jump->handleInput..return;
+				arrowKeysDisplay.S.print.inactive();
+				jump->moveTiles_block..return;
 			};
 			isEqual(inputChar,+"d")<:{
 				...moveTiles.inputs;
 				%startingTile = #(grid.size.(0)-1);//:%grid+
 				%stepSize = #(-1 & 0xffff);//grid.size.(0);
 				%reshift = #(grid.size.(0)*2);//#(grid.size.(0)*(grid.size.(1)-1)+1);
+				arrowKeysDisplay.D.print.active();
 				call moveTiles;
-				jump->handleInput..return;
+				arrowKeysDisplay.D.print.inactive();
+				jump->moveTiles_block..return;
 			};
 			isEqual(inputChar,+"S")<:{
 				repeat 0 {
@@ -292,7 +412,7 @@ ${:main;
 					let size = 3;
 					repeat(string..length/size):@(string[(i+=1)*size]|(string[i*size+1]<<8)|(string[i*size+2]<<16));
 				};
-				jump->handleInput;
+				jump->moveTiles_block;
 			};
 			jump->handleInput;
 		};
