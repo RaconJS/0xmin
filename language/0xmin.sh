@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 #requires nodejs v16.7.0
+#code.0xmin => code.filt or code.asm
+powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
 function useExamples {
 	#to use do
 	./0xmin.sh inputFileName.0xmin -o outputFileName.filt 
@@ -115,8 +117,6 @@ function compile {
 			fi
 		done
 	
-	#code.0xmin => code.filt or code.asm
-	powderToyScriptsFolder=~/snap/the-powder-toy/current/.local/share/"The Powder Toy"/scripts;
 	if [[ $isUsingOutFileNameToExicute == true ]]; then
 		nodejs $mainfolder/compilers/compile.js "$inputFileName" $outFileName; #(nodejs test.js);
 	fi

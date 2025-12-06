@@ -13,7 +13,8 @@ hault;
 supports:
 - 0xmin
 - 0xmin/0xMin1.6 CPU (386P)
-- tptasm/R216 https://github.com/LBPHacker/R216 https://github.com/LBPHacker/tptasm
+- tptasm/R216 https://github.com/LBPHacker/R216
+		- assembled using an embeded tptasm assembler https://github.com/LBPHacker/tptasm
 - tptasm/R316 https://github.com/LBPHacker/R316
 
 may support in future:
@@ -21,9 +22,9 @@ may support in future:
 - wat (web assembly)
 - 0xmin/0xMin1 CPU (231P) https://powdertoy.co.uk/Discussions/Thread/View.html?Thread=24348
 
-comes with tptasm assembler: https://github.com/LBPHacker/tptasm
 
 ## how to install:
+
 ### option 1: through terminal
 1. enter the directory where you want 0xmin compiler to be stored.
 2. run the following commands
@@ -66,6 +67,7 @@ The compiler used javascript features: private properties `#property` and `??`
 For help run `0xmin -help` or `./0xmin.sh -help`
 
 #### To run in TPT:
+make sure to also have installed the tptasm mod for tpt: https://github.com/LBPHacker/tptasm
 
 ##### running on R2:
 - remember to add: 
